@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "FbsDb (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "FbsDb (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}

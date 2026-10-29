@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.tools/dotnet/
+native/FbsDb/bin/
+native/FbsDb/obj/
+native/FbsDb/WebContent/
+tests/**/bin/
+tests/**/obj/
+artifacts/
+*.png
+
+.tools/suggestion-test/
