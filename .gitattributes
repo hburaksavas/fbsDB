@@ -1,0 +1,5 @@
+# Keep generated bridge output deterministic on Windows checkouts.
+scripts/generate-bridge-contract.mjs text eol=lf
+src/bridge/contract.generated.js text eol=lf
+src/bridge/contract.generated.d.ts text eol=lf
+native/FbsDb/Bridge/NativeBridgeContract.g.cs text eol=lf
