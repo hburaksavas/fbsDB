@@ -66,8 +66,14 @@ jobs:
           New-Item -ItemType Directory -Path .artifacts/ci -Force | Out-Null
           npm test -- --test-reporter=spec --test-reporter=junit --test-reporter-destination=stdout --test-reporter-destination=.artifacts/ci/javascript-tests.xml
 
+      - name: Run load smoke scenarios
+        run: npm run test:load -- --profile smoke --enforce-budgets --output .artifacts/ci/load-smoke.json
+
       - name: Run native smoke tests without Oracle
         run: ./scripts/test-native.ps1
+
+      - name: Run large TNS smoke without Oracle
+        run: dotnet run --project tests/ScaleLoad/ScaleLoad.csproj -c Release -- tns 1000 1 .artifacts/ci/tns-load.json
 
       - name: Sync editor bundle to native host
         run: node scripts/sync-webcontent.mjs

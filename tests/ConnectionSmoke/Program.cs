@@ -23,6 +23,12 @@ try {
  await Reject(async () => { await service.SaveProfileAsync(null, "Bad", "FINANCE", tns, "X", "FAKE"); }, "invalid environments rejected");
  var duplicateFile = Path.Combine(root, "duplicate.ora"); File.Copy(tns, duplicateFile); files.Add(duplicateFile);
  Check((await service.GetAliasesAsync()).Count == 2 && (await service.GetAliasesAsync()).All(p => p.Duplicate), "duplicate aliases retain selectable source paths");
+ await File.WriteAllTextAsync(duplicateFile, "finance = (DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=other.test)(PORT=1522))(CONNECT_DATA=(SID=OTHER)))");
+ var otherSource = await service.SaveProfileAsync(null, "Other source", "finance", duplicateFile.ToUpperInvariant(), "APP", "TEST");
+ var resolvedSources = await service.GetProfilesAsync();
+ Check(resolvedSources.Single(p => p.Id == otherSource).Host == "other.test" && resolvedSources.Single(p => p.Id == reader).Host == "localhost", "indexed aliases preserve source identity and case-insensitive lookup");
+ Check((await service.GetAliasesAsync()).All(p => p.Duplicate), "case-insensitive duplicate flags include both sources");
+ await service.DeleteProfileAsync(otherSource);
  files.Clear();
  Check((await service.GetProfilesAsync()).All(p => !p.Available), "missing alias does not delete saved profiles");
  files.Add(tns);

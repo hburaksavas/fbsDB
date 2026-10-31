@@ -1,4 +1,4 @@
-param([int]$DesktopDebugPort = 9348, [switch]$SkipBuild)
+param([int]$DesktopDebugPort = 9348, [switch]$SkipBuild, [switch]$LoadTest)
 $ErrorActionPreference = 'Stop'
 $regressionRepo = Split-Path -Parent $PSScriptRoot
 $regressionRoot = Join-Path $regressionRepo ('.artifacts\desktop-regression\' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -35,9 +35,13 @@ try {
         [Environment]::SetEnvironmentVariable($regressionKey, $regressionEnvironment[$regressionKey], 'Process')
     }
     $regressionProcess = Start-Process -FilePath (Join-Path $regressionApp 'FbsDb.exe') -WorkingDirectory $regressionApp -WindowStyle Hidden -PassThru
-    node tests/desktop-regression-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
-    if ($LASTEXITCODE -ne 0) { throw "Desktop regression failed. Artifacts: $regressionRoot" }
-    Write-Output "Desktop regression report: $(Join-Path $regressionRoot 'report.json')"
+    if ($LoadTest) {
+        node tests/desktop-load-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
+    } else {
+        node tests/desktop-regression-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
+    }
+    if ($LASTEXITCODE -ne 0) { throw "Desktop test failed. Artifacts: $regressionRoot" }
+    Write-Output "Desktop test report: $(Join-Path $regressionRoot 'report.json')"
 } finally {
     foreach ($regressionKey in $regressionPreviousEnvironment.Keys) {
         [Environment]::SetEnvironmentVariable($regressionKey, $regressionPreviousEnvironment[$regressionKey], 'Process')

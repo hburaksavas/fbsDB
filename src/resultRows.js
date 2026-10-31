@@ -1,7 +1,8 @@
 import { compareOracleTemporal } from './oracleTemporal.js';
 import { foldResultText,compareResultNumbers } from './resultLocale.js';
 export function getVisibleResultRows(rows, columns, filter = "", sortColumn = -1, sortDirection = "asc", rowOrder = [], options = {}) {
-  const visibleRows = (rows ?? []).map((row, index) => ({ row, index })).filter(({ row }) => !filter.trim() || row.some((cell) => foldResultText(cell??"NULL",options.sortLocale,options.caseSensitive).includes(foldResultText(filter.trim(),options.sortLocale,options.caseSensitive))));
+  const search = foldResultText(filter.trim(), options.sortLocale, options.caseSensitive);
+  const visibleRows = (rows ?? []).map((row, index) => ({ row, index })).filter(({ row }) => !search || row.some((cell) => foldResultText(cell??"NULL",options.sortLocale,options.caseSensitive).includes(search)));
   if (sortColumn >= 0) {
     const type = columns?.[sortColumn]?.type ?? "";
     const isNumeric = /NUMBER|INTEGER|INT|DECIMAL|NUMERIC|FLOAT|DOUBLE|REAL/i.test(type);

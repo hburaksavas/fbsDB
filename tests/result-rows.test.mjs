@@ -12,6 +12,17 @@ test('date sorting and NULL search use the same view for export', () => {
  assert.deepEqual(getVisibleResultRows([['2026-02-01'],['2025-12-01']],[{type:'DATE'}],'',0).map(x=>x.row[0]), ['2025-12-01','2026-02-01']);
  assert.equal(getVisibleResultRows([[null],['hello']],[],'NULL').length,1);
 });
+
+test('filter normalization preserves Turkish casing, case-sensitive search and empty filters', () => {
+ const rows = [['İSTANBUL'], ['ISTANBUL'], ['istanbul'], [null], ['']];
+ const search = (filter, options = {}) => getVisibleResultRows(rows, [], filter, -1, 'asc', [], { sortLocale: 'tr-TR', ...options }).map(item => item.index);
+ assert.deepEqual(search('  istanbul  '), [0, 2]);
+ assert.deepEqual(search('ıstanbul'), [1]);
+ assert.deepEqual(search('İSTANBUL', { caseSensitive: true }), [0]);
+ assert.deepEqual(search(' NULL '), [3]);
+ assert.deepEqual(search('   '), [0, 1, 2, 3, 4]);
+ assert.deepEqual(search('istanbul', { sortLocale: 'invalid_locale' }), [1, 2]);
+});
 import { moveResultRow } from '../src/resultRows.js';
 test('manual moves preserve source data, filter order, fetched additions and export order', () => {
  const original=[0,1,2,3];

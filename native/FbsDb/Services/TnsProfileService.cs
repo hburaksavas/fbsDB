@@ -84,6 +84,7 @@ public sealed class TnsProfileService
     {
         var files = _tnsFiles?.Invoke() ?? FindTnsFiles();
         var profiles = new List<ConnectionProfile>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var duplicates = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in files)
         {
@@ -91,7 +92,12 @@ public sealed class TnsProfileService
             string content;
             try { content = await File.ReadAllTextAsync(file, cancellationToken); }
             catch (IOException) { continue; }
-            foreach (var profile in Parse(file, content)) { if (profiles.Any(p => p.Id.Equals(profile.Id, StringComparison.OrdinalIgnoreCase))) duplicates.Add(profile.Id); profiles.Add(profile); }
+            foreach (var profile in Parse(file, content))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!seen.Add(profile.Id)) duplicates.Add(profile.Id);
+                profiles.Add(profile);
+            }
         }
         return profiles.Select(profile => profile with { Duplicate = duplicates.Contains(profile.Id) }).OrderBy(p => p.Id, StringComparer.OrdinalIgnoreCase).ToArray();
     }
@@ -102,6 +108,14 @@ public sealed class TnsProfileService
     public async Task<IReadOnlyList<ConnectionProfile>> GetProfilesAsync(CancellationToken cancellationToken = default)
     {
         var aliases = await GetAliasesAsync(cancellationToken);
+        var aliasesBySource = new Dictionary<string, Dictionary<string, ConnectionProfile>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var alias in aliases)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!aliasesBySource.TryGetValue(alias.Id, out var sources))
+                aliasesBySource[alias.Id] = sources = new(StringComparer.OrdinalIgnoreCase);
+            sources.TryAdd(alias.Source, alias); // Keep the first entry, as the previous scan did.
+        }
         await _settingsGate.WaitAsync(cancellationToken);
         try
         {
@@ -114,10 +128,11 @@ public sealed class TnsProfileService
             }
             return ((JsonArray)settings["connectionProfiles"]!).OfType<JsonObject>().Select(item =>
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 string Read(string key) => item[key]?.GetValue<string>() ?? "";
                 var method = Read("method") is { Length: > 0 } savedMethod ? savedMethod : "tns";
                 var target = method == "tns"
-                    ? aliases.FirstOrDefault(a => string.Equals(a.Id, Read("alias"), StringComparison.OrdinalIgnoreCase) && string.Equals(a.Source, Read("source"), StringComparison.OrdinalIgnoreCase)) ?? new ConnectionProfile(Read("alias"), "", "", "", Read("source"), "") { Available = false }
+                    ? (aliasesBySource.TryGetValue(Read("alias"), out var sources) && sources.TryGetValue(Read("source"), out var found) ? found : new ConnectionProfile(Read("alias"), "", "", "", Read("source"), "") { Available = false })
                     : BuildDirectTarget(method, Read("host"), Read("port"), Read("service"), Read("targetType"), Read("descriptor"));
                 return target with { Nls=item["nls"] is JsonObject nls?nls.ToDictionary(entry=>entry.Key,entry=>entry.Value?.GetValue<string>()??""):new Dictionary<string,string>(), Id = Read("id"), Alias = Read("alias"), Name = Read("name"), User = Read("user"), Environment = Read("environment") is { Length: > 0 } env ? env : "UNKNOWN" };
             }).OrderBy(p => p.Name).ToArray();
