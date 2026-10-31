@@ -57,7 +57,9 @@ export function languageMetadataTargets(source, cursor, options = {}, mode = 'co
   const localTypes = plsqlTypeResolver(source, cursor, objects, options.currentSchema);
   localTypes.fields(plsqlMemberPath(source, cursor, context.start));
   for (const target of localTypes.targets) add(target);
-  if (!context.relation || /\bJOIN\b/i.test(context.before) || mode !== 'complete') resolveCompletionSources(context, objects, options.currentSchema, add);
+  const qualifiedSources = context.qualifier && context.sources.filter(ref => (ref.aliasKey || ref.nameKey) === context.qualifierKey);
+  const metadataContext = qualifiedSources?.length ? { ...context, sources: qualifiedSources } : context;
+  if (!context.relation || /\bJOIN\b/i.test(context.before) || mode !== 'complete') resolveCompletionSources(metadataContext, objects, options.currentSchema, add);
   const path = mode === 'signature' ? oracleCallContext(source, cursor)?.path : context.qualifierPath;
   if (path?.length) {
     const names = path.map(part => part.key);

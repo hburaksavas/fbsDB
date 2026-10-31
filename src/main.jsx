@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useLayoutEffect } from "react";
+import { recordStartupMilestone } from "./startupPerformance.js";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.jsx";
 import "./styles.css";
@@ -55,8 +56,13 @@ class ApplicationErrorBoundary extends React.Component {
   }
 }
 
+function MeasuredApp() {
+  useLayoutEffect(() => { recordStartupMilestone('shell-ready'); }, []);
+  return <App />;
+}
+
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <ApplicationErrorBoundary><App /><FeedbackHost /></ApplicationErrorBoundary>
+    <ApplicationErrorBoundary><MeasuredApp /><FeedbackHost /></ApplicationErrorBoundary>
   </React.StrictMode>,
 );

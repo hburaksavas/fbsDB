@@ -35,7 +35,11 @@ npm ci
 .\scripts\run-desktop.ps1
 ```
 
-`run-desktop.ps1` builds the web bundle and unpackaged x64 desktop app, then launches it. To build without launching, run `scripts/build-desktop.ps1`. To create a self-contained portable x64 ZIP, run `scripts/package-desktop.ps1`; output goes to `artifacts/`. The portable package is currently unsigned, has no installer, and still requires WebView2 Runtime on the target machine.
+`run-desktop.ps1` builds the web bundle and unpackaged x64 desktop app, then launches it. To build without launching, run `scripts/build-desktop.ps1`. To create a self-contained portable x64 ZIP, run `scripts/package-desktop.ps1`; output goes to `artifacts/`. Building the portable launcher requires Visual Studio Build Tools with **Desktop development with C++** and the Windows SDK. The portable package is currently unsigned, has no installer, and still requires WebView2 Runtime on the target machine.
+
+Extract the entire ZIP and run the icon-bearing `fbsDB.exe` at its root. Keep the `app/` folder beside it when moving the package. Application DLLs, .NET/Windows App SDK files, localization folders, icons and the web editor are grouped inside `app/`; the root contains only the launcher, `app/` and `README-portable.txt`. The native launcher adds no additional runtime dependency. Web content is replaced on each build so obsolete hashed bundles do not accumulate in the ZIP.
+
+`scripts/test-portable.ps1` extracts the ZIP into a new path containing spaces and Turkish characters, launches it from an unrelated working directory with isolated settings, and checks WebView2/Monaco startup plus embedded EXE icons and running window icons. It saves its report under `.artifacts/portable-smoke/`.
 
 For UI-only development, `npm run dev` starts the Vite preview. It cannot connect to Oracle outside the native desktop host.
 

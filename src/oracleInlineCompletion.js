@@ -1,4 +1,4 @@
-import { getOracleCompletionContext, formatCompletionKeyword } from './oracleCompletion.js';
+import { getOracleCompletionContext, formatCompletionKeyword } from './oracleCompletionContext.js';
 
 // Short, deterministic SQL continuations. Never infer a table name or a value.
 export function oracleInlineCompletion(source, cursor, settings = {}, result) {
@@ -18,7 +18,7 @@ export function oracleInlineCompletion(source, cursor, settings = {}, result) {
   }
   if (!result) return null;
   const candidate = result.candidates[0];
-  if (!candidate || candidate.snippet && !candidate.functionName) return null;
+  if (!candidate || candidate.bulkColumns || candidate.snippet && !candidate.functionName) return null;
   if (candidate.schema && !candidate.preferSchema || context.quoted && !candidate.preferSchema) return null;
   if (candidate.continuation) return candidate;
   const prefix = context.quoted ? source.slice(context.start, cursor) : context.fragment;

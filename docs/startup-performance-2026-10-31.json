@@ -1,0 +1,225 @@
+{
+  "before": {
+    "url": "http://127.0.0.1:4174/",
+    "medians": {
+      "shellMs": 300.5,
+      "editorDomMs": 1187.9000000001397
+    },
+    "samples": [
+      {
+        "shellMs": 350.4000000001397,
+        "editorDomMs": 1246.2000000001863,
+        "milestones": [],
+        "javascript": [
+          {
+            "file": "index-3cnjs0Lu.js",
+            "bytes": 1082787
+          },
+          {
+            "file": "index-DMNqxkta.js",
+            "bytes": 15137
+          }
+        ],
+        "errors": []
+      },
+      {
+        "shellMs": 293.69999999995343,
+        "editorDomMs": 1187.9000000001397,
+        "milestones": [],
+        "javascript": [
+          {
+            "file": "index-3cnjs0Lu.js",
+            "bytes": 1082787
+          },
+          {
+            "file": "index-DMNqxkta.js",
+            "bytes": 15137
+          }
+        ],
+        "errors": []
+      },
+      {
+        "shellMs": 300.5,
+        "editorDomMs": 1171.9000000001397,
+        "milestones": [],
+        "javascript": [
+          {
+            "file": "index-3cnjs0Lu.js",
+            "bytes": 1082787
+          },
+          {
+            "file": "index-DMNqxkta.js",
+            "bytes": 15137
+          }
+        ],
+        "errors": []
+      },
+      {
+        "shellMs": 318.19999999995343,
+        "editorDomMs": 1217.2999999998137,
+        "milestones": [],
+        "javascript": [
+          {
+            "file": "index-3cnjs0Lu.js",
+            "bytes": 1082787
+          },
+          {
+            "file": "index-DMNqxkta.js",
+            "bytes": 15137
+          }
+        ],
+        "errors": []
+      },
+      {
+        "shellMs": 298.0999999998603,
+        "editorDomMs": 1158.8999999999069,
+        "milestones": [],
+        "javascript": [
+          {
+            "file": "index-3cnjs0Lu.js",
+            "bytes": 1082787
+          },
+          {
+            "file": "index-DMNqxkta.js",
+            "bytes": 15137
+          }
+        ],
+        "errors": []
+      }
+    ]
+  },
+  "after": {
+    "url": "http://127.0.0.1:4173/",
+    "medians": {
+      "shellMs": 305,
+      "editorDomMs": 1194.1000000000931
+    },
+    "samples": [
+      {
+        "shellMs": 332.9000000001397,
+        "editorDomMs": 1194.1000000000931,
+        "milestones": [
+          {
+            "name": "fbsdb:startup:shell-ready",
+            "ms": 332.80000000004657
+          }
+        ],
+        "javascript": [
+          {
+            "file": "index-Cxalhd5F.js",
+            "bytes": 651165
+          },
+          {
+            "file": "react-vendor-BpRIGnOt.js",
+            "bytes": 193830
+          },
+          {
+            "file": "index-B6Dn8_bh.js",
+            "bytes": 15144
+          }
+        ],
+        "errors": []
+      },
+      {
+        "shellMs": 305,
+        "editorDomMs": 1253.8999999999069,
+        "milestones": [
+          {
+            "name": "fbsdb:startup:shell-ready",
+            "ms": 304.80000000004657
+          }
+        ],
+        "javascript": [
+          {
+            "file": "index-Cxalhd5F.js",
+            "bytes": 651165
+          },
+          {
+            "file": "react-vendor-BpRIGnOt.js",
+            "bytes": 193830
+          },
+          {
+            "file": "index-B6Dn8_bh.js",
+            "bytes": 15144
+          }
+        ],
+        "errors": []
+      },
+      {
+        "shellMs": 299.0999999998603,
+        "editorDomMs": 1185.3999999999069,
+        "milestones": [
+          {
+            "name": "fbsdb:startup:shell-ready",
+            "ms": 299
+          }
+        ],
+        "javascript": [
+          {
+            "file": "index-Cxalhd5F.js",
+            "bytes": 651165
+          },
+          {
+            "file": "react-vendor-BpRIGnOt.js",
+            "bytes": 193830
+          },
+          {
+            "file": "index-B6Dn8_bh.js",
+            "bytes": 15144
+          }
+        ],
+        "errors": []
+      },
+      {
+        "shellMs": 298.5,
+        "editorDomMs": 1196.1999999999534,
+        "milestones": [
+          {
+            "name": "fbsdb:startup:shell-ready",
+            "ms": 298.30000000004657
+          }
+        ],
+        "javascript": [
+          {
+            "file": "index-Cxalhd5F.js",
+            "bytes": 651165
+          },
+          {
+            "file": "react-vendor-BpRIGnOt.js",
+            "bytes": 193830
+          },
+          {
+            "file": "index-B6Dn8_bh.js",
+            "bytes": 15144
+          }
+        ],
+        "errors": []
+      },
+      {
+        "shellMs": 312.30000000004657,
+        "editorDomMs": 1187.3999999999069,
+        "milestones": [
+          {
+            "name": "fbsdb:startup:shell-ready",
+            "ms": 312.10000000009313
+          }
+        ],
+        "javascript": [
+          {
+            "file": "index-Cxalhd5F.js",
+            "bytes": 651165
+          },
+          {
+            "file": "react-vendor-BpRIGnOt.js",
+            "bytes": 193830
+          },
+          {
+            "file": "index-B6Dn8_bh.js",
+            "bytes": 15144
+          }
+        ],
+        "errors": []
+      }
+    ]
+  }
+}

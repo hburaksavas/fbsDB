@@ -29,7 +29,7 @@ test('SELECT and WHERE exclude unrelated keyword kinds', () => {
 
 test('bare projection aliases survive CTE and inline views', () => {
   for (const marked of ['WITH q AS (SELECT NAME employee_name FROM EMP) SELECT q.| FROM q', 'SELECT q.| FROM (SELECT NAME employee_name FROM EMP) q']) {
-    assert.deepEqual(complete(marked).candidates.map(c => c.label), ['EMPLOYEE_NAME']);
+    assert.deepEqual(complete(marked).candidates.filter(c => !c.bulkColumns).map(c => c.label), ['EMPLOYEE_NAME']);
   }
 });
 
@@ -84,9 +84,9 @@ test('star projections expand verified sources through chained CTEs and nested v
     'WITH q AS (SELECT * FROM EMP) SELECT q.| FROM q',
     'WITH q AS (SELECT e.* FROM EMP e), r AS (SELECT * FROM q) SELECT r.| FROM r',
     'SELECT q.| FROM (SELECT * FROM (SELECT * FROM EMP) x) q',
-  ]) assert.deepEqual(complete(marked).candidates.map(c => c.label), ['ID', 'NAME']);
-  assert.deepEqual(complete('WITH q AS (SELECT d.* FROM EMP e JOIN OTHER.DEPT d ON e.ID=d.ID) SELECT q.| FROM q').candidates.map(c => c.label), ['ID']);
-  assert.deepEqual(complete('WITH q(custom_id, custom_name) AS (SELECT * FROM EMP) SELECT q.| FROM q').candidates.map(c => c.label), ['CUSTOM_ID', 'CUSTOM_NAME']);
+  ]) assert.deepEqual(complete(marked).candidates.filter(c => !c.bulkColumns).map(c => c.label), ['ID', 'NAME']);
+  assert.deepEqual(complete('WITH q AS (SELECT d.* FROM EMP e JOIN OTHER.DEPT d ON e.ID=d.ID) SELECT q.| FROM q').candidates.filter(c => !c.bulkColumns).map(c => c.label), ['ID']);
+  assert.deepEqual(complete('WITH q(custom_id, custom_name) AS (SELECT * FROM EMP) SELECT q.| FROM q').candidates.filter(c => !c.bulkColumns).map(c => c.label), ['CUSTOM_ID', 'CUSTOM_NAME']);
   assert.deepEqual(complete('WITH q AS (SELECT * FROM missing_table) SELECT q.| FROM q').candidates, []);
   const sql = 'WITH q AS (SELECT * FROM EMP) SELECT q. FROM q';
   assert.ok(languageMetadataTargets(sql, sql.indexOf('q.') + 2, { objects, currentSchema: 'APP' }).some(t => t.name === 'EMP'));

@@ -1,4 +1,4 @@
-import { getOracleCompletionContext } from './oracleCompletion.js';
+import { getOracleCompletionContext } from './oracleCompletionContext.js';
 
 // Compatibility entry point for consumers that only need relation completion.
 export function getTableCompletionContext(before) {

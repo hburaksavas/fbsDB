@@ -48,7 +48,7 @@ export function monacoCompletionItems(monaco, model, result, acceptanceCommand) 
   return result.candidates.map((candidate, index) => {
     const start = model.getPositionAt(candidate.start), end = model.getPositionAt(candidate.end);
     return {
-      label: candidate.label, filterText: candidate.filterText || candidate.label, insertText: candidate.insertText,
+      label: candidate.alreadySelected ? { label: candidate.label, description: 'SELECT’te mevcut' } : candidate.label, filterText: candidate.filterText || candidate.label, insertText: candidate.insertText,
       detail: candidate.detail, kind: monaco.languages.CompletionItemKind[kinds[candidate.kind]],
       range: new monaco.Range(start.lineNumber, start.column, end.lineNumber, end.column), sortText: String(index).padStart(4, '0'),
       insertTextRules: candidate.snippet ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet : undefined,

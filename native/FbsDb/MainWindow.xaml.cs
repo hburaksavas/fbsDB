@@ -26,7 +26,9 @@ public sealed partial class MainWindow : Window
 
         Title = "fbsDB · Oracle SQL Workspace";
 
-        AppWindow.SetIcon("Assets/AppIcon.ico");
+        // Portable apps can be launched by Explorer, shortcuts, or a launcher
+        // whose working directory differs from the application directory.
+        AppWindow.SetIcon(System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "AppIcon.ico"));
         AppTitleBar.Visibility = Visibility.Collapsed;
         AppWindow.Resize(new SizeInt32(640, 400));
         if (AppWindow.Presenter is OverlappedPresenter presenter)

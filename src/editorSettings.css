@@ -24,3 +24,8 @@
 .completion-settings .preference-toggle{display:flex;gap:6px}
 .completion-actions{display:flex;gap:8px}
 .completion-actions button{font-size:11px;padding:5px 9px}
+/* Selected projections stay available; focus restores full contrast for acceptance. */
+.monaco-editor .suggest-widget .monaco-list-row[aria-label*=", SELECT’te mevcut,"]:not(.focused) .label-name,
+.monaco-editor .suggest-widget .monaco-list-row[aria-label*=", SELECT’te mevcut,"]:not(.focused) .suggest-icon {
+  opacity: 0.72;
+}

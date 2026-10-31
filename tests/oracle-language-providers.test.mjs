@@ -22,7 +22,7 @@ function harness(text, override = {}) {
     if (type === 'signature') return { signature: oracleSignatureHelp(value, cursor, options) };
     if (type === 'symbol') return { symbol: oracleSymbolInfo(value, cursor, options) };
   } };
-  const broker = { version: () => "a:0:1", objects: () => metadata, systemObjects: () => [], async load(tabId, target, token, kind = 'metadata') { native.push({ tabId, target, kind }); if (override.load) return override.load(tabId, target, token, kind); metadata.push(table); return table; } };
+  const broker = { version: () => "a:0:1", objects: () => metadata, systemObjects: () => [], async load(tabId, target, token, kind = 'metadata') { native.push({ tabId, target, kind }); const value = override.load ? await override.load(tabId, target, token, kind) : table; if (value) metadata.push(value); return value; } };
   const editor = { getModel: () => model, getPosition: () => ({ lineNumber: 1, column: 1 }), addAction: action => { (providers.actions ||= {})[action.id] = action; return { dispose() {} }; } };
   const dispose = installOracleLanguageProviders({ monaco, editor, client, broker, acceptanceCommand: 'test.accept', snapshot: () => state, onDefinition() {}, onReveal() {}, onError() {}, definitionModels: new Map() });
   return { providers, model, state, native, dispose, edit: value => { source = value; version++; } };
@@ -103,4 +103,20 @@ test('inline acceptance uses the same learning command as popup acceptance', asy
   assert.equal(result.items[0].command.id, 'test.accept');
   assert.deepEqual(result.items[0].command.arguments, popup.suggestions[0].command.arguments);
   env.dispose();
+});
+
+
+test('the first alias-dot request waits for columns without requiring a visible popup or a second keystroke', async () => {
+  const env = harness('SELECT o. FROM app.orders o', {
+    settings: { systemPackages: true },
+    load: async () => { await new Promise(resolve => setTimeout(resolve, 90)); return table; },
+  });
+  try {
+    assert.deepEqual(env.providers.complete.triggerCharacters, ['.']);
+    const result = await env.providers.complete.provideCompletionItems(env.model, { column: 10 }, {}, null);
+    assert.equal(result.incomplete, false);
+    assert.ok(result.suggestions.some(item => item.label === 'ID'));
+    assert.ok(result.suggestions.some(item => item.label === 'o.all'));
+    assert.ok(env.native.every(call => call.kind === 'metadata'), 'columns do not wait on unrelated system packages');
+  } finally { env.dispose(); }
 });

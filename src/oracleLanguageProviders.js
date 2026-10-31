@@ -1,6 +1,6 @@
 import { oracleInlineCompletion } from './oracleInlineCompletion.js';
 import { monacoCompletionItems } from './oracleCompletionClient.js';
-import {automaticCompletionAllowed} from './oracleCompletion.js';
+import {automaticCompletionAllowed, getOracleCompletionContext} from './oracleCompletionContext.js';
 
 const markdown = value => String(value || '').replace(/[\\`*_{}\[\]<>]/g, '\\$&');
 const rangeAt = (monaco, model, start, end = start + 1) => {
@@ -13,12 +13,14 @@ export function installOracleLanguageProviders({ monaco, editor, client, broker,
   let disposed = false, lastRefresh = '';
   const prepare = async (model, position, token, mode, manual = false) => {
     const state = snapshot(), revision = client.revision, version = model.getVersionId(), source = model.getValue(), cursor = model.getOffsetAt(position);
-    const valid = () => client.revision === revision && !token?.isCancellationRequested && !model.isDisposed() && model.getVersionId() === version && snapshot().tabId === state.tabId && snapshot().originTabId === state.originTabId;
+    const valid = () => !disposed && client.revision === revision && !token?.isCancellationRequested && !model.isDisposed() && model.getVersionId() === version && snapshot().tabId === state.tabId && snapshot().originTabId === state.originTabId;
+    const context = getOracleCompletionContext(source, cursor);
+    const qualified = !!context.qualifier && !context.relation;
     let analysis = await client.request('analyze', source, cursor, token, { mode });
     if (!valid()) return null;
     const hydrate = async () => {
       if (state.connected && !state.busy) {
-        if (manual || analysis.wantsSystem || state.settings.systemPackages) {
+        if (analysis.wantsSystem || !qualified && (manual || state.settings.systemPackages)) {
           await broker.load(state.originTabId, {}, mode === 'complete' ? null : token, 'systemObjects');
           if (!valid()) return null;
           client.metadata(broker.objects(state.originTabId), broker.systemObjects(state.originTabId), broker.version(state.originTabId));
@@ -36,7 +38,7 @@ export function installOracleLanguageProviders({ monaco, editor, client, broker,
       }
     };
     let incomplete = false;
-    if (mode === 'complete') {
+    if (mode === 'complete' && !qualified) {
       // Cache-only candidates have a bounded wait even on a slow Oracle server.
       // Let shared metadata finish for subsequent keystrokes; never reopen a
       // dismissed popup or publish a reply into another tab/model revision.
@@ -53,7 +55,11 @@ export function installOracleLanguageProviders({ monaco, editor, client, broker,
         lastRefresh = stamp;
         editor.trigger('oracle-metadata', 'editor.action.triggerSuggest', {});
       });
-    } else await hydrate();
+    } else {
+      // Keep the first alias request alive until its columns arrive: returning an
+      // empty list closes Monaco's popup and prevents the background refresh.
+      await hydrate();
+    }
     if (!valid()) return null;
     if (state.busy) client.metadata(broker.objects(state.originTabId), broker.systemObjects(state.originTabId), broker.version(state.originTabId));
     const result = await client.request(mode, source, cursor, token, { manual });
@@ -61,7 +67,7 @@ export function installOracleLanguageProviders({ monaco, editor, client, broker,
   };
 
   disposables.push(monaco.languages.registerCompletionItemProvider('sql', {
-    triggerCharacters: [],
+    triggerCharacters: ['.'],
     async provideCompletionItems(model, position, context, token) {
       const result = await prepare(model, position, token, 'complete', snapshot().manualSuggestion?.());
       return { suggestions: result ? monacoCompletionItems(monaco, model, result, acceptanceCommand) : [], incomplete: result?.incomplete || false };
