@@ -127,6 +127,7 @@ var timer=Stopwatch.StartNew();
 using(var deadline=new CancellationTokenSource(TimeSpan.FromSeconds(15))){
  var timedOut=false;
  try{await session.ExecuteAsync("BEGIN DBMS_SESSION.SLEEP(8); END;",cancellationToken:deadline.Token,timeoutSeconds:1);}
+ catch(TimeoutException){timedOut=true;}
  catch(OracleException error)when(error.Number==1013){timedOut=true;}
  catch(OperationCanceledException)when(!deadline.IsCancellationRequested){timedOut=true;}
  Check(timedOut&&timer.Elapsed<TimeSpan.FromSeconds(7),"query timeout cancels Oracle execution");

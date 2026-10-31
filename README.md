@@ -71,11 +71,21 @@ The connection control now contains the tab's profile/environment, available Ora
 
 ```powershell
 npm run build
-node --test
+npm test
+npm run typecheck:bridge
+.\.tools\dotnet\dotnet.exe run --project tests/BridgeContractSmoke/BridgeContractSmoke.csproj -c Release
 .\scripts\test-workspace.ps1
 ```
 
 The JavaScript tests cover editor, workbench, results, and bridge behavior. Additional .NET smoke projects under `tests/` cover native services; some require a configured live Oracle database. `npm run test:sites` checks the browser worker build.
+
+`npm run test:desktop` builds and launches an isolated WinUI/WebView2 copy, then checks startup, tab editing/switching, native file open/save, Save As, save acknowledgement ordering, dirty close, external changes, and draft recovery/discard. It uses separate settings and browser storage, blocks Oracle commands, and keeps a JSON report under `.artifacts/desktop-regression/`. Picker path selection is substituted by the fixture; actual file reads/writes use the native handlers. The Windows picker window itself is not covered. Use `npm run test:desktop -- -SkipBuild` to reuse the current web bundle while still building a separate desktop copy.
+
+Live Oracle service regression: `.\.tools\dotnet\dotnet.exe run --project tests/OracleLiveRegression/OracleLiveRegression.csproj -c Release -- FBSDB_LOCAL`. It requires an open local test database, saved credentials, and permission to create a temporary table. It creates a uniquely named global temporary table, tests real DML/Commit/Rollback on that fixture only, and drops it during cleanup. It also checks independent sessions, paging, cancellation, timeout, queued metadata cancellation, and explicit/idle reconnect. JSON reports go to `.artifacts/oracle-live/`; user tables and saved credentials are not changed.
+
+Document state, native command handlers, and the shared bridge contract are described in [Architecture](docs/architecture.md). After changing `contracts/native-bridge.json`, run `npm run generate:bridge`; the production build checks that generated JavaScript, TypeScript, and C# files are up to date.
+
+[Windows CI](docs/ci.md) validates PRs and `master` pushes with JavaScript tests, bridge generation/type checks, ten database-independent native smoke projects, and a Windows x64 Release build. The shared native suite is available locally as `scripts/test-native.ps1`; desktop UI and live Oracle checks remain separate integration commands.
 
 ## Repository map
 

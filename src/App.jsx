@@ -1,4 +1,9 @@
 import {EditorContextMenu} from './EditorContextMenu';
+import {DocumentSaves} from './documentSaves.js';
+import {useDocumentSessions} from './useDocumentSessions.js';
+import {useResultSessions} from './useResultSessions.js';
+import {useQueryExecution} from './useQueryExecution.js';
+import {createQueryOperations} from './queryExecution.js';
 import {editorContextObject} from './editorContext';
 import {RunMenu} from './RunMenu';
 import {OracleObjectIcon,oracleObjectClass} from './OracleObjectIcon';
@@ -36,7 +41,6 @@ import {WorkspaceManager} from './WorkspaceManager';
 import {WorkspaceWorksets} from './WorkspaceWorksets';
 import {WorkspaceOpenPopup} from './WorkspaceOpenPopup';
 import {ExternalFileNotice} from './ExternalFileNotice';
-import {applyExternalFileChange} from './externalFileState';
 import { FileMenu } from './FileMenu';
 import { ViewMenu } from './ViewMenu';
 import { DockWorkbench } from './DockWorkbench';
@@ -51,7 +55,7 @@ import { draftSnapshot, parseDraftSnapshot } from './draftRecovery';
 import { DraftRecoveryDialog } from './DraftRecoveryDialog';
 import { EditorSymbolBreadcrumb } from './EditorSymbolBreadcrumb';
 import { IdeCommandPalette } from './IdeCommandPalette';
-import { executionTarget, actionableState } from './workbenchUx';
+import { actionableState } from './workbenchUx';
 import { ActionableState } from './ActionableState';
 import { EditorToolbarOverflow } from './EditorToolbarOverflow';
 import { ResultScope } from './ResultScope.jsx';
@@ -81,12 +85,12 @@ import { TnsSources, useDialogFocus } from "./ConnectionManager";
 import { compilationProblemItems, offsetAtOraclePosition } from "./plsqlDiagnostics";
 import { ProblemsPanel } from "./ProblemsPanel";
 import { getOracleBindNames } from "./oracleBinds";
+import { getSqlStatements } from "./sqlStatements.js";
 import { OracleCompletionClient } from "./oracleCompletionClient";
 import { OracleMetadataBroker, completionCancellation } from "./oracleMetadataBroker";
 import { installOracleLanguageProviders } from "./oracleLanguageProviders";
 import { loadCompletionSettings } from "./editorCompletionSettings.js";
 import { EditorCompletionSettings } from "./EditorCompletionSettings.jsx";
-import { getSqlStatements, getStatementAtCursor } from "./sqlStatements";
 import {
   Activity, AlignLeft, ArrowDown, ArrowDownUp, ArrowUp, ArrowUpDown, Bell, BookOpen, Braces, Check, ChevronDown, ClipboardCopy,
   ChevronRight, CircleHelp, Clock3, Code2, Database, Eye, FileCode2, FilePlus2, Filter, Globe2,
@@ -432,7 +436,7 @@ export function App() {
   const objectAnalysisRequestRef=useRef(null);
   const schemaRequestRef=useRef(null);
   const [scriptDialog,setScriptDialog]=useState(null);
-  const scriptRunsRef=useRef(new Map());
+  const operations = useMemo(createQueryOperations, []);
   const [queryTimeout,setQueryTimeout]=useState(()=>resolveSetting(settings,'editor.queryTimeout').value);
   const [systemLocale,setSystemLocale]=useState(()=>({uiLanguage:navigator.language,region:navigator.language}));
   const language=effectiveLanguage(),region=effectiveRegion(resolveSetting(settings,'ui.region').value,systemLocale);
@@ -494,11 +498,14 @@ export function App() {
   const [connectionOrg,setConnectionOrg]=useState(()=>{if(isNativeHost)return emptyConnectionOrganization();try{return connectionOrganization(mockConnections,JSON.parse(localStorage.getItem("fbsdb.connectionOrganization")||"null"))}catch{return connectionOrganization(mockConnections)}});
   const [explorerQuery, setExplorerQuery] = useState(""), [explorerTab, setExplorerTab] = useState("All"), [groupFilter, setGroupFilter] = useState("All groups"), [schemaQuery, setSchemaQuery] = useState(""), [schemaOwnerFilter, setSchemaOwnerFilter] = useState("All"), [objectScope, setObjectScope] = useState("All"), [objectFavorites, setObjectFavorites] = useState(() => { try { return JSON.parse(localStorage.getItem("fbsdb.objectFavorites") || "[]"); } catch { return []; } }), [recentObjects, setRecentObjects] = useState(() => { try { return JSON.parse(localStorage.getItem("fbsdb.recentObjects") || "[]"); } catch { return []; } }), [activeObject, setActiveObject] = useState("");
   const [resultSearchOpen, setResultSearchOpen] = useState(false);
-  const [fileConnectionProfileId, setFileConnectionProfileId] = useState(null);
+
   function setMaxRows(value){updateTabSession("pageSizePreference",value);}
-  const [tabs, setTabs] = useState(() => [{ id: "tab-1", name: isNativeHost ? "Untitled.sql" : "monthly-invoices.sql", path: null, content: isNativeHost ? "" : initialSql, dirty: false }]), [activeTabId, setActiveTabId] = useState("tab-1");
+  const { documents, tabs, activeTabId, sql, fileName, filePath, fileDirty, fileConnectionProfileId } = useDocumentSessions(
+    () => [{ id: "tab-1", name: isNativeHost ? "Untitled.sql" : "monthly-invoices.sql", path: null, content: isNativeHost ? "" : initialSql, dirty: false }]);
+  const setTabs = documents.setTabs;
+  const setFileDirty = dirty => documents.patch(documents.activeId, { dirty });
   useEffect(() => { setActiveObject(''); setObjectTabActive(false); if(schemaRequestRef.current){sendNativeCommand('schema.cancel',{requestId:schemaRequestRef.current});schemaRequestRef.current=null;} }, [activeTabId]);
-  const [sql, setSql] = useState(isNativeHost ? "" : initialSql), [fileName, setFileName] = useState(isNativeHost ? "Untitled.sql" : "monthly-invoices.sql"), [filePath, setFilePath] = useState(null), [fileDirty, setFileDirty] = useState(false), [pendingFileAction, setPendingFileAction] = useState(null);
+  const [pendingFileAction, setPendingFileAction] = useState(null);
   const [pendingTabClose, setPendingTabClose] = useState(null);
   const [editorContext,setEditorContext]=useState(null);
   const [batchClose,setBatchClose]=useState(null);const batchDiscardRef=useRef(new Set());
@@ -508,8 +515,8 @@ export function App() {
   const [tabSessions, setTabSessions] = useState({});
   const replyOwnerRef = useRef(null);
   const tabSession = tabSessions[activeTabId] || {};
-  setNativeTabId(activeTabId);
-  function updateTabSession(key, value, owner = replyOwnerRef.current || activeTabIdRef.current) {
+  useLayoutEffect(() => { setNativeTabId(documents.active?.metadataOriginTabId || activeTabId); }, [activeTabId, documents]);
+  function updateTabSession(key, value, owner = replyOwnerRef.current || documents.activeId) {
     if (closedTabsRef.current.has(owner)) return;
     setTabSessions(current => { const previous = current[owner] || {}; return { ...current, [owner]: { ...previous, [key]: typeof value === "function" ? value(previous[key] ?? (key === "activeConnection" ? { id: "No connection" } : undefined)) : value } }; });
   }
@@ -536,8 +543,8 @@ export function App() {
   const setRunState = (value, owner) => {
     updateTabSession("runState", value, owner);
     if(typeof value!=='string'||!/clipboard|no primary|no child|no related|place the cursor|before (executing|binding|explaining)|^Saved | linked to |analysis (active|ended)|switch cancelled/i.test(value))return;
-    const tabId=owner||replyOwnerRef.current||activeTabIdRef.current;
-    notifyFeedback({id:`workbench:${tabId}:${value}`,kind:/fail|error/i.test(value)?'error':/before |no primary|no child|no related|place the cursor/i.test(value)?'warning':'info',title:'SQL workbench',message:value,scope:tabId,scopeLabel:tabsRef.current.find(t=>t.id===tabId)?.name});
+    const tabId=owner||replyOwnerRef.current||documents.activeId;
+    notifyFeedback({id:`workbench:${tabId}:${value}`,kind:/fail|error/i.test(value)?'error':/before |no primary|no child|no related|place the cursor/i.test(value)?'warning':'info',title:'SQL workbench',message:value,scope:tabId,scopeLabel:documents.tabs.find(t=>t.id===tabId)?.name});
   };
   const schemaObjects = tabSession.schemaObjects ?? EMPTY_SCHEMA_OBJECTS;
   const setSchemaObjects = (value, owner) => updateTabSession("schemaObjects", value, owner);
@@ -548,21 +555,16 @@ export function App() {
   const schemaError = tabSession.schemaError ?? "";
   const setSchemaError = (value, owner) => updateTabSession("schemaError", value, owner);
   const editorPositionsRef=useRef(new Map()),filePollRef=useRef(null),fileWatchOffsetRef=useRef(0);
-  const tabsRef = useRef(tabs); tabsRef.current = tabs;
   const sessionsRef = useRef(tabSessions); sessionsRef.current = tabSessions;
-  const activeFileSnapshotRef = useRef(null);
-  activeFileSnapshotRef.current = { id: activeTabId, name: fileName, path: filePath, content: sql, dirty: fileDirty, connectionProfileId: fileConnectionProfileId };
-  const [tabResults, setTabResults] = useState({});
-  const tabResultsRef=useRef(tabResults);tabResultsRef.current=tabResults;
+  const { results, tabResults } = useResultSessions();
+  const setTabResults = results.set;
   const closedTabsRef = useRef(new Set());
-  const resultOwnerRef = useRef(null), requestOwnersRef = useRef(new Map());
-  const queryOperationsRef=useRef(new Map()),queryRequestHistoryRef=useRef(new Map()),cancelRequestsRef=useRef(new Map());
   const [showMiniTools, setShowMiniTools] = useState(false);
   const view = tabResults[activeTabId] || {};
   const queryResult = (view.selectedResultKey ? (view.resultSets || []).find(item=>item.key===view.selectedResultKey)?.result : view.queryResult) || null, explainResult = view.explainResult || null, explainMessage = view.explainMessage || "", outputMessage = view.outputMessage || "", resultTab = view.resultTab || "Results", resultFilter = view.resultFilter || "";
-  function updateTabResult(key, value, owner = replyOwnerRef.current || activeTabIdRef.current) {
+  function updateTabResult(key, value, owner = replyOwnerRef.current || documents.activeId) {
     if (closedTabsRef.current.has(owner)) return;
-    setTabResults(current => { const previous = current[owner] || {}; return { ...current, [owner]: { ...previous, [key]: typeof value === "function" ? value(previous[key]) : value } }; });
+    results.update(owner, key, value);
   }
   const setQueryResult = (value, owner) => updateTabResult("queryResult", value, owner);
   const setExplainResult = (value, owner) => updateTabResult("explainResult", value, owner);
@@ -573,11 +575,10 @@ export function App() {
   const fetchingPage = tabSession.fetchingPage || false;
   const setFetchingPage = (value, owner) => updateTabSession("fetchingPage", value, owner);
   const pageError = view.pageError || "";
-  const setPageError = (value, owner) => {updateTabResult("pageError", value, owner);if(value)notifyFeedback({id:`page:${owner||replyOwnerRef.current||activeTabIdRef.current}`,kind:/cancelled/i.test(value)?'info':'error',title:'Result rows',message:value,scope:owner||replyOwnerRef.current||activeTabIdRef.current})};
-  const pageRequestsRef = useRef(new Map());
+  const setPageError = (value, owner) => {updateTabResult("pageError", value, owner);if(value)notifyFeedback({id:`page:${owner||replyOwnerRef.current||documents.activeId}`,kind:/cancelled/i.test(value)?'info':'error',title:'Result rows',message:value,scope:owner||replyOwnerRef.current||documents.activeId})};
   const pageRequestRef = useMemo(() => ({
-    get current() { return pageRequestsRef.current.get(replyOwnerRef.current || activeTabIdRef.current) || null; },
-    set current(value) { const id = replyOwnerRef.current || activeTabIdRef.current; if (value) pageRequestsRef.current.set(id, value); else pageRequestsRef.current.delete(id); },
+    get current() { return operations.pages.get(replyOwnerRef.current || documents.activeId) || null; },
+    set current(value) { const id = replyOwnerRef.current || documents.activeId; if (value) operations.pages.set(id, value); else operations.pages.delete(id); },
   }), []);
   useEffect(() => {
     const dismiss = event => {
@@ -588,7 +589,6 @@ export function App() {
     document.addEventListener("keydown", dismiss); document.addEventListener("pointerdown", dismiss);
     return () => { document.removeEventListener("keydown", dismiss); document.removeEventListener("pointerdown", dismiss); };
   }, []);
-  const resultExecutionMeta = useRef(new Map());
   const sqlResult = resultTab === "Explain" ? explainResult : queryResult;
   const panelMessage = resultTab === "Explain" ? explainMessage : outputMessage;
   useEffect(()=>{
@@ -597,27 +597,17 @@ export function App() {
     window.addEventListener('fbsdb.results.saveDefaults',save);window.addEventListener('fbsdb.results.resetDefaults',reset);
     return()=>{window.removeEventListener('fbsdb.results.saveDefaults',save);window.removeEventListener('fbsdb.results.resetDefaults',reset)};
   },[]);
-  function setSqlResult(value, owner) {
-    if(value) {
-      value={...value,viewIdentity:crypto.randomUUID()};
-      const tabId = owner || replyOwnerRef.current || activeTabIdRef.current;
-      const defaults=newResultDefaults(settingsRef.current,resultExecutionMeta.current.get(tabId)?.workspaceRoot??workspace.root,systemLocale);
-      value={...value,defaultOptions:structuredClone(defaults)};
-      setTabResults(current=>{const tab=current[tabId]||{};const sets=(tab.resultSets||[]).filter(item=>item.pinned);const script=scriptRunsRef.current.get(tabId);if(script?.running)sets.push({key:`script-${script.requestId}-${script.index}`,label:`Script ${script.index+1}`,pinned:true,result:value,view:{options:structuredClone(defaults)}});return {...current,[tabId]:{...tab,resultSets:sets,selectedResultKey:null,queryResult:value,queryView:{options:defaults},resultFilter:"",latestResultName:null}}});
+  function setSqlResult(value, owner = replyOwnerRef.current || documents.activeId) {
+    if (value) {
+      const defaults = newResultDefaults(settingsRef.current, operations.metadata.get(owner)?.workspaceRoot ?? workspace.root, systemLocale);
+      results.publish(owner, value, defaults, operations.scripts.get(owner));
     } else setQueryResult(value, owner);
-    if (value === null) { setExplainResult(null, owner); setExplainMessage("", owner); pageRequestRef.current = null; setFetchingPage(false); setPageError(""); }
+    if (value === null) { setExplainResult(null, owner); setExplainMessage("", owner); operations.pages.delete(owner); setFetchingPage(false, owner); setPageError("", owner); }
   }
-  const resultRenderMeasured=useCallback(({requestId,renderMs,totalMs})=>{
-    setTabSessions(current=>Object.fromEntries(Object.entries(current).map(([id,session])=>[id,session.renderingRequestId===requestId?{...session,rendering:false}:session])));
-    setTabResults(current=>{
-    let changed=false;const next={...current};
-    for(const[tabId,tab]of Object.entries(current)){
-      const update=result=>{if(result?.renderRequestId!==requestId||result.clientTiming?.totalMs!=null)return result;changed=true;return {...result,clientTiming:{...result.clientTiming,renderMs,totalMs}}};
-      const queryResult=update(tab.queryResult),resultSets=(tab.resultSets||[]).map(item=>({...item,result:update(item.result)}));
-      if(queryResult!==tab.queryResult||resultSets.some((item,index)=>item.result!==tab.resultSets?.[index]?.result))next[tabId]={...tab,queryResult,resultSets};
-    }
-    return changed?next:current;
-  });},[]);
+  const resultRenderMeasured = useCallback(timing => {
+    setTabSessions(current => Object.fromEntries(Object.entries(current).map(([id, session]) => [id, session.renderingRequestId === timing.requestId ? { ...session, rendering: false } : session])));
+    results.measure(timing);
+  }, [results]);
   const [workspace, setWorkspace] = useState({ root: null, name: "Open workspace", files: [], entries: [], recent: [] });
   const [completionSettings, setCompletionSettings] = useState(()=>resolveSetting(settings,'editor.completion').value);
   const learningEpochRef = useRef(0), suggestionLearningRef = useRef(null), lastSuggestionAcceptanceRef = useRef(null);
@@ -700,27 +690,28 @@ export function App() {
     return term ? allSqlSnippets.filter((snippet) => `${snippet.trigger} ${snippet.label} ${snippet.detail}`.toLowerCase().includes(term)) : allSqlSnippets;
   }, [snippetFilter, allSqlSnippets]);
   const selectedSnippet = filteredSnippets.find((snippet) => snippet.trigger === selectedSnippetTrigger) ?? filteredSnippets[0] ?? null;
-  const dbConnectionsRef = useRef(dbConnections), activeConnectionRef = useRef(activeConnection), authProfileRef = useRef(authProfile), pendingSwitchRef = useRef(pendingSwitch), transactionPendingRef = useRef(transactionPending), schemaLookupRef = useRef(schemaLookup), schemaReadyRef = useRef(false), schemaRequestedRef = useRef(new Set()), schemaLoadedRef = useRef(new Set()), sqlRef = useRef(sql), monacoRef = useRef(monaco), saveContinuationRef = useRef(null), activeTabIdRef = useRef(activeTabId), pendingHistoryRef = useRef(new Map()), searchRequestRef = useRef(null), searchTimerRef = useRef(null), pendingSearchPositionRef = useRef(null);
-  dbConnectionsRef.current = dbConnections; activeConnectionRef.current = activeConnection; authProfileRef.current = authProfile; pendingSwitchRef.current = pendingSwitch; transactionPendingRef.current = transactionPending; schemaLookupRef.current = schemaLookup; sqlRef.current = sql; monacoRef.current = monaco;
+  const dbConnectionsRef = useRef(dbConnections), activeConnectionRef = useRef(activeConnection), authProfileRef = useRef(authProfile), pendingSwitchRef = useRef(pendingSwitch), transactionPendingRef = useRef(transactionPending), schemaLookupRef = useRef(schemaLookup), schemaReadyRef = useRef(false), schemaRequestedRef = useRef(new Set()), schemaLoadedRef = useRef(new Set()), monacoRef = useRef(monaco), documentSavesRef = useRef(null), pendingHistoryRef = useRef(new Map()), searchRequestRef = useRef(null), searchTimerRef = useRef(null), pendingSearchPositionRef = useRef(null);
+  if (!documentSavesRef.current) documentSavesRef.current = new DocumentSaves();
+  dbConnectionsRef.current = dbConnections; activeConnectionRef.current = activeConnection; authProfileRef.current = authProfile; pendingSwitchRef.current = pendingSwitch; transactionPendingRef.current = transactionPending; schemaLookupRef.current = schemaLookup; monacoRef.current = monaco;
 
   function queueSchemaForSql(text) {
     if (schemaWarmupRef.current) { clearTimeout(schemaWarmupRef.current.timer); schemaWarmupRef.current.cancel(); }
-    if (!isNativeHost || !schemaReadyRef.current || (sessionsRef.current[activeTabIdRef.current]?.executing||sessionsRef.current[activeTabIdRef.current]?.scriptRun?.running)) return;
-    const owner = activeTabIdRef.current, cancellation = completionCancellation();
+    if (!isNativeHost || !schemaReadyRef.current || (sessionsRef.current[documents.activeId]?.executing||sessionsRef.current[documents.activeId]?.scriptRun?.running)) return;
+    const owner = documents.activeId, cancellation = completionCancellation();
     const timer = setTimeout(async () => {
       const client = completionClientRef.current;
-      if (!client || owner !== activeTabIdRef.current || text !== sqlRef.current || cancellation.token.isCancellationRequested) return;
+      if (!client || owner !== documents.activeId || text !== documents.text || cancellation.token.isCancellationRequested) return;
       const model = editorRef.current?.getModel(), position = editorRef.current?.getPosition(), revision = client.revision;
       const analysis = await client.request('analyze', text, model && position ? model.getOffsetAt(position) : text.length, cancellation.token, { mode: 'complete' });
-      if (revision !== client.revision || owner !== activeTabIdRef.current || cancellation.token.isCancellationRequested) return;
+      if (revision !== client.revision || owner !== documents.activeId || cancellation.token.isCancellationRequested) return;
       await Promise.all((analysis.targets || []).map(target => completionMetadataRef.current.load(owner, target, cancellation.token)));
-      if (revision === client.revision && owner === activeTabIdRef.current && !cancellation.token.isCancellationRequested) client.metadata(completionMetadataRef.current.objects(owner), completionMetadataRef.current.systemObjects(owner), completionMetadataRef.current.version(owner));
+      if (revision === client.revision && owner === documents.activeId && !cancellation.token.isCancellationRequested) client.metadata(completionMetadataRef.current.objects(owner), completionMetadataRef.current.systemObjects(owner), completionMetadataRef.current.version(owner));
     }, 200);
     schemaWarmupRef.current = { ...cancellation, timer };
   }
 
   function finishHistoryEntry(status, detail) {
-    const owner = replyOwnerRef.current || activeTabIdRef.current;
+    const owner = replyOwnerRef.current || documents.activeId;
     const id = pendingHistoryRef.current.get(owner);
     if (!id) return;
     setQueryHistory((current) => current.map((entry) => entry.id === id ? { ...entry, status, detail } : entry));
@@ -729,7 +720,7 @@ export function App() {
 
   function pollOpenFiles(){
     if(!isNativeHost||document.hidden||filePollRef.current&&Date.now()-filePollRef.current.at<12000)return;
-    const files=[...new Map(tabsRef.current.filter(tab=>tab.path&&!tab.readOnly).map(tab=>[pathKey(tab.path),{path:tab.path,version:tab.diskVersion??null,hasError:!!tab.externalChange?.error}])).values()];
+    const files=[...new Map(documents.tabs.filter(tab=>tab.path&&!tab.readOnly).map(tab=>[pathKey(tab.path),{path:tab.path,version:tab.diskVersion??null,hasError:!!tab.externalChange?.error}])).values()];
     if(files.length){const offset=fileWatchOffsetRef.current%files.length,rotated=[...files.slice(offset),...files.slice(0,offset)].slice(0,100);filePollRef.current={id:sendNativeCommand('file.poll',{files:rotated}),at:Date.now(),offset,total:files.length};}
   }
   useEffect(()=>{if(!isNativeHost)return;const timer=setInterval(pollOpenFiles,4000);window.addEventListener('focus',pollOpenFiles);return()=>{clearInterval(timer);window.removeEventListener('focus',pollOpenFiles)}},[]);
@@ -746,9 +737,9 @@ export function App() {
 
   useEffect(() => {
     const unsubscribe = subscribeNativeMessages((message) => {
-      const owner = message?.tabId || requestOwnersRef.current.get(message?.requestId) || activeTabIdRef.current;
-      const operation=queryOperationsRef.current.get(owner);
-      if((['sql.result','sql.timeout'].includes(message?.type)||message?.type==='host.error'&&queryRequestHistoryRef.current.has(message.requestId))&&operation&&(operation.requestId!==message.requestId||operation.status!=='running'))return;
+      const owner = message?.tabId || operations.owners.get(message?.requestId) || documents.activeId;
+      const operation=operations.running.get(owner);
+      if((['sql.result','sql.timeout'].includes(message?.type)||message?.type==='host.error'&&operations.history.has(message.requestId))&&operation&&(operation.requestId!==message.requestId||operation.status!=='running'))return;
       replyOwnerRef.current = owner;
       try {
       if(typeof message?.autoCommit==='boolean')updateTabSession('autoCommit',message.autoCommit,owner);
@@ -759,8 +750,7 @@ export function App() {
         setWorkspaceDev(current=>({...current,busy:false,error:message.error||'',...(message.state?{git:message.state}:{}),...(message.diff?{diff:message.diff}:{}),...(message.preview?{preview:message.preview,applied:null}:{}),...(message.result?{applied:message.result,preview:null}:{} )}));
         if(message.type==='workspace.replaceApply'&&message.result){
           const changed=new Map(message.result.applied.map(file=>[file.path.toLowerCase(),file.content])),versions=new Map(message.result.applied.map(file=>[file.path.toLowerCase(),file.diskVersion]));
-          setTabs(current=>current.map(tab=>{const active=tab.id===activeTabIdRef.current,dirty=active?activeFileSnapshotRef.current?.dirty:tab.dirty,content=tab.path?changed.get(tab.path.toLowerCase()):undefined;return !dirty&&content!==undefined?{...tab,content,diskVersion:versions.get(tab.path.toLowerCase())??tab.diskVersion,externalChange:null}:tab}));
-          const active=activeFileSnapshotRef.current,content=active?.path?changed.get(active.path.toLowerCase()):undefined;if(!active?.dirty&&content!==undefined){sqlRef.current=content;setSql(content)}
+          setTabs(current=>current.map(tab=>{const dirty=tab.dirty,content=tab.path?changed.get(tab.path.toLowerCase()):undefined;return !dirty&&content!==undefined?{...tab,content,diskVersion:versions.get(tab.path.toLowerCase())??tab.diskVersion,externalChange:null}:tab}));
           refreshWorkspaceGit();
         }
         return;
@@ -770,11 +760,11 @@ export function App() {
       if(message?.type==='schema.error')notifyFeedback({id:`schema:${owner}`,kind:'error',title:'Oracle metadata could not be loaded',message:message.message||'Metadata unavailable.',scope:owner});
       if (completionMetadataRef.current?.handle(message)) return;
       if(message?.type==='session.context'){if(!closedTabsRef.current.has(owner)&&message.epoch===completionMetadataRef.current.session(owner).epoch){updateTabSession('sessionContext',message.context||null,owner);updateTabSession('sessionContextError',message.error||'',owner)}return;}
-      if(message?.type==='sql.stage') {const run=scriptRunsRef.current.get(owner);if(requestOwnersRef.current.has(message.requestId)||run?.running&&run.requestId===message.requestId&&run.index===message.scriptIndex){updateTabSession('sqlStage',message.stage,owner);setRunState(message.stage,owner)}return;}
+      if(message?.type==='sql.stage') {const run=operations.scripts.get(owner);if(operations.owners.has(message.requestId)||run?.running&&run.requestId===message.requestId&&run.index===message.scriptIndex){updateTabSession('sqlStage',message.stage,owner);setRunState(message.stage,owner)}return;}
       if(message?.type==='analysis.state') {updateTabSession('analysisReadOnly',Boolean(message.enabled),owner);setTransactionPending(Boolean(message.transactionPending),owner);setRunState(message.enabled?'Read-only consistent analysis active':'Read-only analysis ended',owner);return;}
       if(message?.type==='sql.runtimePlan') {setExecuting(false,owner);setCancelling(false,owner);if(message.error){setExplainMessage(message.error,owner);notifyFeedback({kind:'error',title:'Execution plan unavailable',message:message.error,scope:owner})}else{setExplainResult({...message,planKind:'runtime'},owner);setExplainMessage('',owner)}setResultTab('Explain',owner);return;}
       if(message?.type?.startsWith('script.')) {
-        const previous=scriptRunsRef.current.get(owner)||{steps:[]};
+        const previous=operations.scripts.get(owner)||{steps:[]};
         const run={...previous,steps:[...(previous.steps||[])]};
         if(message.type==='script.started'){notifyFeedback({id:`script:${owner}`,kind:'progress',title:'Running SQL script',message:'Starting script…',scope:owner,actions:[{label:'Cancel script',onClick:()=>cancelQuery(owner)}]});run.started=true;run.running=true;run.requestId=message.requestId;run.steps=[];run.completed=0;run.failed=0;}
         if(message.type==='script.step'){
@@ -782,21 +772,21 @@ export function App() {
           run.steps[message.index]={...run.steps[message.index],...message};
           if(message.status==='Running'){notifyFeedback({id:`script:${owner}`,kind:'progress',title:'Running SQL script',message:`Statement ${message.index+1}`,scope:owner,actions:[{label:'Cancel script',onClick:()=>cancelQuery(owner)}]});
             run.index=message.index;updateTabSession('sqlStage','Executing script statement',owner);updateTabSession('operationStartedAt',Date.now(),owner);
-            const context=resultExecutionMeta.current.get(owner)||{};
-            resultExecutionMeta.current.set(owner,{...context,statementOffset:message.offset,executedSql:message.sql,executedAt:new Date().toISOString(),requestStartedAtPerf:performance.now(),executedParameters:(run.parameters||[]).filter(parameter=>getBindNames(message.sql).includes(parameter.name))});
+            const context=operations.metadata.get(owner)||{};
+            operations.metadata.set(owner,{...context,statementOffset:message.offset,executedSql:message.sql,executedAt:new Date().toISOString(),requestStartedAtPerf:performance.now(),executedParameters:(run.parameters||[]).filter(parameter=>getBindNames(message.sql).includes(parameter.name))});
             setExecuting(true,owner);setCancelling(false,owner);
           }
         }
         if(message.type==='script.completed'){notifyFeedback({id:`script:${owner}`,kind:message.failed?'error':message.cancelled?'warning':'success',title:message.cancelled?'Script cancelled':'Script completed',message:`${message.completed||0} completed · ${message.failed||0} failed`+(run.steps.filter(s=>s?.error).map(s=>'\n'+s.error).join('')),scope:owner});Object.assign(run,message,{running:false});setExecuting(false,owner);setCancelling(false,owner);setTransactionPending(Boolean(message.transactionPending),owner);}
-        scriptRunsRef.current.set(owner,run);updateTabSession('scriptRun',run,owner);return;
+        operations.scripts.set(owner,run);updateTabSession('scriptRun',run,owner);return;
       }
-      if(message?.type==='host.error'&&scriptRunsRef.current.get(owner)?.running){const run=scriptRunsRef.current.get(owner),index=run.index;run.steps[index]={...run.steps[index],error:message.message};if(!run.started){run.running=false;updateTabSession('scriptRun',{...run},owner)}}
+      if(message?.type==='host.error'&&operations.scripts.get(owner)?.running){const run=operations.scripts.get(owner),index=run.index;run.steps[index]={...run.steps[index],error:message.message};if(!run.started){run.running=false;updateTabSession('scriptRun',{...run},owner)}}
 
       if (message?.type === "completion.vocabulary") {
         if (sessionsRef.current[owner]?.activeConnection?.id === message.profileId) updateTabSession("oracleVocabulary", { version: message.version, words: message.words || [], error: message.error }, owner);
         return;
       }
-      if (message?.type?.startsWith("schema.") && owner !== activeTabIdRef.current) {
+      if (message?.type?.startsWith("schema.") && owner !== documents.activeId) {
         if (message.type === "schema.loaded") { setSchemaObjects(message.objects || []); setSchemaOwner(message.schema || ""); setSchemaLoading(false); setSchemaError(""); updateTabSession("schemaReady", true); }
         else if (message.type === "schema.loading") { setSchemaLoading(true); updateTabSession("schemaReady", false); }
         else if (message.type === "schema.error") { setSchemaLoading(false); setSchemaError(message.message || "Oracle metadata could not be loaded."); }
@@ -810,32 +800,37 @@ export function App() {
         if (message.type === "tab.closed") { setPendingTabClose(null); action.complete(); }
         else setPendingTabClose({ ...action, tabId: owner, message: message.message, pending: message.transactionPending, resolving: false });
       } else if (message?.type === "file.opened") {
-        const cached = tabsRef.current.find(tab => message.path && pathKey(tab.path) === pathKey(message.path));
+        const cached = documents.tabs.find(tab => message.path && pathKey(tab.path) === pathKey(message.path));
         if (cached && !message.forceNew) { activateTab(cached.id); return; }
-        syncActiveTab();
+        rememberEditorPosition();
         const path = message.path ?? null, id = `file:${crypto.randomUUID()}`;
-        sqlRef.current = message.content ?? ""; activeTabIdRef.current = id; setNativeTabId(id); setActiveTabId(id); setTabs((current) => { const existing = current.find((tab) => tab.id === id); const opened = { id, name: message.fileName ?? "query.sql", path, content: sqlRef.current, dirty: false, connectionProfileId: message.profileId ?? null, diskVersion:message.diskVersion??null }; return existing ? current.map((tab) => tab.id === id ? { ...tab, ...opened } : tab) : [...current, opened]; });
-        setSql(sqlRef.current); setFileName(message.fileName ?? "query.sql"); setFilePath(path); setFileDirty(false); setFileConnectionProfileId(message.profileId ?? null); sendNativeCommand("file.activate", { path, tabId: id });
+        documents.open({ id, name: message.fileName ?? "query.sql", path, content: message.content ?? "", dirty: false, connectionProfileId: message.profileId ?? null, diskVersion: message.diskVersion ?? null });
+        setNativeTabId(id); sendNativeCommand("file.activate", { path, tabId: id });
         const searchPosition = pendingSearchPositionRef.current;
         if (searchPosition && path?.toLowerCase() === searchPosition.path.toLowerCase()) { pendingSearchPositionRef.current = null; requestAnimationFrame(() => { editorRef.current?.setPosition({ lineNumber: searchPosition.lineNumber, column: 1 }); editorRef.current?.revealLineInCenter(searchPosition.lineNumber); editorRef.current?.focus(); }); }
-        if (!message.profileId || message.profileId.toLowerCase() === (tabSessions[id]?.activeConnection?.id || "").toLowerCase()) queueSchemaForSql(sqlRef.current);
+        if (!message.profileId || message.profileId.toLowerCase() === (tabSessions[id]?.activeConnection?.id || "").toLowerCase()) queueSchemaForSql(documents.text);
         if (message.profileId) { const profile = dbConnectionsRef.current.find((item) => item.id.toLowerCase() === message.profileId.toLowerCase()); if (profile && profile.id.toLowerCase() !== (tabSessions[id]?.activeConnection?.id || "").toLowerCase()) { setTimeout(() => beginConnection({ ...profile, tabId: id }), 0); } }
       } else if(message?.type==='file.changes'){
         if(filePollRef.current?.id!==message.requestId)return;fileWatchOffsetRef.current=(filePollRef.current.offset+Math.max(1,message.processed||0))%filePollRef.current.total;filePollRef.current=null;
-        setTabs(current=>current.map(tab=>{const change=message.changes?.find(item=>pathKey(item.path)===pathKey(tab.path)&&(item.expectedVersion??null)===(tab.diskVersion??null));return change?applyExternalFileChange(tab,change,tab.id===activeTabIdRef.current?sqlRef.current:tab.content):tab}));
+        documents.dispatch({ type: 'externalChanges', changes: message.changes || [] });
       } else if(message?.type==='file.conflict'){
-        saveContinuationRef.current=null;
+        documentSavesRef.current.take(message.requestId, message.tabId);
         setTabs(current=>current.map(tab=>tab.id===owner?{...tab,externalChange:{...message.snapshot,noticeId:message.requestId,baselineUnknown:!!message.baselineUnknown}}:tab));
         setRunState('File changed on disk. Reload it or keep your editor text before saving.');
       } else if (message?.type === "file.saved") {
-        const path = message.path ?? null;
-        setTabs(current => current.map(tab => tab.id === owner ? { ...tab, path, name: message.fileName || tab.name, dirty: false, diskVersion:message.diskVersion??null,externalChange:null, connectionProfileId: message.profileId ?? tab.connectionProfileId } : tab));
-        if (owner === activeTabIdRef.current) { setFilePath(path); setFileName(message.fileName || "query.sql"); setFileDirty(false); setFileConnectionProfileId(message.profileId ?? null); }
-        setRunState(`Saved ${message.fileName || "SQL file"}`);
-        const continuation = saveContinuationRef.current; saveContinuationRef.current = null; continuation?.();
-      } else if (message?.type === "file.connectionBound") { const profileId = message.profileId ?? null; setFileConnectionProfileId(profileId); setTabs((current) => current.map((tab) => tab.id === activeTabIdRef.current ? { ...tab, connectionProfileId: profileId } : tab)); setRunState(`${profileId} linked to ${fileName}`);
+        const tab = documents.tabs.find(tab => tab.id === owner);
+        const saved = documentSavesRef.current.saved(message, tab);
+        if (!saved) return;
+        const document = saved.document;
+        documents.patch(owner, document);
+        setRunState(document.dirty ? 'Saved earlier version; newer edits are still unsaved.' : `Saved ${document.name}`);
+        saved.afterSave?.();
+      } else if (message?.type === "file.connectionBound") {
+        const profileId = message.profileId ?? null;
+        documents.patch(owner, { connectionProfileId: profileId });
+        setRunState(`${profileId} linked to ${documents.tabs.find(tab => tab.id === owner)?.name || 'SQL file'}`);
       } else if (message?.type === "file.saveCancelled") {
-        saveContinuationRef.current = null;
+        documentSavesRef.current.take(message.requestId, message.tabId);
       } else if (message?.type === "workspace.state") {
         setWorkspace({ root: message.root ?? null, name: message.name ?? "No workspace", files: message.files ?? [], entries: message.entries ?? [], recent: message.recent ?? [], catalog:message.catalog??[],error:message.error??null });
        } else if (message?.type === "workspace.error") {
@@ -849,8 +844,6 @@ export function App() {
         if (moves.length) {
           const remap = path => moves.reduce((value,move)=>remapWorkspacePath(value,move.source,move.destination),path);
           setTabs(current => current.map(tab => { const path = remap(tab.path); return path !== tab.path ? { ...tab, path, name: path.split(/[\\/]/).at(-1) } : tab; }));
-          const path = remap(activeFileSnapshotRef.current.path);
-          if (path !== activeFileSnapshotRef.current.path) { setFilePath(path); setFileName(path.split(/[\\/]/).at(-1)); }
         }
         if (message.entry && !message.entry.isDirectory) openWorkspaceFile(message.entry);
       } else if (message?.type === "workspace.searchResults") {
@@ -881,9 +874,9 @@ export function App() {
         updateTabSession('sessionContext',null,owner);updateTabSession('sessionContextError','',owner);
         sendNativeCommand('session.context',{tabId:owner,epoch:completionMetadataRef.current.session(owner).epoch});
         const profile = dbConnectionsRef.current.find((item) => item.id === message.profile?.id);
-        if (profile) { if (owner === activeTabIdRef.current) { activeConnectionRef.current = profile; setFileConnectionProfileId(profile.id); } setActiveConnection(profile); setTabs(current => current.map(tab => tab.id === owner ? { ...tab, connectionProfileId: profile.id } : tab)); }
+        if (profile) { if (owner === documents.activeId) { activeConnectionRef.current = profile; } setActiveConnection(profile); setTabs(current => current.map(tab => tab.id === owner ? { ...tab, connectionProfileId: profile.id } : tab)); }
         if (authProfileRef.current?.tabId === owner) setAuthProfile(null); setConnecting(false); setConnectionError(""); setQueryResult(current => current ? { ...current, hasMore: false, cursorUnavailable:current.hasMore } : current); updateTabResult("resultSets",sets=>(sets||[]).map(item=>({...item,result:{...item.result,hasMore:false,cursorUnavailable:item.result.hasMore}}))); setSchemaObjects([]); updateTabSession("schemaReady", false); setTransactionPending(false);
-        if (owner === activeTabIdRef.current) { schemaReadyRef.current = false; schemaLookupRef.current = new Map(); schemaRequestedRef.current.clear(); schemaLoadedRef.current.clear(); }
+        if (owner === documents.activeId) { schemaReadyRef.current = false; schemaLookupRef.current = new Map(); schemaRequestedRef.current.clear(); schemaLoadedRef.current.clear(); }
         setRunState(`Connected to ${message.profile?.id ?? "Oracle"}`);
         if (message.profile?.id) setRecentProfiles((current) => [message.profile.id, ...current.filter((id) => id !== message.profile.id)].slice(0, 20));
       } else if (message?.type === "connection.inactive" || message?.type === "connection.resumed") {
@@ -900,50 +893,49 @@ export function App() {
         updateTabSession("oracleVocabulary", null, owner);
         setQueryResult(current=>current?{...current,hasMore:false,cursorUnavailable:current.hasMore||current.cursorUnavailable}:current);
         updateTabResult('resultSets',sets=>(sets||[]).map(item=>({...item,result:{...item.result,hasMore:false,cursorUnavailable:item.result.hasMore||item.result.cursorUnavailable}})));
-        if (owner === activeTabIdRef.current) activeConnectionRef.current = { id: "Disconnected" }; setSchemaOwner(""); setRunState("Disconnected"); setActiveConnection({ id: "Disconnected", title: "No active session", host: "", port: "", service: "", env: "—", color: "mint" }); if (owner === activeTabIdRef.current) schemaReadyRef.current = false; setSchemaObjects([]); updateTabSession("schemaReady", false); setTransactionPending(false);
+        if (owner === documents.activeId) activeConnectionRef.current = { id: "Disconnected" }; setSchemaOwner(""); setRunState("Disconnected"); setActiveConnection({ id: "Disconnected", title: "No active session", host: "", port: "", service: "", env: "—", color: "mint" }); if (owner === documents.activeId) schemaReadyRef.current = false; setSchemaObjects([]); updateTabSession("schemaReady", false); setTransactionPending(false);
       } else if (message?.type === "sql.page") {
         if (pageRequestRef.current?.id !== message.requestId) return;
-        const owner = pageRequestRef.current.owner; cancelRequestsRef.current.delete(owner);pageRequestRef.current = null; setFetchingPage(false); setCancelling(false,owner); setPageError("", owner);
-        setTabResults(current=>{const tab=current[owner]||{};const append=result=>result?.resultId===message.resultId&&result.rows.length===message.offset?{...result,rows:[...result.rows,...message.rows],returnedRows:result.rows.length+message.rows.length,hasMore:message.hasMore,fetchMetrics:[...(result.fetchMetrics||[]),{offset:message.offset,rows:message.rows.length,elapsedMs:message.elapsedMs,bytes:new TextEncoder().encode(JSON.stringify(message.rows)).length}]}:result;return {...current,[owner]:{...tab,queryResult:append(tab.queryResult),resultSets:(tab.resultSets||[]).map(item=>({...item,result:append(item.result)}))}}});
+        const owner = pageRequestRef.current.owner; operations.cancellations.delete(owner);pageRequestRef.current = null; setFetchingPage(false); setCancelling(false,owner); setPageError("", owner);
+        results.appendPage(owner, message);
       } else if (message?.type === "sql.pageError") {
         if (pageRequestRef.current?.id !== message.requestId) return;
-        const owner = pageRequestRef.current.owner, failedId = pageRequestRef.current.resultId; cancelRequestsRef.current.delete(owner);pageRequestRef.current = null; setFetchingPage(false); setCancelling(false,owner);
-        setTabResults(current=>{const tab=current[owner]||{};const invalidate=result=>result?.resultId===failedId?{...result,hasMore:false,cursorUnavailable:true}:result;return {...current,[owner]:{...tab,queryResult:invalidate(tab.queryResult),resultSets:(tab.resultSets||[]).map(item=>({...item,result:invalidate(item.result)}))}}}); setPageError(message.message || "Page could not be loaded. Run the query again.", owner);
+        const owner = pageRequestRef.current.owner, failedId = pageRequestRef.current.resultId; operations.cancellations.delete(owner);pageRequestRef.current = null; setFetchingPage(false); setCancelling(false,owner);
+        results.invalidateCursor(owner, failedId); setPageError(message.message || "Page could not be loaded. Run the query again.", owner);
       } else if (message?.type === "result.exportProgress" || message?.type === "result.exportComplete") {
         updateTabResult('streamState',{busy:message.type==='result.exportProgress',message:message.message||`${message.rowsWritten||0} rows written`},owner);
         const exporting=message.type==='result.exportProgress';
         notifyFeedback({id:`export:${owner}`,kind:exporting?'progress':message.cancelled?'info':message.success===false?'error':'success',title:exporting?'Exporting results':message.cancelled?'Export cancelled':message.success===false?'Export failed':'Export completed',message:message.message||`${message.rowsWritten||0} rows written`,scope:owner,actions:exporting?[{label:'Cancel export',onClick:()=>sendNativeCommand('result.cancelExport',{tabId:owner})}]:[]});
         if(message.type==='result.exportComplete'&&message.consumed) {
-          const invalidate=result=>result?.resultId===message.resultId?{...result,hasMore:false,cursorUnavailable:true}:result;
-          setTabResults(current=>{const tab=current[owner]||{};return {...current,[owner]:{...tab,queryResult:invalidate(tab.queryResult),resultSets:(tab.resultSets||[]).map(item=>({...item,result:invalidate(item.result)}))}}});
+          results.invalidateCursor(owner, message.resultId);
         }
       } else if (message?.type === "result.columnDefinition") {
-        if(sourceDefinitionRequestRef.current.get(owner)!==message.requestId){requestOwnersRef.current.delete(message.requestId);return;}
+        if(sourceDefinitionRequestRef.current.get(owner)!==message.requestId){operations.owners.delete(message.requestId);return;}
         sourceDefinitionRequestRef.current.delete(owner);
-        requestOwnersRef.current.delete(message.requestId);
+        operations.owners.delete(message.requestId);
         setDefinition({...message.definition,tabId:owner,...(!message.definition?{message:"Source column not found"}:{})});
       } else if (message?.type === "result.primaryKey") {
         if(message.columns?.length){setKeyLookup({...message,tabId:owner});setKeyValues({})}else setRunState(message.message||'No primary key found.');
       } else if (message?.type === "result.children") {
         if(message.links?.length){setKeyLookup({links:message.links,tabId:owner});setKeyValues({})}else setRunState(message.message||'No child relationships found.');
       } else if (message?.type === "result.related") {
-        if(message.sql) { const profile=sessionsRef.current[owner]?.activeConnection;newSqlFileNow(); const id=activeTabIdRef.current; sqlRef.current=message.sql; setSql(message.sql);setFileName('Related.sql');setFileDirty(true);setTabs(current=>current.map(tab=>tab.id===id?{...tab,name:'Related.sql',content:message.sql,dirty:true,connectionProfileId:profile?.id}:tab));if(profile?.id&&!['Disconnected','No connection'].includes(profile.id))beginConnection({...profile,tabId:id}); } else setRunState(message.message||'No related records metadata available');
+        if(message.sql) { const profile=sessionsRef.current[owner]?.activeConnection;newSqlFileNow(); const id=documents.activeId; setTabs(current=>current.map(tab=>tab.id===id?{...tab,name:'Related.sql',content:message.sql,dirty:true,connectionProfileId:profile?.id}:tab));if(profile?.id&&!['Disconnected','No connection'].includes(profile.id))beginConnection({...profile,tabId:id}); } else setRunState(message.message||'No related records metadata available');
       } else if (message?.type === "sql.result") {
-        const owner = message.tabId || requestOwnersRef.current.get(message.requestId) || resultOwnerRef.current || activeTabIdRef.current; requestOwnersRef.current.delete(message.requestId);
-        if(operation)operation.status='complete';cancelRequestsRef.current.delete(owner);updateTabSession('queryOutcome',null,owner);
+        const owner = message.tabId || operations.owners.get(message.requestId) || operations.lastOwner || documents.activeId; operations.owners.delete(message.requestId);
+        if(operation)operation.status='complete';operations.cancellations.delete(owner);updateTabSession('queryOutcome',null,owner);
         if (closedTabsRef.current.has(owner)) { if (message.resultId) sendNativeCommand("sql.closeResult", { resultId: message.resultId, tabId: owner }); setExecuting(false); setCancelling(false); setTransactionPending(Boolean(message.transactionPending)); finishHistoryEntry("Succeeded", "Statement completed in closed tab"); return; }
         finishHistoryEntry("Succeeded", message.rowsAffected == null ? `${message.returnedRows ?? 0} rows · ${message.elapsedMs ?? 0} ms` : `${message.rowsAffected} rows affected · ${message.elapsedMs ?? 0} ms`);
-        if (/^\s*(?:CREATE|ALTER|DROP|RENAME|COMMENT|GRANT|REVOKE)\b/i.test(resultExecutionMeta.current.get(owner)?.executedSql || "")) { completionMetadataRef.current.reset(owner); refreshSchema(owner); }
-        if(/^\s*(?:--[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*ALTER\s+SESSION\b/i.test(resultExecutionMeta.current.get(owner)?.executedSql||'')){sendNativeCommand('session.nls',{tabId:owner,epoch:completionMetadataRef.current.session(owner).epoch});sendNativeCommand('session.context',{tabId:owner,epoch:completionMetadataRef.current.session(owner).epoch});}
-        const executionMeta=resultExecutionMeta.current.get(owner)||{},responseAt=performance.now(),renderRequestId=`${message.requestId||Date.now()}:${message.resultId||'statement'}`;
+        if (/^\s*(?:CREATE|ALTER|DROP|RENAME|COMMENT|GRANT|REVOKE)\b/i.test(operations.metadata.get(owner)?.executedSql || "")) { completionMetadataRef.current.reset(owner); refreshSchema(owner); }
+        if(/^\s*(?:--[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*ALTER\s+SESSION\b/i.test(operations.metadata.get(owner)?.executedSql||'')){sendNativeCommand('session.nls',{tabId:owner,epoch:completionMetadataRef.current.session(owner).epoch});sendNativeCommand('session.context',{tabId:owner,epoch:completionMetadataRef.current.session(owner).epoch});}
+        const executionMeta=operations.metadata.get(owner)||{},responseAt=performance.now(),renderRequestId=`${message.requestId||Date.now()}:${message.resultId||'statement'}`;
         updateTabSession("rendering",Boolean(message.columns?.length),owner);updateTabSession("renderingRequestId",renderRequestId,owner);
         setSqlResult({ ...message, ...executionMeta,renderRequestId,clientTiming:executionMeta.requestStartedAtPerf?{startedAtPerf:executionMeta.requestStartedAtPerf,responseAtPerf:responseAt,renderMs:null,totalMs:null}:undefined,fetchMetrics:[{offset:0,rows:message.rows?.length||0,elapsedMs:message.elapsedMs,bytes:new TextEncoder().encode(JSON.stringify(message.rows||[])).length}] }, owner); const output = (message.output ?? []).join("\n"); setOutputMessage(output, owner); setTransactionPending(Boolean(message.transactionPending)); setExecuting(false); setCancelling(false); setRunState(message.rowsAffected == null ? `${message.returnedRows ?? 0} rows · ${message.elapsedMs ?? 0} ms` : `${message.rowsAffected} rows affected · ${message.elapsedMs ?? 0} ms`); setResultTab(output ? "Output" : "Results", owner);
       } else if (message?.type === "sql.compilation") {
-        if(operation?.requestId===message.requestId){operation.status='complete';cancelRequestsRef.current.delete(owner);updateTabSession('queryOutcome',null,owner)}
+        if(operation?.requestId===message.requestId){operation.status='complete';operations.cancellations.delete(owner);updateTabSession('queryOutcome',null,owner)}
 
-        requestOwnersRef.current.delete(message.requestId);
+        operations.owners.delete(message.requestId);
         if (closedTabsRef.current.has(owner)) return;
-        const context = resultExecutionMeta.current.get(owner) || {}, problems = compilationProblemItems(message.compilation, context, owner);
+        const context = operations.metadata.get(owner) || {}, problems = compilationProblemItems(message.compilation, context, owner);
         updateTabSession("compilationProblems", problems, owner); updateTabSession("runtimeProblems", [], owner);
         setTransactionPending(!!message.transactionPending, owner); setExecuting(false, owner); setCancelling(false, owner);
         const errors = problems.filter(problem => problem.severity === "error").length;
@@ -953,18 +945,18 @@ export function App() {
         completionMetadataRef.current.reset(owner); refreshSchema(owner);
       } else if (message?.type === "sql.cancelled") {
         const fetching=sessionsRef.current[owner]?.fetchingPage;
-        if(operation&&!fetching&&!sessionsRef.current[owner]?.scriptRun?.running&&(operation.status!=='running'||message.requestId&&![operation.requestId,cancelRequestsRef.current.get(owner)].includes(message.requestId)))return;
+        if(operation&&!fetching&&!sessionsRef.current[owner]?.scriptRun?.running&&(operation.status!=='running'||message.requestId&&![operation.requestId,operations.cancellations.get(owner)].includes(message.requestId)))return;
         setTransactionPending(Boolean(message.transactionPending));
-        if (message.complete) { cancelRequestsRef.current.delete(owner);if(operation?.status==='running'){requestOwnersRef.current.delete(operation.requestId);operation.status='complete';updateTabSession('queryOutcome',{kind:'cancelled',elapsedMs:Date.now()-operation.startedAt,requestId:operation.requestId},owner)}if(fetching){setFetchingPage(false,owner);setPageError('Row loading cancelled.',owner)}finishHistoryEntry("Cancelled", "Query cancelled"); setExecuting(false); setCancelling(false); setRunState("Query cancelled."); }
+        if (message.complete) { operations.cancellations.delete(owner);if(operation?.status==='running'){operations.owners.delete(operation.requestId);operation.status='complete';updateTabSession('queryOutcome',{kind:'cancelled',elapsedMs:Date.now()-operation.startedAt,requestId:operation.requestId},owner)}if(fetching){setFetchingPage(false,owner);setPageError('Row loading cancelled.',owner)}finishHistoryEntry("Cancelled", "Query cancelled"); setExecuting(false); setCancelling(false); setRunState("Query cancelled."); }
         else { setCancelling(true); setRunState("Waiting for Oracle to stop the query…"); }
       } else if (message?.type === "sql.timeout") {
-        requestOwnersRef.current.delete(message.requestId);
-        if(operation)operation.status='complete';cancelRequestsRef.current.delete(owner);updateTabSession('queryOutcome',{kind:'timeout',message:message.message||'Query timed out.',elapsedMs:operation?Date.now()-operation.startedAt:undefined,requestId:message.requestId},owner);setResultTab('Results',owner);
+        operations.owners.delete(message.requestId);
+        if(operation)operation.status='complete';operations.cancellations.delete(owner);updateTabSession('queryOutcome',{kind:'timeout',message:message.message||'Query timed out.',elapsedMs:operation?Date.now()-operation.startedAt:undefined,requestId:message.requestId},owner);setResultTab('Results',owner);
 
         finishHistoryEntry("Failed", message.message || "Query timed out.");
         setTransactionPending(Boolean(message.transactionPending), owner); setExecuting(false, owner); setCancelling(false, owner); setRunState(message.message || "Query timed out.", owner);
       } else if (message?.type === "sql.explainResult") {
-        const owner = message.tabId || requestOwnersRef.current.get(message.requestId) || resultOwnerRef.current || activeTabIdRef.current; requestOwnersRef.current.delete(message.requestId);
+        const owner = message.tabId || operations.owners.get(message.requestId) || operations.lastOwner || documents.activeId; operations.owners.delete(message.requestId);
         setExplainResult(message, owner); setExplainMessage("", owner); setExecuting(false); setCancelling(false); setRunState(`Execution plan · ${message.returnedRows ?? 0} steps · ${message.elapsedMs ?? 0} ms`);
       } else if (message?.type === "transaction.state") {
         if(!message.pending)updateTabSession("analysisReadOnly",false,owner); setTransactionPending(Boolean(message.pending)); setRunState(`Transaction ${message.state}`);
@@ -972,7 +964,7 @@ export function App() {
         if (!message.pending && pendingSwitchRef.current?.tabId === owner) { const profile = pendingSwitchRef.current; setPendingSwitch(null); if (profile.disconnect) sendNativeCommand("connection.disconnect", { tabId: owner }); else setTimeout(() => beginConnection(profile), 0); }
       } else if (message?.type === "schema.loading") { setSchemaLoading(true); setSchemaError(""); setSchemaStale((sessionsRef.current[owner]?.schemaObjects || []).length > 0); updateTabSession("schemaReady", false); schemaReadyRef.current = false;
       } else if (message?.type === "schema.loaded") {
-        if (schemaRequestRef.current === message.requestId) schemaRequestRef.current = null; const objects = message.objects ?? []; schemaLookupRef.current = makeOracleRelationLookup(objects, message.schema ?? ""); setSchemaObjects(objects); setSchemaOwner(message.schema ?? ""); setSchemaLoading(false); setSchemaStale(false); setSchemaError(""); schemaReadyRef.current = true; updateTabSession("schemaReady", true); schemaRequestedRef.current.clear(); schemaLoadedRef.current.clear(); queueSchemaForSql(sqlRef.current);
+        if (schemaRequestRef.current === message.requestId) schemaRequestRef.current = null; const objects = message.objects ?? []; schemaLookupRef.current = makeOracleRelationLookup(objects, message.schema ?? ""); setSchemaObjects(objects); setSchemaOwner(message.schema ?? ""); setSchemaLoading(false); setSchemaStale(false); setSchemaError(""); schemaReadyRef.current = true; updateTabSession("schemaReady", true); schemaRequestedRef.current.clear(); schemaLoadedRef.current.clear(); queueSchemaForSql(documents.text);
       } else if (message?.type === "schema.cancelled") {
         if (schemaRequestRef.current === message.requestId) schemaRequestRef.current = null; setSchemaLoading(false); setSchemaStale((sessionsRef.current[owner]?.schemaObjects || []).length > 0); setSchemaError('Metadata loading cancelled.');
       } else if (message?.type === "schema.table" || message?.type === "schema.object") {
@@ -981,22 +973,22 @@ export function App() {
       } else if (message?.type === "host.error") {
         const failedQuery=operation?.requestId===message.requestId&&operation.status==='running';
         if(failedQuery||message.explain)finishHistoryEntry("Failed", "Execution failed");
-        saveContinuationRef.current = null;
+        documentSavesRef.current.take(message.requestId, message.tabId);
         if(message.requestId===filePollRef.current?.id)filePollRef.current=null;
-        const owner = message.tabId || requestOwnersRef.current.get(message.requestId) || resultOwnerRef.current || activeTabIdRef.current; requestOwnersRef.current.delete(message.requestId);
+        const owner = message.tabId || operations.owners.get(message.requestId) || operations.lastOwner || documents.activeId; operations.owners.delete(message.requestId);
         if(message.requestId===sessionsRef.current[owner]?.autoCommitRequestId)updateTabSession('autoCommitPending',false,owner);
         const failedConnection = pendingConnectionsRef.current.get(message.requestId);
         if (failedConnection) { pendingConnectionsRef.current.delete(message.requestId); setConnecting(false, owner); setAuthProfile({ ...dbConnectionsRef.current.find(p => p.id === failedConnection.id), ...failedConnection, credentials: undefined }); setConnectionError(message.message || "Connection failed", owner); }
-        if(tabResultsRef.current[owner]?.streamState?.busy){updateTabResult("streamState",{busy:false,message:message.message||"Export failed"},owner);dismissFeedback(`export:${owner}`)} const error = message.message ?? "Desktop operation failed"; if(!failedQuery)notifyFeedback({id:`native:${message.requestId||owner}`,kind:"error",title:"Operation failed",message:error,scope:owner,scopeLabel:tabsRef.current.find(t=>t.id===owner)?.name}); if(failedQuery)updateTabSession('runState',error,owner);else setRunState(error); if (typeof message.transactionPending === "boolean") setTransactionPending(message.transactionPending);
+        if(results.tabs[owner]?.streamState?.busy){updateTabResult("streamState",{busy:false,message:message.message||"Export failed"},owner);dismissFeedback(`export:${owner}`)} const error = message.message ?? "Desktop operation failed"; if(!failedQuery)notifyFeedback({id:`native:${message.requestId||owner}`,kind:"error",title:"Operation failed",message:error,scope:owner,scopeLabel:documents.tabs.find(t=>t.id===owner)?.name}); if(failedQuery)updateTabSession('runState',error,owner);else setRunState(error); if (typeof message.transactionPending === "boolean") setTransactionPending(message.transactionPending);
         if (authProfileRef.current?.tabId === owner) { setConnectionError(error); setConnecting(false); }
         if (pendingTabCloseRef.current?.tabId === owner) setPendingTabClose(current => current ? { ...current, resolving: false, message: error } : current);
         if(!operation||operation.status!=='running'||failedQuery||message.explain){setExecuting(false);setCancelling(false)}
         if(failedQuery){
-          operation.status='complete';cancelRequestsRef.current.delete(owner);
+          operation.status='complete';operations.cancellations.delete(owner);
           updateTabSession('queryOutcome',{kind:'error',message:error,elapsedMs:Date.now()-operation.startedAt,requestId:message.requestId},owner);setResultTab('Results',owner);setOutputMessage(error,owner);
-          updateTabSession('runtimeProblems',[{id:`${owner}:runtime`,tabId:owner,severity:'error',source:'Oracle',message:error,fileName:tabsRef.current.find(tab=>tab.id===owner)?.name||'SQL'}],owner);
+          updateTabSession('runtimeProblems',[{id:`${owner}:runtime`,tabId:owner,severity:'error',source:'Oracle',message:error,fileName:documents.tabs.find(tab=>tab.id===owner)?.name||'SQL'}],owner);
         }
-        else if ((!failedConnection && !authProfileRef.current && /ORA-\d+/i.test(error)) || message.explain) { if (message.explain) setExplainMessage(error, owner); else setOutputMessage(error, owner); setResultTab(message.explain ? "Explain" : "Output", owner); updateTabSession("runtimeProblems", [{ id: `${owner}:runtime`, tabId: owner, severity: "error", source: "Oracle", message: error, fileName: tabsRef.current.find(tab => tab.id === owner)?.name || "SQL" }], owner); }
+        else if ((!failedConnection && !authProfileRef.current && /ORA-\d+/i.test(error)) || message.explain) { if (message.explain) setExplainMessage(error, owner); else setOutputMessage(error, owner); setResultTab(message.explain ? "Explain" : "Output", owner); updateTabSession("runtimeProblems", [{ id: `${owner}:runtime`, tabId: owner, severity: "error", source: "Oracle", message: error, fileName: documents.tabs.find(tab => tab.id === owner)?.name || "SQL" }], owner); }
       }
       } finally { replyOwnerRef.current = null; }
     });
@@ -1005,7 +997,7 @@ export function App() {
 
   useEffect(() => {
     const refreshCompletionMetadata = () => {
-      const tab = tabsRef.current.find(item => item.id === activeTabIdRef.current), owner = tab?.metadataOriginTabId || activeTabIdRef.current;
+      const tab = documents.tabs.find(item => item.id === documents.activeId), owner = tab?.metadataOriginTabId || documents.activeId;
       const connection = sessionsRef.current[owner]?.activeConnection;
       if (!isNativeHost || !connection || ["No connection", "Disconnected"].includes(connection.id)) return;
       completionMetadataRef.current.reset(owner);
@@ -1031,7 +1023,7 @@ export function App() {
       if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='p'){event.preventDefault();event.stopPropagation();if(!document.querySelector('.modal-backdrop')||paletteMode)setPaletteMode(event.shiftKey?'commands':'files');return;}
       if ((event.ctrlKey || event.metaKey) && event.altKey && event.key.toLowerCase() === "z") { event.preventDefault(); setFocusMode(value=>!value); return; }
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey && event.key.toLowerCase() === "f" && !editorRef.current?.hasTextFocus()) { event.preventDefault(); setShowSearch(true); setShowHistory(false); return; }
-      if (event.key === "F8" && !document.querySelector(".modal-backdrop, .feedback-notification")) { const items = problemsRef.current.filter(problem => problem.tabId === activeTabIdRef.current); if (items.length) { event.preventDefault(); problemCursorRef.current = problemCursorRef.current < 0 ? event.shiftKey ? items.length - 1 : 0 : (problemCursorRef.current + (event.shiftKey ? -1 : 1) + items.length) % items.length; navigateProblem(items[problemCursorRef.current]); } return; }
+      if (event.key === "F8" && !document.querySelector(".modal-backdrop, .feedback-notification")) { const items = problemsRef.current.filter(problem => problem.tabId === documents.activeId); if (items.length) { event.preventDefault(); problemCursorRef.current = problemCursorRef.current < 0 ? event.shiftKey ? items.length - 1 : 0 : (problemCursorRef.current + (event.shiftKey ? -1 : 1) + items.length) % items.length; navigateProblem(items[problemCursorRef.current]); } return; }
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "o") { event.preventDefault(); openSqlFile(); return; }
       if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "n") { event.preventDefault(); if (!document.querySelector('.modal-backdrop')) newSqlFileFromLastConnection(); return; }
       if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key === "Tab") { event.preventDefault(); if (!document.querySelector('.modal-backdrop')) cycleSqlTab(event.shiftKey ? -1 : 1); return; }
@@ -1111,14 +1103,14 @@ export function App() {
     return installOracleLanguageProviders({
       monaco, editor: editorRef.current, client, broker, acceptanceCommand: completionAcceptanceRef.current, definitionModels: definitionModelsRef.current,
       snapshot: () => {
-        const tab = tabsRef.current.find(item => item.id === activeTabIdRef.current), originTabId = tab?.metadataOriginTabId || activeTabIdRef.current;
+        const tab = documents.tabs.find(item => item.id === documents.activeId), originTabId = tab?.metadataOriginTabId || documents.activeId;
         const originSession = sessionsRef.current[originTabId] || {}, connection = originSession.activeConnection;
-        return { busy: !!(originSession.executing || originSession.scriptRun?.running || originSession.fetchingPage), sourceObject: tab?.definitionObject, tabId: activeTabIdRef.current, originTabId, connected: isNativeHost && !!connection && !["No connection", "Disconnected"].includes(connection.id), settings: completionSettings,
+        return { busy: !!(originSession.executing || originSession.scriptRun?.running || originSession.fetchingPage), sourceObject: tab?.definitionObject, tabId: documents.activeId, originTabId, connected: isNativeHost && !!connection && !["No connection", "Disconnected"].includes(connection.id), settings: completionSettings,
           manualSuggestion: () => { const manual = manualSuggestionRef.current; manualSuggestionRef.current = false; return manual; } };
       },
       onDefinition: openOracleDefinition,
       onReveal: target => {
-        if (metadataOriginTabId !== activeTabIdRef.current) activateTab(metadataOriginTabId);
+        if (metadataOriginTabId !== documents.activeId) activateTab(metadataOriginTabId);
         setSidebarOpen(true); setSchemaQuery("");
         const object = sessionsRef.current[metadataOriginTabId]?.schemaObjects?.find(item => item.owner === target.owner && item.name === target.name && item.type === target.type);
         if (object) { setActiveObject(oracleSchemaKey(object)); requestSchemaDetails(object); requestAnimationFrame(() => { const section = document.querySelector('.schema-section'); if (section) section.open = true; }); }
@@ -1137,10 +1129,10 @@ export function App() {
       if (!model || !client) return;
       const text = model.getValue(), version = model.getVersionId();
       const result = await client.request("diagnostics", text, 0);
-      if (!result.diagnostics || model.isDisposed() || model.getVersionId() !== version || activeTabIdRef.current !== owner) return;
+      if (!result.diagnostics || model.isDisposed() || model.getVersionId() !== version || documents.activeId !== owner) return;
       const problems = result.diagnostics.map((item, index) => {
         const start = model.getPositionAt(item.start), end = model.getPositionAt(item.end);
-        return { ...item, id: `${owner}:lint:${index}`, tabId: owner, fileName: tabsRef.current.find(tab => tab.id === owner)?.name || "SQL", line: start.lineNumber, column: start.column, offset: item.start, editorSnapshot: text, startLineNumber: start.lineNumber, startColumn: start.column, endLineNumber: end.lineNumber, endColumn: end.column };
+        return { ...item, id: `${owner}:lint:${index}`, tabId: owner, fileName: documents.tabs.find(tab => tab.id === owner)?.name || "SQL", line: start.lineNumber, column: start.column, offset: item.start, editorSnapshot: text, startLineNumber: start.lineNumber, startColumn: start.column, endLineNumber: end.lineNumber, endColumn: end.column };
       });
       updateTabSession("lintProblems", problems, owner);
       monaco.editor.setModelMarkers(model, "fbsdb-lint", problems.map(problem => ({ ...problem, severity: problem.severity === "warning" ? monaco.MarkerSeverity.Warning : monaco.MarkerSeverity.Error })));
@@ -1155,14 +1147,14 @@ export function App() {
   }, [monaco, sql, activeTabId, tabSession.compilationProblems, tabSession.runtimeProblems]);
 
   function updateTokenColor(token, color) { setAllTokenColors((current) => ({ ...current, [theme]: { ...current[theme], [token]: color } })); }
-  function editorIsReadonly() { return !!tabsRef.current.find(tab => tab.id === activeTabIdRef.current)?.readOnly; }
+  function editorIsReadonly() { return !!documents.tabs.find(tab => tab.id === documents.activeId)?.readOnly; }
   async function navigateProblem(problem) {
-    const tab = tabsRef.current.find(tab => tab.id === problem.tabId);
+    const tab = documents.tabs.find(tab => tab.id === problem.tabId);
     if (!tab) return;
-    const text = problem.tabId === activeTabIdRef.current ? sqlRef.current : tab.content;
+    const text = problem.tabId === documents.activeId ? documents.text : tab.content;
     if (problem.offset != null && problem.editorSnapshot === text) {
       rememberLocation();
-      if (problem.tabId !== activeTabIdRef.current) activateTab(problem.tabId);
+      if (problem.tabId !== documents.activeId) activateTab(problem.tabId);
       requestAnimationFrame(() => { const editor = editorRef.current, model = editor?.getModel(); if (!model || model.getValue() !== text) return; const position = model.getPositionAt(problem.offset); editor.setPosition(position); editor.revealPositionInCenter(position); editor.focus(); rememberLocation(problem.tabId,position); });
       return;
     }
@@ -1177,15 +1169,15 @@ export function App() {
       openOracleDefinition(source, prefix == null ? null : { lineNumber: prefix.split('\n').length, column: prefix.length - prefix.lastIndexOf('\n') });
       return;
     }
-    if (problem.tabId !== activeTabIdRef.current) activateTab(problem.tabId);
+    if (problem.tabId !== documents.activeId) activateTab(problem.tabId);
     if (problem.source === 'Oracle') setResultTab('Output', problem.tabId);
   }
-  function rememberLocation(tabId=activeTabIdRef.current,position=editorRef.current?.getPosition()) { if(!navigatingRef.current&&position)navigationHistoryRef.current.push({tabId,...position}); }
+  function rememberLocation(tabId=documents.activeId,position=editorRef.current?.getPosition()) { if(!navigatingRef.current&&position)navigationHistoryRef.current.push({tabId,...position}); }
   function navigateHistory(direction) {
     if(direction<0&&navigationHistoryRef.current.index===navigationHistoryRef.current.items.length-1)rememberLocation();
-    const location=navigationHistoryRef.current.move(direction,item=>tabsRef.current.some(tab=>tab.id===item.tabId));if(!location)return;
+    const location=navigationHistoryRef.current.move(direction,item=>documents.tabs.some(tab=>tab.id===item.tabId));if(!location)return;
     navigatingRef.current=true;
-    if(location.tabId!==activeTabIdRef.current)activateTab(location.tabId);
+    if(location.tabId!==documents.activeId)activateTab(location.tabId);
     requestAnimationFrame(()=>{editorRef.current?.setPosition(location);editorRef.current?.revealPositionInCenter(location);editorRef.current?.focus();navigatingRef.current=false});
   }
   function jumpToOffset(offset) {const editor=editorRef.current;if(!editor?.getModel())return;rememberLocation();const position=editor.getModel().getPositionAt(offset);editor.setPosition(position);editor.revealPositionInCenter(position);editor.focus();rememberLocation();}
@@ -1200,11 +1192,11 @@ export function App() {
       const trigger=editor.getDomNode(),r=trigger.getBoundingClientRect(),x=event.event?.posx||r.left+30,y=event.event?.posy||r.top+30;
       event.event?.preventDefault?.();event.event?.stopPropagation?.();
       if(object){openObjectContext({type:'contextmenu',preventDefault(){},stopPropagation(){},currentTarget:trigger,clientX:x,clientY:y},object);setEditorContext(null)}
-      else setEditorContext({tabId:activeTabIdRef.current,model,version:model.getVersionId(),selection:range,trigger,x,y,selected:!range.isEmpty(),canUndo:model.canUndo(),canRedo:model.canRedo(),readOnly:editorIsReadonly()});
+      else setEditorContext({tabId:documents.activeId,model,version:model.getVersionId(),selection:range,trigger,x,y,selected:!range.isEmpty(),canUndo:model.canUndo(),canRedo:model.canRedo(),readOnly:editorIsReadonly()});
     };const listener=editor.onContextMenu(show),keyboard=editor.onKeyDown(event=>{const e=event.browserEvent;if(e.key==='ContextMenu'||e.key==='F10'&&e.shiftKey){e.preventDefault();e.stopPropagation();const position=editor.getPosition(),p=editor.getScrolledVisiblePosition(position),r=editor.getDomNode().getBoundingClientRect();show({target:{position},event:{posx:r.left+(p?.left||20),posy:r.top+(p?.top||20)+20}})}});return()=>{listener.dispose();keyboard.dispose();setEditorContext(null)};
   },[monaco,activeTabId,completionObjects,completionSchema]);
   async function editorContextAction(action,context){
-    const editor=editorRef.current,valid=()=>activeTabIdRef.current===context.tabId&&editor.getModel()===context.model&&!context.model.isDisposed()&&context.model.getVersionId()===context.version;
+    const editor=editorRef.current,valid=()=>documents.activeId===context.tabId&&editor.getModel()===context.model&&!context.model.isDisposed()&&context.model.getVersionId()===context.version;
     const check=()=>{if(!valid())throw Error('The editor changed. Open the menu again.')};check();editor.setSelection(context.selection);editor.focus();
     if(action==='run'){runQuery();return}if(action==='explain'){explainQuery();return}if(action==='format'){await formatSql();return}
     if(action==='selectAll'){editor.setSelection(context.model.getFullModelRange());return}
@@ -1219,7 +1211,7 @@ export function App() {
     const trigger=event.currentTarget,rect=trigger.getBoundingClientRect(),originTabId=metadataOriginTabId;
     const profileId=sessionsRef.current[originTabId]?.activeConnection?.id;
     if(!profileId||['No connection','Disconnected'].includes(profileId))return;
-    setObjectMenu({cancellation:completionCancellation(),item:{...item,owner:item.owner||schemaOwner},trigger,x:event.type==='contextmenu'?event.clientX||rect.left:rect.left,y:event.type==='contextmenu'?event.clientY||rect.bottom:rect.bottom,editorTabId:activeTabIdRef.current,originTabId,profileId,epoch:completionMetadataRef.current.session(originTabId).epoch});
+    setObjectMenu({cancellation:completionCancellation(),item:{...item,owner:item.owner||schemaOwner},trigger,x:event.type==='contextmenu'?event.clientX||rect.left:rect.left,y:event.type==='contextmenu'?event.clientY||rect.bottom:rect.bottom,editorTabId:documents.activeId,originTabId,profileId,epoch:completionMetadataRef.current.session(originTabId).epoch});
   }
   function openExplorerObject(item,view='Overview',originTabId=metadataOriginTabId) {
     setDefinitionError('');
@@ -1232,17 +1224,17 @@ export function App() {
   }
   function openObjectSqlDraft(text,item,profileId,save=false) {
     setObjectTabActive(false);newSqlFileNow();
-    const id=activeTabIdRef.current,name=(item.name.replace(/[<>:"/\\|?*\u0000-\u001f]/g,'_').slice(0,100)||'Object')+'.sql';
-    sqlRef.current=text;setSql(text);setFileName(name);setFileDirty(true);setFileConnectionProfileId(profileId);
+    const id=documents.activeId,name=(item.name.replace(/[<>:"/\\|?*\u0000-\u001f]/g,'_').slice(0,100)||'Object')+'.sql';
+
     setTabs(current=>current.map(tab=>tab.id===id?{...tab,name,content:text,dirty:true,connectionProfileId:profileId}:tab));
     const profile=dbConnectionsRef.current.find(item=>item.id.toLowerCase()===profileId?.toLowerCase());
     if(isNativeHost&&profile)beginConnection({...profile,tabId:id});
-    if(save&&isNativeHost)sendNativeCommand('file.save',{tabId:id,path:null,fileName:name,content:text});
+    if(save&&isNativeHost)documentSavesRef.current.start(sendNativeCommand,{id,path:null,name,content:text,dirty:true,connectionProfileId:profileId});
     else if(save){const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),0)}
   }
   async function objectContextAction(action,context) {
     const {item,originTabId,editorTabId,profileId,epoch}=context,broker=completionMetadataRef.current;
-    const valid=()=>!context.cancellation.token.isCancellationRequested&&activeTabIdRef.current===editorTabId&&!closedTabsRef.current.has(originTabId)&&broker.session(originTabId).epoch===epoch&&sessionsRef.current[originTabId]?.activeConnection?.id===profileId;
+    const valid=()=>!context.cancellation.token.isCancellationRequested&&documents.activeId===editorTabId&&!closedTabsRef.current.has(originTabId)&&broker.session(originTabId).epoch===epoch&&sessionsRef.current[originTabId]?.activeConnection?.id===profileId;
     const check=()=>{if(!valid())throw Error('The originating tab or connection changed. Open the menu again.')};
     const load=async(kind,target=item)=>{check();const value=await broker.load(originTabId,target,context.cancellation.token,kind);check();if(!value)throw Error(broker.session(originTabId).lastError||'Oracle metadata is unavailable for this object.');return value};
     check();
@@ -1282,15 +1274,15 @@ export function App() {
     objectAnalysisRequestRef.current?.cancel();const cancellation=completionCancellation();objectAnalysisRequestRef.current=cancellation;
     const originTabId=requestedOriginTabId,broker=completionMetadataRef.current,epoch=broker.session(originTabId).epoch;
     setObjectAnalysis({target,originTabId,loading:true});
-    const editorTabId=activeTabIdRef.current;
+    const editorTabId=documents.activeId;
     const [data,metadata]=await Promise.all([broker.load(originTabId,target,cancellation.token,'objectAnalysis'),relationships?broker.load(originTabId,target,cancellation.token,'metadata'):Promise.resolve(null)]);
-    if(activeTabIdRef.current===editorTabId&&!cancellation.token.isCancellationRequested&&epoch===broker.session(originTabId).epoch)setObjectAnalysis({target,originTabId,data:data?{...data,relationships:metadata?.foreignKeys||[]}:null,loading:false});
+    if(documents.activeId===editorTabId&&!cancellation.token.isCancellationRequested&&epoch===broker.session(originTabId).epoch)setObjectAnalysis({target,originTabId,data:data?{...data,relationships:metadata?.foreignKeys||[]}:null,loading:false});
   }
   async function openExplorerDefinition(target) {
     setDefinitionError('');
     const originTabId=metadataOriginTabId,broker=completionMetadataRef.current,epoch=broker.session(originTabId).epoch;
     const source=await broker.load(originTabId,target,undefined,'definition');
-    if(source&&broker.session(originTabId).epoch===epoch&&!closedTabsRef.current.has(originTabId)&&activeTabIdRef.current===activeTabId)openOracleDefinition({...source,originTabId});
+    if(source&&broker.session(originTabId).epoch===epoch&&!closedTabsRef.current.has(originTabId)&&documents.activeId===activeTabId)openOracleDefinition({...source,originTabId});
     else if(!source)setDefinitionError(broker.session(originTabId).lastError||'Oracle definition is unavailable for this object.');
   }
   function choosePaletteItem(item) {
@@ -1304,120 +1296,137 @@ export function App() {
   useEffect(()=>{
     setDocumentOutline([]);if(!monaco||!completionClientRef.current)return;
     let cancelled=false;const source=sql,tabId=activeTabId;
-    const timer=setTimeout(async()=>{const result=await completionClientRef.current?.request('outline',source,0);if(!cancelled&&tabId===activeTabIdRef.current&&sqlRef.current===source)setDocumentOutline(result?.outline||[])},250);
+    const timer=setTimeout(async()=>{const result=await completionClientRef.current?.request('outline',source,0);if(!cancelled&&tabId===documents.activeId&&documents.text===source)setDocumentOutline(result?.outline||[])},250);
     return()=>{cancelled=true;clearTimeout(timer)};
   },[sql,activeTabId,monaco,completionSettings,completionObjects,completionSchema,completionSession.oracleVocabulary,allSqlSnippets]);
   function openOracleDefinition(source, selection) {
     if (!['PACKAGE', 'PACKAGE BODY', 'PROCEDURE', 'FUNCTION', 'TRIGGER', 'TYPE', 'TYPE BODY'].includes(source.type)) {
-      setObjectDefinition({ ...source, originTabId: source.originTabId || activeTabIdRef.current });
+      setObjectDefinition({ ...source, originTabId: source.originTabId || documents.activeId });
       return;
     }
     rememberLocation();
     const originTabId = source.originTabId, id = `definition:${originTabId}:${source.owner}:${source.type}:${source.name}`;
-    syncActiveTab();
+    rememberEditorPosition();
     const tab = { id, name: `${source.owner}.${source.name}${source.type.endsWith(" BODY") ? ".body" : ""}.sql`, path: null, content: source.text, dirty: false, readOnly: true, metadataOriginTabId: originTabId, definitionObject: { owner: source.owner, name: source.name, type: source.type } };
-    setTabs(current => current.some(item => item.id === id) ? current.map(item => item.id === id ? tab : item) : [...current, tab]);
-    activeTabIdRef.current = id; sqlRef.current = source.text; setNativeTabId(originTabId); setActiveTabId(id); setSql(source.text); setFileName(tab.name); setFilePath(null); setFileDirty(false); setFileConnectionProfileId(null);
+    documents.open(tab);
+    setNativeTabId(originTabId);
     requestAnimationFrame(() => { const position = { lineNumber: selection?.startLineNumber || selection?.lineNumber || 1, column: selection?.startColumn || selection?.column || 1 }; editorRef.current?.setPosition(position); editorRef.current?.revealPositionInCenter(position); editorRef.current?.focus(); rememberLocation(id,position); });
   }
   useEffect(()=>{
     if(recovery)return;
-    const save=()=>{try{localStorage.setItem('fbsdb.sqlDrafts',JSON.stringify(draftSnapshot(tabsRef.current,activeTabIdRef.current,activeFileSnapshotRef.current)))}catch{}};
+    const save=()=>{try{localStorage.setItem('fbsdb.sqlDrafts',JSON.stringify(draftSnapshot(documents.tabs,documents.activeId)))}catch{}};
     const timer=setTimeout(save,700);window.addEventListener('pagehide',save);
     return()=>{clearTimeout(timer);window.removeEventListener('pagehide',save)};
   },[tabs,sql,fileDirty,filePath,fileConnectionProfileId,activeTabId,recovery]);
   function restoreDrafts(files,reconnect) {
     const restored=files.map(file=>({...file,id:`recovered-${crypto.randomUUID()}`})),selectedIndex=files.findIndex(file=>file.id===recovery.activeTabId),active=restored[Math.max(0,selectedIndex)];
-    const live=tabsRef.current.filter(tab=>tab.dirty||tab.path||tab.content.trim());
-    setTabs([...live,...restored]);activeTabIdRef.current=active.id;setNativeTabId(active.id);sqlRef.current=active.content;
-    setActiveTabId(active.id);setSql(active.content);setFileName(active.name);setFilePath(active.path);setFileDirty(active.dirty);setFileConnectionProfileId(active.connectionProfileId);
+    const live=documents.tabs.filter(tab=>tab.dirty||tab.path||tab.content.trim());
+    documents.replace([...live,...restored], active.id);setNativeTabId(active.id);
     setRecovery(null);if(isNativeHost)sendNativeCommand('file.activate',{tabId:active.id,path:active.path});
     if(reconnect&&active.connectionProfileId){const profile=dbConnectionsRef.current.find(item=>item.id===active.connectionProfileId);if(profile)beginConnection({...profile,tabId:active.id});}
   }
   function worksetSnapshot(){
     const root=workspace.root;if(!root)return {files:[]};
     const inside=path=>pathKey(path).startsWith(pathKey(root)+'/');
-    const files=[...new Map(tabsRef.current.filter(tab=>tab.path&&!tab.readOnly&&inside(tab.path)).map(tab=>{const position=tab.id===activeTabIdRef.current?editorRef.current?.getPosition():editorPositionsRef.current.get(tab.id);return [pathKey(tab.path),{path:tab.path.slice(root.replace(/[\\/]$/,'').length+1).replace(/\\/g,'/'),line:position?.lineNumber||1,column:position?.column||1}]})).values()];
-    return {files,activePath:activeFileSnapshotRef.current?.path&&inside(activeFileSnapshotRef.current.path)?activeFileSnapshotRef.current.path.slice(root.length+1).replace(/\\/g,'/'):null};
+    const files=[...new Map(documents.tabs.filter(tab=>tab.path&&!tab.readOnly&&inside(tab.path)).map(tab=>{const position=tab.id===documents.activeId?editorRef.current?.getPosition():editorPositionsRef.current.get(tab.id);return [pathKey(tab.path),{path:tab.path.slice(root.replace(/[\\/]$/,'').length+1).replace(/\\/g,'/'),line:position?.lineNumber||1,column:position?.column||1}]})).values()];
+    return {files,activePath:documents.active?.path&&inside(documents.active.path)?documents.active.path.slice(root.length+1).replace(/\\/g,'/'):null};
   }
   function openWorkset(message){
-    if(pathKey(message.root)!==pathKey(workspace.root))return;syncActiveTab();
-    const current=tabsRef.current.map(tab=>tab.id===activeTabIdRef.current?{...tab,...activeFileSnapshotRef.current,content:sqlRef.current}:tab),ordered=[];
+    if(pathKey(message.root)!==pathKey(workspace.root))return;rememberEditorPosition();
+    const current=documents.tabs,ordered=[];
     for(const file of message.files||[]){const existing=current.find(tab=>pathKey(tab.path)===pathKey(file.path));const tab=existing||{id:`file:${crypto.randomUUID()}`,name:file.fileName,path:file.path,content:file.content,dirty:false,connectionProfileId:file.profileId??null,restoreConnectionOnActivate:!!file.profileId,diskVersion:file.diskVersion};ordered.push(tab);editorPositionsRef.current.set(tab.id,{lineNumber:file.line,column:file.column});if(!existing)sendNativeCommand('file.activate',{path:tab.path,tabId:tab.id})}
-    if(!ordered.length)return;const ids=new Set(ordered.map(tab=>tab.id)),next=[...current.filter(tab=>!ids.has(tab.id)),...ordered];tabsRef.current=next;setTabs(next);setObjectTabActive(false);
+    if(!ordered.length)return;const ids=new Set(ordered.map(tab=>tab.id)),next=[...current.filter(tab=>!ids.has(tab.id)),...ordered];setTabs(next);setObjectTabActive(false);
     const wanted=message.workset.activePath?pathKey(message.root+'/'+message.workset.activePath):null;const active=ordered.find(tab=>pathKey(tab.path)===wanted)||ordered[0];activateTab(active.id);const source=message.files.find(file=>pathKey(file.path)===pathKey(active.path));requestAnimationFrame(()=>{const position={lineNumber:source.line,column:source.column};editorRef.current?.setPosition(position);editorRef.current?.revealPositionInCenterIfOutsideViewport(position)});
   }
-  function resolveExternalFile(reload){
-    const tab=tabsRef.current.find(tab=>tab.id===activeTabIdRef.current),change=tab?.externalChange;if(!change||change.error)return;
-    const keepDraft=!reload&&change.missing,content=reload?change.content:sqlRef.current,dirty=reload?false:true,path=keepDraft?null:tab.path;
-    setTabs(current=>current.map(item=>item.id===tab.id?{...item,path,content,dirty,diskVersion:change.version,externalChange:null}:item));sqlRef.current=content;setSql(content);setFileDirty(dirty);if(keepDraft){setFilePath(null);sendNativeCommand('file.activate',{path:null,tabId:tab.id})}
+  function resolveExternalFile(reload) {
+    const tab = documents.active, change = tab?.externalChange;
+    if (!change || change.error || reload && change.missing) return;
+    documents.dispatch({ type: 'resolveExternal', id: tab.id, reload });
+    if (!reload && change.missing) sendNativeCommand('file.activate', { path: null, tabId: tab.id });
   }
-  function syncActiveTab() { if(editorRef.current?.getPosition())editorPositionsRef.current.set(activeTabIdRef.current,editorRef.current.getPosition()); const snapshot = { ...activeFileSnapshotRef.current, content: sqlRef.current }; setTabs((current) => current.map((tab) => tab.id === snapshot.id ? { ...tab, ...snapshot } : tab)); }
+  function rememberEditorPosition() {
+    if (documents.activeId && editorRef.current?.getPosition()) editorPositionsRef.current.set(documents.activeId, editorRef.current.getPosition());
+  }
   function openSqlFileNow() { if (isNativeHost) sendNativeCommand("file.open"); else openFileInputRef.current?.click(); }
-  function openSqlFile() { syncActiveTab(); openSqlFileNow(); }
+  function openSqlFile() { rememberEditorPosition(); openSqlFileNow(); }
   function openWorkspace() {setShowOpenWorkspace(true);}
-  function openWorkspaceFile(file) { const cached = tabsRef.current.find((tab) => pathKey(tab.path) === pathKey(file.path)); if (cached && !file.newTab) { activateTab(cached.id); return; } syncActiveTab(); if (isNativeHost) sendNativeCommand("file.openPath", { path: file.path, forceNew:!!file.newTab }); else openSqlFileNow(); }
-  function activateTab(id) { rememberLocation(); syncActiveTab(); const tab = tabsRef.current.find((item) => item.id === id); if (!tab) return; const restorePosition=editorPositionsRef.current.get(id); setNativeTabId(tab.metadataOriginTabId || id); activeTabIdRef.current = id; sqlRef.current = tab.content; setActiveTabId(id); setSql(tab.content); setFileName(tab.name); setFilePath(tab.path); setFileDirty(tab.dirty); setFileConnectionProfileId(tab.connectionProfileId ?? null); schemaLookupRef.current = makeOracleRelationLookup(sessionsRef.current[id]?.schemaObjects || [], sessionsRef.current[id]?.schemaOwner); schemaReadyRef.current = Boolean(sessionsRef.current[id]?.schemaReady); schemaLoadedRef.current.clear(); schemaRequestedRef.current.clear(); if (isNativeHost && !tab.readOnly) sendNativeCommand("file.activate", { path: tab.path, tabId: id }); queueSchemaForSql(tab.content);
+  function openWorkspaceFile(file) { const cached = documents.tabs.find((tab) => pathKey(tab.path) === pathKey(file.path)); if (cached && !file.newTab) { activateTab(cached.id); return; } rememberEditorPosition(); if (isNativeHost) sendNativeCommand("file.openPath", { path: file.path, forceNew:!!file.newTab }); else openSqlFileNow(); }
+  function activateTab(id, remember = true) { if (remember) { rememberLocation(); rememberEditorPosition(); } const tab = documents.tabs.find((item) => item.id === id); if (!tab) return; const restorePosition=editorPositionsRef.current.get(id); setNativeTabId(tab.metadataOriginTabId || id); documents.activate(id); schemaLookupRef.current = makeOracleRelationLookup(sessionsRef.current[id]?.schemaObjects || [], sessionsRef.current[id]?.schemaOwner); schemaReadyRef.current = Boolean(sessionsRef.current[id]?.schemaReady); schemaLoadedRef.current.clear(); schemaRequestedRef.current.clear(); if (isNativeHost && !tab.readOnly) sendNativeCommand("file.activate", { path: tab.path, tabId: id }); queueSchemaForSql(tab.content);
     if(isNativeHost&&tab.restoreConnectionOnActivate){
-      tabsRef.current=tabsRef.current.map(item=>item.id===id?{...item,restoreConnectionOnActivate:false}:item);
       setTabs(current=>current.map(item=>item.id===id?{...item,restoreConnectionOnActivate:false}:item));
       const profile=dbConnectionsRef.current.find(item=>item.id.toLowerCase()===tab.connectionProfileId?.toLowerCase());
       if(profile)beginConnection({...profile,tabId:id});
     }
     requestAnimationFrame(() => {const position=restorePosition;if(position){editorRef.current?.setPosition(position);editorRef.current?.revealPositionInCenterIfOutsideViewport(position)}editorRef.current?.focus();rememberLocation(id)}); }
-  function cycleSqlTab(direction) { const items = tabsRef.current; if (items.length < 2) return; const index = items.findIndex(item => item.id === activeTabIdRef.current); activateTab(items[(index + direction + items.length) % items.length].id); }
-  function newSqlFileNow() { const id = `new-${crypto.randomUUID()}`; syncActiveTab(); activeTabIdRef.current = id; setNativeTabId(id); if (isNativeHost) sendNativeCommand("file.new", { tabId: id }); setActiveTabId(id); schemaReadyRef.current = false; schemaLookupRef.current = new Map(); schemaLoadedRef.current.clear(); schemaRequestedRef.current.clear(); setTabs((current) => [...current, { id, name: "Untitled.sql", path: null, content: "", dirty: false, connectionProfileId: null }]); sqlRef.current = ""; setSql(""); setFileName("Untitled.sql"); setFilePath(null); setFileDirty(false); setFileConnectionProfileId(null); requestAnimationFrame(() => editorRef.current?.focus()); }
-  function newSqlFileFromLastConnection() { const current = activeConnectionRef.current; const profile = dbConnectionsRef.current.find(item => item.id === (current && !['No connection', 'Disconnected'].includes(current.id) ? current.id : null)); newSqlFileNow(); if (profile) { if (isNativeHost) beginConnection({ ...profile, tabId: activeTabIdRef.current }); else { setActiveConnection(profile); setTabs(tabs => tabs.map(tab => tab.id === activeTabIdRef.current ? { ...tab, connectionProfileId: profile.id } : tab)); } } }
+  function cycleSqlTab(direction) { const items = documents.tabs; if (items.length < 2) return; const index = items.findIndex(item => item.id === documents.activeId); activateTab(items[(index + direction + items.length) % items.length].id); }
+  function newSqlFileNow() {
+    const id = `new-${crypto.randomUUID()}`;
+    rememberEditorPosition();
+    documents.open({ id, name: "Untitled.sql", path: null, content: "", dirty: false, connectionProfileId: null });
+    setNativeTabId(id);
+    if (isNativeHost) sendNativeCommand("file.new", { tabId: id });
+    schemaReadyRef.current = false; schemaLookupRef.current = new Map(); schemaLoadedRef.current.clear(); schemaRequestedRef.current.clear();
+    requestAnimationFrame(() => editorRef.current?.focus());
+  }
+  function newSqlFileFromLastConnection() { const current = activeConnectionRef.current; const profile = dbConnectionsRef.current.find(item => item.id === (current && !['No connection', 'Disconnected'].includes(current.id) ? current.id : null)); newSqlFileNow(); if (profile) { if (isNativeHost) beginConnection({ ...profile, tabId: documents.activeId }); else { setActiveConnection(profile); setTabs(tabs => tabs.map(tab => tab.id === documents.activeId ? { ...tab, connectionProfileId: profile.id } : tab)); } } }
   function closeTab(id, onClosed = null) {
-    const tab = tabsRef.current.find(item => item.id === id); if (!tab) return;
+    const tab = documents.tabs.find(item => item.id === id); if (!tab) return;
     const complete = () => {
       setObjectDefinition(current => current?.originTabId === id ? null : current);
-      batchDiscardRef.current.delete(id);closedTabsRef.current.add(id); pageRequestsRef.current.delete(id); completionMetadataRef.current.forget(id); completionRecentRef.current.delete(id);
+      documentSavesRef.current.forget(id);
+      batchDiscardRef.current.delete(id);closedTabsRef.current.add(id); operations.pages.delete(id); completionMetadataRef.current.forget(id); completionRecentRef.current.delete(id);
       setTabSessions(current => { const next = { ...current }; delete next[id]; return next; });
-      setTabResults(current => { const next = { ...current }; delete next[id]; return next; });
-      const currentTabs = tabsRef.current;
+      results.forget(id);
+      const activeIdBeforeClose = documents.activeId;
+      const currentTabs = documents.tabs;
       const remaining = currentTabs.filter(item => item.id !== id);
       setTabs(current => current.filter(item => item.id !== id));
-      if (id !== activeTabIdRef.current) { onClosed?.(); return; }
-      if (remaining.length) { const next = remaining[Math.max(0, currentTabs.findIndex(item => item.id === id) - 1)]; activateTab(next.id); }
+      if (id !== activeIdBeforeClose) { onClosed?.(); return; }
+      if (remaining.length) { const next = remaining[Math.max(0, currentTabs.findIndex(item => item.id === id) - 1)]; activateTab(next.id, false); }
       else newSqlFileNow();
       onClosed?.();
     };
     const retry = () => { const request = sendNativeCommand("tab.close", { tabId: id }); tabCloseActionsRef.current.set(request, { complete, retry }); };
     const close = () => isNativeHost && !tab.readOnly ? retry() : complete();
-    if (tab.dirty && !tab.readOnly && !batchDiscardRef.current.has(id)) { if (id !== activeTabIdRef.current) activateTab(id); setPendingFileAction({ run: close }); }
+    if (tab.dirty && !tab.readOnly && !batchDiscardRef.current.has(id)) { if (id !== documents.activeId) activateTab(id); setPendingFileAction({ run: close }); }
     else close();
   }
   function closeTabs(ids) {
-    const selected=[...new Set(ids)],dirty=selected.filter(id=>tabsRef.current.find(tab=>tab.id===id)?.dirty);
+    const selected=[...new Set(ids)],dirty=selected.filter(id=>documents.tabs.find(tab=>tab.id===id)?.dirty);
     const run=discard=>{setBatchClose(null);if(discard)batchDiscardRef.current=new Set(selected);const queue=[...selected];const next=()=>{const id=queue.shift();if(id)closeTab(id,()=>setTimeout(next,0));else batchDiscardRef.current.clear()};next()};
     if(dirty.length>1)setBatchClose({count:dirty.length,run});else run(false);
   }
   function newSqlFile() { newSqlFileFromLastConnection(); }
   function saveSqlFile(afterSave = null) {
-    learnSqlUsage(sqlRef.current);
-    if (tabsRef.current.find(tab => tab.id === activeTabIdRef.current)?.readOnly) return;
-    if (isNativeHost) { saveContinuationRef.current = afterSave; sendNativeCommand("file.save", { path: filePath, fileName, content: sql, diskVersion:tabsRef.current.find(tab=>tab.id===activeTabIdRef.current)?.diskVersion??null }); return; }
+    learnSqlUsage(documents.text);
+    if (documents.tabs.find(tab => tab.id === documents.activeId)?.readOnly) return;
+    if (isNativeHost) {
+      const tab = documents.tabs.find(tab => tab.id === documents.activeId);
+      if (!tab) return;
+      const document = tab;
+      if (!documentSavesRef.current.start(sendNativeCommand, document, afterSave)) setRunState('A save is already in progress for this file.');
+      return;
+    }
     const url = URL.createObjectURL(new Blob([sql], { type: "text/sql;charset=utf-8" })), link = document.createElement("a"); link.href = url; link.download = fileName || "query.sql"; link.click(); URL.revokeObjectURL(url); setFileDirty(false); afterSave?.();
   }
   function connectInBackground(item, credentials = {}) {
-    const tabId = item.tabId || activeTabIdRef.current;
+    const tabId = item.tabId || documents.activeId;
     if ([...pendingConnectionsRef.current.values()].some(profile => profile.tabId === tabId)) return;
     updateTabSession("sessionContext",null,tabId);updateTabSession("operationStartedAt",Date.now(),tabId);setConnecting(true, tabId); setConnectionError("", tabId); updateTabSession("connectingProfile", item.name || item.id, tabId); updateTabSession("connectingProfileId",item.id,tabId);
     const requestId = sendNativeCommand("connection.connect", { profileId: item.id, ...credentials, tabId });
     pendingConnectionsRef.current.set(requestId, { ...item, user: credentials.user || item.user || item.savedUser, credentials: undefined, tabId });
   }
   function beginConnection(item) {
-    const tabId = item.tabId || activeTabIdRef.current; item = { ...item, tabId };
+    const tabId = item.tabId || documents.activeId; item = { ...item, tabId };
     if (item.credentials || item.hasSavedCredentials) { setAuthProfile(null); connectInBackground(item, item.credentials || {}); }
     else { setAuthProfile(item); setConnectionError("", tabId); setConnecting(false, tabId); }
   }
-  function switchConnection(item, force = false) { if (editorIsReadonly()) return; if (item.available === false) { setManagementError("TNS source unavailable. Edit this connection or refresh sources."); return; } setShowPicker(false); if (!force && item.id.toLowerCase() === activeConnection.id.toLowerCase()) return; if (isNativeHost && transactionPending) { setPendingSwitch({ ...item, tabId: activeTabIdRef.current }); return; } if (isNativeHost) { beginConnection(item); return; } setActiveConnection(item); setRunState(`Connected to ${item.id}`); }
-  function disconnectActiveConnection() { setShowPicker(false); if (transactionPending) setPendingSwitch({ id: "disconnect", disconnect: true, tabId: activeTabIdRef.current }); else if (isNativeHost) sendNativeCommand("connection.disconnect", { tabId: activeTabIdRef.current }); else setActiveConnection({ id: "Disconnected", title: "No active session", env: "—" }); }
+  function switchConnection(item, force = false) { if (editorIsReadonly()) return; if (item.available === false) { setManagementError("TNS source unavailable. Edit this connection or refresh sources."); return; } setShowPicker(false); if (!force && item.id.toLowerCase() === activeConnection.id.toLowerCase()) return; if (isNativeHost && transactionPending) { setPendingSwitch({ ...item, tabId: documents.activeId }); return; } if (isNativeHost) { beginConnection(item); return; } setActiveConnection(item); setRunState(`Connected to ${item.id}`); }
+  function disconnectActiveConnection() { setShowPicker(false); if (transactionPending) setPendingSwitch({ id: "disconnect", disconnect: true, tabId: documents.activeId }); else if (isNativeHost) sendNativeCommand("connection.disconnect", { tabId: documents.activeId }); else setActiveConnection({ id: "Disconnected", title: "No active session", env: "—" }); }
   function previewConnectionOrganization(payload){const next=changeConnectionOrganization(connectionOrg,payload,dbConnections);setConnectionOrg(next);setDbConnections(current=>organizedProfiles(current,next).map(p=>({...p,group:p.groups[0]||''})))}
   function connectionContextAction(action,context){
     const item=context.item,folderId=context.kind==='folder'?item.id:context.kind==='profile'?item.folderId:null;
-    if(action==='newSql'){newSqlFileNow();if(isNativeHost)beginConnection({...item,tabId:activeTabIdRef.current});return;}
+    if(action==='newSql'){newSqlFileNow();if(isNativeHost)beginConnection({...item,tabId:documents.activeId});return;}
     if(action==='connect'||action==='reconnect')switchConnection(item,action==='reconnect');
     else if(action==='disconnect')disconnectActiveConnection();
     else if(action==='edit')setProfileEditor(item);
@@ -1435,7 +1444,7 @@ export function App() {
     if (authProfile.testOnly) { setConnecting(true, authProfile.tabId); authTestRequestRef.current = sendNativeCommand("connection.test", { profileId: authProfile.id, ...credentials, tabId: authProfile.tabId }); return; }
     const profile = authProfile; setAuthProfile(null); connectInBackground(profile, credentials);
   }
-  function finishTransaction(action) { if (isNativeHost) sendNativeCommand(`transaction.${action}`, { tabId: pendingSwitch?.tabId || activeTabIdRef.current }); else setRunState(action === "commit" ? "Transaction committed" : "Transaction rolled back"); }
+  function finishTransaction(action) { if (isNativeHost) sendNativeCommand(`transaction.${action}`, { tabId: pendingSwitch?.tabId || documents.activeId }); else setRunState(action === "commit" ? "Transaction committed" : "Transaction rolled back"); }
   function resultExportData(overrideOptions) {
     const state=(resultTab==='Results'&&view.selectedResultKey?view.resultSets?.find(item=>item.key===view.selectedResultKey)?.view:view[resultTab==='Explain'?'planView':'queryView'])||{};
     const options=overrideOptions||state.options||{};const data=deriveResultData(sqlResult?.rows||[],sqlResult?.columns||[],options.derivedColumns||[]);
@@ -1504,17 +1513,17 @@ export function App() {
     catch { setRunState("Clipboard access failed. Export the fetched rows as CSV instead."); }
   }
   function requestSchemaDetails(item,originTabId=metadataOriginTabId,force=false) { const key = oracleSchemaKey(item).toLowerCase(); if(force){schemaLoadedRef.current.delete(key);schemaRequestedRef.current.delete(key)} if (!isNativeHost || schemaLoadedRef.current.has(key) || schemaRequestedRef.current.has(key)) return; schemaRequestedRef.current.add(key); sendNativeCommand("schema.objectDetails", { tabId:originTabId, owner: item.owner, name: item.name, objectType: item.type }); }
-  function refreshSchema(owner = activeTabIdRef.current) { if (schemaRequestRef.current) sendNativeCommand('schema.cancel', { requestId: schemaRequestRef.current, tabId: owner }); const id = sendNativeCommand("schema.refresh", { tabId: owner }); schemaRequestRef.current = id || null; return id; }
+  function refreshSchema(owner = documents.activeId) { if (schemaRequestRef.current) sendNativeCommand('schema.cancel', { requestId: schemaRequestRef.current, tabId: owner }); const id = sendNativeCommand("schema.refresh", { tabId: owner }); schemaRequestRef.current = id || null; return id; }
   function insertEditorText(text) { const editor = editorRef.current; if (!editor || editorIsReadonly()) return; editor.executeEdits("schema-explorer", [{ range: editor.getSelection(), text, forceMoveMarkers: true }]); editor.focus(); setFileDirty(true); }
-  function handleEditorChange(value) { if (editorIsReadonly()) return; sqlRef.current = value ?? ""; setSql(sqlRef.current); setFileDirty(true); setTabs((current) => current.map((tab) => tab.id === activeTabIdRef.current ? { ...tab, content: sqlRef.current, dirty: true } : tab)); queueSchemaForSql(sqlRef.current); }
+  function handleEditorChange(value) { if (editorIsReadonly()) return; documents.edit(value ?? ""); queueSchemaForSql(documents.text); }
   async function formatSql() {
     if (editorIsReadonly()) return;
     const editor = editorRef.current, model = editor?.getModel(), client = completionClientRef.current;
     if (!editor || !model || !client) return;
     const selection = editor.getSelection(), hasSelection = selection && !selection.isEmpty(), range = hasSelection ? selection : model.getFullModelRange();
-    const source = model.getValueInRange(range), version = model.getVersionId(), owner = activeTabIdRef.current;
+    const source = model.getValueInRange(range), version = model.getVersionId(), owner = documents.activeId;
     const result = await client.request("format", source, 0, null, { style: sqlFormatterStyle(resolveSetting(settingsRef.current,'editor.sqlFormatter').value, codeStyle) });
-    if (model.isDisposed() || model.getVersionId() !== version || activeTabIdRef.current !== owner || editor.getModel() !== model || typeof result?.formatted !== "string") return;
+    if (model.isDisposed() || model.getVersionId() !== version || documents.activeId !== owner || editor.getModel() !== model || typeof result?.formatted !== "string") return;
     const formatted = result.formatted;
     if (formatted === source) { setRunState("No formatting changes."); return; }
     editor.pushUndoStop(); editor.executeEdits("fbsdb.formatSql", [{ range, text: hasSelection ? formatted.replace(/\n$/, "") : formatted, forceMoveMarkers: true }]); editor.pushUndoStop();
@@ -1565,19 +1574,11 @@ export function App() {
   useEffect(()=>{workspaceDevRequestsRef.current.clear();setWorkspaceDev({});setWorkspaceSearchScope(null);setWorkspaceReplaceScope(null);setWorkspaceDevMode(null);setShowWorksets(false);searchRequestRef.current=null;if(workspace.root&&isNativeHost)refreshWorkspaceGit();},[workspace.root]);
   function refreshWorkspaceGit() {if(isNativeHost)workspaceDevelopmentCommand('workspace.git');}
   function openWorkspaceDevelopment(mode,scope=null) {setWorkspaceReplaceScope(scope);setWorkspaceDev(current=>({...current,preview:null,applied:null}));setWorkspaceDevMode(mode);if(mode==='git')refreshWorkspaceGit();}
-  function unsavedWorkspacePaths() {return tabsRef.current.map(tab=>tab.id===activeTabIdRef.current?{...tab,...activeFileSnapshotRef.current}:tab).filter(tab=>tab.dirty&&tab.path).map(tab=>tab.path);}
+  function unsavedWorkspacePaths() {return documents.tabs.filter(tab=>tab.dirty&&tab.path).map(tab=>tab.path);}
   function previewWorkspaceReplace(search,replacement,caseSensitive){setWorkspaceDev(current=>({...current,preview:null,applied:null}));workspaceDevelopmentCommand('workspace.replacePreview',{search,replacement,caseSensitive,scope:workspaceReplaceScope,excluded:unsavedWorkspacePaths()});}
   function applyWorkspaceReplace(selected){if(!workspaceDev.preview)return;workspaceDevelopmentCommand('workspace.replaceApply',{previewId:workspaceDev.preview.id,selected,excluded:unsavedWorkspacePaths()});}
-  function openScriptPreview() { const tabId=activeTabIdRef.current,run=scriptRunsRef.current.get(tabId);setScriptDialog({tabId,source:run?.running?run.source:sqlRef.current}); }
-  function startScript(statements,parameters,continueOnError) {
-    const owner=scriptDialog.tabId,session=sessionsRef.current[owner]||{},profile=session.activeConnection;
-    if(!isNativeHost||tabResultsRef.current[owner]?.streamState?.busy||session.executing||session.scriptRun?.running||session.fetchingPage||session.connecting||!profile||['No connection','Disconnected'].includes(profile.id))return;
-    const existing=tabResultsRef.current[owner]?.queryResult;
-    if(existing)updateTabResult('resultSets',sets=>[...(sets||[]),{key:`before-script-${crypto.randomUUID()}`,label:'Before script',pinned:true,result:existing,view:tabResultsRef.current[owner]?.queryView||{}}],owner);
-    const run={running:true,source:scriptDialog.source,steps:[],parameters};scriptRunsRef.current.set(owner,run);updateTabSession('scriptRun',run,owner);
-    resultExecutionMeta.current.set(owner,{fileName:tabsRef.current.find(tab=>tab.id===owner)?.name,editorSnapshot:scriptDialog.source,executedProfile:profile.name||profile.id,executionPageSize:maxRows,workspaceRoot:workspace.root});
-    run.requestId=sendNativeCommand('script.execute',{tabId:owner,continueOnError,timeoutSeconds:queryTimeout,pageSize:maxRows,statements:statements.map(statement=>({...statement,parameters:parameters.filter(parameter=>getBindNames(statement.sql).includes(parameter.name))}))});
-  }
+  function openScriptPreview() { const tabId=documents.activeId,run=operations.scripts.get(tabId);setScriptDialog({tabId,source:run?.running?run.source:documents.text}); }
+
   const executionFlashRef=useRef(null),executionFlashTimerRef=useRef(null);
   function flashExecutionTarget(target) {
     const editor=editorRef.current,model=editor?.getModel();
@@ -1587,41 +1588,12 @@ export function App() {
     const decorations=editor.createDecorationsCollection([{range:{startLineNumber:start.lineNumber,startColumn:start.column,endLineNumber:end.lineNumber,endColumn:end.column},options:{className:'sql-execution-target',isWholeLine:false,description:'SQL execution target'}}]);
     executionFlashRef.current=decorations;
     executionFlashTimerRef.current=setTimeout(()=>decorations.clear(),1600);
-    updateTabSession('executionTarget',`${target.kind} · Ln ${start.lineNumber}–${end.lineNumber}`,activeTabIdRef.current);
+    updateTabSession('executionTarget',`${target.kind} · Ln ${start.lineNumber}–${end.lineNumber}`,documents.activeId);
   }
   useEffect(()=>{executionFlashRef.current?.clear();return()=>{clearTimeout(executionFlashTimerRef.current);executionFlashRef.current?.clear()}},[activeTabId]);
-  function runQuery(statementOverride) {
-    if (tabsRef.current.find(tab => tab.id === activeTabIdRef.current)?.readOnly) return;
-    if (view.streamState?.busy) { setRunState("Finish or cancel the streaming export before executing SQL."); return; }
-    if (executing || pendingBindSql || pageRequestRef.current) return;
-    const editor = editorRef.current, model = editor?.getModel(), position = editor?.getPosition() ?? lastEditorPositionRef.current;
-    if (!isNativeHost) { setRunState("Connect to an Oracle profile in the desktop app to execute SQL."); return; }
-    if (!activeConnection || ["No connection", "Disconnected"].includes(activeConnection.id)) { setShowPicker(true); return; }
-    const selection=editor?.getSelection();
-    const target=executionTarget(model?.getValue()||sqlRef.current,{start:selection&&model?model.getOffsetAt(selection.getStartPosition()):0,end:selection&&model?model.getOffsetAt(selection.getEndPosition()):0,caret:position&&model?model.getOffsetAt(position):0,override:typeof statementOverride==='string'?statementOverride:undefined});
-    const statement=target?.sql;
-    if(statement?.trim())flashExecutionTarget(target);
-    if (!statement?.trim()) { setRunState("Place the cursor in a SQL statement or select SQL to run."); return; }
-    const binds = getBindNames(statement); if (binds.length) { setPendingBindSql(statement); return; } executeStatement(statement);
-  }
-  runQueryRef.current = runQuery;
-  function explainQuery() {
-    if (tabsRef.current.find(tab => tab.id === activeTabIdRef.current)?.readOnly) return;
-    if (executing) { setResultTab("Explain"); return; }
-    if (!isNativeHost) { setResultTab("Explain"); setExplainMessage("Connect to an Oracle profile in the desktop app to inspect an execution plan."); return; }
-    if (!activeConnection || ["No connection", "Disconnected"].includes(activeConnection.id)) { setShowPicker(true); setRunState("Connect to an Oracle profile before explaining SQL."); return; }
-    const editor = editorRef.current, model = editor?.getModel(), position = editor?.getPosition() ?? lastEditorPositionRef.current;
-    const selection = editor?.getSelection(); let statement = selection && !selection.isEmpty() ? model.getValueInRange(selection) : "";
-    if (!statement && model) { const text = model.getValue(); statement = getStatementAtCursor(text, position ? model.getOffsetAt(position) : 0); }
-    if (!statement?.trim()) { setResultTab("Explain"); setExplainMessage("Place the cursor in a SQL statement or select SQL to explain."); return; }
-    updateTabSession("sqlStage","Building execution plan");updateTabSession("operationStartedAt",Date.now()); resultOwnerRef.current = activeTabIdRef.current; setExecutionKind("explain"); setExecuting(true); setCancelling(false); setResultTab("Explain"); setExplainResult(null); setExplainMessage(""); setRunState("Building execution plan…"); requestOwnersRef.current.set(sendNativeCommand("sql.explain", { sql: statement }), activeTabIdRef.current);
-  }
-  function executeStatement(statement, parameters = [], miniTool = false, executionContext = {}) { updateTabSession('queryOutcome',null);cancelRequestsRef.current.delete(activeTabIdRef.current); if(miniTool||executionContext.serverFilter)updateTabSession('executionTarget',miniTool?'mini tool':'server filter',activeTabIdRef.current); updateTabSession('rendering',false,activeTabIdRef.current);learnSqlUsage(statement); const executionPageSize=pageSizes.next;updateTabSession("sqlStage","Executing SQL");updateTabSession("operationStartedAt",Date.now()); statement=statement.replace(/^(\s*SELECT)(?=\*)/i,"$1 "); updateTabResult("selectedResultKey",null); const snapshot = sqlRef.current, currentModel = editorRef.current?.getModel(), currentSelection = editorRef.current?.getSelection(); const selectedOffset = currentModel && currentSelection && !currentSelection.isEmpty() ? currentModel.getOffsetAt(currentSelection.getStartPosition()) : null; const cursorOffset = currentModel && editorRef.current?.getPosition() ? currentModel.getOffsetAt(editorRef.current.getPosition()) : null; const matches = getSqlStatements(snapshot).filter(item => item.sql === statement.trim()); const selected = matches.find(item => cursorOffset != null && item.start <= cursorOffset && cursorOffset <= item.end) || (matches.length === 1 ? matches[0] : null); const statementOffset = selectedOffset != null && snapshot.slice(selectedOffset, selectedOffset + statement.length) === statement ? selectedOffset : selected?.start ?? null; updateTabSession("runtimeProblems", [], activeTabIdRef.current); resultExecutionMeta.current.set(activeTabIdRef.current, { statementOffset, fileName: tabsRef.current.find(tab => tab.id === activeTabIdRef.current)?.name, executedAt: new Date().toISOString(), requestStartedAtPerf: performance.now(), executedProfile: activeConnectionRef.current.name || activeConnectionRef.current.id, editorSnapshot: sqlRef.current, executedSql: statement, executedParameters:parameters,executionPageSize,workspaceRoot:workspace.root,...executionContext }); resultOwnerRef.current = activeTabIdRef.current; pageRequestRef.current = null; setFetchingPage(false); setPageError(""); setExecutionKind("query"); setResultTab("Results"); const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`; pendingHistoryRef.current.set(activeTabIdRef.current, id); setQueryHistory((current) => [{ id, sql: statement, profile: activeConnectionRef.current.id, startedAt: Date.now(), status: "Running", detail: "Executing…" }, ...current].slice(0,historyLimit)); setExecuting(true); setCancelling(false); setRunState("Executing Oracle statement…"); setPendingBindSql(null); const requestId = sendNativeCommand("sql.execute", { sql: statement, parameters, miniTool, timeoutSeconds:queryTimeout, pageSize: executionPageSize, previousResultId: (view.resultSets||[]).some(item=>item.pinned&&item.result.resultId===view.queryResult?.resultId)?null:view.queryResult?.resultId||null }); requestOwnersRef.current.set(requestId, activeTabIdRef.current);queryOperationsRef.current.set(activeTabIdRef.current,{requestId,startedAt:Date.now(),status:'running'});queryRequestHistoryRef.current.set(requestId,activeTabIdRef.current);if(queryRequestHistoryRef.current.size>256)queryRequestHistoryRef.current.delete(queryRequestHistoryRef.current.keys().next().value);updateTabSession('queryRequestId',requestId);return requestId; }
-  function fetchMoreResults() {
-    if (!isNativeHost || !queryResult?.hasMore || pageRequestRef.current || executing) return;
-    updateTabSession("operationStartedAt",Date.now()); setFetchingPage(true); setPageError("");
-    pageRequestRef.current = { owner: activeTabIdRef.current, resultId:queryResult.resultId, id: sendNativeCommand("sql.fetchNext", { resultId: queryResult.resultId, pageSize: maxRows }) };
-  }
+
+
+
   function streamResultToFile(format="csv",overrideOptions) {
     updateTabSession('operationStartedAt',Date.now());
     if(!isNativeHost || !sqlResult?.columns?.length)return;
@@ -1658,18 +1630,30 @@ export function App() {
     setCustomSqlSnippets((current) => [...current, snippet]); setSelectedSnippetTrigger(trigger); setSnippetFilter(""); setSnippetError(""); setSnippetDraft({ trigger: "", label: "", detail: "", text: "SELECT ${1:column_name}\nFROM ${2:table_name};" }); setSnippetFormOpen(false);
   }
   function deleteCustomSqlSnippet(trigger) { setCustomSqlSnippets((current) => current.filter((snippet) => snippet.trigger !== trigger)); setSelectedSnippetTrigger("sel"); }
-  function openWorkspaceSearchMatch(match) { const cached = tabs.find((tab) => tab.path?.toLowerCase() === match.path.toLowerCase()); if (cached) { activateTab(cached.id); setShowSearch(false); requestAnimationFrame(() => { editorRef.current?.setPosition({ lineNumber: match.lineNumber, column: 1 }); editorRef.current?.revealLineInCenter(match.lineNumber); editorRef.current?.focus(); }); return; } syncActiveTab(); pendingSearchPositionRef.current = { path: match.path, lineNumber: match.lineNumber }; setShowSearch(false); sendNativeCommand("file.openPath", { path: match.path }); }
-  function cancelQuery(owner=activeTabIdRef.current,expectedRequestId) {
-    if(typeof owner!=='string')owner=activeTabIdRef.current;
-    const session=sessionsRef.current[owner],operation=queryOperationsRef.current.get(owner);
-    if(!isNativeHost||!session||session.cancelling||cancelRequestsRef.current.has(owner)||!(session.executing||session.fetchingPage||session.scriptRun?.running))return;
-    if(expectedRequestId&&(operation?.requestId!==expectedRequestId||operation.status!=='running'))return;
-    setCancelling(true,owner);setRunState('Sending cancellation request…',owner);
-    cancelRequestsRef.current.set(owner,sendNativeCommand('sql.cancel',{tabId:owner}));
-  }
+  function openWorkspaceSearchMatch(match) { const cached = tabs.find((tab) => tab.path?.toLowerCase() === match.path.toLowerCase()); if (cached) { activateTab(cached.id); setShowSearch(false); requestAnimationFrame(() => { editorRef.current?.setPosition({ lineNumber: match.lineNumber, column: 1 }); editorRef.current?.revealLineInCenter(match.lineNumber); editorRef.current?.focus(); }); return; } rememberEditorPosition(); pendingSearchPositionRef.current = { path: match.path, lineNumber: match.lineNumber }; setShowSearch(false); sendNativeCommand("file.openPath", { path: match.path }); }
 
-  function pinCurrentResult(){if(!queryResult?.columns?.length)return;if(view.selectedResultKey){updateTabResult('resultSets',sets=>(sets||[]).filter(item=>item.key!==view.selectedResultKey));updateTabResult('selectedResultKey',null)}else{const key=`pin-${Date.now()}`;updateTabResult('resultSets',sets=>[...(sets||[]),{key,result:{...queryResult,hasMore:false},label:view.latestResultName||(queryResult.executedSql||'Pinned result').slice(0,45),view:view.queryView,pinned:true}]);updateTabResult('selectedResultKey',key)}}
-  function releaseResult(result){const id=result.resultId;if(id)sendNativeCommand('sql.closeResult',{resultId:id});setTabResults(current=>{const tab=current[activeTabId]||{};const release=value=>value&&(value===result||id&&value.resultId===id)?{...value,rows:[],returnedRows:0,hasMore:false,released:true}:value;return {...current,[activeTabId]:{...tab,queryResult:release(tab.queryResult),resultSets:(tab.resultSets||[]).map(item=>({...item,result:release(item.result)}))}}})}
+
+  const { runQuery, explainQuery, executeStatement, fetchMoreResults, cancelQuery, startScript } = useQueryExecution({
+    documents, results, operations, native: isNativeHost, send: sendNativeCommand,
+    readSession: owner => sessionsRef.current[owner] || (owner === documents.activeId ? { activeConnection: activeConnectionRef.current } : {}),
+    settings: { pageSize: pageSizes.next, scriptPageSize: maxRows, timeout: queryTimeout, workspaceRoot: workspace.root },
+    editor: { current: editorRef.current, lastPosition: lastEditorPositionRef.current, flash: flashExecutionTarget },
+    session: { update: updateTabSession, status: setRunState },
+    ui: { pendingBind: pendingBindSql, bind: setPendingBindSql, showConnections: () => setShowPicker(true), scriptDialog },
+    history: {
+      learn: learnSqlUsage,
+      start(owner, statement, profile) {
+        const id = crypto.randomUUID(); pendingHistoryRef.current.set(owner, id);
+        setQueryHistory(current => [{ id, sql: statement, profile, startedAt: Date.now(), status: 'Running', detail: 'Executing…' }, ...current].slice(0, historyLimit));
+      },
+    },
+  });
+  runQueryRef.current = runQuery;
+  const pinCurrentResult = () => results.pin(documents.activeId);
+  function releaseResult(result, owner = activeTabId) {
+    if (result.resultId) sendNativeCommand('sql.closeResult', { tabId: owner, resultId: result.resultId });
+    results.release(owner, result);
+  }
   const managementContent={
     Name:<form className="result-settings-form" onSubmit={e=>{e.preventDefault();const key=renameResult||view.selectedResultKey||'latest';if(key==='latest')updateTabResult('latestResultName',newResultName.trim()||'Latest');else updateTabResult('resultSets',sets=>(sets||[]).map(item=>item.key===key?{...item,label:newResultName.trim()||'Result'}:item));setNewResultName('');setRenameResult(null)}}><h2>Rename result</h2><label>Name<input aria-label="Result name" maxLength={80} value={newResultName} placeholder={(view.selectedResultKey?view.resultSets?.find(item=>item.key===view.selectedResultKey)?.label:view.latestResultName)||'Result name'} onChange={e=>setNewResultName(e.target.value)}/></label><button disabled={!newResultName.trim()}>Rename result</button></form>,
     Source:definition?.tabId===activeTabId?<div className="result-settings-definition"><h2>{definition.name?`${definition.schema||'Current schema'}.${definition.table}.${definition.name}`:'Source definition'}</h2><dl>{Object.entries(definition).filter(([key])=>key!=='constraints'&&key!=='tabId').map(([key,value])=><div key={key}><dt>{({schema:'Schema',table:'Table',name:'Column',type:'Data type',size:'Length',precision:'Precision',scale:'Scale',nullable:'Nullable',defaultValue:'Default value',message:'Status'})[key]||key}</dt><dd>{typeof value==='boolean'?value?'Yes':'No':String(value??'—')}</dd></div>)}</dl><h3>Constraints</h3>{(definition.constraints||[]).map((constraint,i)=><div className="result-rule-row" key={i}><strong>{constraint.name}</strong><span>{({P:'Primary key',R:'Foreign key',U:'Unique',C:'Check'})[constraint.type]||constraint.type}{constraint.status?' · '+constraint.status:''}</span>{constraint.condition&&<code>{constraint.condition}</code>}</div>)}</div>:<p>Select a source column and use Source definition.</p>,
@@ -1746,7 +1730,7 @@ export function App() {
         {id:'replace',label:'Preview replace in workspace SQL files',disabled:!isNativeHost||!workspace.root,run:()=>openWorkspaceDevelopment('replace')},
         {id:'search',label:'Search workspace',detail:'Ctrl+Shift+F',run:()=>setShowSearch(true)},
       ]}/>}
-    <input ref={openFileInputRef} type="file" accept=".sql,text/plain" hidden onChange={async (event) => { const file = event.target.files?.[0]; if (file) { const content = await file.text(); syncActiveTab(); const id = `file:${crypto.randomUUID()}`; setTabs(current => [...current, { id, name: file.name, path: null, content, dirty: false, connectionProfileId: null }]); activeTabIdRef.current = id; setNativeTabId(id); setActiveTabId(id); sqlRef.current = content; setSql(content); setFileName(file.name); setFilePath(null); setFileDirty(false); setFileConnectionProfileId(null); } event.target.value = ""; }} />
+    <input ref={openFileInputRef} type="file" accept=".sql,text/plain" hidden onChange={async (event) => { const file = event.target.files?.[0]; if (file) { const content = await file.text(); rememberEditorPosition(); const id = `file:${crypto.randomUUID()}`; documents.open({ id, name: file.name, path: null, content, dirty: false, connectionProfileId: null }); setNativeTabId(id); } event.target.value = ""; }} />
     <FileMenu connectionControl={<ConnectionControl key={metadataOriginTabId} context={summarySession.sessionContext} contextError={summarySession.sessionContextError} executing={summarySession.executing} fetching={summarySession.fetchingPage} rendering={summarySession.rendering} cancelling={summarySession.cancelling} stage={summarySession.sqlStage} startedAt={summarySession.operationStartedAt} transactionPending={summarySession.transactionPending} readOnlyAnalysis={summarySession.analysisReadOnly} exporting={Boolean(tabResults[metadataOriginTabId]?.streamState?.busy)} inactive={Boolean(summarySession.inactive)} profile={summaryConnection} connected={summaryConnected} connecting={summarySession.connecting} connectingProfile={summarySession.connectingProfile} disabled={activeTabReadonly} open={showPicker} onOpen={() => setShowPicker(true)}/>} onManageWorkspaces={()=>setShowWorkspaceManager(true)} workspace={workspace} onNew={newSqlFile} onOpen={openSqlFile} onSave={() => saveSqlFile()} onOpenWorkspace={openWorkspace} language={language}>
       <RunMenu actions={[{label:'Run statement',shortcut:resolveSetting(settings,'editor.shortcuts').value.run,disabled:executing||fetchingPage,run:runQuery},{label:'Preview / run script',run:openScriptPreview},{id:'navigation',separator:true},{label:'File outline',shortcut:resolveSetting(settings,'editor.shortcuts').value.outline,run:()=>setPaletteMode('outline')},{label:'Navigate back',shortcut:'Alt+Left',run:()=>navigateHistory(-1)},{label:'Navigate forward',shortcut:'Alt+Right',run:()=>navigateHistory(1)}]}/>
       <ViewMenu settings={settings} layout={layout} language={language} onSetting={(id, value) => applySettings(changeSetting(settings, id, value))} onLayout={updateLayout} onPanel={showDockPanel} focusMode={focusMode} onFocusMode={setFocusMode} onResults={name => { setFocusMode(false); updateLayout(current => ({ ...current, resultsCollapsed: false })); setResultTab(name); }} onReset={resetPanelLayout} onSettings={() => setShowAppearance(true)} onCloseDetails={() => { setObjectDefinition(null); window.dispatchEvent(new Event('fbsdb.closeDetails')); }}/>
@@ -1754,7 +1738,7 @@ export function App() {
     <div className="workbench"><aside className="activity-rail"><button className={`rail-button explorer-rail-toggle${sidebarOpen && !focusMode ? " selected" : ""}`} title={sidebarOpen && !focusMode ? "Hide explorer" : "Show explorer"} aria-label={sidebarOpen && !focusMode ? "Hide explorer" : "Show explorer"} aria-pressed={sidebarOpen && !focusMode} onClick={() => {if(focusMode){setFocusMode(false);setSidebarOpen(true)}else setSidebarOpen(open=>!open)}}><Database size={18} /></button><button className="rail-button" title="Search workbench (Ctrl+P)" aria-label="Search workbench" onClick={() => setPaletteMode("files")}><Search size={18} /></button><button className="rail-button" title="History" aria-label="History" onClick={() => { setShowHistory(true); setShowSearch(false); }}><History size={18} /></button><button className="rail-button" title="SQL snippets" aria-label="SQL snippets" onClick={() => { setSnippetFilter(""); setShowSnippets(true); }}><Braces size={18} /></button><button className="rail-button" title="SQL mini tools" aria-label="SQL mini tools" onClick={() => setShowMiniTools(true)}><Workflow size={18}/></button><div className="rail-spacer" /><button className={`rail-button${focusMode?" selected":""}`} title="Editor focus mode (Ctrl+Alt+Z)" aria-label="Editor focus mode" aria-pressed={focusMode} onClick={()=>setFocusMode(value=>!value)}><Code2 size={18}/></button><button className="rail-button" title="Settings" aria-label="Settings" onClick={() => setShowAppearance(true)}><Settings2 size={18} /></button></aside>
       <DockWorkbench layout={layout} onChange={updateLayout} panels={dockPanels} hidden={focusMode}>
       <div className="editor-results-stack"><section className="editor-workspace" data-inspector={Boolean(objectInspectorView)}><div className="commandbar"><div className="command-left"><button className="icon-button" title="Open file (Ctrl+Shift+O)" aria-label="Open file (Ctrl+Shift+O)" onClick={openSqlFile}><FolderOpen size={16} /></button><button className="icon-button" title="Undo (Ctrl+Z)" aria-label="Undo" onMouseDown={(event) => event.preventDefault()} onClick={() => { editorRef.current?.trigger("toolbar", "undo", {}); editorRef.current?.focus(); }}><Undo2 size={15} /></button><button className="icon-button format-sql-button" title="Format SQL (Ctrl+Shift+F)" aria-label="Format SQL" onMouseDown={(event) => event.preventDefault()} onClick={formatSql}><AlignLeft size={15} /></button><span className="toolbar-separator" /><label className="fetch-limit-picker" title="Rows per result page"><span>Rows</span><select aria-label="Rows per result page" value={maxRows} onChange={(event) => setMaxRows(Number(event.target.value))}>{[100, 500, 1000, 5000, 10000].map((limit) => <option key={limit} value={limit}>{limit.toLocaleString()}</option>)}</select></label><button className={`run-button${!executing && !fetchingPage && !cancelling ? " idle" : ""}`} aria-label={cancelling ? "Cancelling SQL statement" : (executing || fetchingPage) ? "Cancel current SQL statement" : "Run SQL statement"} disabled={cancelling || activeTabReadonly} title={cancelling ? "Waiting for Oracle to stop this statement" : (executing || fetchingPage) ? "Cancel current SQL statement" : `Run SQL statement (${resolveSetting(settings,"editor.shortcuts").value.run||"unassigned"})`} onMouseDown={(event) => event.preventDefault()} onClick={() => (executing || fetchingPage) ? cancelQuery() : runQuery()}>{cancelling ? <Activity size={14} className="spin" /> : <Play size={14} fill="currentColor" />} <span className="sr-only">{(executing || fetchingPage) && (cancelling ? "Cancelling…" : "Cancel")}</span></button><span className="toolbar-separator" /><button className="transaction-button commit" title="Commit" aria-label="Commit" onClick={() => finishTransaction("commit")} disabled={!transactionPending||executing||fetchingPage}><Check size={13} /></button><button className="transaction-button rollback" title="Rollback" aria-label="Rollback" onClick={() => finishTransaction("rollback")} disabled={!transactionPending||executing||fetchingPage}><X size={13} /></button><button type="button" className={`transaction-button auto-commit${tabSession.autoCommit?' enabled':''}`} aria-label="Auto commit" aria-pressed={Boolean(tabSession.autoCommit)} title={transactionPending?'Commit or roll back pending changes before changing auto commit':`Auto commit ${tabSession.autoCommit?'on':'off'}`} disabled={!isNativeHost||activeTabReadonly||transactionPending||executing||fetchingPage||connecting||tabSession.autoCommitPending} onClick={()=>{updateTabSession('autoCommitPending',true,activeTabId);updateTabSession('autoCommitRequestId',sendNativeCommand('transaction.autoCommit',{tabId:activeTabId,enabled:!tabSession.autoCommit}),activeTabId)}}><RefreshCw size={13}/></button></div><EditorToolbarOverflow theme={theme} onOpen={openSqlFile} onUndo={()=>{editorRef.current?.trigger("toolbar","undo",{});editorRef.current?.focus()}} onFormat={formatSql} pageSize={maxRows} onPageSize={setMaxRows} readOnly={activeTabReadonly}/></div><EditorTabs tabs={[...tabs.map(tab=>({...tab,queryFailed:['error','timeout'].includes(tabSessions[tab.id]?.queryOutcome?.kind),profileName:dbConnections.find(p=>p.id===(tabSessions[tab.id]?.activeConnection?.id||tab.connectionProfileId))?.name,connectionProfileId:tabSessions[tab.id]?.activeConnection?.id||tab.connectionProfileId})), ...objectTabs.map(tab => ({ id: tab.id, name: `${tab.object.owner}.${tab.object.name}`, kind: 'object', connectionProfileId:tabSessions[tab.originTabId]?.activeConnection?.id }))]} activeId={objectTabActive ? objectTabId : activeTabId} onActivate={id => { const selected = objectTabs.find(tab => tab.id === id); if (selected) { setActiveObjectTabId(id); setObjectTabActive(true); setActiveObject(selected.key); inspectOracleObject(selected.object,selected.originTabId,selected.view==='Related tables'); } else { setObjectTabActive(false); setActiveObject(''); activateTab(id); } }} onClose={id => { if (objectTabs.some(tab => tab.id === id)) { setObjectTabs(current => current.filter(tab => tab.id !== id)); if (activeObjectTabId === id) { setObjectTabActive(false); setActiveObjectTabId(null); objectAnalysisRequestRef.current?.cancel(); setObjectAnalysis(null); } } else closeTab(id); }} onCloseMany={ids => { const objectIds = new Set(objectTabs.map(tab => tab.id)); if (ids.includes(activeObjectTabId)) { setObjectTabActive(false); setActiveObjectTabId(null); objectAnalysisRequestRef.current?.cancel(); setObjectAnalysis(null); } setObjectTabs(current => current.filter(tab => !ids.includes(tab.id))); closeTabs(ids.filter(id => !objectIds.has(id))); }} onNew={() => { setObjectTabActive(false); setActiveObject(''); newSqlFile(); }}>{!objectInspectorView && filePath && <button className={fileConnectionProfileId === activeConnection.id ? "icon-button file-connection-button bound" : "icon-button file-connection-button"} title="Bind current connection to this file" aria-label="Bind current connection to this file" disabled={!isNativeHost || !workspace.root || ["No connection", "Disconnected"].includes(activeConnection.id)} onClick={bindCurrentConnectionToFile}><Database size={14} /></button>}</EditorTabs><div className="breadcrumb"><span>{workspace.name}</span>{filePath && <><ChevronRight size={12} /><span>{filePath.split(/[\\/]/).slice(-2, -1)[0]}</span></>}<ChevronRight size={12} /><b>{fileName}{fileDirty ? " *" : ""}</b><EditorSymbolBreadcrumb editor={editorRef.current} tabId={activeTabId} outline={documentOutline}/>{filePath && <span className="file-connection-chip" title="Saved connection for this file"><Database size={11} />{(dbConnections.find(item => item.id === fileConnectionProfileId)?.name || fileConnectionProfileId) ?? "No profile bound"}</span>}</div><ExternalFileNotice key={activeTabId} change={tabs.find(tab=>tab.id===activeTabId)?.externalChange} dirty={fileDirty} onReload={()=>resolveExternalFile(true)} onKeep={()=>resolveExternalFile(false)} onRetry={pollOpenFiles}/><div className="editor-container"><div className="editor-sql-surface" hidden={Boolean(objectInspectorView)}><Suspense fallback={<div className="editor-loading">Loading SQL editor…</div>}><Editor height="100%" defaultLanguage="sql" value={sql} onChange={handleEditorChange} theme={editorThemeName} onMount={(editor, monacoInstance) => { setMonaco(monacoInstance);
-    editor.onDidChangeModelContent(event => { const accepted = lastSuggestionAcceptanceRef.current; if (event.isUndoing && accepted && accepted.tabId === activeTabIdRef.current && event.versionId === accepted.version + 1 && Date.now()-accepted.at < 10000 && completionSettingsRef.current.learning) { suggestionLearningRef.current.record(accepted.scope, accepted.context, accepted.key, -1); lastSuggestionAcceptanceRef.current = null; publishLearning(); } }); completionTabKeyRef.current = editor.createContextKey("fbsdb.acceptCompletionOnTab", completionSettings.acceptTab); completionAcceptanceRef.current = editor.addCommand(0, (_accessor, key, context) => { if (completionSettingsRef.current.learning) { const scope = suggestionScope(); suggestionLearningRef.current.record(scope, context || 'statement', key); lastSuggestionAcceptanceRef.current = { scope, context: context || 'statement', key, tabId: activeTabIdRef.current, version: editor.getModel().getVersionId(), at: Date.now() }; publishLearning(); } const tabId = activeTabIdRef.current; completionRecentRef.current.set(tabId, [key, ...(completionRecentRef.current.get(tabId) || []).filter(item => item !== key)].slice(0, 100)); completionClientRef.current?.remember(key); }); editor.addCommand(monacoInstance.KeyCode.Tab, () => { editor.trigger("keyboard", "hideSuggestWidget", {}); editor.trigger("keyboard", "editor.action.inlineSuggest.hide", {}); editor.trigger("keyboard", "tab", {}); }, "(suggestWidgetVisible || inlineSuggestionVisible) && editorTextFocus && !fbsdb.acceptCompletionOnTab"); editor.addAction({ id: "fbsdb.runStatement", label: "Run SQL statement", run: () => runQueryRef.current?.() }); editor.addAction({ id: "fbsdb.deleteLine", label: "Delete line", precondition: "editorTextFocus && !editorReadonly", run: () => editor.trigger("keyboard", "editor.action.deleteLines", {}) }); editor.addAction({ id: "fbsdb.formatSql", label: "Format SQL", run: () => formatterRef.current?.() }); installRunGutter(editor, monacoInstance); editorRef.current = editor; lastEditorPositionRef.current = editor.getPosition(); editor.onDidChangeCursorPosition(({ position }) => { lastEditorPositionRef.current = position;editorPositionsRef.current.set(activeTabIdRef.current,position); }); editor.focus(); announceUiReady(); }} options={{ fontFamily: `"${resolveSetting(settings,"editor.fontFamily").value}", Consolas, monospace`, fontSize: codeStyle.fontSize, readOnly: activeTabReadonly, lineHeight: Math.max(codeStyle.fontSize + 2, resolveSetting(settings,"editor.lineHeight").value), minimap: { enabled: resolveSetting(settings,"editor.minimap").value }, padding: { top: 18, bottom: 18 }, lineNumbers: resolveSetting(settings,"editor.lineNumbers").value ? "on" : "off", renderLineHighlight: resolveSetting(settings,"editor.lineHighlight").value ? "line" : "none", renderWhitespace: resolveSetting(settings,"editor.whitespace").value ? "all" : "none", scrollBeyondLastLine: false, smoothScrolling: !reduceMotion, automaticLayout: true, contextmenu:false, wordWrap: resolveSetting(settings,"editor.wordWrap").value ? "on" : "off", glyphMargin: true, folding: resolveSetting(settings,"editor.folding").value, guides: { indentation: resolveSetting(settings,"editor.indentGuides").value, highlightActiveIndentation: resolveSetting(settings,"editor.indentGuides").value }, suggest: { showWords: false, showSnippets: completionSettings.snippets, preview: false }, inlineSuggest: { enabled: completionSettings.inline, mode: "prefix", showToolbar: "never", minShowDelay: completionSettings.delay, suppressSuggestions: false }, quickSuggestions: false, suggestOnTriggerCharacters: false, acceptSuggestionOnEnter: completionSettings.acceptEnter ? "on" : "off", tabCompletion: completionSettings.acceptTab ? "on" : "off", parameterHints: { enabled: completionSettings.signatureHelp }, tabSize: codeStyle.tabSize, insertSpaces: codeStyle.insertSpaces, cursorBlinking: reduceMotion?"solid":resolveSetting(settings,"editor.cursorBlinking").value, cursorStyle: resolveSetting(settings,"editor.cursorStyle").value, cursorSmoothCaretAnimation: reduceMotion?"off":"on", bracketPairColorization: { enabled: resolveSetting(settings,"editor.bracketColors").value }, overviewRulerLanes: 0, fixedOverflowWidgets: true, find: { addExtraSpaceOnTop: false } }} /></Suspense></div>{objectInspectorView}{!objectInspectorView && objectDefinition && objectDefinition.originTabId === metadataOriginTabId && <OracleDefinitionView hidden={focusMode} source={objectDefinition} onClose={() => setObjectDefinition(null)}/>}</div><div className="editor-status"><EditorSessionStatus executionTarget={tabSession.executionTarget} inactive={Boolean(tabSession.inactive)} editor={editorRef.current} tabId={activeTabId} connection={activeConnection} connected={sessionConnected} connecting={connecting} executing={executing} cancelling={cancelling} fetching={fetchingPage} startedAt={tabSession.operationStartedAt} stage={tabSession.sqlStage} readOnlyAnalysis={tabSession.analysisReadOnly} transactionPending={transactionPending} exporting={Boolean(view.streamState?.busy)} /><span>SQL</span><span>Spaces: {codeStyle.tabSize}</span><span>UTF-8</span><span className="status-sql"><Code2 size={12} /> Oracle SQL</span><button type="button" className="status-intellisense saved-state editor-save-button" title={activeTabReadonly ? "Read only" : "Save SQL file (Ctrl+S)"} aria-label={activeTabReadonly ? "Read only" : "Save SQL file (Ctrl+S)"} disabled={activeTabReadonly} onClick={() => saveSqlFile()}>{activeTabReadonly ? <><LockKeyhole size={12} /> Read only</> : fileDirty ? <><Save size={12} /> Unsaved</> : <><Save size={12} /> Saved</>}</button></div></section>
+    editor.onDidChangeModelContent(event => { const accepted = lastSuggestionAcceptanceRef.current; if (event.isUndoing && accepted && accepted.tabId === documents.activeId && event.versionId === accepted.version + 1 && Date.now()-accepted.at < 10000 && completionSettingsRef.current.learning) { suggestionLearningRef.current.record(accepted.scope, accepted.context, accepted.key, -1); lastSuggestionAcceptanceRef.current = null; publishLearning(); } }); completionTabKeyRef.current = editor.createContextKey("fbsdb.acceptCompletionOnTab", completionSettings.acceptTab); completionAcceptanceRef.current = editor.addCommand(0, (_accessor, key, context) => { if (completionSettingsRef.current.learning) { const scope = suggestionScope(); suggestionLearningRef.current.record(scope, context || 'statement', key); lastSuggestionAcceptanceRef.current = { scope, context: context || 'statement', key, tabId: documents.activeId, version: editor.getModel().getVersionId(), at: Date.now() }; publishLearning(); } const tabId = documents.activeId; completionRecentRef.current.set(tabId, [key, ...(completionRecentRef.current.get(tabId) || []).filter(item => item !== key)].slice(0, 100)); completionClientRef.current?.remember(key); }); editor.addCommand(monacoInstance.KeyCode.Tab, () => { editor.trigger("keyboard", "hideSuggestWidget", {}); editor.trigger("keyboard", "editor.action.inlineSuggest.hide", {}); editor.trigger("keyboard", "tab", {}); }, "(suggestWidgetVisible || inlineSuggestionVisible) && editorTextFocus && !fbsdb.acceptCompletionOnTab"); editor.addAction({ id: "fbsdb.runStatement", label: "Run SQL statement", run: () => runQueryRef.current?.() }); editor.addAction({ id: "fbsdb.deleteLine", label: "Delete line", precondition: "editorTextFocus && !editorReadonly", run: () => editor.trigger("keyboard", "editor.action.deleteLines", {}) }); editor.addAction({ id: "fbsdb.formatSql", label: "Format SQL", run: () => formatterRef.current?.() }); installRunGutter(editor, monacoInstance); editorRef.current = editor; lastEditorPositionRef.current = editor.getPosition(); editor.onDidChangeCursorPosition(({ position }) => { lastEditorPositionRef.current = position;editorPositionsRef.current.set(documents.activeId,position); }); editor.focus(); announceUiReady(); }} options={{ fontFamily: `"${resolveSetting(settings,"editor.fontFamily").value}", Consolas, monospace`, fontSize: codeStyle.fontSize, readOnly: activeTabReadonly, lineHeight: Math.max(codeStyle.fontSize + 2, resolveSetting(settings,"editor.lineHeight").value), minimap: { enabled: resolveSetting(settings,"editor.minimap").value }, padding: { top: 18, bottom: 18 }, lineNumbers: resolveSetting(settings,"editor.lineNumbers").value ? "on" : "off", renderLineHighlight: resolveSetting(settings,"editor.lineHighlight").value ? "line" : "none", renderWhitespace: resolveSetting(settings,"editor.whitespace").value ? "all" : "none", scrollBeyondLastLine: false, smoothScrolling: !reduceMotion, automaticLayout: true, contextmenu:false, wordWrap: resolveSetting(settings,"editor.wordWrap").value ? "on" : "off", glyphMargin: true, folding: resolveSetting(settings,"editor.folding").value, guides: { indentation: resolveSetting(settings,"editor.indentGuides").value, highlightActiveIndentation: resolveSetting(settings,"editor.indentGuides").value }, suggest: { showWords: false, showSnippets: completionSettings.snippets, preview: false }, inlineSuggest: { enabled: completionSettings.inline, mode: "prefix", showToolbar: "never", minShowDelay: completionSettings.delay, suppressSuggestions: false }, quickSuggestions: false, suggestOnTriggerCharacters: false, acceptSuggestionOnEnter: completionSettings.acceptEnter ? "on" : "off", tabCompletion: completionSettings.acceptTab ? "on" : "off", parameterHints: { enabled: completionSettings.signatureHelp }, tabSize: codeStyle.tabSize, insertSpaces: codeStyle.insertSpaces, cursorBlinking: reduceMotion?"solid":resolveSetting(settings,"editor.cursorBlinking").value, cursorStyle: resolveSetting(settings,"editor.cursorStyle").value, cursorSmoothCaretAnimation: reduceMotion?"off":"on", bracketPairColorization: { enabled: resolveSetting(settings,"editor.bracketColors").value }, overviewRulerLanes: 0, fixedOverflowWidgets: true, find: { addExtraSpaceOnTop: false } }} /></Suspense></div>{objectInspectorView}{!objectInspectorView && objectDefinition && objectDefinition.originTabId === metadataOriginTabId && <OracleDefinitionView hidden={focusMode} source={objectDefinition} onClose={() => setObjectDefinition(null)}/>}</div><div className="editor-status"><EditorSessionStatus executionTarget={tabSession.executionTarget} inactive={Boolean(tabSession.inactive)} editor={editorRef.current} tabId={activeTabId} connection={activeConnection} connected={sessionConnected} connecting={connecting} executing={executing} cancelling={cancelling} fetching={fetchingPage} startedAt={tabSession.operationStartedAt} stage={tabSession.sqlStage} readOnlyAnalysis={tabSession.analysisReadOnly} transactionPending={transactionPending} exporting={Boolean(view.streamState?.busy)} /><span>SQL</span><span>Spaces: {codeStyle.tabSize}</span><span>UTF-8</span><span className="status-sql"><Code2 size={12} /> Oracle SQL</span><button type="button" className="status-intellisense saved-state editor-save-button" title={activeTabReadonly ? "Read only" : "Save SQL file (Ctrl+S)"} aria-label={activeTabReadonly ? "Read only" : "Save SQL file (Ctrl+S)"} disabled={activeTabReadonly} onClick={() => saveSqlFile()}>{activeTabReadonly ? <><LockKeyhole size={12} /> Read only</> : fileDirty ? <><Save size={12} /> Unsaved</> : <><Save size={12} /> Saved</>}</button></div></section>
       <ResizeHandle axis="y" value={resultsHeight} onChange={value=>{setFocusMode(false);setResultsHeight(value)}} min={15} max={70} label="Resize results" panelSelector=".result-panel" />
       <section className="result-panel" data-collapsed={bottomCollapsed}>
         <div className="result-header"><div className="result-tabs">
@@ -1775,7 +1759,7 @@ export function App() {
           ? <SqlResultsView
               onExportInsert={exportResultsInsertSql}
               sourceDefinition={definition?.tabId === activeTabId ? definition : null}
-              onCloseSourceDefinition={() => { const owner = activeTabIdRef.current, requestId = sourceDefinitionRequestRef.current.get(owner); if (requestId) requestOwnersRef.current.delete(requestId); sourceDefinitionRequestRef.current.delete(owner); setDefinition(null); }}
+              onCloseSourceDefinition={() => { const owner = documents.activeId, requestId = sourceDefinitionRequestRef.current.get(owner); if (requestId) operations.owners.delete(requestId); sourceDefinitionRequestRef.current.delete(owner); setDefinition(null); }}
               memoryItems={[{ key: "latest", label: view.latestResultName || "Latest", result: view.queryResult }, ...(view.resultSets || []).filter(item => item.pinned)].filter(item => item.result).map(item => ({ ...item, memoryKB: Math.round(estimateResultMemory(item.result) / 1024) }))}
               onReleaseResult={releaseResult} onPin={pinCurrentResult} onExplain={explainQuery}
               key={`${activeTabId}:${resultTab}:${view.selectedResultKey || "latest"}:${sqlResult?.viewIdentity||sqlResult?.resultId||"empty"}`}
@@ -1783,7 +1767,7 @@ export function App() {
               onViewStateChange={state => { if (resultTab === "Results" && view.selectedResultKey) updateTabResult("resultSets", sets => (sets || []).map(item => item.key === view.selectedResultKey ? { ...item, view: state } : item), activeTabId); else updateTabResult(resultTab === "Explain" ? "planView" : "queryView", state, activeTabId); }}
               onMetadata={metadata => { const url = URL.createObjectURL(new Blob([JSON.stringify(metadata, null, 2)], { type: "application/json" })), link = document.createElement("a"); link.href = url; link.download = "result-metadata.json"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0); }}
               onGenerateSql={sql => sendNativeCommand("result.openSql", { sql })}
-              onSourceDefinition={column => { const owner = activeTabIdRef.current; setDefinition(null); const requestId = sendNativeCommand("result.columnDefinition", { column, tabId: owner }); if (requestId) { sourceDefinitionRequestRef.current.set(owner, requestId); requestOwnersRef.current.set(requestId, owner); } }}
+              onSourceDefinition={column => { const owner = documents.activeId; setDefinition(null); const requestId = sendNativeCommand("result.columnDefinition", { column, tabId: owner }); if (requestId) { sourceDefinitionRequestRef.current.set(owner, requestId); operations.owners.set(requestId, owner); } }}
               onUpdateDraft={(columns, rows) => sendNativeCommand("result.updateDraft", { columns, rows })}
               connected={sessionConnected} onConnect={()=>setShowPicker(true)} onEdit={()=>editorRef.current?.focus()} onClearServerFilter={()=>{const base=queryResult?.serverFilter;if(base&&!executing&&!fetchingPage&&!view.streamState?.busy)executeStatement(base.sql,base.parameters);}} onServerFilter={applyServerFilters} onExportColumns={exportChosenColumns} onLookup={requestPrimaryKey}
               onClearFilter={() => setResultFilter("")} onChildren={openChildRecords} onSql={insertEditorText} onRelated={openRelatedRecords}
@@ -1808,7 +1792,7 @@ export function App() {
       onDelete={(profile) => { setManagementError(""); if (isNativeHost) sendNativeCommand("connection.delete", { profileId: profile.id }); else setDbConnections(current => current.filter(p => p.id !== profile.id)); }}
       onDisconnect={disconnectActiveConnection}
       onReconnect={profile => switchConnection(profile, true)}
-      onTest={profile => { setShowPicker(false); setConnectionError(""); setAuthProfile({ ...profile, testOnly: true, tabId: activeTabIdRef.current }); setConnecting(false); }} />}
+      onTest={profile => { setShowPicker(false); setConnectionError(""); setAuthProfile({ ...profile, testOnly: true, tabId: documents.activeId }); setConnecting(false); }} />}
     {showMiniTools && <MiniToolsDialog key={`${workspace.root}:${activeTabId}`} root={workspace.root} tabId={activeTabId} sourceResult={queryResult} result={view.queryResult} profiles={dbConnections} profile={activeConnection} connected={isNativeHost && sessionConnected && !connecting && !activeTabReadonly} busy={executing || fetchingPage || connecting || Boolean(view.streamState?.busy) || Boolean(tabSession.scriptRun?.running)} status={tabSession.runState} outcome={tabSession.queryOutcome} onConnect={switchConnection} onRun={(statement, parameters) => {
       assertMiniToolSelect(statement);
       if (!isNativeHost || !sessionConnected || connecting || executing || fetchingPage || view.streamState?.busy || tabSession.scriptRun?.running || activeTabReadonly) throw new Error('Connect an idle SQL tab before running a mini tool.');
@@ -1821,7 +1805,7 @@ export function App() {
     {editorContext&&<EditorContextMenu context={editorContext} onClose={()=>setEditorContext(null)} onAction={editorContextAction} actions={[{id:'run',label:editorContext.selected?'Run selection':'Run statement',disabled:executing||fetchingPage||activeTabReadonly},{id:'explain',label:'Explain plan',disabled:executing||fetchingPage},{id:'format',label:editorContext.selected?'Format selection':'Format SQL',disabled:editorContext.readOnly},{id:'edit',separator:true},{id:'undo',label:'Undo',disabled:editorContext.readOnly||!editorContext.canUndo},{id:'redo',label:'Redo',disabled:editorContext.readOnly||!editorContext.canRedo},{id:'cut',label:'Cut',disabled:editorContext.readOnly||!editorContext.selected},{id:'copy',label:'Copy',disabled:!editorContext.selected},{id:'paste',label:'Paste',disabled:editorContext.readOnly},{id:'selectAll',label:'Select all'},{id:'comment',label:'Toggle comment',disabled:editorContext.readOnly},{id:'find',label:'Find'},{id:'replace',label:'Replace',disabled:editorContext.readOnly}]}/>}
     {objectMenu&&<OracleObjectMenu context={objectMenu} favorite={objectFavorites.includes(oracleSchemaKey(objectMenu.item))} onAction={objectContextAction} onClose={()=>setObjectMenu(null)}/>}
     {connectionMenu&&<ConnectionContextMenu context={connectionMenu} organization={connectionOrg} favorites={favorites} activeProfileId={activeConnection.id} usedProfileIds={Object.values(tabSessions).map(session=>session.activeConnection?.id).filter(Boolean)} connectionDisabled={activeTabReadonly||connecting||executing||cancelling} onClose={()=>setConnectionMenu(null)} onAction={connectionContextAction} onPreviewOrganization={previewConnectionOrganization}/>}
-    {profileEditor && <ConnectionLibrary onNewSql={profile=>{setProfileEditor(null);newSqlFileNow();if(isNativeHost)beginConnection({...profile,tabId:activeTabIdRef.current})}} favorites={favorites} onToggleFavorite={id=>setFavorites(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])} activeProfileId={activeConnection.id} onDisconnect={()=>{setProfileEditor(null);disconnectActiveConnection()}} connectionDisabled={activeTabReadonly||connecting||executing||cancelling} managementError={managementError} profiles={dbConnections} aliases={tnsAliases} organization={connectionOrg} initialContext={profileEditor.libraryContext} initialAction={profileEditor.libraryAction} initialProfile={profileEditor===true||profileEditor.libraryContext?null:profileEditor} usedProfileIds={Object.values(tabSessions).map(s=>s.activeConnection?.id).filter(Boolean)} onClose={()=>setProfileEditor(null)} onConnect={(profile,force=false)=>{setProfileEditor(null);switchConnection(profile,force)}}
+    {profileEditor && <ConnectionLibrary onNewSql={profile=>{setProfileEditor(null);newSqlFileNow();if(isNativeHost)beginConnection({...profile,tabId:documents.activeId})}} favorites={favorites} onToggleFavorite={id=>setFavorites(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])} activeProfileId={activeConnection.id} onDisconnect={()=>{setProfileEditor(null);disconnectActiveConnection()}} connectionDisabled={activeTabReadonly||connecting||executing||cancelling} managementError={managementError} profiles={dbConnections} aliases={tnsAliases} organization={connectionOrg} initialContext={profileEditor.libraryContext} initialAction={profileEditor.libraryAction} initialProfile={profileEditor===true||profileEditor.libraryContext?null:profileEditor} usedProfileIds={Object.values(tabSessions).map(s=>s.activeConnection?.id).filter(Boolean)} onClose={()=>setProfileEditor(null)} onConnect={(profile,force=false)=>{setProfileEditor(null);switchConnection(profile,force)}}
       onOrganizationChange={payload=>{const next=changeConnectionOrganization(connectionOrg,payload,dbConnections);setConnectionOrg(next);setDbConnections(current=>organizedProfiles(current,next).map(p=>({...p,group:p.groups[0]||''})))}}
       onSaved={(id,connect,credentials)=>{if(connect){const profile=dbConnectionsRef.current.find(p=>p.id===id);if(profile){setProfileEditor(null);switchConnection({...profile,...(credentials?.password?{credentials}:{})},true)}}}}
       onPreviewSave={(profile,connect)=>{const organization={...connectionOrg,assignments:{...connectionOrg.assignments,[profile.id]:{folderId:profile.folderId||null,groupIds:profile.groupIds||[]}}};setConnectionOrg(organization);const item={...profile,title:profile.name,color:profile.env==='PROD'?'rose':profile.env==='DEV'?'mint':'neutral'};setDbConnections(current=>organizedProfiles([...current.filter(p=>p.id!==profile.id),item],organization));if(connect){setProfileEditor(null);switchConnection(item)}}}
@@ -1841,8 +1825,3 @@ export function App() {
     {showAppearance && <AppearanceSettings aliases={tnsAliases} profiles={dbConnections} originTabId={metadataOriginTabId} activeProfileId={completionSession.activeConnection?.id} metadataEpoch={completionMetadataRef.current.session(metadataOriginTabId).epoch} settings={settings} onSettingsChange={applySettings} settingsError={settingsError} workspaceRoot={workspace.root} theme={theme} onThemeChange={setTheme} tokenColors={tokenColors} onTokenColorChange={updateTokenColor} completionSettings={completionSettings} onCompletionSettingsChange={setCompletionSettings} completionError={completionError} queryTimeout={queryTimeout} onQueryTimeoutChange={setQueryTimeout} completionVocabulary={oracleVocabularyStatus(completionSettings.oracleVersion, completionSession.oracleVocabulary)} completionMetadataStatus={completionSession.completionMetadataStatus || (completionSession.activeConnection && !["No connection", "Disconnected"].includes(completionSession.activeConnection.id) ? "Oracle metadata is loaded on demand." : "Offline Oracle vocabulary; connect to load object metadata.")} codeStyle={codeStyle} onCodeStyleChange={setCodeStyle} systemLocale={systemLocale} onClose={() => setShowAppearance(false)} />}
   </main>;
 }
-
-
-
-
-

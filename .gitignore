@@ -12,5 +12,14 @@ artifacts/
 .tools/
 *.png
 !native/FbsDb/Assets/SplashScreen.scale-200.png
+# Required native application assets must be present in clean CI checkouts.
+!native/FbsDb/Assets/AppIcon.png
+!native/FbsDb/Assets/LockScreenLogo.scale-200.png
+!native/FbsDb/Assets/Square150x150Logo.scale-200.png
+!native/FbsDb/Assets/Square44x44Logo.scale-200.png
+!native/FbsDb/Assets/Square44x44Logo.targetsize-24_altform-unplated.png
+!native/FbsDb/Assets/Square44x44Logo.targetsize-48_altform-lightunplated.png
+!native/FbsDb/Assets/StoreLogo.png
+!native/FbsDb/Assets/Wide310x150Logo.scale-200.png
 
 .tools/suggestion-test/

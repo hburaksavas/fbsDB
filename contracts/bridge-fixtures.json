@@ -1,0 +1,432 @@
+[
+  {
+    "name": "save a draft",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "file.save",
+      "payload": {
+        "path": null,
+        "content": "SELECT 1",
+        "diskVersion": null
+      }
+    }
+  },
+  {
+    "name": "save refuses missing text",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "file.save",
+      "payload": {}
+    }
+  },
+  {
+    "name": "save refuses numeric text",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "file.save",
+      "payload": {
+        "content": 42
+      }
+    }
+  },
+  {
+    "name": "save refuses null text",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "file.save",
+      "payload": {
+        "content": null
+      }
+    }
+  },
+  {
+    "name": "unknown command",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "file.destroy",
+      "payload": {}
+    }
+  },
+  {
+    "name": "missing tab identity",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": null,
+      "command": "file.new",
+      "payload": {}
+    }
+  },
+  {
+    "name": "missing request identity",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": null,
+      "tabId": "a",
+      "command": "file.new",
+      "payload": {}
+    }
+  },
+  {
+    "name": "metadata cancel",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "completion.cancel",
+      "payload": {
+        "requestId": "metadata-1"
+      }
+    }
+  },
+  {
+    "name": "schema cancel",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "schema.cancel",
+      "payload": {
+        "requestId": "schema-1"
+      }
+    }
+  },
+  {
+    "name": "SQL cancel",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "sql.cancel",
+      "payload": {}
+    }
+  },
+  {
+    "name": "invalid cancellation request",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "completion.cancel",
+      "payload": {
+        "requestId": 12
+      }
+    }
+  },
+  {
+    "name": "SQL with binds",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "sql.execute",
+      "payload": {
+        "sql": "SELECT :id FROM dual",
+        "parameters": [
+          {
+            "name": "id",
+            "type": "NUMBER",
+            "value": "42"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "invalid bind shape",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "sql.execute",
+      "payload": {
+        "sql": "SELECT :id FROM dual",
+        "parameters": [
+          {
+            "name": "id"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "script statement",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "script.execute",
+      "payload": {
+        "statements": [
+          {
+            "sql": "SELECT 1",
+            "start": 0
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "invalid script shape",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "script.execute",
+      "payload": {
+        "statements": [
+          {
+            "sql": 42
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "fractional metadata epoch",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "session.context",
+      "payload": {
+        "epoch": 1.5
+      }
+    }
+  },
+  {
+    "name": "file watch with unknown baseline",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "file.poll",
+      "payload": {
+        "files": [
+          {
+            "path": "a.sql",
+            "version": null
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "lookup values are an object",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "result.lookupSql",
+      "payload": {
+        "schema": "APP",
+        "table": "T",
+        "values": {
+          "ID": "42"
+        }
+      }
+    }
+  },
+  {
+    "name": "child metadata is an object",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "result.children",
+      "payload": {
+        "column": {
+          "name": "ID",
+          "type": "NUMBER"
+        },
+        "rowValues": {
+          "ID": 42
+        }
+      }
+    }
+  },
+  {
+    "name": "workspace preview",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "workspace.replacePreview",
+      "payload": {
+        "search": "one",
+        "replacement": "two",
+        "caseSensitive": false,
+        "excluded": []
+      }
+    }
+  },
+  {
+    "name": "workspace apply",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "workspace.replaceApply",
+      "payload": {
+        "previewId": "p",
+        "selected": [
+          "a.sql"
+        ],
+        "excluded": []
+      }
+    }
+  },
+  {
+    "name": "list tools needs no tool body",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "workspace.tools.list",
+      "payload": {
+        "root": "D:/sql"
+      }
+    }
+  },
+  {
+    "name": "saved reply",
+    "direction": "reply",
+    "valid": true,
+    "message": {
+      "type": "file.saved",
+      "requestId": "r-1",
+      "tabId": "a",
+      "path": "a.sql",
+      "fileName": "a.sql",
+      "diskVersion": "v2"
+    }
+  },
+  {
+    "name": "saved reply without baseline",
+    "direction": "reply",
+    "valid": false,
+    "message": {
+      "type": "file.saved",
+      "path": "a.sql",
+      "fileName": "a.sql"
+    }
+  },
+  {
+    "name": "unknown reply",
+    "direction": "reply",
+    "valid": false,
+    "message": {
+      "type": "file.mystery"
+    }
+  },
+  {
+    "name": "metadata reply",
+    "direction": "reply",
+    "valid": true,
+    "message": {
+      "type": "completion.reply",
+      "requestId": "r-1",
+      "epoch": 1,
+      "result": {
+        "columns": []
+      }
+    }
+  },
+  {
+    "name": "invalid metadata error",
+    "direction": "reply",
+    "valid": false,
+    "message": {
+      "type": "completion.reply",
+      "epoch": 1,
+      "error": 12
+    }
+  },
+  {
+    "name": "native error",
+    "direction": "reply",
+    "valid": true,
+    "message": {
+      "type": "host.error",
+      "requestId": null,
+      "message": "Unavailable",
+      "transactionPending": null
+    }
+  },
+  {
+    "name": "metadata epoch exceeds DTO range",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "r",
+      "tabId": "a",
+      "command": "session.context",
+      "payload": {
+        "epoch": 2147483648
+      }
+    }
+  },
+  {
+    "name": "prototype is not a reply discriminator",
+    "direction": "reply",
+    "valid": false,
+    "message": {
+      "type": "__proto__"
+    }
+  }
+]

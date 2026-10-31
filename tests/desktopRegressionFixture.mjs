@@ -1,0 +1,55 @@
+// Keep the real native host and file handlers. Only picker path selection and
+// reply timing are substituted; database commands are never forwarded.
+export function desktopRegressionFixture(root) {
+  return `(() => {
+    const root = ${JSON.stringify(root)};
+    const state = window.__desktopRegression = { root, ready: false, commands: [], replies: [], errors: [], blocked: [], openPaths: [], savePaths: [], holdSaves: false, pendingReplies: [] };
+    const normalize = value => value.split(String.fromCharCode(92)).join('/').toLowerCase();
+    const inside = value => typeof value === 'string' && normalize(value).startsWith(normalize(root) + '/') && !value.replace(/\\\\/g, '/').split('/').includes('..');
+    window.addEventListener('error', event => state.errors.push(event.message));
+    window.addEventListener('unhandledrejection', event => state.errors.push(String(event.reason)));
+    const nativePost = chrome.webview.postMessage.bind(chrome.webview);
+    const nativeAdd = chrome.webview.addEventListener.bind(chrome.webview);
+    const nativeRemove = chrome.webview.removeEventListener.bind(chrome.webview);
+    const wrappers = new Map();
+    nativeAdd('message', event => {
+      const message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+      state.replies.push({ type: message.type, requestId: message.requestId, tabId: message.tabId, path: message.path });
+      if (state.replies.length > 512) state.replies.shift();
+    });
+    chrome.webview.addEventListener = (name, listener) => {
+      if (name !== 'message') return nativeAdd(name, listener);
+      const wrapped = event => {
+        const message = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+        if (state.holdSaves && message.type === 'file.saved') state.pendingReplies.push(() => listener(event));
+        else listener(event);
+      };
+      wrappers.set(listener, wrapped); nativeAdd(name, wrapped);
+    };
+    chrome.webview.removeEventListener = (name, listener) => { nativeRemove(name, wrappers.get(listener) || listener); wrappers.delete(listener); };
+    state.releaseSaves = () => { state.holdSaves = false; const callbacks = state.pendingReplies.splice(0); callbacks.forEach(callback => callback()); };
+    state.post = message => chrome.webview.postMessage(JSON.stringify(message));
+    chrome.webview.postMessage = value => {
+      const message = typeof value === 'string' ? JSON.parse(value) : value;
+      if (message.type === 'ui.ready') { state.ready = true; nativePost(value); return; }
+      const allowed = ['file.new', 'file.activate', 'file.open', 'file.openPath', 'file.save', 'file.poll', 'tab.close', 'system.locale', 'ui.setTheme', 'ui.setZoom', 'connection.list'];
+      if (message.type !== 'command' || !allowed.includes(message.command)) { state.blocked.push(message.command || message.type); return; }
+      const payload = message.payload || {};
+      state.commands.push({ id: message.id, command: message.command, tabId: message.tabId, path: payload.path });
+      if (state.commands.length > 512) state.commands.shift();
+      if (message.command === 'file.open') {
+        const path = state.openPaths.shift();
+        if (!inside(path)) throw new Error('No isolated path queued for Open.');
+        message.command = 'file.openPath'; message.payload = { ...payload, path };
+      }
+      if (message.command === 'file.save' && !payload.path) {
+        const selection = state.savePaths.shift();
+        if (!selection || !inside(selection.path)) throw new Error('No isolated path queued for Save As.');
+        message.payload = { ...payload, path: selection.path, diskVersion: selection.diskVersion };
+      }
+      if (message.payload?.path != null && !inside(message.payload.path)) throw new Error('File command escaped the isolated test root.');
+      if (message.command === 'file.poll' && (payload.files || []).some(file => !inside(file.path))) throw new Error('File polling escaped the isolated test root.');
+      nativePost(JSON.stringify(message));
+    };
+  })()`;
+}

@@ -1,3 +1,4 @@
+import { validateNativeCommand, validateNativeReply } from './bridge/validation.js';
 import { reviveOracleTemporal } from './oracleTemporal.js';
 const webViewHost = window.chrome?.webview ?? null;
 const temporalMessages=new WeakMap();
@@ -11,7 +12,8 @@ export const isNativeHost = Boolean(webViewHost);
 export function sendNativeCommand(command, payload = {}) {
   if (!webViewHost) return null;
   const id = `ui-${Date.now()}-${nextId++}`;
-  webViewHost.postMessage(JSON.stringify({ type: "command", id, command, payload, tabId: payload.tabId ?? currentTabId }));
+  const message = validateNativeCommand({ type: "command", id, command, payload, tabId: payload.tabId ?? currentTabId });
+  webViewHost.postMessage(JSON.stringify(message));
   return id;
 }
 
@@ -22,6 +24,7 @@ export function subscribeNativeMessages(listener) {
     if (typeof message === "string") {
       try { message = JSON.parse(message); } catch { return; }
     }
+    try { validateNativeReply(message); } catch (error) { console.warn("Invalid native reply", error.message); return; }
     if(Array.isArray(message?.rows)&&Array.isArray(message.columns)&&message.columns.some(column=>column.temporalKind)){const cached=temporalMessages.get(message);if(cached)message=cached;else{const original=message;message={...message,rows:message.rows.map(row=>row.map((cell,index)=>message.columns[index]?.temporalKind?reviveOracleTemporal(cell):cell))};temporalMessages.set(original,message)}}
     listener(message);
   };
