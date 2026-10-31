@@ -386,7 +386,8 @@ public sealed partial class MainPage : Page
                             var snapshot = await WorkspaceFileService.ReadAsync(_workspace.ResolveWorksetFile(entry.Path));
                             size += snapshot.Content?.Length * 2L ?? 0;
                             if (snapshot.Missing || snapshot.Error is not null || size > 20 * 1024 * 1024) { skipped.Add(entry.Path + ": " + (snapshot.Error ?? (snapshot.Missing ? "File missing" : "Workset size limit"))); continue; }
-                            files.Add(new { path = snapshot.Path, content = snapshot.Content, diskVersion = snapshot.Version, fileName = Path.GetFileName(snapshot.Path), entry.Line, entry.Column });
+                            var profileId = await _workspace.GetFileConnectionAsync(snapshot.Path);
+                            files.Add(new { path = snapshot.Path, content = snapshot.Content, diskVersion = snapshot.Version, fileName = Path.GetFileName(snapshot.Path), profileId, entry.Line, entry.Column });
                         }
                         return new { files, skipped };
                     });

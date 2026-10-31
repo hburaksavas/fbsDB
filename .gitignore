@@ -7,6 +7,10 @@ native/FbsDb/WebContent/
 tests/**/bin/
 tests/**/obj/
 artifacts/
+.artifacts/
+.vscode/
+.tools/
 *.png
+!native/FbsDb/Assets/SplashScreen.scale-200.png
 
 .tools/suggestion-test/

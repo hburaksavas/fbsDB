@@ -20,6 +20,12 @@ def resize(image: Image.Image, size: tuple[int, int]) -> Image.Image:
     return image.resize(size, Image.Resampling.LANCZOS)
 
 
+def save_splash(image: Image.Image) -> None:
+    splash = Image.new("RGBA", (1240, 600), (0, 0, 0, 0))
+    splash.alpha_composite(resize(image.convert("RGBA"), (260, 260)), (490, 170))
+    splash.save(ASSETS / "SplashScreen.scale-200.png")
+
+
 def main() -> None:
     image = Image.open(SOURCE).convert("RGBA")
     pixels = np.asarray(image, dtype=np.float32).copy()
@@ -63,6 +69,7 @@ def main() -> None:
     wide = Image.new("RGBA", (620, 300), (0, 0, 0, 0))
     wide.alpha_composite(resize(colored, (260, 260)), (180, 20))
     wide.save(ASSETS / "Wide310x150Logo.scale-200.png")
+    save_splash(colored)
 
     colored.save(
         ASSETS / "AppIcon.ico",
