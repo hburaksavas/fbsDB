@@ -3924,7 +3924,25 @@ export const bridgeContract = {
           "type": "string"
         },
         "catalog": {
-          "type": "array"
+          "type": "object",
+          "properties": {
+            "tools": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "errors": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "tools",
+            "errors"
+          ]
         },
         "tool": {
           "type": "object"
@@ -3951,7 +3969,25 @@ export const bridgeContract = {
           "type": "string"
         },
         "catalog": {
-          "type": "array"
+          "type": "object",
+          "properties": {
+            "tools": {
+              "type": "array",
+              "items": {
+                "type": "object"
+              }
+            },
+            "errors": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "tools",
+            "errors"
+          ]
         },
         "tool": {
           "type": "object"

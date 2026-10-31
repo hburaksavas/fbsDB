@@ -72,6 +72,10 @@ export function MiniToolsDialog({ root, tabId, sourceResult, result, profiles, p
     </aside><div className="mini-tool-content">
       {!isNativeHost || !root ? <p>Open a workspace in the desktop app to save and run mini tools.</p> : !draft ? <p>Select a saved tool, or run a SELECT and choose “Save SELECT as tool”. Opening a tool does not execute SQL.</p> : <>
         <label>Tool name<input value={draft.name} maxLength={100} disabled={busy || saving} onChange={e => change({ name: e.target.value })}/></label>
+        <p>Revision {draft.revision || 0} · shared definitions contain no parameter values</p>
+        <label>Description<textarea maxLength={2000} disabled={busy || saving} value={draft.description || ''} onChange={e => change({description:e.target.value})}/></label>
+        <label>Usage example (use placeholders, never real personal data)<textarea maxLength={2000} disabled={busy || saving} value={draft.usage || ''} onChange={e => change({usage:e.target.value})}/></label>
+        <label>Changes in this revision<textarea maxLength={2000} disabled={busy || saving} value={draft.changeNotes || ''} onChange={e => change({changeNotes:e.target.value})}/></label>
         <label>Oracle profile<select aria-label="Mini tool Oracle profile" value={profile?.id || ''} disabled={busy || saving} onChange={e => { setRunId(null); setValues({}); const selected = profiles.find(p => p.id === e.target.value); if (selected) onConnect(selected); }}><option value={profile?.id || ''}>{profile?.name || profile?.id || 'Choose a profile'}</option>{profiles.filter(p => p.id !== profile?.id).map(p => <option key={p.id} value={p.id}>{p.name || p.id} · {p.env}</option>)}</select></label>
         <p className="mini-tool-context">{connected ? 'Connected' : 'Not connected'} · {profile?.host} / {profile?.service} · {profile?.env}</p>
         <details><summary>SQL and view definition</summary>

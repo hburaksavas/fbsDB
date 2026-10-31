@@ -99,3 +99,11 @@ test('executing again keeps a pinned cursor and closes an unpinned previous resu
   f.results.update('a', 'queryResult', { resultId: 'replace-me' });
   f.actions.executeStatement('SELECT 3 FROM dual'); assert.equal(f.commands[1].payload.previousResultId, 'replace-me');
 });
+
+test('single DDL requires explicit confirmation and cannot run over a pending transaction',()=>{
+ const f=fixture();let prompts=0;f.ports.ui.confirmDdl=()=>{prompts++;return false};
+ f.actions.executeStatement('DROP TABLE x');assert.equal(f.commands.length,0);assert.equal(prompts,1);
+ f.sessions.a.transactionPending=true;f.ports.ui.confirmDdl=()=>{prompts++;return true};
+ f.actions.executeStatement('DROP TABLE x');assert.equal(f.commands.length,0);assert.equal(prompts,1);assert.match(f.statuses.at(-1).value,/Commit or roll back/);
+ f.sessions.a.transactionPending=false;f.actions.executeStatement('DROP TABLE x');assert.equal(f.commands.length,1);
+});

@@ -1,7 +1,7 @@
 import {Feedback} from './Feedback';
 import {useEffect,useState} from 'react';
 import {AlertCircle,CheckCircle2,Rows3,Table2,Timer,Square,Code2,Copy,LoaderCircle,CircleSlash} from 'lucide-react';
-import {LONG_QUERY_MS,elapsedQueryTime,formatQueryDuration,queryFailureDetails} from './resultStatus.js';
+import {LONG_QUERY_MS,elapsedQueryTime,formatQueryDuration,queryFailureDetails,transactionRecoveryHint} from './resultStatus.js';
 
 export function ResultIdle(){
   return <section className="result-idle" data-kind="idle" role="status">
@@ -41,5 +41,5 @@ export function ResultNotice({kind='idle',title,detail,metric,raw,code,onEdit,on
 }
 export function ResultFailure({outcome,onEdit}){
   const value=queryFailureDetails(outcome);
-  return <ResultNotice {...value} detail={value.hint} raw={value.message} onEdit={onEdit} metric={Number.isFinite(outcome.elapsedMs)?formatQueryDuration(outcome.elapsedMs):undefined}/>;
+  return <ResultNotice {...value} detail={[value.hint,transactionRecoveryHint(outcome)].filter(Boolean).join(' ')} raw={value.message} onEdit={onEdit} metric={Number.isFinite(outcome.elapsedMs)?formatQueryDuration(outcome.elapsedMs):undefined}/>;
 }

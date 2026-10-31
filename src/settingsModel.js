@@ -45,6 +45,8 @@ export const settingDefinitions={
   'editor.shortcuts':{label:'Keyboard shortcuts',default:defaultEditorShortcuts,normalize:normalizeEditorShortcuts,category:'shortcuts',scopes:['user'],when:'Immediately',hidden:true},
   'editor.completion':{label:'Oracle completion preferences',default:defaultCompletionSettings,normalize:value=>value&&typeof value==='object'&&!Array.isArray(value)?normalizeCompletionSettings(value):undefined,category:'completion',scopes:['user'],when:'Immediately',hidden:true},
   'ui.motion':{...select('Interface motion','system',['system','reduce','full'],'accessibility'),scopes:['user'],when:'Immediately'},
+  'privacy.historyDays':{...select('History retention in days (0 = no expiry)',0,[0,1,7,30,90],'privacy'),scopes:['user'],when:'Immediately'},
+  'privacy.excludedProfiles':{...select('Disable history for profile IDs (comma separated)','',null,'privacy'),type:'text',maxLength:2000,scopes:['user'],when:'Immediately'},
   'privacy.historyLimit':{...select('Retained queries (reducing removes older history)',50,[0,10,25,50,100],'privacy'),scopes:['user'],when:'Immediately'},
   'results.density':select('Row density','compact',['compact','comfortable']),
   'results.wrap':toggle('Wrap cell text',false),

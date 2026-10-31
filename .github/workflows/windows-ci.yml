@@ -55,6 +55,9 @@ jobs:
       - name: Check TypeScript bridge API
         run: npm run typecheck:bridge
 
+      - name: Check history and query outcome types
+        run: npm run typecheck:domain
+
       - name: Build web bundle
         run: npm run build
 

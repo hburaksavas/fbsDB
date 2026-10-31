@@ -1,4 +1,5 @@
 export const nativeUxFixture=`(()=>{
+ localStorage.setItem('fbsdb.onboardingSeen','true');
  const listeners=new Set(),commands=[];const nativePost=chrome.webview.postMessage.bind(chrome.webview);
  const nativeAdd=chrome.webview.addEventListener.bind(chrome.webview),nativeRemove=chrome.webview.removeEventListener.bind(chrome.webview);
  chrome.webview.addEventListener=(name,listener)=>{if(name==='message')listeners.add(listener);nativeAdd(name,listener)};

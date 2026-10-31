@@ -1,3 +1,8 @@
+import { useConnectionLifecycle } from './useConnectionLifecycle.js';
+import { GettingStartedDialog } from './GettingStartedDialog';
+import { QueryHistoryDialog } from './QueryHistoryDialog';
+import { retainHistory, historyAllowed } from './queryHistory.js';
+import { persistLocal } from './localPersistence.js';
 import { recordStartupMilestone } from './startupPerformance.js';
 import {EditorContextMenu} from './EditorContextMenu';
 import {DocumentSaves} from './documentSaves.js';
@@ -392,6 +397,8 @@ function getBindNames(sql) {
 
 export function App() {
   const [monaco, setMonaco] = useState(null);
+  const [pendingDdl,setPendingDdl]=useState(null);
+  const [showGettingStarted,setShowGettingStarted]=useState(()=>{try{return !localStorage.getItem('fbsdb.onboardingSeen')}catch{return true}});
   const [settings,setSettings]=useState(()=>loadSettings(localStorage)),[settingsError,setSettingsError]=useFeedbackState('',{title:'Settings',scope:null});
   const settingsRef=useRef(settings);settingsRef.current=settings;
   useEffect(()=>{try{saveSettings(localStorage,settings);setSettingsError('')}catch{setSettingsError('Settings could not be saved on this device.')}},[settings]);
@@ -420,7 +427,7 @@ export function App() {
     sendNativeCommand('system.locale');
     return unsubscribe;
   },[]);
-  useEffect(()=>{try{localStorage.setItem('fbsdb.queryTimeout',String(queryTimeout))}catch{}},[queryTimeout]);
+  useEffect(()=>{try{persistLocal(localStorage, 'fbsdb.queryTimeout',String(queryTimeout))}catch{}},[queryTimeout]);
   const [recovery,setRecovery]=useState(()=>{try{return parseDraftSnapshot(localStorage.getItem('fbsdb.sqlDrafts'))}catch{return null}});
   const layout = resolveSetting(settings, 'ui.layout').value;
   const workbenchDensity = resolveSetting(settings, 'ui.density').value;
@@ -459,7 +466,7 @@ export function App() {
       const saved = JSON.parse(localStorage.getItem("fbsdb.queryHistory") || "[]");
       if (!Array.isArray(saved)) return [];
       return saved.filter((entry) => entry && typeof entry.sql === "string" && typeof entry.profile === "string" && Number.isFinite(entry.startedAt))
-        .slice(0,resolveSetting(settings,'privacy.historyLimit').value).map((entry) => entry.status === "Running" ? { ...entry, status: "Interrupted", detail: "App closed before completion" } : entry);
+        .filter(entry => historyAllowed(entry.profile, resolveSetting(settings,'privacy.excludedProfiles').value) && (!resolveSetting(settings,'privacy.historyDays').value || entry.startedAt >= Date.now()-resolveSetting(settings,'privacy.historyDays').value*86400000)).slice(0,resolveSetting(settings,'privacy.historyLimit').value).map((entry) => entry.status === "Running" ? { ...entry, status: "Interrupted", detail: "App closed before completion" } : entry);
     } catch { return []; }
   });
   const [searchQuery, setSearchQuery] = useState(""), [historyFilter, setHistoryFilter] = useState(""), [searchMatches, setSearchMatches] = useState([]), [searching, setSearching] = useState(false), [searchTruncated, setSearchTruncated] = useState(false);
@@ -618,7 +625,8 @@ export function App() {
   useEffect(()=>{if(isNativeHost)sendNativeCommand('ui.setTheme',{theme})},[theme]);
   const [allTokenColors,setAllTokenColors]=useState(()=>{const saved=resolveSetting(settings,'ui.tokenColors').value;return resolveTokenColors(saved)});
   const [editorThemeName, setEditorThemeName] = useState("vs-dark");
-  useEffect(()=>{const limit=resolveSetting(settings,'privacy.historyLimit').value;setQueryHistory(current=>current.length>limit?current.slice(0,limit):current)},[settings.user['privacy.historyLimit']]);
+  useEffect(()=>{setQueryHistory(current=>retainHistory(current,{limit:resolveSetting(settings,'privacy.historyLimit').value,days:resolveSetting(settings,'privacy.historyDays').value,excludedProfiles:resolveSetting(settings,'privacy.excludedProfiles').value}))},[settings.user['privacy.historyLimit'],settings.user['privacy.historyDays'],settings.user['privacy.excludedProfiles']]);
+  useEffect(()=>{const timer=setInterval(()=>setQueryHistory(current=>retainHistory(current,{limit:resolveSetting(settings,'privacy.historyLimit').value,days:resolveSetting(settings,'privacy.historyDays').value,excludedProfiles:resolveSetting(settings,'privacy.excludedProfiles').value})),60000);return()=>clearInterval(timer)},[settings]);
   useEffect(()=>{const clear=()=>setQueryHistory([]);window.addEventListener('fbsdb.history.clear',clear);return()=>window.removeEventListener('fbsdb.history.clear',clear)},[]);
   const motionPreference=resolveSetting(settings,'ui.motion').value,historyLimit=resolveSetting(settings,'privacy.historyLimit').value;
   const [systemReducedMotion,setSystemReducedMotion]=useState(()=>window.matchMedia?.('(prefers-reduced-motion: reduce)').matches||false);
@@ -917,11 +925,11 @@ export function App() {
         const fetching=sessionsRef.current[owner]?.fetchingPage;
         if(operation&&!fetching&&!sessionsRef.current[owner]?.scriptRun?.running&&(operation.status!=='running'||message.requestId&&![operation.requestId,operations.cancellations.get(owner)].includes(message.requestId)))return;
         setTransactionPending(Boolean(message.transactionPending));
-        if (message.complete) { operations.cancellations.delete(owner);if(operation?.status==='running'){operations.owners.delete(operation.requestId);operation.status='complete';updateTabSession('queryOutcome',{kind:'cancelled',elapsedMs:Date.now()-operation.startedAt,requestId:operation.requestId},owner)}if(fetching){setFetchingPage(false,owner);setPageError('Row loading cancelled.',owner)}finishHistoryEntry("Cancelled", "Query cancelled"); setExecuting(false); setCancelling(false); setRunState("Query cancelled."); }
+        if (message.complete) { operations.cancellations.delete(owner);if(operation?.status==='running'){operations.owners.delete(operation.requestId);operation.status='complete';updateTabSession('queryOutcome',{transactionPending:message.transactionPending,kind:'cancelled',elapsedMs:Date.now()-operation.startedAt,requestId:operation.requestId},owner)}if(fetching){setFetchingPage(false,owner);setPageError('Row loading cancelled.',owner)}finishHistoryEntry("Cancelled", "Query cancelled"); setExecuting(false); setCancelling(false); setRunState("Query cancelled."); }
         else { setCancelling(true); setRunState("Waiting for Oracle to stop the query…"); }
       } else if (message?.type === "sql.timeout") {
         operations.owners.delete(message.requestId);
-        if(operation)operation.status='complete';operations.cancellations.delete(owner);updateTabSession('queryOutcome',{kind:'timeout',message:message.message||'Query timed out.',elapsedMs:operation?Date.now()-operation.startedAt:undefined,requestId:message.requestId},owner);setResultTab('Results',owner);
+        if(operation)operation.status='complete';operations.cancellations.delete(owner);updateTabSession('queryOutcome',{transactionPending:message.transactionPending,kind:'timeout',message:message.message||'Query timed out.',elapsedMs:operation?Date.now()-operation.startedAt:undefined,requestId:message.requestId},owner);setResultTab('Results',owner);
 
         finishHistoryEntry("Failed", message.message || "Query timed out.");
         setTransactionPending(Boolean(message.transactionPending), owner); setExecuting(false, owner); setCancelling(false, owner); setRunState(message.message || "Query timed out.", owner);
@@ -955,7 +963,7 @@ export function App() {
         if(!operation||operation.status!=='running'||failedQuery||message.explain){setExecuting(false);setCancelling(false)}
         if(failedQuery){
           operation.status='complete';operations.cancellations.delete(owner);
-          updateTabSession('queryOutcome',{kind:'error',message:error,elapsedMs:Date.now()-operation.startedAt,requestId:message.requestId},owner);setResultTab('Results',owner);setOutputMessage(error,owner);
+          updateTabSession('queryOutcome',{transactionPending:message.transactionPending,kind:'error',message:error,elapsedMs:Date.now()-operation.startedAt,requestId:message.requestId},owner);setResultTab('Results',owner);setOutputMessage(error,owner);
           updateTabSession('runtimeProblems',[{id:`${owner}:runtime`,tabId:owner,severity:'error',source:'Oracle',message:error,fileName:documents.tabs.find(tab=>tab.id===owner)?.name||'SQL'}],owner);
         }
         else if ((!failedConnection && !authProfileRef.current && /ORA-\d+/i.test(error)) || message.explain) { if (message.explain) setExplainMessage(error, owner); else setOutputMessage(error, owner); setResultTab(message.explain ? "Explain" : "Output", owner); updateTabSession("runtimeProblems", [{ id: `${owner}:runtime`, tabId: owner, severity: "error", source: "Oracle", message: error, fileName: documents.tabs.find(tab => tab.id === owner)?.name || "SQL" }], owner); }
@@ -1036,19 +1044,19 @@ export function App() {
     return () => window.removeEventListener("keydown", runStatementShortcut, true);
   }, [settings.user['editor.shortcuts']]);
 
-  useEffect(() => { localStorage.setItem("fbsdb.theme", theme); localStorage.setItem("fbsdb.tokenColors", JSON.stringify(allTokenColors)); }, [theme, allTokenColors]);
+  useEffect(() => { persistLocal(localStorage, "fbsdb.theme", theme); persistLocal(localStorage, "fbsdb.tokenColors", JSON.stringify(allTokenColors)); }, [theme, allTokenColors]);
   useEffect(() => {
     const reset = () => { learningEpochRef.current++; suggestionLearningRef.current.clear(); lastSuggestionAcceptanceRef.current = null; publishLearning(); };
     window.addEventListener('fbsdb.resetSuggestionLearning', reset);
     return () => window.removeEventListener('fbsdb.resetSuggestionLearning', reset);
   }, [completionSettings.learning, activeTabId, workspace.root]);
-  useEffect(() => { localStorage.setItem("fbsdb.completion", JSON.stringify(completionSettings)); localStorage.setItem("fbsdb.autoCompletion", String(autoCompletion)); localStorage.setItem("fbsdb.codeStyle", JSON.stringify(codeStyle)); }, [completionSettings, autoCompletion, codeStyle]);
+  useEffect(() => { persistLocal(localStorage, "fbsdb.completion", JSON.stringify(completionSettings)); persistLocal(localStorage, "fbsdb.autoCompletion", String(autoCompletion)); persistLocal(localStorage, "fbsdb.codeStyle", JSON.stringify(codeStyle)); }, [completionSettings, autoCompletion, codeStyle]);
   useEffect(() => { completionTabKeyRef.current?.set(completionSettings.acceptTab); }, [completionSettings.acceptTab]);
-  useEffect(() => { localStorage.setItem("fbsdb.favorites", JSON.stringify(favorites)); localStorage.setItem("fbsdb.recent", JSON.stringify(recentProfiles)); }, [favorites, recentProfiles]);
-  useEffect(()=>{if(!isNativeHost)localStorage.setItem("fbsdb.connectionOrganization",JSON.stringify(connectionOrg))},[connectionOrg]);
-  useEffect(() => { localStorage.setItem("fbsdb.maxRows", String(maxRows)); }, [maxRows]);
-  useEffect(() => { localStorage.setItem("fbsdb.queryHistory", JSON.stringify(queryHistory.slice(0,historyLimit))); }, [queryHistory,historyLimit]);
-  useEffect(() => { localStorage.setItem("fbsdb.customSqlSnippets", JSON.stringify(customSqlSnippets)); }, [customSqlSnippets]);
+  useEffect(() => { persistLocal(localStorage, "fbsdb.favorites", JSON.stringify(favorites)); persistLocal(localStorage, "fbsdb.recent", JSON.stringify(recentProfiles)); }, [favorites, recentProfiles]);
+  useEffect(()=>{if(!isNativeHost)persistLocal(localStorage, "fbsdb.connectionOrganization",JSON.stringify(connectionOrg))},[connectionOrg]);
+  useEffect(() => { persistLocal(localStorage, "fbsdb.maxRows", String(maxRows)); }, [maxRows]);
+  useEffect(() => { persistLocal(localStorage, "fbsdb.queryHistory", JSON.stringify(retainHistory(queryHistory,{limit:historyLimit,days:resolveSetting(settings,'privacy.historyDays').value,excludedProfiles:resolveSetting(settings,'privacy.excludedProfiles').value}))); }, [queryHistory,historyLimit]);
+  useEffect(() => { persistLocal(localStorage, "fbsdb.customSqlSnippets", JSON.stringify(customSqlSnippets)); }, [customSqlSnippets]);
 
 
   useEffect(() => {
@@ -1196,7 +1204,7 @@ export function App() {
     setActiveObject(key);setObjectTabs(current=>existing?current.map(tab=>tab.id===id?{...tab,object:item,view}:tab):[...current,{id,key,object:item,originTabId,view}]);
     setActiveObjectTabId(id);setObjectTabActive(true);
     requestAnimationFrame(()=>document.querySelector('.oracle-object-inspector [aria-selected="true"]')?.focus());
-    setRecentObjects(keys=>{const next=[key,...keys.filter(value=>value!==key)].slice(0,30);localStorage.setItem('fbsdb.recentObjects',JSON.stringify(next));return next});
+    setRecentObjects(keys=>{const next=[key,...keys.filter(value=>value!==key)].slice(0,30);persistLocal(localStorage, 'fbsdb.recentObjects',JSON.stringify(next));return next});
     requestSchemaDetails(item,originTabId);inspectOracleObject(item,originTabId,view==='Related tables');
   }
   function openObjectSqlDraft(text,item,profileId,save=false) {
@@ -1216,7 +1224,7 @@ export function App() {
     const load=async(kind,target=item)=>{check();const value=await broker.load(originTabId,target,context.cancellation.token,kind);check();if(!value)throw Error(broker.session(originTabId).lastError||'Oracle metadata is unavailable for this object.');return value};
     check();
     if(action.startsWith('details:')){openExplorerObject(item,action.slice(8),originTabId);return}
-    if(action==='favorite'){const key=oracleSchemaKey(item);setObjectFavorites(keys=>{const next=keys.includes(key)?keys.filter(k=>k!==key):[...keys,key];localStorage.setItem('fbsdb.objectFavorites',JSON.stringify(next));return next});return}
+    if(action==='favorite'){const key=oracleSchemaKey(item);setObjectFavorites(keys=>{const next=keys.includes(key)?keys.filter(k=>k!==key):[...keys,key];persistLocal(localStorage, 'fbsdb.objectFavorites',JSON.stringify(next));return next});return}
     if(action.startsWith('copy:')){await navigator.clipboard.writeText(action==='copy:name'?item.name:qualifiedObject(item));return}
     if(action==='refresh'){broker.invalidate(originTabId,item);requestSchemaDetails(item,originTabId,true);if(objectTabActive&&inspectorObject&&oracleSchemaKey(inspectorObject)===oracleSchemaKey(item))inspectOracleObject(item,originTabId,objectTab?.view==='Related tables');return}
     if(action==='target'){
@@ -1291,7 +1299,7 @@ export function App() {
   }
   useEffect(()=>{
     if(recovery)return;
-    const save=()=>{try{localStorage.setItem('fbsdb.sqlDrafts',JSON.stringify(draftSnapshot(documents.tabs,documents.activeId)))}catch{}};
+    const save=()=>persistLocal(localStorage, 'fbsdb.sqlDrafts',JSON.stringify(draftSnapshot(documents.tabs,documents.activeId)));
     const timer=setTimeout(save,700);window.addEventListener('pagehide',save);
     return()=>{clearTimeout(timer);window.removeEventListener('pagehide',save)};
   },[tabs,sql,fileDirty,filePath,fileConnectionProfileId,activeTabId,recovery]);
@@ -1386,20 +1394,11 @@ export function App() {
     }
     const url = URL.createObjectURL(new Blob([sql], { type: "text/sql;charset=utf-8" })), link = document.createElement("a"); link.href = url; link.download = fileName || "query.sql"; link.click(); URL.revokeObjectURL(url); setFileDirty(false); afterSave?.();
   }
-  function connectInBackground(item, credentials = {}) {
-    const tabId = item.tabId || documents.activeId;
-    if ([...pendingConnectionsRef.current.values()].some(profile => profile.tabId === tabId)) return;
-    updateTabSession("sessionContext",null,tabId);updateTabSession("operationStartedAt",Date.now(),tabId);setConnecting(true, tabId); setConnectionError("", tabId); updateTabSession("connectingProfile", item.name || item.id, tabId); updateTabSession("connectingProfileId",item.id,tabId);
-    const requestId = sendNativeCommand("connection.connect", { profileId: item.id, ...credentials, tabId });
-    pendingConnectionsRef.current.set(requestId, { ...item, user: credentials.user || item.user || item.savedUser, credentials: undefined, tabId });
-  }
-  function beginConnection(item) {
-    const tabId = item.tabId || documents.activeId; item = { ...item, tabId };
-    if (item.credentials || item.hasSavedCredentials) { setAuthProfile(null); connectInBackground(item, item.credentials || {}); }
-    else { setAuthProfile(item); setConnectionError("", tabId); setConnecting(false, tabId); }
-  }
-  function switchConnection(item, force = false) { if (editorIsReadonly()) return; if (item.available === false) { setManagementError("TNS source unavailable. Edit this connection or refresh sources."); return; } setShowPicker(false); if (!force && item.id.toLowerCase() === activeConnection.id.toLowerCase()) return; if (isNativeHost && transactionPending) { setPendingSwitch({ ...item, tabId: documents.activeId }); return; } if (isNativeHost) { beginConnection(item); return; } setActiveConnection(item); setRunState(`Connected to ${item.id}`); }
-  function disconnectActiveConnection() { setShowPicker(false); if (transactionPending) setPendingSwitch({ id: "disconnect", disconnect: true, tabId: documents.activeId }); else if (isNativeHost) sendNativeCommand("connection.disconnect", { tabId: documents.activeId }); else setActiveConnection({ id: "Disconnected", title: "No active session", env: "—" }); }
+
+
+
+
+  const { connectInBackground, beginConnection, switchConnection, disconnectActiveConnection, submitConnectionCredentials, finishTransaction } = useConnectionLifecycle({ documents, pendingConnectionsRef, updateTabSession, setConnecting, setConnectionError, setAuthProfile, editorIsReadonly, setManagementError, setShowPicker, activeConnection, transactionPending, setPendingSwitch, setActiveConnection, setRunState, authProfile, authTestRequestRef, pendingSwitch });
   function previewConnectionOrganization(payload){const next=changeConnectionOrganization(connectionOrg,payload,dbConnections);setConnectionOrg(next);setDbConnections(current=>organizedProfiles(current,next).map(p=>({...p,group:p.groups[0]||''})))}
   function connectionContextAction(action,context){
     const item=context.item,folderId=context.kind==='folder'?item.id:context.kind==='profile'?item.folderId:null;
@@ -1416,12 +1415,8 @@ export function App() {
     else if(action==='refresh')sendNativeCommand('connection.list');
   }
 
-  function submitConnectionCredentials(credentials) {
-    if (!authProfile) return;
-    if (authProfile.testOnly) { setConnecting(true, authProfile.tabId); authTestRequestRef.current = sendNativeCommand("connection.test", { profileId: authProfile.id, ...credentials, tabId: authProfile.tabId }); return; }
-    const profile = authProfile; setAuthProfile(null); connectInBackground(profile, credentials);
-  }
-  function finishTransaction(action) { if (isNativeHost) sendNativeCommand(`transaction.${action}`, { tabId: pendingSwitch?.tabId || documents.activeId }); else setRunState(action === "commit" ? "Transaction committed" : "Transaction rolled back"); }
+
+
   function resultExportData(overrideOptions) {
     const state=(resultTab==='Results'&&view.selectedResultKey?view.resultSets?.find(item=>item.key===view.selectedResultKey)?.view:view[resultTab==='Explain'?'planView':'queryView'])||{};
     const options=overrideOptions||state.options||{};const data=deriveResultData(sqlResult?.rows||[],sqlResult?.columns||[],options.derivedColumns||[]);
@@ -1616,10 +1611,11 @@ export function App() {
     settings: { pageSize: pageSizes.next, scriptPageSize: maxRows, timeout: queryTimeout, workspaceRoot: workspace.root },
     editor: { current: editorRef.current, lastPosition: lastEditorPositionRef.current, flash: flashExecutionTarget },
     session: { update: updateTabSession, status: setRunState },
-    ui: { pendingBind: pendingBindSql, bind: setPendingBindSql, showConnections: () => setShowPicker(true), scriptDialog },
+    ui: { confirmDdl: request => {setPendingDdl(request);return false}, pendingBind: pendingBindSql, bind: setPendingBindSql, showConnections: () => setShowPicker(true), scriptDialog },
     history: {
       learn: learnSqlUsage,
       start(owner, statement, profile) {
+        if (!historyLimit || !historyAllowed(profile, resolveSetting(settings,'privacy.excludedProfiles').value)) return;
         const id = crypto.randomUUID(); pendingHistoryRef.current.set(owner, id);
         setQueryHistory(current => [{ id, sql: statement, profile, startedAt: Date.now(), status: 'Running', detail: 'Executing…' }, ...current].slice(0, historyLimit));
       },
@@ -1761,7 +1757,7 @@ export function App() {
     </div>
       </DockWorkbench>
     </div>
-    <footer className="app-status"><div><Folder size={12}/><span title={workspace.root||'Open a workspace'}>{workspace.name}</span></div><div><span>Ctrl+P · Search workbench</span><span className="status-divider"/><span>Ctrl+Enter · Run SQL</span></div><div><LockKeyhole size={12}/><span>Manual commit</span></div></footer>
+    <footer className="app-status"><div><Folder size={12}/><span title={workspace.root||'Open a workspace'}>{workspace.name}</span></div><div><button type="button" onClick={()=>setShowGettingStarted(true)}>Getting started</button><span>Ctrl+P · Search workbench</span><span className="status-divider"/><span>Ctrl+Enter · Run SQL</span></div><div><LockKeyhole size={12}/><span>Manual commit</span></div></footer>
     {showPicker && <ConnectionPicker items={dbConnections.map(item => ({ ...item, recent: recentProfiles.includes(item.id) }))} current={activeConnection} onClose={() => setShowPicker(false)} onConnect={switchConnection} favorites={favorites} setFavorites={setFavorites} groups={connectionGroupNames} onManage={()=>{setShowPicker(false);setProfileEditor(true)}} managementError={managementError}
       onNew={() => { setShowPicker(false); setProfileEditor({}); }}
       onEdit={(profile) => { setShowPicker(false); setProfileEditor(profile); }}
@@ -1777,7 +1773,8 @@ export function App() {
     }} onCancelRun={cancelQuery} onFetchMore={fetchMoreResults} onClose={() => setShowMiniTools(false)}/></Suspense>}
     {showSnippets && <ModalBackdrop onClose={() => setShowSnippets(false)} onMouseDown={(event) => event.target === event.currentTarget && setShowSnippets(false)}><section className="appearance-modal snippet-browser-modal" role="dialog" aria-modal="true" aria-labelledby="snippet-browser-title"><header className="appearance-header"><div><div className="eyebrow">SQL TOOLKIT</div><h2 id="snippet-browser-title">SQL snippets</h2><p>Search, preview, and insert SQL templates, or create your own.</p></div><div className="snippet-header-actions"><button className="button-secondary" onClick={() => { setSnippetFormOpen(true); setSnippetError(""); }}><Plus size={13} /> New custom</button><button className="icon-button" onClick={() => setShowSnippets(false)} aria-label="Close SQL snippets"><X size={17} /></button></div></header><label className="workspace-search-input snippet-search-input"><Search size={15} /><input autoFocus value={snippetFilter} onChange={(event) => setSnippetFilter(event.target.value)} placeholder="Search snippets or triggers…" aria-label="Search SQL snippets" /></label><div className="snippet-browser-body"><div className="snippet-list" role="listbox" aria-label="Available SQL snippets">{filteredSnippets.length ? filteredSnippets.map((snippet) => <button key={snippet.trigger} className={`snippet-option ${selectedSnippet?.trigger === snippet.trigger ? "selected" : ""}`} role="option" aria-selected={selectedSnippet?.trigger === snippet.trigger} onClick={() => { setSelectedSnippetTrigger(snippet.trigger); setSnippetFormOpen(false); }}><span className="snippet-trigger">{snippet.trigger}</span><span className="snippet-option-copy"><b>{snippet.label}</b><small>{snippet.detail}</small></span><ChevronRight size={14} /></button>) : <div className="query-history-empty"><Search size={20} /><b>No matching snippets</b><span>Try a SQL keyword or trigger such as `cte`.</span></div>}</div>{snippetFormOpen ? <div className="snippet-preview snippet-form-panel"><div className="snippet-preview-heading"><div><span className="appearance-section-title">CUSTOM TEMPLATE</span><b>Create a SQL snippet</b></div><Braces size={15} /></div><label>Trigger<input autoFocus maxLength={24} value={snippetDraft.trigger} onChange={(event) => { setSnippetDraft((draft) => ({ ...draft, trigger: event.target.value })); setSnippetError(""); }} placeholder="e.g. myquery" /></label><label>Name<input maxLength={48} value={snippetDraft.label} onChange={(event) => setSnippetDraft((draft) => ({ ...draft, label: event.target.value }))} placeholder="e.g. Active invoices" /></label><label>Description<input maxLength={100} value={snippetDraft.detail} onChange={(event) => setSnippetDraft((draft) => ({ ...draft, detail: event.target.value }))} placeholder="Shown in IntelliSense" /></label><label>SQL template<textarea spellCheck="false" value={snippetDraft.text} onChange={(event) => setSnippetDraft((draft) => ({ ...draft, text: event.target.value }))} placeholder="Use ${1:placeholder} for editable Tab stops" /></label>{snippetError && <Feedback title="Snippet could not be saved">{snippetError}</Feedback>}</div> : selectedSnippet && <div className="snippet-preview"><div className="snippet-preview-heading"><div><span className="appearance-section-title">{customSqlSnippets.some((snippet) => snippet.trigger === selectedSnippet.trigger) ? "CUSTOM SNIPPET" : "BUILT-IN PREVIEW"}</span><b>{selectedSnippet.label}</b></div><div className="snippet-preview-tools">{customSqlSnippets.some((snippet) => snippet.trigger === selectedSnippet.trigger) && <button className="snippet-delete-button" aria-label={"Delete " + selectedSnippet.label} title="Delete custom snippet" onClick={() => deleteCustomSqlSnippet(selectedSnippet.trigger)}><Trash2 size={13} /></button>}<code>{selectedSnippet.trigger}</code></div></div><p>{selectedSnippet.detail}</p><pre>{selectedSnippet.text.replace(/\$\{\d+:([^}]+)\}/g, "$1")}</pre><div className="snippet-placeholder-note"><Zap size={13} /> Tab moves between editable placeholders.</div></div>}</div><footer className="appearance-footer"><span>{sqlSnippets.length} built-in · {customSqlSnippets.length} custom · Ctrl+Space opens trigger suggestions</span>{snippetFormOpen ? <div className="snippet-footer-actions"><button className="button-secondary" onClick={() => { setSnippetFormOpen(false); setSnippetError(""); }}>Cancel</button><button className="button-primary" onClick={saveCustomSqlSnippet}><Check size={13} /> Save snippet</button></div> : <button className="button-primary" disabled={!selectedSnippet} onClick={() => insertSqlSnippet(selectedSnippet)}><Braces size={14} /> Insert snippet</button>}</footer></section></ModalBackdrop>}
     {showSearch && <ModalBackdrop onClose={() => setShowSearch(false)} onMouseDown={(event) => { if (event.target === event.currentTarget) setShowSearch(false); }}><section className="appearance-modal workspace-search-modal" role="dialog" aria-modal="true" aria-labelledby="workspace-search-title"><header className="appearance-header"><div><div className="eyebrow">WORKSPACE SEARCH</div><h2 id="workspace-search-title">Find in SQL files</h2><p>{workspaceSearchScope?`Search SQL files in ${workspaceSearchScope}`:'Case-insensitive search across SQL files in the open workspace.'}</p></div><button className="icon-button" aria-label="Close workspace search" onClick={() => setShowSearch(false)}><X size={17} /></button></header><label className="workspace-search-input"><Search size={15} /><input autoFocus value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search text in .sql files…" aria-label="Search SQL workspace" /></label><div className="workspace-search-summary">{!isNativeHost ? "Open the desktop app to search workspace files." : !workspace.root ? "Open a workspace to search its SQL files." : searchQuery.trim().length < 2 ? "Enter at least 2 characters to search." : searching ? "Searching workspace…" : `${searchMatches.length} match${searchMatches.length === 1 ? "" : "es"}${searchTruncated ? " · search limits reached; some files may be omitted" : ""}`}</div><div className="workspace-search-results">{searchMatches.map((match, index) => <button className="workspace-search-result" key={`${match.path}:${match.lineNumber}:${index}`} onClick={() => openWorkspaceSearchMatch(match)}><span><b>{match.relativePath}</b><small>Line {match.lineNumber}</small></span><code>{match.lineText}</code></button>)}{isNativeHost && workspace.root && searchQuery.trim().length >= 2 && !searching && !searchMatches.length && <div className="query-history-empty"><Search size={20} /><b>{searchTruncated ? "No matches in scanned files" : "No matches found"}</b><span>{searchTruncated ? "Some files were skipped because the workspace is large." : "Try a different term or shorter fragment."}</span><button className="button-secondary" onClick={()=>setSearchQuery("")}>Clear search</button></div>}{!isNativeHost && <div className="query-history-empty"><Search size={20} /><b>Workspace search is available in the desktop app</b><span>It searches SQL files in the open workspace.</span></div>}</div><footer className="appearance-footer"><span>{searchMatches.length ? "Select a match to open its file at that line." : "Search runs locally against workspace SQL files."}</span><button className="button-secondary" onClick={() => { setShowSearch(false); setSearchQuery(""); setSearchMatches([]); }}>Close</button></footer></section></ModalBackdrop>}
-    {showHistory && <ModalBackdrop onClose={() => setShowHistory(false)} onMouseDown={(event) => { if (event.target === event.currentTarget) setShowHistory(false); }}><section className="appearance-modal query-history-modal" role="dialog" aria-modal="true" aria-labelledby="query-history-title"><header className="appearance-header"><div><div className="eyebrow">QUERY HISTORY</div><h2 id="query-history-title">Recent executions</h2><p>SQL text only; bind values are never saved. The last 50 executions stay on this device.</p></div><button className="icon-button" aria-label="Close query history" onClick={() => setShowHistory(false)}><X size={17} /></button></header><label className="workspace-search-input history-search-input"><Search size={15} /><input autoFocus value={historyFilter} onChange={(event) => setHistoryFilter(event.target.value)} placeholder="Search SQL, profile, or status..." aria-label="Search query history" /></label><div className="query-history-list">{filteredQueryHistory.length ? filteredQueryHistory.map((entry) => <article className="query-history-item" key={entry.id}><div className="query-history-meta"><span className={`query-history-status ${entry.status.toLowerCase()}`} /><b>{entry.profile}</b><time>{new Date(entry.startedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</time><span className={`query-history-label ${entry.status.toLowerCase()}`}>{entry.status}</span></div><pre>{entry.sql}</pre><div className="query-history-actions"><span>{entry.detail}</span><button className="button-secondary" onClick={() => insertHistorySql(entry.sql)}><FileCode2 size={13} /> Insert into editor</button></div></article>) : queryHistory.length ? <div className="query-history-empty"><Search size={20} /><b>No matching executions</b><span>Try another SQL fragment, profile name, or status.</span><button className="button-secondary" onClick={()=>setHistoryFilter("")}>Clear history filter</button></div> : <div className="query-history-empty"><History size={20} /><b>No saved queries yet</b><span>Executed statements will appear here.</span></div>}</div><footer className="appearance-footer"><span>{historyFilter.trim() ? `${filteredQueryHistory.length} of ${queryHistory.length} executions match` : `${queryHistory.length} of 50 recent executions on this device`}</span><button className="button-secondary" disabled={!queryHistory.length} onClick={() => setQueryHistory([])}>Clear history</button></footer></section></ModalBackdrop>}
+    {showGettingStarted && <GettingStartedDialog onClose={()=>{persistLocal(localStorage,'fbsdb.onboardingSeen','true');setShowGettingStarted(false)}}/>}
+    {showHistory && <QueryHistoryDialog historyLimit={historyLimit} historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} queryHistory={queryHistory} filteredQueryHistory={filteredQueryHistory} setQueryHistory={setQueryHistory} insertHistorySql={insertHistorySql} setShowHistory={setShowHistory}/>}
     {showTnsSources && <TnsSources aliases={tnsAliases} onClose={() => setShowTnsSources(false)} />}
     {editorContext&&<EditorContextMenu context={editorContext} onClose={()=>setEditorContext(null)} onAction={editorContextAction} actions={[{id:'run',label:editorContext.selected?'Run selection':'Run statement',disabled:executing||fetchingPage||activeTabReadonly},{id:'explain',label:'Explain plan',disabled:executing||fetchingPage},{id:'format',label:editorContext.selected?'Format selection':'Format SQL',disabled:editorContext.readOnly},{id:'edit',separator:true},{id:'undo',label:'Undo',disabled:editorContext.readOnly||!editorContext.canUndo},{id:'redo',label:'Redo',disabled:editorContext.readOnly||!editorContext.canRedo},{id:'cut',label:'Cut',disabled:editorContext.readOnly||!editorContext.selected},{id:'copy',label:'Copy',disabled:!editorContext.selected},{id:'paste',label:'Paste',disabled:editorContext.readOnly},{id:'selectAll',label:'Select all'},{id:'comment',label:'Toggle comment',disabled:editorContext.readOnly},{id:'find',label:'Find'},{id:'replace',label:'Replace',disabled:editorContext.readOnly}]}/>}
     {objectMenu&&<OracleObjectMenu context={objectMenu} favorite={objectFavorites.includes(oracleSchemaKey(objectMenu.item))} onAction={objectContextAction} onClose={()=>setObjectMenu(null)}/>}
@@ -1796,6 +1793,7 @@ export function App() {
     {authProfile && <ConnectionAuthDialog key={`${authProfile.tabId}:${authProfile.id}`} profile={authProfile} connecting={tabSessions[authProfile.tabId]?.connecting || false} error={tabSessions[authProfile.tabId]?.connectionError || ""} onClose={() => setAuthProfile(null)} onConnect={submitConnectionCredentials} />}
     {pendingBindSql && <Suspense fallback={<div role="status">Loading…</div>}><BindParameterDialog file={filePath} sql={pendingBindSql} onCancel={() => setPendingBindSql(null)} onExecute={(values) => executeStatement(pendingBindSql, values)} /></Suspense>}
     {pendingSwitch && <ModalBackdrop onClose={() => { setPendingSwitch(null); setRunState("Connection switch cancelled."); }}><section className="appearance-modal transaction-guard"><header className="appearance-header"><div><div className="eyebrow">UNCOMMITTED CHANGES</div><h2>{pendingSwitch.disconnect ? "Disconnecting" : "Switching connection"}</h2><p>Commit or roll back the pending transaction before {pendingSwitch.disconnect ? "disconnecting" : `connecting to ${pendingSwitch.name || pendingSwitch.id}`}.</p></div></header><footer className="appearance-footer"><button className="button-secondary" onClick={() => { setPendingSwitch(null); setRunState("Connection switch cancelled."); }}>Cancel</button><div><button className="transaction-button rollback" onClick={() => finishTransaction("rollback")}><X size={13} /> Rollback & {pendingSwitch.disconnect ? "disconnect" : "switch"}</button><button className="button-primary" onClick={() => finishTransaction("commit")}><Check size={13} /> Commit & {pendingSwitch.disconnect ? "disconnect" : "switch"}</button></div></footer></section></ModalBackdrop>}
+    {pendingDdl && <FeedbackDialog kind="warning" title="Run DDL statement?" onClose={()=>setPendingDdl(null)} actions={<><button onClick={()=>setPendingDdl(null)}>Cancel</button><button className="danger" onClick={()=>{const request=pendingDdl;setPendingDdl(null);if(documents.activeId!==request.owner||sessionsRef.current[request.owner]?.activeConnection?.id!==request.profileId){setRunState('The execution tab or connection changed. Review the statement and run it again.',request.owner);return;}executeStatement(request.statement,request.parameters,request.miniTool,{ddlConfirmed:true});}}>Run DDL</button></>}><p>Oracle DDL commits automatically and cannot be undone with Rollback. Pending changes must be committed or rolled back first.</p><p>Profile: {pendingDdl.profileId}</p><pre>{pendingDdl.statement}</pre></FeedbackDialog>}
     {batchClose&&<FeedbackDialog kind="warning" title={`Close ${batchClose.count} unsaved editors?`} onClose={()=>setBatchClose(null)} actions={<><button onClick={()=>setBatchClose(null)}>Cancel</button><button onClick={()=>batchClose.run(false)}>Review individually</button><button className="danger" onClick={()=>batchClose.run(true)}>Discard All</button></>}>Discard unsaved editor changes in these tabs? Pending database transactions still require Commit or Rollback.</FeedbackDialog>}
     {pendingTabClose && <ModalBackdrop onClose={() => {batchDiscardRef.current.clear();setPendingTabClose(null)}}><section className="appearance-modal transaction-guard" role="dialog" aria-modal="true" aria-label="Close SQL session"><header className="appearance-header"><div><div className="eyebrow">SQL TAB SESSION</div><h2>{pendingTabClose.pending ? "Uncommitted changes" : "Could not close tab"}</h2><p>{pendingTabClose.message || "Resolve this tab’s transaction before closing it."}</p></div></header><footer className="appearance-footer"><button className="button-secondary" onClick={() => {batchDiscardRef.current.clear();setPendingTabClose(null)}}>Cancel</button><div>{pendingTabClose.pending ? ["rollback", "commit"].map(action => <button key={action} disabled={pendingTabClose.resolving} className={action === "commit" ? "button-primary" : "transaction-button rollback"} onClick={() => { const pending = { ...pendingTabClose, resolving: true }; pendingTabCloseRef.current = pending; setPendingTabClose(pending); sendNativeCommand(`transaction.${action}`, { tabId: pending.tabId }); }}>{action === "commit" ? "Commit" : "Rollback"} & close</button>) : <button className="button-primary" onClick={pendingTabClose.retry}>Retry</button>}</div></footer></section></ModalBackdrop>}
     {pendingFileAction && <ModalBackdrop onClose={() => {batchDiscardRef.current.clear();setPendingFileAction(null)}}><section className="appearance-modal transaction-guard"><header className="appearance-header"><div><div className="eyebrow">UNSAVED SQL</div><h2>Save changes to {fileName}?</h2><p>Your edits will be lost if you continue without saving.</p></div></header><footer className="appearance-footer"><button className="button-secondary" onClick={() => {batchDiscardRef.current.clear();setPendingFileAction(null)}}>Cancel</button><div><button className="transaction-button rollback" onClick={() => { const run = pendingFileAction.run; setPendingFileAction(null); run(); }}>Discard changes</button><button className="button-primary" onClick={() => saveSqlFile(() => { setPendingFileAction(null); pendingFileAction.run(); })}><Check size={13} /> Save</button></div></footer></section></ModalBackdrop>}

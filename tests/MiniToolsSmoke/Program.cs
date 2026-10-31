@@ -23,6 +23,12 @@ try
     var text = await File.ReadAllTextAsync(file);
     Require(!text.Contains("SECRET"), "Runtime data escaped into the tool file.");
     Require(text.Contains("Customer ID") && text.Contains("NUMBER"), "Field definition was lost.");
+    Require(saved.Revision == 1, "Initial revision missing.");
+    var update = saved with { Description = "Look up a customer", Usage = "Supply :ID", ChangeNotes = "Document usage" };
+    var updated = await MiniToolService.SaveAsync(root, JsonSerializer.SerializeToElement(update, new JsonSerializerOptions(JsonSerializerDefaults.Web)));
+    Require(updated.Revision == 2 && updated.Description == update.Description && updated.Usage == update.Usage && updated.ChangeNotes == update.ChangeNotes, "Sharing metadata did not roundtrip.");
+    try { await MiniToolService.SaveAsync(root, JsonSerializer.SerializeToElement(update, new JsonSerializerOptions(JsonSerializerDefaults.Web))); throw new Exception("Stale tool save overwrote a newer revision."); }
+    catch (InvalidOperationException) { }
     var catalog = JsonSerializer.SerializeToElement(await MiniToolService.ListAsync(root));
     Require(catalog.GetProperty("tools").GetArrayLength() == 1, "Saved tool was not listed.");
     var second = Path.Combine(root, "second-workspace"); Directory.CreateDirectory(Path.Combine(second, ".fbsdb", "tools"));

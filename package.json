@@ -15,7 +15,9 @@
     "typecheck:bridge": "tsc -p tsconfig.bridge.json",
     "test": "node scripts/test-unit.mjs",
     "test:load": "node scripts/test-load.mjs",
-    "test:desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-desktop.ps1"
+    "test:desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-desktop.ps1",
+    "typecheck:domain": "tsc -p tsconfig.domain.json",
+    "test:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-release.ps1"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

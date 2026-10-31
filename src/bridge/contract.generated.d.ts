@@ -1042,7 +1042,10 @@ export interface ReplyMessages {
   "tabId"?: string;
   "autoCommit"?: boolean;
   "root"?: string;
-  "catalog"?: Array<JsonValue>;
+  "catalog"?: {
+  "tools": Array<Record<string, JsonValue>>;
+  "errors": Array<string>;
+};
   "tool"?: Record<string, JsonValue>;
 };
   "workspace.tools.save": { type: "workspace.tools.save" } & {
@@ -1050,7 +1053,10 @@ export interface ReplyMessages {
   "tabId"?: string;
   "autoCommit"?: boolean;
   "root"?: string;
-  "catalog"?: Array<JsonValue>;
+  "catalog"?: {
+  "tools": Array<Record<string, JsonValue>>;
+  "errors": Array<string>;
+};
   "tool"?: Record<string, JsonValue>;
 };
   "workspace.worksetOpened": { type: "workspace.worksetOpened" } & {

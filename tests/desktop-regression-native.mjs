@@ -14,7 +14,7 @@ const cdp = await connectNativePage(endpoint), checks = [], startedAt = new Date
 const editor = `window.monaco?.editor.getEditors().find(editor => document.contains(editor.getDomNode()))`;
 const activeTab = `document.querySelector('.file-tab.active')?.dataset.editorTab`;
 const quote = JSON.stringify;
-let installed, failure;
+let installed, failure, startupMetrics;
 const reportFile = path.join(root, 'report.json');
 
 async function healthy() {
@@ -68,6 +68,17 @@ try {
   await check('startup: real Monaco mount and native initialization', async () => {
     await cdp.until(`window.__desktopRegression?.ready && ${editor} && ['workspace.state', 'connection.profiles'].every(type => window.__desktopRegression.replies.some(reply => reply.type === type))`, 'Desktop startup', 60000);
     assert.equal(await cdp.evaluate('window.__desktopRegression.root'), fixtureRoot);
+    startupMetrics=await cdp.evaluate(`performance.getEntriesByType('measure').filter(m=>m.name.startsWith('fbsdb:startup:')).map(m=>({name:m.name,durationMs:m.duration}))`);
+    assert.ok(startupMetrics.some(m=>m.name==='fbsdb:startup:editor-ready'));
+  });
+
+  await check('first-use guide: visible, dismissible and remembered across reloads', async () => {
+    await cdp.until(`document.getElementById('getting-started-title')`, 'Getting started guide');
+    await cdp.textClick('[aria-labelledby="getting-started-title"] button', 'Start working');
+    assert.equal(await cdp.evaluate(`localStorage.getItem('fbsdb.onboardingSeen')`),'true');
+    await cdp.call('Page.reload');
+    await cdp.until(`window.__desktopRegression?.ready && ${editor}`, 'Restart after onboarding');
+    assert.equal(await cdp.evaluate(`!!document.getElementById('getting-started-title')`),false);
   });
 
   let firstDraft, secondDraft;
@@ -179,7 +190,7 @@ try {
   try { diagnostics = await cdp.evaluate('({url: location.href, readyState: document.readyState, errors: window.__desktopRegression?.errors, blocked: window.__desktopRegression?.blocked, commands: window.__desktopRegression?.commands, replies: window.__desktopRegression?.replies, error: document.querySelector(".application-error pre")?.textContent})'); } catch { diagnostics = { debuggerDisconnected: true }; }
   await writeFile(reportFile, JSON.stringify({ startedAt, completedAt: new Date().toISOString(), status: failure ? 'failed' : 'passed',
     coverage: { host: 'real WinUI/WebView2', files: 'real native handlers and disk writes', picker: 'path selection substituted; OS picker interaction excluded', oracle: 'blocked' },
-    checks, diagnostics, error: failure?.message }, null, 2));
+    startupMetrics, checks, diagnostics, error: failure?.message }, null, 2));
   if (installed) await cdp.call('Page.removeScriptToEvaluateOnNewDocument', { identifier: installed.identifier }).catch(() => {});
   cdp.close();
 }

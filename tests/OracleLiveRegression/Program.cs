@@ -127,6 +127,16 @@ try
         await a.RollbackAsync();
         Require(Convert.ToInt32((await a.ExecuteAsync("SELECT 44 FROM dual")).Rows[0][0]) == 44, "Timed-out session is unusable.");
     });
+    await Check("pending DML blocks successful and failing DDL without implicit commit", async () => {
+        await a.ExecuteAsync($"INSERT INTO {table} VALUES (97531)");
+        await Reject<InvalidOperationException>(() => a.ExecuteAsync($"ALTER TABLE {table} ADD (BLOCKED_N NUMBER)"));
+        await Reject<InvalidOperationException>(() => a.ExecuteAsync($"ALTER TABLE {table} THIS_IS_INVALID_DDL"));
+        Require(a.HasPendingTransaction && await Count(a) == 1, "DDL guard changed pending data.");
+        await a.RollbackAsync();
+        Require(await Count(a) == 0, "Blocked DDL implicitly committed data.");
+        await Reject<OracleException>(() => a.ExecuteAsync($"ALTER TABLE {table} THIS_IS_INVALID_DDL"));
+        Require(!a.HasPendingTransaction, "Failed DDL invented a pending transaction.");
+    });
     await Check("pending transactions prevent idle suspension and disconnect", async () => {
         await a.BeginReadOnlyAnalysisAsync();
         Require(!await a.SuspendIfIdleAsync(TimeSpan.Zero), "Idle suspension lost a pending transaction.");

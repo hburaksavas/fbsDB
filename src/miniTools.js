@@ -35,7 +35,7 @@ export function normalizeMiniTool(input) {
   const columns = (Array.isArray(input.columns) ? input.columns : []).map((c, index) => ({
     index, name: String(c.name || '').slice(0, 256), visible: c.visible !== false,
   }));
-  return { version: 1, id: /^[a-f0-9]{32}$/.test(input.id) ? input.id : '', name, sql, fields, columns };
+  return { version: 1, id: /^[a-f0-9]{32}$/.test(input.id) ? input.id : '', name, sql, fields, columns, description: String(input.description || '').slice(0,2000), usage: String(input.usage || '').slice(0,2000), changeNotes: String(input.changeNotes || '').slice(0,2000), revision: Number.isInteger(input.revision) && input.revision > 0 ? input.revision : 0 };
 }
 
 export function miniToolFromResult(result) {

@@ -1,4 +1,6 @@
+﻿param([string]$CertificateThumbprint = "", [switch]$RequireSigned)
 $ErrorActionPreference = "Stop"
+if ($RequireSigned -and -not $CertificateThumbprint) { throw 'A code-signing certificate thumbprint is required for a signed release.' }
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $localDotnet = Join-Path $repoRoot ".tools\dotnet"
 $project = Join-Path $repoRoot "native\FbsDb\FbsDb.csproj"
@@ -64,6 +66,15 @@ Configure Oracle aliases through a tnsnames.ora file. ODP.NET Core is bundled;
 an Oracle client installation is not needed for ordinary TCP connections.
 '@ | Set-Content -LiteralPath (Join-Path $publishDir "README-portable.txt") -Encoding UTF8
 
+    $signTargets = @((Join-Path $publishDir 'fbsDB.exe'), (Join-Path $appDir 'fbsDB.exe'))
+    if ($CertificateThumbprint) {
+        $certificate = Get-Item -LiteralPath ("Cert:\CurrentUser\My\" + $CertificateThumbprint)
+        if (-not $certificate.HasPrivateKey) { throw 'The selected certificate has no private key.' }
+        foreach ($target in $signTargets) {
+            $signature = Set-AuthenticodeSignature -LiteralPath $target -Certificate $certificate -HashAlgorithm SHA256 -TimestampServer 'http://timestamp.digicert.com'
+            if ($signature.Status -ne 'Valid') { throw "Code signing failed for $target : $($signature.StatusMessage)" }
+        }
+    }
     Compress-Archive -Path (Join-Path $publishDir "*") -DestinationPath $archivePath -CompressionLevel Optimal
     Write-Host "Portable package created: $archivePath"
 }

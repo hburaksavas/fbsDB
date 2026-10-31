@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -5,7 +6,7 @@ namespace FbsDb.Services;
 
 public sealed record MiniToolField(string Name, string Label, string Type, bool Required, string Description);
 public sealed record MiniToolColumn(int Index, string Name, bool Visible);
-public sealed record MiniTool(int Version, string Id, string Name, string Sql, MiniToolField[] Fields, MiniToolColumn[] Columns);
+public sealed record MiniTool(int Version, string Id, string Name, string Sql, MiniToolField[] Fields, MiniToolColumn[] Columns, string Description = "", string Usage = "", string ChangeNotes = "", int Revision = 0);
 
 public static class MiniToolService
 {
@@ -69,7 +70,8 @@ public static class MiniToolService
         if (fields.Length > 1000 || fields.Any(f => string.IsNullOrWhiteSpace(f.Name) || f.Name.Length > 256)) throw new InvalidOperationException("Invalid bind fields.");
         var columns = (tool.Columns ?? []).Select((c, i) => new MiniToolColumn(i, c.Name ?? "", c.Visible)).ToArray();
         if (columns.Length > 1000 || columns.Any(c => c.Name.Length > 256)) throw new InvalidOperationException("Invalid result columns.");
-        return new(1, tool.Id ?? "", tool.Name.Trim(), tool.Sql, fields, columns);
+        string Text(string? value) => (value ?? "")[..Math.Min((value ?? "").Length, 2000)];
+        return new(1, tool.Id ?? "", tool.Name.Trim(), tool.Sql, fields, columns, Text(tool.Description), Text(tool.Usage), Text(tool.ChangeNotes), Math.Max(0, tool.Revision));
     }
 
     private static string Folder(string root)
@@ -98,7 +100,15 @@ public static class MiniToolService
         return new { tools, errors };
     }
 
+    private static readonly ConcurrentDictionary<string, SemaphoreSlim> SaveGates = new(StringComparer.OrdinalIgnoreCase);
     public static async Task<MiniTool> SaveAsync(string root, JsonElement document)
+    {
+        var gate = SaveGates.GetOrAdd(Path.GetFullPath(root), _ => new SemaphoreSlim(1, 1));
+        await gate.WaitAsync();
+        try { return await SaveCoreAsync(root, document); }
+        finally { gate.Release(); }
+    }
+    private static async Task<MiniTool> SaveCoreAsync(string root, JsonElement document)
     {
         var tool = Normalize(document);
         var id = Regex.IsMatch(tool.Id, "^[a-f0-9]{32}$") ? tool.Id : Guid.NewGuid().ToString("N");
@@ -106,6 +116,14 @@ public static class MiniToolService
         var folder = Folder(root); Directory.CreateDirectory(folder);
         var path = Path.Combine(folder, id + ".json");
         if (File.Exists(path) && File.GetAttributes(path).HasFlag(FileAttributes.ReparsePoint)) throw new InvalidOperationException("Linked tool files are not supported.");
+        var revision = 0;
+        if (File.Exists(path))
+        {
+            using var previous = JsonDocument.Parse(await File.ReadAllTextAsync(path));
+            revision = Normalize(previous.RootElement).Revision;
+            if (revision != tool.Revision) throw new InvalidOperationException("This tool changed on disk. Reopen it before saving your changes.");
+        }
+        tool = tool with { Revision = checked(revision + 1) };
         var temporary = Path.Combine(folder, Guid.NewGuid().ToString("N") + ".tmp");
         try { await File.WriteAllTextAsync(temporary, JsonSerializer.Serialize(tool, Json)); File.Move(temporary, path, true); }
         finally { if (File.Exists(temporary)) File.Delete(temporary); }

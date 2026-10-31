@@ -1,3 +1,4 @@
+import { isDdl } from './sqlSafety.js';
 import { executionTarget } from './workbenchUx.js';
 import { getSqlStatements, getStatementAtCursor } from './sqlStatements.js';
 import { getOracleBindNames } from './oracleBinds.js';
@@ -42,6 +43,10 @@ export function createQueryExecution(getPorts) {
     },
     executeStatement(statement, parameters = [], miniTool = false, executionContext = {}) {
       const p = getPorts(), { owner, session, view } = active(p), operations = p.operations;
+      if (isDdl(statement)) {
+        if (session.transactionPending) { p.session.status('Commit or roll back pending changes before running DDL. DDL commits automatically.', owner); return; }
+        if (!executionContext.ddlConfirmed && !p.ui.confirmDdl?.({statement,parameters,miniTool,owner,profileId:session.activeConnection?.id})) return;
+      }
       operations.cancellations.delete(owner);
       set(p, owner, { queryOutcome: null, rendering: false, sqlStage: 'Executing SQL', operationStartedAt: Date.now(), runtimeProblems: [] });
       if (miniTool || executionContext.serverFilter) p.session.update('executionTarget', miniTool ? 'mini tool' : 'server filter', owner);

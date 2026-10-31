@@ -155,6 +155,8 @@ public sealed partial class OracleSessionService : IDisposable
             var statement = OracleSqlUnit.Normalize(sql);
             if (statement.Length == 0) throw new InvalidOperationException("There is no SQL statement to run.");
             if (_analysisReadOnly && FirstKeyword(statement) is not ("SELECT" or "WITH")) throw new InvalidOperationException("Read-only analysis permits SELECT queries only. End analysis before executing this statement.");
+            if (IsDdl(statement) && _transaction is not null)
+                throw new InvalidOperationException("Commit or roll back pending changes before running DDL. DDL commits automatically and cannot be rolled back.");
             var beginsTransaction = OracleSqlUnit.RequiresManualTransaction(statement) && _transaction is null;
             command = _connection.CreateCommand();
             command.BindByName = true;
@@ -486,7 +488,7 @@ public sealed partial class OracleSessionService : IDisposable
     }
 
     private static bool IsDml(string sql) => FirstKeyword(sql) is "INSERT" or "UPDATE" or "DELETE" or "MERGE";
-    private static bool IsDdl(string sql) => FirstKeyword(sql) is "CREATE" or "ALTER" or "DROP" or "TRUNCATE" or "RENAME" or "GRANT" or "REVOKE";
+    private static bool IsDdl(string sql) => FirstKeyword(sql) is "CREATE" or "ALTER" or "DROP" or "TRUNCATE" or "RENAME" or "GRANT" or "REVOKE" or "COMMENT" or "AUDIT" or "NOAUDIT";
     private static string FirstKeyword(string sql) => Regex.Match(Regex.Replace(sql, @"(?s)/\*.*?\*/|--[^\r\n]*", " ").TrimStart(), @"^[A-Za-z]+").Value.ToUpperInvariant();
     private static object? ToWireValue(object value) => value switch
     {

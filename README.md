@@ -104,3 +104,5 @@ Document state, native command handlers, and the shared bridge contract are desc
 | `worker/` | Browser build asset worker |
 
 The optional `scripts/setup-banking-db.ps1` sets up a local sample banking database for development on a machine with Oracle Free installed. Review the script and its database prerequisites before running it.
+
+Product focus, execution acceptance, history privacy, upgrade/rollback and the signed release gate: [Product and release](docs/product-and-release.md).

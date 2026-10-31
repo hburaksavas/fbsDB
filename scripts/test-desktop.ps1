@@ -41,6 +41,10 @@ try {
         node tests/desktop-regression-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
     }
     if ($LASTEXITCODE -ne 0) { throw "Desktop test failed. Artifacts: $regressionRoot" }
+    if (-not $LoadTest) {
+        node tests/review-improvements-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
+        if ($LASTEXITCODE -ne 0) { throw "Review improvement UI tests failed. Artifacts: $regressionRoot" }
+    }
     Write-Output "Desktop test report: $(Join-Path $regressionRoot 'report.json')"
 } finally {
     foreach ($regressionKey in $regressionPreviousEnvironment.Keys) {
