@@ -2,9 +2,29 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.jsx";
 import "./styles.css";
+import "./sqlFormatterSettings.css";
+import "./editorSettings.css";
 import "./docking.css";
 import "./connectionControl.css";
 import "./editorTabs.css";
+import "./themeConsistency.css";
+import './miniTools.css';
+import './workbenchUx.css';
+import './resultColumnActions.css';
+import './themeTokens.css';
+import './themeSurfaces.css';
+import './connectionLibrary.css';
+import './connectionContextMenu.css';
+import './workspaceManagement.css';
+import './formControls.css';
+import './explorerIcons.css';
+import './connectionPassword.css';
+import './resultStatus.css';
+import './feedback.css';
+import {FeedbackHost} from './Feedback';
+import {applyDocumentTheme} from './themeModel';
+import {loadSettings,resolveSetting} from './settingsModel';
+applyDocumentTheme(resolveSetting(loadSettings(localStorage),'ui.theme').value);
 
 // Keep the embedded workbench free of the browser's default right-click menu.
 // Feature-specific menus, such as the Results grid menu, still receive the event.
@@ -25,11 +45,11 @@ class ApplicationErrorBoundary extends React.Component {
     if (!this.state.error) return this.props.children;
 
     return (
-      <main style={{ minHeight: "100vh", padding: 32, boxSizing: "border-box", background: "#0d141d", color: "#dce5ef", fontFamily: "Segoe UI, sans-serif" }}>
-        <h1 style={{ color: "#ff8f8f", fontSize: 18 }}>fbsDB arayüzü görüntülenemedi</h1>
-        <p>Uygulama boş ekrana düşmek yerine hatayı gösterdi. SQL sonuçlarını veya bağlantı durumunu kaybetmeden hatayı inceleyebilmemiz için bu mesajı paylaşın.</p>
-        <pre style={{ padding: 16, overflow: "auto", whiteSpace: "pre-wrap", background: "#151f2b", border: "1px solid #344253", borderRadius: 8 }}>{String(this.state.error?.stack || this.state.error)}</pre>
-        <button onClick={() => window.location.reload()} style={{ padding: "8px 12px", color: "#dce5ef", background: "#263747", border: "1px solid #43576b", borderRadius: 6, cursor: "pointer" }}>Uygulamayı yeniden yükle</button>
+      <main className="desktop-shell application-error theme-scope" data-theme={document.documentElement.dataset.theme||'default'}>
+        <h1>fbsDB arayüzü görüntülenemedi</h1>
+        <p>Arayüz hatasının ayrıntıları aşağıdadır. İnceledikten sonra uygulamayı yeniden yükleyebilirsiniz.</p>
+        <pre>{String(this.state.error?.stack || this.state.error)}</pre>
+        <button className="button-secondary" onClick={() => window.location.reload()}>Uygulamayı yeniden yükle</button>
       </main>
     );
   }
@@ -37,6 +57,6 @@ class ApplicationErrorBoundary extends React.Component {
 
 createRoot(document.getElementById("root")).render(
   <React.StrictMode>
-    <ApplicationErrorBoundary><App /></ApplicationErrorBoundary>
+    <ApplicationErrorBoundary><App /><FeedbackHost /></ApplicationErrorBoundary>
   </React.StrictMode>,
 );

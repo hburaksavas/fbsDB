@@ -28,6 +28,18 @@ public sealed partial class OracleSessionService : IDisposable
 
     public bool IsConnected => _connection?.State == System.Data.ConnectionState.Open;
     public bool HasPendingTransaction => _transaction is not null;
+    private volatile bool _autoCommit;
+    public bool AutoCommit => _autoCommit;
+    public async Task SetAutoCommitAsync(bool enabled)
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            if (enabled && _transaction is not null) throw new InvalidOperationException("Commit or roll back the pending transaction before enabling auto commit.");
+            _autoCommit = enabled;
+        }
+        finally { _gate.Release(); }
+    }
     public string? ProfileId => _profileId;
     public string? ServerVersion => IsConnected ? _connection!.ServerVersion : null;
 
@@ -227,12 +239,21 @@ public sealed partial class OracleSessionService : IDisposable
                 _transaction = null; _analysisReadOnly = false;
                 transactionPending = false;
             }
+            if (_autoCommit && beginsTransaction && _transaction is not null)
+            {
+                progress?.Report("Committing statement");
+                await _transaction.CommitAsync(operationToken);
+                await _transaction.DisposeAsync();
+                _transaction = null;
+                transactionPending = false;
+            }
             timer.Stop();
             if (command.SqlId is { Length: > 0 } sqlId) _executedSqlIds.Add(sqlId);
             return new SqlExecutionResult([], [], affected, timer.ElapsedMilliseconds, 0, false, transactionPending, outputLines) { SqlId = command.SqlId };
         }
         catch (Exception ex) when (Volatile.Read(ref timeoutElapsed) == 1 && !cancellationToken.IsCancellationRequested)
         {
+            if (_transaction is not null) _autoCommit = false;
             _activeCommand = null;
             await ClosePagedResultAsync();
             if (_transaction is not null && _connection?.State != System.Data.ConnectionState.Open)
@@ -244,6 +265,7 @@ public sealed partial class OracleSessionService : IDisposable
         }
         catch (Exception ex) when (operationCancellation?.IsCancellationRequested == true && ex is not OperationCanceledException)
         {
+            if (_transaction is not null) _autoCommit = false;
             _activeCommand = null;
             await ClosePagedResultAsync();
             if (_transaction is not null && _connection?.State != System.Data.ConnectionState.Open)
@@ -255,6 +277,7 @@ public sealed partial class OracleSessionService : IDisposable
         }
         catch
         {
+            if (_transaction is not null) _autoCommit = false;
             _activeCommand = null;
             await ClosePagedResultAsync();
             if (_transaction is not null && _connection?.State != System.Data.ConnectionState.Open)
@@ -721,6 +744,35 @@ WHERE f.constraint_type='R' AND f.owner=NVL(:o,SYS_CONTEXT('USERENV','CURRENT_SC
                 if (!string.IsNullOrWhiteSpace(comment)) objectDetails.Add(new SchemaProperty("Comment", comment));
             }
 
+            if (normalizedType == "TABLE")
+            {
+                await using var constraintCommand = _connection.CreateCommand();
+                constraintCommand.BindByName = true;
+                if (_transaction is not null) constraintCommand.Transaction = _transaction;
+                constraintCommand.CommandText = "SELECT c.constraint_name,c.constraint_type,c.status,c.validated,(SELECT LISTAGG(cc.column_name,', ') WITHIN GROUP (ORDER BY cc.position) FROM all_cons_columns cc WHERE cc.owner=c.owner AND cc.constraint_name=c.constraint_name) columns,c.r_owner,c.r_constraint_name,c.delete_rule,(SELECT r.owner||'.'||r.table_name FROM all_constraints r WHERE r.owner=c.r_owner AND r.constraint_name=c.r_constraint_name) referenced_table FROM all_constraints c WHERE c.owner=:owner AND c.table_name=:name ORDER BY c.constraint_type,c.constraint_name";
+                constraintCommand.Parameters.Add("owner", OracleDbType.Varchar2).Value = normalizedOwner;
+                constraintCommand.Parameters.Add("name", OracleDbType.Varchar2).Value = normalizedName;
+                await using (var reader = await constraintCommand.ExecuteReaderAsync(cancellationToken))
+                    while (await reader.ReadAsync(cancellationToken))
+                    {
+                        var kind = reader.GetString(1) switch { "P" => "PRIMARY KEY", "R" => "FOREIGN KEY", "U" => "UNIQUE", "C" => "CHECK", _ => reader.GetString(1) };
+                        var value = $"{kind} · {reader.GetString(2)} · {reader.GetString(3)}";
+                        if (!reader.IsDBNull(4)) value += $" · ({reader.GetString(4)})";
+                        if (!reader.IsDBNull(8)) value += $" · REFERENCES {reader.GetString(8)}";
+                        if (!reader.IsDBNull(7) && reader.GetString(7) != "NO ACTION") value += $" · ON DELETE {reader.GetString(7)}";
+                        objectDetails.Add(new SchemaProperty("Constraint · " + reader.GetString(0), value));
+                    }
+
+                await using var indexCommand = _connection.CreateCommand();
+                indexCommand.BindByName = true;
+                if (_transaction is not null) indexCommand.Transaction = _transaction;
+                indexCommand.CommandText = "SELECT i.index_name,i.index_type,i.uniqueness,i.status,i.visibility,i.partitioned,i.compression,(SELECT LISTAGG(c.column_name,', ') WITHIN GROUP (ORDER BY c.column_position) FROM all_ind_columns c WHERE c.index_owner=i.owner AND c.index_name=i.index_name) columns FROM all_indexes i WHERE i.owner=:owner AND i.table_name=:name ORDER BY i.index_name";
+                indexCommand.Parameters.Add("owner", OracleDbType.Varchar2).Value = normalizedOwner;
+                indexCommand.Parameters.Add("name", OracleDbType.Varchar2).Value = normalizedName;
+                await using var indexReader = await indexCommand.ExecuteReaderAsync(cancellationToken);
+                while (await indexReader.ReadAsync(cancellationToken)) objectDetails.Add(new SchemaProperty("Index · " + indexReader.GetString(0), $"{indexReader.GetString(1)} · {indexReader.GetString(2)} · {indexReader.GetString(3)} · {indexReader.GetString(4)} · partitioned {indexReader.GetString(5)} · compression {indexReader.GetString(6)} · {(indexReader.IsDBNull(7) ? "" : indexReader.GetString(7))}"));
+            }
+
             if (normalizedType == "VIEW")
             {
                 await using var command = _connection.CreateCommand();
@@ -737,7 +789,7 @@ WHERE f.constraint_type='R' AND f.owner=NVL(:o,SYS_CONTEXT('USERENV','CURRENT_SC
                 await using var command = _connection.CreateCommand();
                 command.BindByName = true;
                 if (_transaction is not null) command.Transaction = _transaction;
-                command.CommandText = "SELECT refresh_mode, refresh_method, build_mode, fast_refreshable, last_refresh_type, staleness FROM all_mviews WHERE owner=:owner AND mview_name=:name";
+                command.CommandText = "SELECT refresh_mode, refresh_method, build_mode, fast_refreshable, last_refresh_type, staleness, last_refresh_date FROM all_mviews WHERE owner=:owner AND mview_name=:name";
                 command.Parameters.Add("owner", OracleDbType.Varchar2).Value = normalizedOwner;
                 command.Parameters.Add("name", OracleDbType.Varchar2).Value = normalizedName;
                 await using var reader = await command.ExecuteReaderAsync(cancellationToken);
@@ -749,6 +801,7 @@ WHERE f.constraint_type='R' AND f.owner=NVL(:o,SYS_CONTEXT('USERENV','CURRENT_SC
                     objectDetails.Add(new SchemaProperty("Fast refresh", reader.GetString(3)));
                     objectDetails.Add(new SchemaProperty("Last refresh", reader.GetString(4)));
                     objectDetails.Add(new SchemaProperty("Staleness", reader.GetString(5)));
+                    objectDetails.Add(new SchemaProperty("Last refresh date", reader.IsDBNull(6) ? "Never" : reader.GetDateTime(6).ToString("u", CultureInfo.InvariantCulture)));
                 }
             }
             else if (normalizedType == "TRIGGER")
@@ -756,17 +809,21 @@ WHERE f.constraint_type='R' AND f.owner=NVL(:o,SYS_CONTEXT('USERENV','CURRENT_SC
                 await using var command = _connection.CreateCommand();
                 command.BindByName = true;
                 if (_transaction is not null) command.Transaction = _transaction;
-                command.CommandText = "SELECT table_owner, table_name, trigger_type, triggering_event, status, description FROM all_triggers WHERE owner=:owner AND trigger_name=:name";
+                command.CommandText = "SELECT table_owner, table_name, base_object_type, trigger_type, triggering_event, status, description, when_clause FROM all_triggers WHERE owner=:owner AND trigger_name=:name";
                 command.Parameters.Add("owner", OracleDbType.Varchar2).Value = normalizedOwner;
                 command.Parameters.Add("name", OracleDbType.Varchar2).Value = normalizedName;
                 await using var reader = await command.ExecuteReaderAsync(cancellationToken);
                 if (await reader.ReadAsync(cancellationToken))
                 {
-                    objectDetails.Add(new SchemaProperty("Table", $"{reader.GetString(0)}.{reader.GetString(1)}"));
-                    objectDetails.Add(new SchemaProperty("Trigger type", reader.GetString(2)));
-                    objectDetails.Add(new SchemaProperty("Event", reader.GetString(3)));
-                    objectDetails.Add(new SchemaProperty("Status", reader.GetString(4)));
-                    objectDetails.Add(new SchemaProperty("Description", reader.GetString(5)));
+                    itemTargetOwner = reader.IsDBNull(0) ? null : reader.GetString(0);
+                    itemTargetName = reader.IsDBNull(1) ? null : reader.GetString(1);
+                    if (itemTargetName is not null) objectDetails.Add(new SchemaProperty("Table", $"{itemTargetOwner}.{itemTargetName}"));
+                    objectDetails.Add(new SchemaProperty("Base object type", reader.GetString(2)));
+                    objectDetails.Add(new SchemaProperty("Trigger type", reader.GetString(3)));
+                    objectDetails.Add(new SchemaProperty("Event", reader.GetString(4)));
+                    objectDetails.Add(new SchemaProperty("Status", reader.GetString(5)));
+                    objectDetails.Add(new SchemaProperty("Description", reader.GetString(6)));
+                    if (!reader.IsDBNull(7)) objectDetails.Add(new SchemaProperty("When clause", reader.GetString(7)));
                 }
             }
             else if (normalizedType == "TYPE")
@@ -774,17 +831,22 @@ WHERE f.constraint_type='R' AND f.owner=NVL(:o,SYS_CONTEXT('USERENV','CURRENT_SC
                 await using var command = _connection.CreateCommand();
                 command.BindByName = true;
                 if (_transaction is not null) command.Transaction = _transaction;
-                command.CommandText = "SELECT typecode, attributes, methods, predefined, incomplete FROM all_types WHERE owner=:owner AND type_name=:name";
+                command.CommandText = "SELECT typecode, attributes, methods, predefined, incomplete, supertype_owner, supertype_name, final, instantiable FROM all_types WHERE owner=:owner AND type_name=:name";
                 command.Parameters.Add("owner", OracleDbType.Varchar2).Value = normalizedOwner;
                 command.Parameters.Add("name", OracleDbType.Varchar2).Value = normalizedName;
-                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-                if (await reader.ReadAsync(cancellationToken))
+                await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
                 {
-                    objectDetails.Add(new SchemaProperty("Type code", reader.GetString(0)));
-                    objectDetails.Add(new SchemaProperty("Attributes", reader.GetValue(1).ToString() ?? "0"));
-                    objectDetails.Add(new SchemaProperty("Methods", reader.GetValue(2).ToString() ?? "0"));
-                    objectDetails.Add(new SchemaProperty("Predefined", reader.GetString(3)));
-                    objectDetails.Add(new SchemaProperty("Incomplete", reader.GetString(4)));
+                    if (await reader.ReadAsync(cancellationToken))
+                    {
+                        objectDetails.Add(new SchemaProperty("Type code", reader.GetString(0)));
+                        objectDetails.Add(new SchemaProperty("Attributes", reader.GetValue(1).ToString() ?? "0"));
+                        objectDetails.Add(new SchemaProperty("Methods", reader.GetValue(2).ToString() ?? "0"));
+                        objectDetails.Add(new SchemaProperty("Predefined", reader.GetString(3)));
+                        objectDetails.Add(new SchemaProperty("Incomplete", reader.GetString(4)));
+                        if (!reader.IsDBNull(6)) objectDetails.Add(new SchemaProperty("Supertype", $"{reader.GetString(5)}.{reader.GetString(6)}"));
+                        objectDetails.Add(new SchemaProperty("Final", reader.GetString(7)));
+                        objectDetails.Add(new SchemaProperty("Instantiable", reader.GetString(8)));
+                    }
                 }
                 await using var attrsCommand = _connection.CreateCommand();
                 attrsCommand.BindByName = true;
@@ -792,8 +854,17 @@ WHERE f.constraint_type='R' AND f.owner=NVL(:o,SYS_CONTEXT('USERENV','CURRENT_SC
                 attrsCommand.CommandText = "SELECT attr_name, attr_type_name, length, precision, scale FROM all_type_attrs WHERE owner=:owner AND type_name=:name ORDER BY attr_no";
                 attrsCommand.Parameters.Add("owner", OracleDbType.Varchar2).Value = normalizedOwner;
                 attrsCommand.Parameters.Add("name", OracleDbType.Varchar2).Value = normalizedName;
-                await using var attrsReader = await attrsCommand.ExecuteReaderAsync(cancellationToken);
-                while (await attrsReader.ReadAsync(cancellationToken)) columns.Add(new SchemaColumn(attrsReader.GetString(0), $"{attrsReader.GetString(1)} ({attrsReader.GetValue(2)})", true, false));
+                await using (var attrsReader = await attrsCommand.ExecuteReaderAsync(cancellationToken))
+                    while (await attrsReader.ReadAsync(cancellationToken)) columns.Add(new SchemaColumn(attrsReader.GetString(0), $"{attrsReader.GetString(1)} ({attrsReader.GetValue(2)})", true, false));
+
+                await using var methodsCommand = _connection.CreateCommand();
+                methodsCommand.BindByName = true;
+                if (_transaction is not null) methodsCommand.Transaction = _transaction;
+                methodsCommand.CommandText = "SELECT method_name,method_type,parameters,results,final,instantiable,overriding,inherited FROM all_type_methods WHERE owner=:owner AND type_name=:name ORDER BY method_no";
+                methodsCommand.Parameters.Add("owner", OracleDbType.Varchar2).Value = normalizedOwner;
+                methodsCommand.Parameters.Add("name", OracleDbType.Varchar2).Value = normalizedName;
+                await using var methodsReader = await methodsCommand.ExecuteReaderAsync(cancellationToken);
+                while (await methodsReader.ReadAsync(cancellationToken)) objectDetails.Add(new SchemaProperty("Method", $"{methodsReader.GetString(0)} · {methodsReader.GetString(1)} · {methodsReader.GetValue(2)} parameter(s) · {methodsReader.GetValue(3)} result(s) · final {methodsReader.GetString(4)} · instantiable {methodsReader.GetString(5)} · overriding {methodsReader.GetString(6)} · inherited {methodsReader.GetString(7)}"));
             }
 
             if (normalizedType is "TABLE" or "VIEW" or "MATERIALIZED VIEW" or "SYNONYM")
@@ -822,16 +893,23 @@ WHERE f.constraint_type='R' AND f.owner=NVL(:o,SYS_CONTEXT('USERENV','CURRENT_SC
                 await using var command = _connection.CreateCommand();
                 command.BindByName = true;
                 if (_transaction is not null) command.Transaction = _transaction;
-                command.CommandText = "SELECT table_owner, table_name, index_type, uniqueness, status FROM all_indexes WHERE owner=:owner AND index_name=:name";
+                command.CommandText = "SELECT table_owner, table_name, index_type, uniqueness, status, visibility, partitioned, compression FROM all_indexes WHERE owner=:owner AND index_name=:name";
                 command.Parameters.Add("owner", OracleDbType.Varchar2).Value = normalizedOwner;
                 command.Parameters.Add("name", OracleDbType.Varchar2).Value = normalizedName;
-                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-                if (await reader.ReadAsync(cancellationToken))
+                await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
                 {
-                    objectDetails.Add(new SchemaProperty("Table", $"{reader.GetString(0)}.{reader.GetString(1)}"));
-                    objectDetails.Add(new SchemaProperty("Index type", reader.GetString(2)));
-                    objectDetails.Add(new SchemaProperty("Uniqueness", reader.GetString(3)));
-                    objectDetails.Add(new SchemaProperty("Status", reader.GetString(4)));
+                    if (await reader.ReadAsync(cancellationToken))
+                    {
+                        itemTargetOwner = reader.GetString(0);
+                        itemTargetName = reader.GetString(1);
+                        objectDetails.Add(new SchemaProperty("Table", $"{itemTargetOwner}.{itemTargetName}"));
+                        objectDetails.Add(new SchemaProperty("Index type", reader.GetString(2)));
+                        objectDetails.Add(new SchemaProperty("Uniqueness", reader.GetString(3)));
+                        objectDetails.Add(new SchemaProperty("Status", reader.GetString(4)));
+                        objectDetails.Add(new SchemaProperty("Visibility", reader.GetString(5)));
+                        objectDetails.Add(new SchemaProperty("Partitioned", reader.GetString(6)));
+                        objectDetails.Add(new SchemaProperty("Compression", reader.GetString(7)));
+                    }
                 }
                 await using var columnCommand = _connection.CreateCommand();
                 columnCommand.BindByName = true;
@@ -847,18 +925,25 @@ WHERE f.constraint_type='R' AND f.owner=NVL(:o,SYS_CONTEXT('USERENV','CURRENT_SC
                 await using var command = _connection.CreateCommand();
                 command.BindByName = true;
                 if (_transaction is not null) command.Transaction = _transaction;
-                command.CommandText = "SELECT table_name, constraint_type, status, validated, search_condition FROM all_constraints WHERE owner=:owner AND constraint_name=:name";
+                command.CommandText = "SELECT c.table_name, c.constraint_type, c.status, c.validated, c.search_condition, c.r_owner, c.r_constraint_name, c.deferrable, c.deferred, c.delete_rule, (SELECT r.owner||'.'||r.table_name FROM all_constraints r WHERE r.owner=c.r_owner AND r.constraint_name=c.r_constraint_name) referenced_table FROM all_constraints c WHERE c.owner=:owner AND c.constraint_name=:name";
                 command.Parameters.Add("owner", OracleDbType.Varchar2).Value = normalizedOwner;
                 command.Parameters.Add("name", OracleDbType.Varchar2).Value = normalizedName;
-                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-                if (await reader.ReadAsync(cancellationToken))
+                await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
                 {
-                    itemTargetName = reader.GetString(0);
-                    objectDetails.Add(new SchemaProperty("Table", $"{normalizedOwner}.{itemTargetName}"));
-                    objectDetails.Add(new SchemaProperty("Constraint type", reader.GetString(1)));
-                    objectDetails.Add(new SchemaProperty("Status", reader.GetString(2)));
-                    objectDetails.Add(new SchemaProperty("Validated", reader.GetString(3)));
-                    if (!reader.IsDBNull(4)) objectDetails.Add(new SchemaProperty("Condition", reader.GetString(4)));
+                    if (await reader.ReadAsync(cancellationToken))
+                    {
+                        itemTargetOwner = normalizedOwner;
+                        itemTargetName = reader.GetString(0);
+                        objectDetails.Add(new SchemaProperty("Table", $"{normalizedOwner}.{itemTargetName}"));
+                        objectDetails.Add(new SchemaProperty("Constraint type", reader.GetString(1)));
+                        objectDetails.Add(new SchemaProperty("Status", reader.GetString(2)));
+                        objectDetails.Add(new SchemaProperty("Validated", reader.GetString(3)));
+                        if (!reader.IsDBNull(4)) objectDetails.Add(new SchemaProperty("Condition", reader.GetString(4)));
+                        objectDetails.Add(new SchemaProperty("Deferrable", reader.GetString(7)));
+                        objectDetails.Add(new SchemaProperty("Deferred", reader.GetString(8)));
+                        if (!reader.IsDBNull(10)) objectDetails.Add(new SchemaProperty("References", reader.GetString(10)));
+                        if (!reader.IsDBNull(9)) objectDetails.Add(new SchemaProperty("Delete rule", reader.GetString(9)));
+                    }
                 }
                 await using var columnCommand = _connection.CreateCommand();
                 columnCommand.BindByName = true;
@@ -910,37 +995,92 @@ WHERE f.constraint_type='R' AND f.owner=NVL(:o,SYS_CONTEXT('USERENV','CURRENT_SC
                 await using var command = _connection.CreateCommand();
                 command.BindByName = true;
                 if (_transaction is not null) command.Transaction = _transaction;
-                command.CommandText = "SELECT line, text FROM all_source WHERE owner=:owner AND name=:name AND type IN (:type,:bodyType) ORDER BY CASE type WHEN :type THEN 1 ELSE 2 END, line";
+                command.CommandText = "SELECT line, text FROM all_source WHERE owner=:owner AND name=:name AND type=:type ORDER BY line";
                 command.Parameters.Add("owner", OracleDbType.Varchar2).Value = normalizedOwner;
                 command.Parameters.Add("name", OracleDbType.Varchar2).Value = normalizedName;
                 command.Parameters.Add("type", OracleDbType.Varchar2).Value = normalizedType;
-                command.Parameters.Add("bodyType", OracleDbType.Varchar2).Value = normalizedType switch { "PACKAGE" => "PACKAGE BODY", "TYPE" => "TYPE BODY", _ => normalizedType };
                 var source = new System.Text.StringBuilder();
-                await using var reader = await command.ExecuteReaderAsync(cancellationToken);
-                while (await reader.ReadAsync(cancellationToken)) source.Append(reader.GetString(1));
+                await using (var reader = await command.ExecuteReaderAsync(cancellationToken))
+                    while (await reader.ReadAsync(cancellationToken)) source.Append(reader.GetString(1));
                 if (source.Length > 0) objectDetails.Add(new SchemaProperty("Source", source.ToString()));
+                if (normalizedType is "PACKAGE" or "TYPE")
+                {
+                    await using var bodyCommand = _connection.CreateCommand();
+                    bodyCommand.BindByName = true;
+                    if (_transaction is not null) bodyCommand.Transaction = _transaction;
+                    bodyCommand.CommandText = "SELECT text FROM all_source WHERE owner=:owner AND name=:name AND type=:bodyType ORDER BY line";
+                    bodyCommand.Parameters.Add("owner", OracleDbType.Varchar2).Value = normalizedOwner;
+                    bodyCommand.Parameters.Add("name", OracleDbType.Varchar2).Value = normalizedName;
+                    bodyCommand.Parameters.Add("bodyType", OracleDbType.Varchar2).Value = normalizedType + " BODY";
+                    var body = new System.Text.StringBuilder();
+                    await using (var bodyReader = await bodyCommand.ExecuteReaderAsync(cancellationToken))
+                        while (await bodyReader.ReadAsync(cancellationToken)) body.Append(bodyReader.GetString(0));
+                    if (body.Length > 0) objectDetails.Add(new SchemaProperty("Body", body.ToString()));
+                }
                 if (normalizedType is "PROCEDURE" or "FUNCTION")
                 {
                     await using var argsCommand = _connection.CreateCommand();
                     argsCommand.BindByName = true;
                     if (_transaction is not null) argsCommand.Transaction = _transaction;
-                    argsCommand.CommandText = "SELECT NVL(argument_name,'RETURN'), in_out, data_type, position FROM all_arguments WHERE owner=:owner AND object_name=:name AND data_level=0 ORDER BY sequence";
+                    argsCommand.CommandText = "SELECT NVL(argument_name,'RETURN'), in_out, data_type, position, overload, defaulted FROM all_arguments WHERE owner=:owner AND object_name=:name AND data_level=0 ORDER BY sequence";
                     argsCommand.Parameters.Add("owner", OracleDbType.Varchar2).Value = normalizedOwner;
                     argsCommand.Parameters.Add("name", OracleDbType.Varchar2).Value = normalizedName;
                     await using var argsReader = await argsCommand.ExecuteReaderAsync(cancellationToken);
-                    while (await argsReader.ReadAsync(cancellationToken)) objectDetails.Add(new SchemaProperty(argsReader.GetString(0), $"{argsReader.GetString(1)} · {argsReader.GetString(2)} · position {argsReader.GetInt32(3)}"));
+                    while (await argsReader.ReadAsync(cancellationToken)) objectDetails.Add(new SchemaProperty(argsReader.GetString(0), $"{argsReader.GetString(1)} · {argsReader.GetString(2)} · position {argsReader.GetInt32(3)}{(argsReader.IsDBNull(4) ? "" : $" · overload {argsReader.GetString(4)}")}{(argsReader.GetString(5) == "Y" ? " · has default" : "")}"));
                 }
                 if (normalizedType == "PACKAGE")
                 {
                     await using var membersCommand = _connection.CreateCommand();
                     membersCommand.BindByName = true;
                     if (_transaction is not null) membersCommand.Transaction = _transaction;
-                    membersCommand.CommandText = "SELECT procedure_name, subprogram_id FROM all_procedures WHERE owner=:owner AND object_name=:name AND procedure_name IS NOT NULL ORDER BY subprogram_id";
+                    membersCommand.CommandText = "SELECT procedure_name, subprogram_id, overload FROM all_procedures WHERE owner=:owner AND object_name=:name AND procedure_name IS NOT NULL ORDER BY subprogram_id";
                     membersCommand.Parameters.Add("owner", OracleDbType.Varchar2).Value = normalizedOwner;
                     membersCommand.Parameters.Add("name", OracleDbType.Varchar2).Value = normalizedName;
                     await using var membersReader = await membersCommand.ExecuteReaderAsync(cancellationToken);
-                    while (await membersReader.ReadAsync(cancellationToken)) objectDetails.Add(new SchemaProperty("Member", $"{membersReader.GetString(0)} · subprogram {membersReader.GetInt32(1)}"));
+                    while (await membersReader.ReadAsync(cancellationToken)) objectDetails.Add(new SchemaProperty("Member", $"{membersReader.GetString(0)} · subprogram {membersReader.GetInt32(1)}{(membersReader.IsDBNull(2) ? "" : $" · overload {membersReader.GetString(2)}")}"));
                 }
+            }
+
+            if (normalizedType is not ("DATABASE LINK" or "CONSTRAINT"))
+            {
+                await using var statusCommand = _connection.CreateCommand();
+                statusCommand.BindByName = true;
+                if (_transaction is not null) statusCommand.Transaction = _transaction;
+                statusCommand.CommandText = "SELECT status, created, last_ddl_time FROM all_objects WHERE owner=:owner AND object_name=:name AND object_type=:objectType";
+                statusCommand.Parameters.Add("owner", OracleDbType.Varchar2).Value = normalizedOwner;
+                statusCommand.Parameters.Add("name", OracleDbType.Varchar2).Value = normalizedName;
+                statusCommand.Parameters.Add("objectType", OracleDbType.Varchar2).Value = normalizedType;
+                await using (var statusReader = await statusCommand.ExecuteReaderAsync(cancellationToken))
+                    if (await statusReader.ReadAsync(cancellationToken))
+                    {
+                        objectDetails.Add(new SchemaProperty("Object status", statusReader.GetString(0)));
+                        objectDetails.Add(new SchemaProperty("Created", statusReader.GetDateTime(1).ToString("u", CultureInfo.InvariantCulture)));
+                        objectDetails.Add(new SchemaProperty("Last DDL", statusReader.GetDateTime(2).ToString("u", CultureInfo.InvariantCulture)));
+                    }
+                if (normalizedType is "PACKAGE" or "TYPE")
+                {
+                    await using var bodyStatusCommand = _connection.CreateCommand();
+                    bodyStatusCommand.BindByName = true;
+                    if (_transaction is not null) bodyStatusCommand.Transaction = _transaction;
+                    bodyStatusCommand.CommandText = "SELECT status FROM all_objects WHERE owner=:owner AND object_name=:name AND object_type=:bodyType";
+                    bodyStatusCommand.Parameters.Add("owner", OracleDbType.Varchar2).Value = normalizedOwner;
+                    bodyStatusCommand.Parameters.Add("name", OracleDbType.Varchar2).Value = normalizedName;
+                    bodyStatusCommand.Parameters.Add("bodyType", OracleDbType.Varchar2).Value = normalizedType + " BODY";
+                    var bodyStatus = Convert.ToString(await bodyStatusCommand.ExecuteScalarAsync(cancellationToken), CultureInfo.InvariantCulture);
+                    objectDetails.Add(new SchemaProperty("Body status", bodyStatus ?? "No body"));
+                }
+            }
+
+            if (normalizedType is "PACKAGE" or "PROCEDURE" or "FUNCTION" or "TRIGGER" or "TYPE")
+            {
+                await using var errorsCommand = _connection.CreateCommand();
+                errorsCommand.BindByName = true;
+                if (_transaction is not null) errorsCommand.Transaction = _transaction;
+                errorsCommand.CommandText = "SELECT type,line,position,attribute,text FROM all_errors WHERE owner=:owner AND name=:name ORDER BY sequence FETCH FIRST 101 ROWS ONLY";
+                errorsCommand.Parameters.Add("owner", OracleDbType.Varchar2).Value = normalizedOwner;
+                errorsCommand.Parameters.Add("name", OracleDbType.Varchar2).Value = normalizedName;
+                await using var errorsReader = await errorsCommand.ExecuteReaderAsync(cancellationToken);
+                while (await errorsReader.ReadAsync(cancellationToken)) objectDetails.Add(new SchemaProperty($"Compilation error · {errorsReader.GetString(0)} {errorsReader.GetInt32(1)}:{errorsReader.GetInt32(2)}", $"{errorsReader.GetString(3)} · {errorsReader.GetString(4)}"));
             }
 
             var indexed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

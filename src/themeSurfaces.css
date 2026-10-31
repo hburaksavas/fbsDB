@@ -1,0 +1,63 @@
+/* Shared component roles. Palette values live only in themePalettes.json. */
+.desktop-shell,.theme-scope{color:var(--foreground)}
+.desktop-shell{background:var(--bg)}
+.desktop-shell :is(input,select,textarea){color-scheme:inherit;accent-color:var(--accent)}
+:is(.desktop-shell,.theme-scope)[data-theme] :is(input:not([type="checkbox"],[type="radio"],[type="color"],[type="file"],[type="range"]),textarea,select):not(.monaco-editor *){background:var(--input);color:var(--foreground);border:1px solid var(--line-strong);border-radius:5px}
+:is(.desktop-shell,.theme-scope)[data-theme] :is(input:not([type="checkbox"],[type="radio"],[type="color"],[type="file"],[type="range"]),textarea,select):not(.monaco-editor *):focus-visible{outline:0;box-shadow:none;border-color:var(--focus-ring)}
+.desktop-shell :is(input,textarea)::placeholder,.theme-scope :is(input,textarea)::placeholder{color:var(--muted);opacity:1}
+.desktop-shell select option,.theme-scope select option{background:var(--input);color:var(--foreground)}
+.desktop-shell :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),select,textarea),.theme-scope :is(input,select,textarea){border-color:var(--line-strong)}
+.desktop-shell :is(.explorer-search,.picker-search,.workspace-search-input,.fetch-limit-picker){border-color:var(--line-strong)}
+/* Composite search fields have one frame and one focus indicator on the wrapper. */
+.desktop-shell[data-theme] :is(.explorer-search,.picker-search,.workspace-search-input,.fetch-limit-picker,.result-settings-search,.result-popover-search){border:1px solid var(--line-strong);border-radius:5px;background:var(--input);color:var(--muted)}
+.desktop-shell[data-theme] :is(.explorer-search,.picker-search,.workspace-search-input,.fetch-limit-picker,.result-settings-search,.result-popover-search,.ide-palette-search) :is(input,select),
+.desktop-shell[data-theme] :is(.explorer-search,.picker-search,.workspace-search-input,.fetch-limit-picker,.result-settings-search,.result-popover-search,.ide-palette-search) :is(input,select):focus-visible{border:0;border-radius:0;outline:0;box-shadow:none;background:transparent;color:var(--foreground)}
+.desktop-shell[data-theme] :is(.explorer-search,.picker-search,.workspace-search-input,.fetch-limit-picker,.result-settings-search,.result-popover-search):focus-within{border-color:var(--focus-ring);box-shadow:none}
+.desktop-shell .ide-palette-search:focus-within{outline:0;border-bottom-color:var(--focus-ring)}
+.desktop-shell ::selection,.theme-scope ::selection{background:var(--selection-bg);color:var(--selection-text)}
+.desktop-shell .button-primary,.desktop-shell .run-button:not(.idle){background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.desktop-shell .button-primary:hover:not(:disabled),.desktop-shell .run-button:not(.idle):hover:not(:disabled){background:var(--accent-strong);color:var(--on-accent)}
+.desktop-shell .run-button.idle{background:transparent;color:var(--accent-text)}
+.desktop-shell .button-secondary{color:var(--foreground);border-color:var(--line)}
+.desktop-shell .button-secondary:hover:not(:disabled){background:var(--hover-bg);color:var(--foreground)}
+.desktop-shell .ide-palette-results>button[aria-selected="true"]{background:var(--selection-bg);color:var(--selection-text)}
+.desktop-shell :is(.script-statements nav small,.bind-row small,.runtime-cursor-plan header p,.oracle-object-body p,.oracle-dependency-list small,.connection-diagnostic-steps section>span,.git-commit-info,.source-line-number,.query-timeout-setting small,.result-default-settings header p,.default-setting-row small,.nls-settings>p,.object-definition-view small,.oracle-inspector-dependencies small){opacity:1;color:var(--muted)}
+.desktop-shell .ide-palette-results [role="option"] small{opacity:1;color:var(--muted)}
+.desktop-shell .ide-palette-results [aria-selected="true"] small{color:var(--selection-text)}
+.desktop-shell .connection-control-summary{opacity:1}
+.desktop-shell .connection-row.selected :is(.connection-name,.connection-sub){color:var(--selection-text)}
+.desktop-shell .script-statements nav button.active small{color:var(--selection-text)}
+.desktop-shell :is(.workspace-dev-content>section,.runtime-cursor-plan pre,.draft-recovery-body pre,.script-statements pre){background:var(--editor-bg)}
+.theme-scope.editor-overflow-menu kbd{opacity:1;color:var(--muted)}
+.desktop-shell :is(.offline-dot,.result-highlight-case-track>span){background:var(--muted)}
+.desktop-shell .result-highlight-case-toggle[aria-checked="true"] .result-highlight-case-track>span{background:var(--accent)}
+.desktop-shell .dirty-dot{background:var(--warning)}
+.desktop-shell .grid-wrap{--result-scroll-track:var(--scroll-track);--result-scroll-thumb:var(--scroll-thumb);--result-scroll-hover:var(--scroll-hover)}
+.desktop-shell[data-theme] .compact-editor-tabs{--tabs-surface:var(--chrome);--tabs-active:var(--surface-raised);--tabs-text:var(--foreground);--tabs-muted:var(--muted);--tabs-border:var(--line)}
+.desktop-shell[data-theme] .dock-workbench{--dock-bg:var(--panel);--dock-header:var(--chrome);--dock-line:var(--line);--dock-text:var(--foreground);--dock-muted:var(--muted)}
+.desktop-shell :is(.result-grid td.selected-cell,.result-grid td.selected-cell button,.result-grid td.selected-cell em){color:var(--selection-text)}
+.desktop-shell .result-grid td.selected-cell{background:var(--selection-bg)}
+.desktop-shell .result-grid td.result-find-match:not(.selected-cell){background:var(--warning-bg);color:var(--foreground)}
+.desktop-shell .result-grid td[style*="--rule-color"]:not(.selected-cell){background:var(--rule-color);color:var(--foreground)}
+.desktop-shell :is(.result-grid td em,.result-grid td small){color:var(--muted)}
+.desktop-shell .syntax-preview{background:var(--editor-bg);color:var(--foreground);--preview-keyword:var(--syntax-keyword);--preview-string:var(--syntax-string);--preview-comment:var(--syntax-comment);--preview-number:var(--syntax-number)}
+.desktop-shell :is(.result-selection-stats,.result-footer,.app-status,.editor-status){color:var(--muted);border-color:var(--line)}
+.desktop-shell .result-action-feedback{color:var(--muted)}
+.desktop-shell :is(.success-state,.query-history-label.succeeded){color:var(--success)}
+.desktop-shell :is(.oracle-explorer-error,.auth-error,.snippet-form-error,.problem-error,.query-history-label.failed){color:var(--danger)}
+.desktop-shell :is(.oracle-explorer-stale,.result-warnings,.query-history-label.cancelled,.session-status-pending){color:var(--warning)}
+.desktop-shell :is(.result-tools-dialog,.column-format-popover,.column-actions-menu,.result-context-menu,.result-hover-popover,.workspace-context-menu,.ide-file-popover,.view-popover){background:var(--surface);color:var(--foreground);border-color:var(--line)}
+.desktop-shell .modal-backdrop{background:var(--backdrop)}
+.desktop-shell :is(.appearance-modal,.connection-modal,.connection-detail){background:var(--surface);color:var(--foreground);border-color:var(--line)}
+.desktop-shell .result-highlight-swatch.teal{background:var(--teal)}
+.desktop-shell .result-highlight-swatch.amber{background:var(--warning)}
+.desktop-shell .result-highlight-swatch.rose{background:var(--danger)}
+.desktop-shell :is(.result-scope,.column-actions-menu footer){color:var(--muted)}
+.theme-scope.editor-overflow-menu{background:var(--surface);color:var(--foreground);border-color:var(--line);box-shadow:0 8px 24px var(--shadow-color)}
+.theme-scope.app-tooltip{background:var(--tooltip-bg);color:var(--foreground);border-color:var(--line-strong);box-shadow:0 6px 18px var(--shadow-color)}
+.theme-scope :is(button,summary):focus-visible{outline:2px solid var(--focus-ring);outline-offset:2px}
+.application-error{min-height:100vh;height:auto;padding:32px;box-sizing:border-box;font-family:var(--ui-font-family,'Segoe UI',sans-serif);overflow:auto}
+.application-error h1{color:var(--danger);font-size:18px}
+.application-error pre{padding:16px;overflow:auto;white-space:pre-wrap;background:var(--input);border:1px solid var(--line);border-radius:8px;color:var(--foreground)}
+.application-error button{align-self:flex-start;padding:8px 12px;border:1px solid var(--line);border-radius:6px;background:var(--surface-raised);color:var(--foreground)}
+@media(forced-colors:active){.desktop-shell :focus-visible,.theme-scope :focus-visible{outline-color:Highlight}.desktop-shell .result-grid td.selected-cell{forced-color-adjust:none;background:Highlight;color:HighlightText}.desktop-shell .result-grid td.selected-cell *{color:HighlightText}}

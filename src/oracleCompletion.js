@@ -239,6 +239,7 @@ export function getOracleCompletions(source, cursor, { settings: supplied = {}, 
   const keywordStyle = settings.keywordCase === 'auto' ? (formatCompletionKeyword('SELECT', source) === 'select' ? 'lower' : 'upper') : settings.keywordCase;
   const candidates = [], seen = new Set();
   const add = (name, kind, rank, detail, extra = {}) => {
+    if(({keyword:settings.showKeywords,function:settings.showFunctions,field:settings.showColumns})[kind]===false)return;
     const match = completionMatch(name, context.fragment, settings.matchMode, context.quoted);
     if (match < 0) return;
     const key = `${kind}:${extra.identity || name}`;
@@ -316,9 +317,10 @@ export function getOracleCompletions(source, cursor, { settings: supplied = {}, 
 
 
 // Empty lines require a concrete syntactic expectation, even when indented.
-export function automaticCompletionAllowed(source, cursor) {
+export function automaticCompletionAllowed(source, cursor, settings = {}) {
   const context = getOracleCompletionContext(source, cursor);
   if (context.blocked || context.bind) return false;
+  if(!context.qualifier && context.fragment.length < (settings.minCharacters || 0))return false;
   const line = source.slice(source.lastIndexOf('\n', cursor - 1) + 1, cursor);
   if (line.trim()) return true;
   return context.relation || !!context.qualifier || ['SELECT', 'WHERE', 'ON', 'SET', 'HAVING', 'VALUES', 'ORDER', 'GROUP'].includes(context.clause);

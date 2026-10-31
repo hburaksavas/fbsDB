@@ -1,0 +1,730 @@
+/* Shared surfaces are inherited by popovers, dialogs, and Results controls. */
+:root { font-family: var(--ui-font-family, 'DM Sans', 'Segoe UI', sans-serif); }
+.desktop-shell {
+  color-scheme: dark;
+  font-family: var(--ui-font-family, 'DM Sans', 'Segoe UI', sans-serif);
+}
+
+.desktop-shell .active-connection-label,
+.desktop-shell .connection-control-name,
+.desktop-shell .connection-name,
+.desktop-shell .schema-scope,
+.desktop-shell .object-count,
+.desktop-shell .breadcrumb > span:last-child,
+.desktop-shell .result-tab-count,
+.desktop-shell .result-page-number,
+.desktop-shell .detail-title strong,
+.desktop-shell .explorer-disclosure > summary,
+.desktop-shell .column-tree em,
+.desktop-shell .detail-fields .source-path,
+.desktop-shell .explorer-disclosure > summary::before,
+.desktop-shell .snippet-form-panel input,
+.desktop-shell .snippet-form-panel textarea {
+  font-family: var(--ui-font-family, 'DM Sans', 'Segoe UI', sans-serif);
+}
+
+.ui-font-setting {
+  display: grid;
+  grid-template-columns: minmax(110px, 160px) minmax(170px, 240px);
+  align-items: center;
+  gap: 10px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.ui-font-setting select { width: 100%; }
+
+.desktop-shell[data-theme="dark"] {
+  background: var(--bg);
+}
+
+/* Monokai Grey uses neutral surfaces throughout the workbench. */
+.desktop-shell[data-theme="dark"] .titlebar,
+.desktop-shell[data-theme="dark"] .activity-rail { background: var(--chrome); border-color: var(--line); }
+.desktop-shell[data-theme="dark"] .commandbar,
+.desktop-shell[data-theme="dark"] .app-status,
+.desktop-shell[data-theme="dark"] .editor-status,
+.desktop-shell[data-theme="dark"] .result-header { background: var(--chrome); border-color: var(--line); color: var(--muted); }
+.desktop-shell[data-theme="dark"] .explorer,
+.desktop-shell[data-theme="dark"] .result-panel,
+.desktop-shell[data-theme="dark"] .editor-workspace { background: var(--panel); border-color: var(--line); }
+.desktop-shell[data-theme="dark"] .editor-tabs,
+.desktop-shell[data-theme="dark"] .breadcrumb { background: var(--chrome); border-color: var(--line); }
+.desktop-shell[data-theme="dark"] .breadcrumb b,
+.desktop-shell[data-theme="dark"] .result-tabs button.active { color: var(--text); }
+.desktop-shell[data-theme="dark"] .result-tabs button.active::after { background: var(--accent); }
+.desktop-shell[data-theme="dark"] .result-grid th { background: var(--surface-raised); color: var(--muted); border-color: var(--line); }
+.desktop-shell[data-theme="dark"] .result-grid td { border-color: var(--line-soft); color: var(--text); }
+.desktop-shell[data-theme="dark"] .result-grid .rownum { background: var(--surface-raised); color: var(--muted); }
+.desktop-shell[data-theme="dark"] .result-grid td.selected-cell { color: var(--text); }
+.desktop-shell[data-theme="dark"] .appearance-modal,
+.desktop-shell[data-theme="dark"] .connection-modal,
+.desktop-shell[data-theme="dark"] .connection-detail,
+.desktop-shell[data-theme="dark"] .completion-card { background: var(--surface); color: var(--text); border-color: var(--line); }
+.desktop-shell[data-theme="dark"] .appearance-header,
+.desktop-shell[data-theme="dark"] .appearance-footer,
+.desktop-shell[data-theme="dark"] .modal-footer,
+.desktop-shell[data-theme="dark"] .picker-tabs { border-color: var(--line); }
+.desktop-shell[data-theme="dark"] .theme-choice,
+.desktop-shell[data-theme="dark"] .token-color-row { background: var(--surface-raised); color: var(--text); border-color: var(--line); }
+.desktop-shell[data-theme="dark"] .syntax-preview { background: var(--input); color: var(--text); border-color: var(--line); }
+.desktop-shell[data-theme="dark"] .button-secondary,
+.desktop-shell[data-theme="dark"] .transaction-button,
+.desktop-shell[data-theme="dark"] .pager-button { border-color: var(--line); color: var(--text); }
+.desktop-shell[data-theme="dark"] .button-secondary:hover,
+.desktop-shell[data-theme="dark"] .transaction-button:hover,
+.desktop-shell[data-theme="dark"] .pager-button:hover { background: var(--surface-raised); }
+.desktop-shell[data-theme="dark"] .completion-head,
+.desktop-shell[data-theme="dark"] .completion-foot { background: var(--surface-raised); border-color: var(--line); }
+.desktop-shell[data-theme="dark"] .connection-row:hover,
+.desktop-shell[data-theme="dark"] .schema-type-filter button:hover,
+.desktop-shell[data-theme="dark"] .oracle-object-row:hover,
+.desktop-shell[data-theme="dark"] .oracle-object-row.active { background: var(--surface-raised); color: var(--text); }
+.desktop-shell[data-theme="dark"] .picker-list .connection-row.selected { background: var(--selection-bg); border-color: var(--success-border); box-shadow: inset 2px 0 var(--accent); }
+.desktop-shell[data-theme="dark"] .explorer-search,
+.desktop-shell[data-theme="dark"] .picker-search,
+.desktop-shell[data-theme="dark"] .objects-section-content .schema-type-filter select { background: var(--input); color: var(--text); border-color: var(--line); }
+.desktop-shell[data-theme="dark"] .explorer-search input,
+.desktop-shell[data-theme="dark"] .picker-search input { color: var(--text); }
+.desktop-shell[data-theme="dark"] .connection-row.selected,
+.desktop-shell[data-theme="dark"] .explorer-tabs button.active,
+.desktop-shell[data-theme="dark"] .rail-button.selected { background: var(--selection-bg); color: var(--accent-text); border-color: var(--success-border); }
+.desktop-shell[data-theme="dark"] .rail-button:hover,
+.desktop-shell[data-theme="dark"] .icon-button:hover,
+.desktop-shell[data-theme="dark"] .menu-bar button:hover,
+.desktop-shell[data-theme="dark"] .section-heading button:hover,
+.desktop-shell[data-theme="dark"] .oracle-schema-node > summary:hover,
+.desktop-shell[data-theme="dark"] .oracle-category-node > summary:hover { background: var(--surface-raised); color: var(--text); }
+.desktop-shell[data-theme="dark"] .query-history-item,
+.desktop-shell[data-theme="dark"] .workspace-search-result,
+.desktop-shell[data-theme="dark"] .snippet-preview,
+.desktop-shell[data-theme="dark"] .snippet-option:hover { background: var(--surface-raised); border-color: var(--line); color: var(--text); }
+.desktop-shell[data-theme="dark"] .query-history-item pre,
+.desktop-shell[data-theme="dark"] .snippet-preview pre,
+.desktop-shell[data-theme="dark"] .cell-preview-value { background: var(--input); color: var(--text); border-color: var(--line); }
+.desktop-shell[data-theme="dark"] .workspace-search-input,
+.desktop-shell[data-theme="dark"] .connection-group-control select,
+.desktop-shell[data-theme="dark"] .group-filter select,
+.desktop-shell[data-theme="dark"] .new-group-form input,
+.desktop-shell[data-theme="dark"] .profile-fields input,
+.desktop-shell[data-theme="dark"] .profile-fields select,
+.desktop-shell[data-theme="dark"] .profile-fields textarea { background: var(--input); color: var(--text); border-color: var(--line); }
+.desktop-shell[data-theme="dark"] .workspace-search-input input { color: var(--text); }
+.desktop-shell[data-theme="dark"] .objects-section-content .schema-search,
+.desktop-shell[data-theme="dark"] .objects-section-content .schema-type-filter select,
+.desktop-shell[data-theme="dark"] .object-scope-switch { border-color: var(--line); }
+.desktop-shell[data-theme="dark"] .db-icon.mint,
+.desktop-shell[data-theme="dark"] .output-icon { background: var(--success-bg); color: var(--accent-text); border-color: var(--success-border); }
+.desktop-shell[data-theme="dark"] .db-icon.neutral {
+  background: var(--surface-raised);
+  color: var(--muted);
+  border-color: var(--line);
+}
+.desktop-shell[data-theme="dark"] .env-badge:has(i):not(.mint):not(.blue):not(.rose):not(.amber) {
+  background: var(--info-bg);
+  color: var(--info);
+  border-color: var(--info-border);
+}
+.desktop-shell[data-theme="dark"] .result-settings-window {
+  --settings-surface: var(--surface-raised);
+  --settings-sidebar: var(--surface-raised);
+  --settings-content: var(--surface-raised);
+  --settings-border: var(--line);
+  --settings-text: var(--foreground);
+  --settings-muted: var(--muted);
+  --settings-input: var(--input);
+  --settings-hover: var(--hover-bg);
+}
+.desktop-shell[data-theme="dark"] .dock-workbench {
+  --dock-bg: var(--surface-raised);
+  --dock-header: var(--chrome);
+  --dock-line: var(--line);
+  --dock-text: var(--foreground);
+  --dock-muted: var(--muted);
+}
+.desktop-shell[data-theme="dark"] .compact-editor-tabs {
+  --tabs-surface: var(--chrome);
+  --tabs-active: var(--hover-bg);
+  --tabs-text: var(--foreground);
+  --tabs-muted: var(--muted);
+  --tabs-border: var(--line);
+}
+.desktop-shell[data-theme="dark"] .grid-wrap {
+  --result-scroll-track: var(--surface-raised);
+  --result-scroll-thumb: var(--surface-raised);
+  --result-scroll-hover: var(--hover-bg);
+}
+
+.desktop-shell[data-theme="light"] {
+  color-scheme: light;
+}
+
+/* The editor host and explorer keep their own backgrounds outside Monaco. */
+.desktop-shell[data-theme="light"] .editor-workspace { background: var(--surface); }
+.desktop-shell[data-theme="light"] .run-button:not(.idle),
+.desktop-shell[data-theme="light"] .button-primary { color: var(--on-accent); }
+.desktop-shell[data-theme="light"] .explorer::-webkit-scrollbar-track { background: var(--panel); }
+.desktop-shell[data-theme="light"] .explorer::-webkit-scrollbar-thumb { background: var(--surface-raised); }
+.desktop-shell[data-theme="light"] .objects-section-content .oracle-explorer-caption,
+.desktop-shell[data-theme="light"] .oracle-object-target,
+.desktop-shell[data-theme="light"] .oracle-property-row > b,
+.desktop-shell[data-theme="light"] .oracle-details-empty,
+.desktop-shell[data-theme="light"] .oracle-object-details .oracle-column-copy em { color: var(--muted); }
+.desktop-shell[data-theme="light"] .oracle-object-details { border-left-color: var(--line); }
+.desktop-shell[data-theme="light"] .oracle-property-row { border-bottom-color: var(--line-soft); }
+.desktop-shell[data-theme="light"] .oracle-source-node > summary { color: var(--accent-text); }
+.desktop-shell[data-theme="light"] .oracle-object-tree > .oracle-schema-node > summary:hover,
+.desktop-shell[data-theme="light"] .schema-type-filter button:hover,
+.desktop-shell[data-theme="light"] .object-favorites-filter:hover,
+.desktop-shell[data-theme="light"] .object-favorites-filter.active,
+.desktop-shell[data-theme="light"] .oracle-object-favorite:hover,
+.desktop-shell[data-theme="light"] .oracle-object-favorite.active { background: var(--selection-bg); }
+.desktop-shell[data-theme="light"] .schema-type-filter button:hover { color: var(--text); }
+.desktop-shell[data-theme="light"] .object-favorites-filter,
+.desktop-shell[data-theme="light"] .object-scope-switch button,
+.desktop-shell[data-theme="light"] .oracle-category-node > summary,
+.desktop-shell[data-theme="light"] .oracle-object-row { color: var(--muted); }
+.desktop-shell[data-theme="light"] .oracle-object-virtual-list { scrollbar-color: var(--surface-raised) transparent; }
+.desktop-shell[data-theme="light"] .oracle-explorer-stale { background: var(--surface); border-color: var(--warning-border); color: var(--warning); }
+
+/* Metadata inspector is also shown as a full editor tab. */
+.oracle-object-inspector {
+  background: var(--surface);
+  color: var(--foreground);
+  border-color: var(--line);
+}
+.oracle-object-inspector > header,
+.oracle-object-inspector > nav,
+.oracle-inspector-column,
+.oracle-inspector-dependency,
+.oracle-inspector-properties,
+.oracle-inspector-properties dt,
+.oracle-inspector-properties dd,
+.oracle-inspector-table-head,
+.oracle-inspector-table-row { border-color: var(--line); }
+.oracle-object-inspector > header small,
+.oracle-object-inspector > nav button,
+.oracle-object-inspector-body > p,
+.oracle-inspector-column span,
+.oracle-inspector-dependency small,
+.oracle-tree-hint,
+.oracle-inspector-properties dt,
+.oracle-inspector-empty,
+.oracle-inspector-column-list > .oracle-inspector-column > div span,
+.oracle-inspector-column-list > .oracle-inspector-column > small,
+.oracle-inspector-column-list > .oracle-inspector-column p,
+.oracle-inspector-source-label { color: var(--muted); }
+.oracle-object-inspector > nav button[aria-selected="true"] {
+  color: var(--accent-text);
+  box-shadow: inset 0 -2px var(--accent);
+}
+.oracle-object-inspector > nav button:hover,
+.oracle-inspector-actions button:hover,
+.oracle-inspector-dependency:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+  color: var(--text);
+}
+.oracle-inspector-actions button,
+.oracle-inspector-dependency,
+.oracle-inspector-properties dd,
+.oracle-inspector-source,
+.oracle-inspector-table-row { color: var(--foreground); }
+.oracle-inspector-table-head { background: var(--surface-raised); color: var(--muted); }
+.oracle-object-inspector pre { scrollbar-color: var(--line) transparent; }
+
+/* Shell controls that previously retained dark text or fills in the light theme. */
+.desktop-shell[data-theme="light"] .titlebar .brand-name span { color: var(--accent-text); }
+.desktop-shell[data-theme="light"] .rail-button:hover,
+.desktop-shell[data-theme="light"] .icon-button:hover,
+.desktop-shell[data-theme="light"] .menu-bar button:hover,
+.desktop-shell[data-theme="light"] .section-heading button:hover,
+.desktop-shell[data-theme="light"] .pager-button:hover { background: var(--hover-bg); color: var(--text); }
+.desktop-shell[data-theme="light"] .rail-button.selected { background: var(--selection-bg); color: var(--accent-text); }
+.desktop-shell[data-theme="light"] .transaction-button,
+.desktop-shell[data-theme="light"] .pager-button,
+.desktop-shell[data-theme="light"] .button-secondary { border-color: var(--line); color: var(--text); }
+.desktop-shell[data-theme="light"] .transaction-button:hover,
+.desktop-shell[data-theme="light"] .button-secondary:hover { background: var(--hover-bg); }
+.desktop-shell[data-theme="light"] .toolbar-separator,
+.desktop-shell[data-theme="light"] .status-divider { background: var(--line); }
+.desktop-shell[data-theme="light"] .breadcrumb b,
+.desktop-shell[data-theme="light"] .breadcrumb > span:last-child,
+.desktop-shell[data-theme="light"] .editor-status .status-sql,
+.desktop-shell[data-theme="light"] .result-tabs button.active,
+.desktop-shell[data-theme="light"] .result-footer b,
+.desktop-shell[data-theme="light"] .output-empty b { color: var(--text); }
+.desktop-shell[data-theme="light"] .result-tabs button:hover { color: var(--text); }
+.desktop-shell[data-theme="light"] .result-tab-count,
+.desktop-shell[data-theme="light"] .output-icon { background: var(--surface-raised); color: var(--accent-text); }
+.desktop-shell[data-theme="light"] .result-footer,
+.desktop-shell[data-theme="light"] .app-status { border-color: var(--line); }
+.desktop-shell[data-theme="light"] .result-grid td.selected-cell { color: var(--text); }
+.desktop-shell[data-theme="light"] .result-grid td.numeric,
+.desktop-shell[data-theme="light"] .result-grid td.date-cell { color: var(--text); }
+.desktop-shell[data-theme="light"] .editor-status .editor-save-button { color: var(--accent-text); }
+.desktop-shell[data-theme="light"] .fetch-limit-picker select { color-scheme: light; }
+
+/* Connection chooser uses several component-local colors. */
+.desktop-shell[data-theme="light"] .modal-header p,
+.desktop-shell[data-theme="light"] .picker-tabs button,
+.desktop-shell[data-theme="light"] .detail-title span:not(.db-icon),
+.desktop-shell[data-theme="light"] .detail-fields > div span,
+.desktop-shell[data-theme="light"] .detail-fields .source-path,
+.desktop-shell[data-theme="light"] .secure-note,
+.desktop-shell[data-theme="light"] .detail-empty,
+.desktop-shell[data-theme="light"] .empty-state { color: var(--muted); }
+.desktop-shell[data-theme="light"] .picker-tabs,
+.desktop-shell[data-theme="light"] .modal-footer,
+.desktop-shell[data-theme="light"] .secure-note { border-color: var(--line); }
+.desktop-shell[data-theme="light"] .picker-tabs button.active,
+.desktop-shell[data-theme="light"] .detail-title strong,
+.desktop-shell[data-theme="light"] .detail-fields > div b,
+.desktop-shell[data-theme="light"] .empty-state b { color: var(--text); }
+.desktop-shell[data-theme="light"] .picker-tabs button span { background: var(--surface-raised); color: var(--muted); }
+.desktop-shell[data-theme="light"] .picker-list .connection-row.selected { background: var(--selection-bg); border-color: var(--line); }
+.desktop-shell[data-theme="light"] .connection-detail { background: var(--surface); border-color: var(--line); }
+.desktop-shell[data-theme="light"] .connection-row:hover { background: var(--hover-bg); }
+.desktop-shell[data-theme="light"] .connection-sub,
+.desktop-shell[data-theme="light"] .source-button { color: var(--muted); }
+.desktop-shell[data-theme="light"] .source-button { border-color: var(--line); }
+.desktop-shell[data-theme="light"] .db-icon { background: var(--success-bg); border-color: var(--success-border); color: var(--success); }
+.desktop-shell[data-theme="light"] .db-icon.blue { background: var(--info-bg); border-color: var(--info-border); color: var(--info); }
+.desktop-shell[data-theme="light"] .db-icon.rose { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
+.desktop-shell[data-theme="light"] .db-icon.amber { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning); }
+.desktop-shell[data-theme="light"] .env-badge { background: var(--success-bg); border-color: var(--success-border); color: var(--success); }
+.desktop-shell[data-theme="light"] .env-badge.blue { background: var(--info-bg); border-color: var(--info-border); color: var(--info); }
+.desktop-shell[data-theme="light"] .env-badge.rose { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
+.desktop-shell[data-theme="light"] .env-badge.amber { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning); }
+.desktop-shell[data-theme="light"] .env-badge:has(i):not(.mint):not(.blue):not(.rose):not(.amber),
+.desktop-shell[data-theme="light"] .env-badge[data-env="UNKNOWN"] {
+  background: var(--info-bg);
+  border-color: var(--info-border);
+  color: var(--info);
+}
+.desktop-shell[data-theme="light"] .db-icon.neutral {
+  background: var(--surface-raised);
+  border-color: var(--line);
+  color: var(--muted);
+}
+.desktop-shell[data-theme="light"] .connection-control-environment[data-env="UNKNOWN"] {
+  background: var(--surface-raised);
+  color: var(--muted);
+}
+
+/* Native selects, keycaps, and popovers follow the active palette. */
+.desktop-shell select,
+.desktop-shell input,
+.desktop-shell textarea { accent-color: var(--accent); }
+.desktop-shell[data-theme="light"] kbd { background: var(--surface-raised); border-color: var(--line); color: var(--muted); }
+.desktop-shell[data-theme="light"] .view-popover,
+.desktop-shell[data-theme="light"] .ide-file-popover,
+.desktop-shell[data-theme="light"] .workspace-context-menu { background: var(--panel2); color: var(--text); border-color: var(--line); }
+.desktop-shell[data-theme="light"] .view-field select,
+.desktop-shell[data-theme="light"] .view-field input { background: var(--surface); color: var(--text); border-color: var(--line); }
+
+/* Explorer filters, query history, and workspace search are modal surfaces too. */
+.desktop-shell[data-theme="light"] .explorer-tabs button,
+.desktop-shell[data-theme="light"] .connection-group-control > span,
+.desktop-shell[data-theme="light"] .group-filter > span,
+.desktop-shell[data-theme="light"] .query-history-meta,
+.desktop-shell[data-theme="light"] .query-history-meta time,
+.desktop-shell[data-theme="light"] .query-history-actions,
+.desktop-shell[data-theme="light"] .query-history-empty,
+.desktop-shell[data-theme="light"] .workspace-search-summary,
+.desktop-shell[data-theme="light"] .workspace-search-result small,
+.desktop-shell[data-theme="light"] .workspace-search-result code { color: var(--muted); }
+.desktop-shell[data-theme="light"] .explorer-tabs button:hover { color: var(--text); }
+.desktop-shell[data-theme="light"] .explorer-tabs button.active { background: var(--selection-bg); color: var(--accent-text); }
+.desktop-shell[data-theme="light"] .connection-group-control select,
+.desktop-shell[data-theme="light"] .group-filter select,
+.desktop-shell[data-theme="light"] .new-group-form input,
+.desktop-shell[data-theme="light"] .workspace-search-input { background: var(--input); color: var(--text); border-color: var(--line); }
+.desktop-shell[data-theme="light"] .workspace-search-input input { color: var(--text); }
+.desktop-shell[data-theme="light"] .workspace-search-input input::placeholder { color: var(--dim); }
+.desktop-shell[data-theme="light"] .query-history-item,
+.desktop-shell[data-theme="light"] .workspace-search-result { background: var(--surface); color: var(--text); border-color: var(--line); }
+.desktop-shell[data-theme="light"] .workspace-search-result:hover { background: var(--hover-bg); border-color: var(--line); }
+.desktop-shell[data-theme="light"] .query-history-item pre { background: var(--surface-2); color: var(--text); border-color: var(--line); }
+.desktop-shell[data-theme="light"] .query-history-meta b,
+.desktop-shell[data-theme="light"] .query-history-empty b,
+.desktop-shell[data-theme="light"] .workspace-search-result b { color: var(--text); }
+.desktop-shell[data-theme="light"] .query-history-label { background: var(--surface-raised); color: var(--muted); }
+.desktop-shell[data-theme="light"] .query-history-label.succeeded,
+.desktop-shell[data-theme="light"] .state-tag { background: var(--success-bg); border-color: var(--success-border); color: var(--success); }
+.desktop-shell[data-theme="light"] .query-history-label.failed,
+.desktop-shell[data-theme="light"] .state-tag.overdue { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
+.desktop-shell[data-theme="light"] .query-history-label.cancelled,
+.desktop-shell[data-theme="light"] .state-tag.pending { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning); }
+.desktop-shell[data-theme="light"] .workspace-name:hover,
+.desktop-shell[data-theme="light"] .workspace-action:hover { background: var(--hover-bg); color: var(--text); }
+.desktop-shell[data-theme="light"] .result-page-number,
+.desktop-shell[data-theme="light"] .appearance-header p,
+.desktop-shell[data-theme="light"] .syntax-settings > div > p,
+.desktop-shell[data-theme="light"] .appearance-section-title { color: var(--muted); }
+
+/* Settings controls share one compact treatment across every category. */
+.settings-workspace {
+  --settings-field-placeholder: var(--muted);
+}
+.desktop-shell[data-theme="dark"] .settings-workspace {
+  --settings-field-placeholder: var(--muted);
+}
+.desktop-shell[data-theme="light"] .settings-workspace {
+  --settings-field-placeholder: var(--muted);
+}
+.desktop-shell .settings-workspace input:not([type="checkbox"]):not([type="color"]):not([type="file"]),
+.desktop-shell .settings-workspace select,
+.desktop-shell .settings-workspace textarea {
+  min-height: 30px;
+  border: 1px solid var(--settings-field-border);
+  border-radius: 5px;
+  background: var(--settings-field-bg);
+  color: var(--settings-field-text);
+  font: inherit;
+  font-size: 11px;
+  padding: 5px 8px;
+}
+.desktop-shell .settings-workspace input:not([type="checkbox"]):not([type="color"]):not([type="file"])::placeholder,
+.desktop-shell .settings-workspace textarea::placeholder { color: var(--settings-field-placeholder); }
+.desktop-shell .settings-workspace select option {
+  background: var(--settings-field-bg);
+  color: var(--settings-field-text);
+}
+.desktop-shell .settings-workspace input:not([type="checkbox"]):not([type="color"]):not([type="file"]):focus-visible,
+.desktop-shell .settings-workspace select:focus-visible,
+.desktop-shell .settings-workspace textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  border-color: var(--accent);
+}
+.desktop-shell .settings-workspace input[type="checkbox"] {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  flex: 0 0 15px;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  border: 1px solid var(--settings-field-border);
+  border-radius: 4px;
+  background: var(--settings-field-bg);
+  cursor: pointer;
+}
+.desktop-shell .settings-workspace input[type="checkbox"]::after {
+  content: "";
+  width: 7px;
+  height: 4px;
+  border-left: 2px solid var(--on-accent);
+  border-bottom: 2px solid var(--on-accent);
+  transform: translateY(-1px) rotate(-45deg) scale(0);
+}
+.desktop-shell .settings-workspace input[type="checkbox"]:checked {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.desktop-shell .settings-workspace input[type="checkbox"]:checked::after {
+  transform: translateY(-1px) rotate(-45deg) scale(1);
+}
+.desktop-shell .settings-workspace input[type="checkbox"]:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.desktop-shell .settings-workspace :is(input, select, textarea):disabled {
+  opacity: .55;
+  cursor: not-allowed;
+}
+
+/* Docked Connections and Object Explorer use the active theme's chrome. */
+.desktop-shell[data-theme] .connections-section-content .explorer-tabs button,
+.desktop-shell[data-theme] .connections-section-content .group-filter > span,
+.desktop-shell[data-theme] .objects-section-content .schema-type-filter > span,
+.desktop-shell[data-theme] .objects-section-content .object-scope-switch button,
+.desktop-shell[data-theme] .objects-section-content .schema-scope,
+.desktop-shell[data-theme] .objects-section-content .oracle-category-node > summary,
+.desktop-shell[data-theme] .objects-section-content .oracle-object-tree .object-count {
+  color: var(--muted);
+}
+.desktop-shell[data-theme] .connections-section-content .explorer-tabs button:hover,
+.desktop-shell[data-theme] .objects-section-content .object-scope-switch button:hover {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.desktop-shell[data-theme] .connections-section-content .explorer-tabs button.active {
+  color: var(--accent-text);
+  background: color-mix(in srgb, var(--accent) 13%, var(--panel));
+}
+.desktop-shell[data-theme] .connections-section-content .connection-row {
+  color: var(--text);
+}
+.desktop-shell[data-theme] .connections-section-content .connection-row:hover,
+.desktop-shell[data-theme] .connections-section-content .connection-row.selected {
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  border-color: color-mix(in srgb, var(--accent) 32%, var(--line));
+}
+.desktop-shell[data-theme] .connections-section-content .connection-name {
+  color: var(--text);
+}
+.desktop-shell[data-theme] .connections-section-content .connection-sub,
+.desktop-shell[data-theme] .connections-section-content .star-button:not(.active) {
+  color: var(--muted);
+}
+.desktop-shell[data-theme] .connections-section-content .db-icon:not(.neutral) {
+  background: color-mix(in srgb, currentColor 12%, var(--panel));
+  border-color: color-mix(in srgb, currentColor 30%, var(--line));
+}
+.desktop-shell[data-theme] .connections-section-content .env-badge:not([data-env="UNKNOWN"]) {
+  background: color-mix(in srgb, currentColor 10%, var(--panel));
+  border-color: color-mix(in srgb, currentColor 25%, var(--line));
+}
+.desktop-shell[data-theme] .connections-section-content .group-filter select,
+.desktop-shell[data-theme] .objects-section-content .schema-type-filter select {
+  background: var(--input);
+  color: var(--text);
+  border-color: var(--line);
+}
+.desktop-shell[data-theme] .connections-section-content .group-filter select option,
+.desktop-shell[data-theme] .objects-section-content .schema-type-filter select option {
+  background: var(--surface);
+  color: var(--text);
+}
+.desktop-shell[data-theme] .objects-section-content .schema-search,
+.desktop-shell[data-theme] .objects-section-content .object-scope-switch {
+  border-color: var(--line);
+}
+.desktop-shell[data-theme] .objects-section-content .schema-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+.desktop-shell[data-theme] .objects-section-content .schema-scope .schema-scope-name {
+  color: var(--text);
+}
+.desktop-shell[data-theme] .objects-section-content .schema-scope .schema-connection-icon,
+.desktop-shell[data-theme] .objects-section-content .schema-scope .schema-refresh {
+  color: var(--muted);
+}
+.desktop-shell[data-theme] .objects-section-content .schema-scope .schema-refresh:hover,
+.desktop-shell[data-theme] .objects-section-content .schema-type-filter button:hover {
+  background: color-mix(in srgb, var(--accent) 10%, var(--panel));
+  color: var(--text);
+}
+.desktop-shell[data-theme] .objects-section-content .object-scope-switch button.active {
+  color: var(--accent-text);
+}
+.desktop-shell[data-theme] .objects-section-content .object-scope-switch button.active::after {
+  background: var(--accent);
+}
+
+/* Editor and Results status strips share text, borders, and active states. */
+.desktop-shell[data-theme] .editor-status,
+.desktop-shell[data-theme] .result-header,
+.desktop-shell[data-theme] .result-footer,
+.desktop-shell[data-theme] .result-selection-stats {
+  border-color: var(--line);
+  color: var(--muted);
+}
+.desktop-shell[data-theme] .panel-resizer,
+.desktop-shell[data-theme] .vertical-splitter { background: var(--line); }
+.desktop-shell[data-theme] .panel-resizer:hover,
+.desktop-shell[data-theme] .panel-resizer:focus-visible,
+.desktop-shell[data-theme] .panel-resizer:active { background: var(--accent); }
+.desktop-shell[data-theme] .editor-status > span:first-child,
+.desktop-shell[data-theme] .editor-status .session-profile,
+.desktop-shell[data-theme] .editor-status .editor-position,
+.desktop-shell[data-theme] .editor-status .status-sql,
+.desktop-shell[data-theme] .editor-status svg,
+.desktop-shell[data-theme] .result-tabs button,
+.desktop-shell[data-theme] .result-tabs button svg,
+.desktop-shell[data-theme] .result-page-controls .result-context {
+  color: var(--muted);
+}
+.desktop-shell[data-theme] .editor-status .session-status-connected,
+.desktop-shell[data-theme] .editor-status .session-status-connected svg,
+.desktop-shell[data-theme] .editor-status .editor-save-button,
+.desktop-shell[data-theme] .success-state,
+.desktop-shell[data-theme] .success-state svg {
+  color: var(--accent-text);
+}
+.desktop-shell[data-theme] .result-tabs button:hover,
+.desktop-shell[data-theme] .result-tabs button.active {
+  color: var(--text);
+}
+.desktop-shell[data-theme] .result-tabs button.active svg { color: var(--accent-text); }
+.desktop-shell[data-theme] .result-tabs button.active::after {
+  background: var(--accent);
+}
+.desktop-shell[data-theme] .result-tab-count {
+  background: color-mix(in srgb, var(--accent) 13%, var(--panel));
+  color: var(--accent-text);
+}
+.desktop-shell[data-theme] .result-footer {
+  background: var(--panel);
+}
+.desktop-shell[data-theme] .result-selection-stats {
+  background: var(--surface);
+}
+.desktop-shell[data-theme] .result-footer b,
+.desktop-shell[data-theme] .result-page-controls [role="status"] {
+  color: var(--text);
+}
+
+/* Connection profiles use the same field palette as the rest of the shell. */
+.desktop-shell[data-theme] .profile-fields label,
+.desktop-shell[data-theme] .profile-fields label small {
+  color: var(--muted);
+}
+.desktop-shell[data-theme] .profile-fields input:where(:not([type="checkbox"])),
+.desktop-shell[data-theme] .profile-fields select,
+.desktop-shell[data-theme] .profile-fields textarea {
+  background: var(--input);
+  color: var(--text);
+  border-color: var(--line);
+}
+.desktop-shell[data-theme] .profile-fields :is(input, textarea)::placeholder {
+  color: var(--dim);
+}
+.desktop-shell[data-theme] .profile-fields select option {
+  background: var(--surface);
+  color: var(--text);
+}
+.desktop-shell[data-theme] .profile-editor > .profile-fields {
+  scrollbar-color: var(--line) var(--surface);
+}
+.desktop-shell[data-theme] .profile-editor > .profile-fields::-webkit-scrollbar-track { background: var(--surface); }
+.desktop-shell[data-theme] .profile-editor > .profile-fields::-webkit-scrollbar-thumb { background: var(--line); }
+.desktop-shell[data-theme] .completion-head svg,
+.desktop-shell[data-theme] .workspace-file svg,
+.desktop-shell[data-theme] .file-connection-chip svg { color: var(--accent-text); }
+.desktop-shell[data-theme] .file-connection-chip {
+  color: var(--accent-text);
+  background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+  border-color: color-mix(in srgb, var(--accent) 25%, var(--line));
+}
+.desktop-shell[data-theme] .file-connection-button:hover,
+.desktop-shell[data-theme] .file-connection-button.bound,
+.desktop-shell[data-theme] .format-sql-button:hover {
+  color: var(--accent-text) !important;
+  background: color-mix(in srgb, var(--accent) 11%, var(--panel)) !important;
+}
+
+/* Focus and selection colors must change with the active theme. */
+.desktop-shell[data-theme] :is(button, input, select, textarea):focus-visible {
+  outline-color: var(--accent);
+}
+.desktop-shell[data-theme] .profile-fields :is(input, select, textarea):focus,
+.desktop-shell[data-theme] .auth-fields input:focus,
+.desktop-shell[data-theme] .bind-row :is(input, select):focus,
+.desktop-shell[data-theme] .preference-row :is(input, select):focus,
+.desktop-shell[data-theme] .snippet-form-panel :is(input, textarea):focus,
+.desktop-shell[data-theme] .connection-group-control select:focus,
+.desktop-shell[data-theme] .group-filter select:focus,
+.desktop-shell[data-theme] .new-group-form input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.desktop-shell[data-theme] .explorer-search:focus-within,
+.desktop-shell[data-theme] .picker-search:focus-within,
+.desktop-shell[data-theme] .workspace-search-input:focus-within,
+.desktop-shell[data-theme] .fetch-limit-picker:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.desktop-shell[data-theme] .workspace-file.selected,
+.desktop-shell[data-theme] .snippet-option.selected {
+  box-shadow: inset 2px 0 var(--accent);
+}
+.desktop-shell[data-theme] .picker-tabs button.active::after {
+  background: var(--accent);
+}
+.desktop-shell[data-theme] .picker-list .connection-row.selected {
+  box-shadow: inset 2px 0 var(--accent);
+}
+.desktop-shell[data-theme] .result-export-menu button:hover,
+.desktop-shell[data-theme] .result-tools-dialog button:hover,
+.desktop-shell[data-theme] .result-tools-dialog button.active,
+.desktop-shell[data-theme] .result-context-menu button:hover,
+.desktop-shell[data-theme] .result-grid-tools > button:hover,
+.desktop-shell[data-theme] .result-grid-tools > button.active,
+.desktop-shell[data-theme] .result-set-tabs .active {
+  background: color-mix(in srgb, var(--accent) 13%, transparent);
+}
+.desktop-shell[data-theme] .column-resizer:hover,
+.desktop-shell[data-theme] .column-resizer:focus {
+  background: color-mix(in srgb, var(--accent) 40%, transparent);
+}
+.desktop-shell[data-theme] .oracle-schema-node > summary:focus-visible,
+.desktop-shell[data-theme] .oracle-category-node > summary:focus-visible,
+.desktop-shell[data-theme] .oracle-object-row:focus-visible,
+.desktop-shell[data-theme] .oracle-object-row:focus {
+  outline-color: var(--accent);
+}
+.desktop-shell[data-theme="light"] .column-sort-trigger.active,
+.desktop-shell[data-theme="light"] .result-grid th .result-column-select-button.active svg {
+  color: var(--accent-text);
+}
+
+/* SQL snippets and query history keep their list, selection, and status chrome in the active palette. */
+.desktop-shell[data-theme] .snippet-option {
+  color: var(--muted);
+}
+.desktop-shell[data-theme] .snippet-option:hover {
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 24%, var(--line));
+}
+.desktop-shell[data-theme] .snippet-option.selected {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--line));
+  box-shadow: inset 2px 0 var(--accent);
+}
+.desktop-shell[data-theme] .snippet-option-copy b,
+.desktop-shell[data-theme] .snippet-preview-heading b {
+  color: var(--text);
+}
+.desktop-shell[data-theme] .snippet-option-copy small,
+.desktop-shell[data-theme] .snippet-preview > p,
+.desktop-shell[data-theme] .snippet-placeholder-note,
+.desktop-shell[data-theme] .snippet-browser-modal .appearance-footer > span {
+  color: var(--muted);
+}
+.desktop-shell[data-theme] .snippet-trigger,
+.desktop-shell[data-theme] .snippet-preview-heading > code,
+.desktop-shell[data-theme] .snippet-preview-tools > code {
+  color: var(--accent-text);
+  background: var(--input);
+  border-color: var(--line);
+}
+.desktop-shell[data-theme] .snippet-preview,
+.desktop-shell[data-theme] .query-history-item {
+  background: var(--surface);
+  border-color: var(--line);
+}
+.desktop-shell[data-theme] .snippet-preview pre,
+.desktop-shell[data-theme] .query-history-item pre {
+  background: var(--input);
+  border-color: var(--line);
+  color: var(--text);
+}
+.desktop-shell[data-theme] .snippet-placeholder-note svg { color: var(--accent-text); }
+.desktop-shell[data-theme] .query-history-meta,
+.desktop-shell[data-theme] .query-history-meta time,
+.desktop-shell[data-theme] .query-history-actions { color: var(--muted); }
+.desktop-shell[data-theme] .query-history-meta b { color: var(--text); }
+.desktop-shell[data-theme] .query-history-label.succeeded {
+  color: var(--status-success);
+  background: color-mix(in srgb, var(--status-success) 15%, var(--surface));
+}
+.desktop-shell[data-theme] .query-history-status.succeeded { background: var(--status-success); }
+.desktop-shell[data-theme] .snippet-list,
+.desktop-shell[data-theme] .query-history-list {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) var(--surface);
+}
+.desktop-shell[data-theme] .snippet-list::-webkit-scrollbar,
+.desktop-shell[data-theme] .query-history-list::-webkit-scrollbar { width: 9px; }
+.desktop-shell[data-theme] .snippet-list::-webkit-scrollbar-track,
+.desktop-shell[data-theme] .query-history-list::-webkit-scrollbar-track { background: var(--surface); }
+.desktop-shell[data-theme] .snippet-list::-webkit-scrollbar-thumb,
+.desktop-shell[data-theme] .query-history-list::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border: 2px solid var(--surface);
+  border-radius: 7px;
+}

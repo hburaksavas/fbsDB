@@ -26,13 +26,15 @@ test('workbench and IDE dialogs render with disconnected session and explicit co
   assert.match(module.exports.html,/Disconnected/);
   assert.match(module.exports.html,/Open Editors/);
   assert.match(module.exports.html,/aria-label="Application menu"/);
-  assert.match(module.exports.html,/Open Folder/);
+  assert.match(module.exports.html,/Open workspace/);
   assert.match(module.exports.html,/class="status-intellisense saved-state editor-save-button"[^>]*aria-label="Save SQL file \(Ctrl\+S\)"/);
   assert.doesNotMatch(module.exports.html.match(/<div class="editor-tabs-actions">([\s\S]*?)<\/div>/)?.[1] || '',/Save SQL file/);
   assert.doesNotMatch(module.exports.html,/>SQL FILES</);
   assert.match(module.exports.html.replace(/<!--.*?-->/g,''),/Ln 1, Col 1/);
   assert.match(module.exports.palette,/aria-disabled="true"/);
-  assert.match(module.exports.script,/DDL implicitly commits/);
+  // The DDL warning is now an explicit confirmation opened by Run script;
+  // native feedback tests verify the guard before any execution request.
+  assert.match(module.exports.script,/CREATE TABLE t/);
   assert.match(module.exports.script,/SQL script preview/);
   assert.match(module.exports.object,/CREATE TABLE T/);
   assert.match(module.exports.replacement,/SELECT 2 FROM dual/);

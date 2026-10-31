@@ -1,0 +1,41 @@
+/* A field owns one frame. Focus changes that frame's color, never its size. */
+:is(.desktop-shell,.theme-scope)[data-theme] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]):not([type="range"]),textarea,select):not(.monaco-editor *){
+ border:1px solid var(--line);border-radius:6px;background:var(--input);color:var(--foreground);outline:0;box-shadow:none;
+}
+:is(.desktop-shell,.theme-scope)[data-theme] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="file"]):not([type="range"]),textarea,select):not(.monaco-editor *):is(:focus,:focus-visible){
+ border-color:var(--focus-ring);outline:0;box-shadow:none;
+}
+/* These inputs share their parent's frame, including toolbar row selectors. */
+:is(.desktop-shell,.theme-scope)[data-theme] :is(.explorer-search,.picker-search,.workspace-search-input,.fetch-limit-picker,.result-settings-search,.result-popover-search,.schema-search,.password-entry-frame){
+ border:1px solid var(--line);border-radius:6px;background:var(--input);outline:0;box-shadow:none;
+}
+:is(.desktop-shell,.theme-scope)[data-theme] :is(.explorer-search,.picker-search,.workspace-search-input,.fetch-limit-picker,.result-settings-search,.result-popover-search,.schema-search,.password-entry-frame):focus-within{
+ border-color:var(--focus-ring);outline:0!important;box-shadow:none!important;
+}
+:is(.desktop-shell,.theme-scope)[data-theme] :is(.explorer-search,.picker-search,.workspace-search-input,.fetch-limit-picker,.result-settings-search,.result-popover-search,.schema-search,.ide-palette-search,.password-entry-frame) :is(input,select):is(*,:focus,:focus-visible){
+ border:0!important;border-radius:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;color:var(--foreground);
+}
+.desktop-shell[data-theme] .ide-palette-search{outline:0;box-shadow:none}
+.desktop-shell[data-theme] .ide-palette-search:focus-within{border-bottom-color:var(--focus-ring);outline:0;box-shadow:none}
+
+/* Monaco draws the frame on .monaco-inputbox, never on its inner textarea. */
+html[data-theme] .monaco-inputbox{border-radius:6px;outline:0!important;box-shadow:none!important}
+html[data-theme] .monaco-inputbox :is(input,textarea).input,
+.desktop-shell[data-theme] .monaco-editor .inputarea{
+ border:0!important;outline:0!important;box-shadow:none!important;border-radius:0!important;background:transparent!important;
+}
+html[data-theme] .monaco-inputbox:not(.error):not(.warning):focus-within,
+html[data-theme] .monaco-findInput:focus-within .monaco-inputbox:not(.error):not(.warning){border-color:var(--focus-ring)!important}
+html[data-theme] .monaco-inputbox.error{border-color:var(--danger)!important}
+html[data-theme] .monaco-inputbox.warning{border-color:var(--warning)!important}
+.desktop-shell[data-theme] .monaco-editor :is(input,textarea):focus{outline:0!important;box-shadow:none!important;border-color:var(--focus-ring)}
+.desktop-shell[data-theme] .monaco-editor .find-widget{border-radius:7px}
+.desktop-shell[data-theme] .monaco-editor .monaco-custom-toggle{border-radius:4px}
+.desktop-shell[data-theme] .monaco-editor .monaco-custom-toggle:focus{border-color:var(--focus-ring)!important;outline:0!important;box-shadow:none!important}
+.desktop-shell[data-theme] .find-widget :is([role="button"],[role="checkbox"]):not([aria-disabled="true"]):hover{background-color:var(--hover-bg)}
+/* Monaco's fixed overflow layer must not sit above application dialogs. */
+body:has(.modal-backdrop) :is(.find-widget,.quick-input-widget,.monaco-hover,.workbench-hover-container){visibility:hidden!important;pointer-events:none!important}
+@media(forced-colors:active){
+ :is(.desktop-shell,.theme-scope)[data-theme] :is(input,textarea,select):focus{border-color:Highlight}
+ .desktop-shell[data-theme] .monaco-editor .monaco-inputbox:focus-within{border-color:Highlight!important}
+}

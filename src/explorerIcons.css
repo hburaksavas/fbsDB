@@ -1,0 +1,14 @@
+/* Shared by the docked explorers, connection chooser and body-portal menus. */
+:is(.desktop-shell,.theme-scope)[data-theme] .oracle-object-icon.object-table{color:var(--icon-table)}
+:is(.desktop-shell,.theme-scope)[data-theme] .oracle-object-icon:is(.object-view,.object-materialized-view){color:var(--icon-view)}
+:is(.desktop-shell,.theme-scope)[data-theme] .oracle-object-icon:is(.object-procedure,.object-function){color:var(--icon-routine)}
+:is(.desktop-shell,.theme-scope)[data-theme] .oracle-object-icon.object-package{color:var(--icon-package)}
+:is(.desktop-shell,.theme-scope)[data-theme] .oracle-object-icon.object-type{color:var(--icon-type)}
+:is(.desktop-shell,.theme-scope)[data-theme] .oracle-object-icon:is(.object-trigger,.object-sequence,.object-index){color:var(--icon-key)}
+:is(.desktop-shell,.theme-scope)[data-theme] .oracle-object-icon.object-constraint{color:var(--danger)}
+:is(.desktop-shell,.theme-scope)[data-theme] .oracle-object-icon:is(.object-synonym,.object-database-link){color:var(--icon-link)}
+:is(.desktop-shell,.theme-scope)[data-theme] :is(.oracle-schema-icon,.connection-tree-entry>svg,.connection-definition-row>svg){color:var(--icon-connection)}
+:is(.desktop-shell,.theme-scope)[data-theme] :is(.connection-tree-folder>summary>svg,.connection-folder-row>svg.lucide-folder,.connection-folder-row>svg.lucide-folder-open){color:var(--icon-folder)}
+:is(.desktop-shell,.theme-scope)[data-theme] .db-icon.mint{color:var(--success)}
+:is(.desktop-shell,.theme-scope)[data-theme] .connection-dot.neutral{background:var(--muted)}
+:is(.desktop-shell,.theme-scope)[data-theme] .connection-context-menu button>svg{color:inherit}

@@ -4,6 +4,7 @@ const temporalMessages=new WeakMap();
 let nextId = 1;
 let currentTabId = "tab-1";
 export function setNativeTabId(tabId) { currentTabId = tabId; }
+export function getNativeTabId() { return currentTabId; }
 
 export const isNativeHost = Boolean(webViewHost);
 

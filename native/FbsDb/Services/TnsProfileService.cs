@@ -24,7 +24,7 @@ public sealed class TnsProfileService
     private readonly Func<IEnumerable<string>>? _tnsFiles;
     public TnsProfileService(string? settingsPath = null, Func<IEnumerable<string>>? tnsFiles = null)
     {
-        _settingsPath = settingsPath ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "fbsDB", "settings.json");
+        _settingsPath = settingsPath ?? Environment.GetEnvironmentVariable("FBSDB_CONNECTION_SETTINGS_PATH") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "fbsDB", "settings.json");
         _tnsFiles = tnsFiles;
     }
 
@@ -48,35 +48,36 @@ public sealed class TnsProfileService
         }
     }
 
+    public async Task<JsonObject> GetOrganizationAsync()
+    {
+        await _settingsGate.WaitAsync();
+        try { var settings = await ReadSettingsAsync(); var previous = settings["connectionOrganization"]?.ToJsonString(); var organization = ConnectionOrganization.Ensure(settings); if (previous != organization.ToJsonString()) await WriteSettingsAsync(settings); return (JsonObject)organization.DeepClone(); }
+        finally { _settingsGate.Release(); }
+    }
+    public async Task<JsonObject> ChangeOrganizationAsync(JsonElement payload)
+    {
+        await _settingsGate.WaitAsync();
+        try {
+            var settings = await ReadSettingsAsync(); var organization = ConnectionOrganization.Ensure(settings);
+            ConnectionOrganization.Apply(organization, payload, (settings["connectionProfiles"] as JsonArray ?? []).OfType<JsonObject>().Select(p => ConnectionOrganization.Read(p, "id")));
+            await WriteSettingsAsync(settings); return (JsonObject)organization.DeepClone();
+        } finally { _settingsGate.Release(); }
+    }
     public async Task SetConnectionGroupAsync(string profileId, string? group)
     {
         await _settingsGate.WaitAsync();
-        try
-        {
-
-        if (string.IsNullOrWhiteSpace(profileId)) throw new ArgumentException("A connection alias is required.", nameof(profileId));
-        var normalizedGroup = group?.Trim();
-        if (normalizedGroup?.Length > 80) throw new ArgumentException("Group names must be 80 characters or fewer.", nameof(group));
-
-        Directory.CreateDirectory(Path.GetDirectoryName(_settingsPath)!);
-        JsonObject settings;
-        try { settings = File.Exists(_settingsPath) ? JsonNode.Parse(await File.ReadAllTextAsync(_settingsPath)) as JsonObject ?? throw new JsonException("Settings must be a JSON object.") : []; }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException)
-        {
-            throw new InvalidOperationException("Settings could not be read, so the connection group was not changed.", ex);
-        }
-
-        var groups = settings["connectionGroups"] as JsonObject;
-        if (groups is null) settings["connectionGroups"] = groups = [];
-        if (normalizedGroup is null) groups.Remove(profileId);
-        else groups[profileId] = normalizedGroup;
-
-        var temporaryPath = _settingsPath + ".tmp";
-        await File.WriteAllTextAsync(temporaryPath, settings.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
-        File.Move(temporaryPath, _settingsPath, overwrite: true);
-    
-        }
-        finally { _settingsGate.Release(); }
+        try {
+            var settings = await ReadSettingsAsync();
+            var profile = (settings["connectionProfiles"] as JsonArray)?.OfType<JsonObject>().FirstOrDefault(p => ConnectionOrganization.Read(p, "id") == profileId) ?? throw new InvalidOperationException("Connection no longer exists.");
+            var organization = ConnectionOrganization.Ensure(settings);
+            var name = group?.Trim() ?? (ConnectionOrganization.Read(profile, "environment") switch { "DEV" => "Development", "PROD" => "Production", "TEST" or "UAT" => "Testing", _ => "" });
+            var ids = string.IsNullOrWhiteSpace(name) ? Array.Empty<string>() : new[] { ConnectionOrganization.Group(organization, name) };
+            var assignment = organization["assignments"]![profileId]!.AsObject();
+            ConnectionOrganization.Assign(organization, profileId, ConnectionOrganization.Read(assignment, "folderId"), ids);
+            var groups = settings["connectionGroups"] as JsonObject; if (groups is null) settings["connectionGroups"] = groups = new JsonObject();
+            if (group is null) groups.Remove(profileId); else groups[profileId] = name;
+            await WriteSettingsAsync(settings);
+        } finally { _settingsGate.Release(); }
     }
 
     public async Task<IReadOnlyList<ConnectionProfile>> GetAliasesAsync(CancellationToken cancellationToken = default)
@@ -123,7 +124,7 @@ public sealed class TnsProfileService
         }
         finally { _settingsGate.Release(); }
     }
-    public async Task<string> SaveProfileAsync(string? id, string name, string alias, string source, string user, string environment, string method = "tns", string host = "", string port = "1521", string service = "", string targetType = "service", string descriptor = "")
+    public async Task<string> SaveProfileAsync(string? id, string name, string alias, string source, string user, string environment, string method = "tns", string host = "", string port = "1521", string service = "", string targetType = "service", string descriptor = "", string? folderId = null, IReadOnlyList<string>? groupIds = null)
     {
         if (string.IsNullOrWhiteSpace(name) || name.Length > 80 || string.IsNullOrWhiteSpace(user) || user.Length > 128) throw new InvalidOperationException("Enter a connection name and Oracle username.");
         if (!new[] { "UNKNOWN", "DEV", "TEST", "UAT", "PROD" }.Contains(environment)) throw new InvalidOperationException("Invalid environment.");
@@ -141,7 +142,10 @@ public sealed class TnsProfileService
             var entry = new JsonObject { ["id"] = id, ["name"] = name.Trim(), ["alias"] = alias, ["source"] = source, ["user"] = user.Trim(), ["environment"] = environment, ["method"] = method, ["host"] = target.Host, ["port"] = target.Port, ["service"] = target.Service, ["targetType"] = target.TargetType, ["descriptor"] = method == "descriptor" ? target.Descriptor : "" };
             if(existing?["nls"] is JsonNode nls)entry["nls"]=nls.DeepClone();
             if (method != "tns") { entry["alias"] = ""; entry["source"] = ""; }
+            var organization = ConnectionOrganization.Ensure(settings);
             if (existing is null) profiles.Add(entry); else profiles[profiles.IndexOf(existing)] = entry;
+            if (groupIds is not null) ConnectionOrganization.Assign(organization, id, folderId, groupIds);
+            else ConnectionOrganization.Ensure(settings);
             await WriteSettingsAsync(settings);
             return id;
         }
@@ -202,6 +206,7 @@ public sealed class TnsProfileService
             {
                 var entry = profiles.OfType<JsonObject>().FirstOrDefault(p => p["id"]?.GetValue<string>() == id);
                 if (entry is not null) profiles.Remove(entry);
+                (settings["connectionOrganization"]?["assignments"] as JsonObject)?.Remove(id);
                 if (settings["connectionGroups"] is JsonObject groups) groups.Remove(id);
                 await WriteSettingsAsync(settings);
             }

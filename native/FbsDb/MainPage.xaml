@@ -8,16 +8,16 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
-    <Grid Background="#0C1118">
+    <Grid Background="{ThemeResource ShellBackgroundBrush}">
         <WebView2
             x:Name="EditorWebView"
             HorizontalAlignment="Stretch"
             VerticalAlignment="Stretch"
-            DefaultBackgroundColor="#0C1118" />
-        <Grid x:Name="StartupOverlay" Background="#091118">
+            DefaultBackgroundColor="{ThemeResource ShellBackgroundColor}" />
+        <Grid x:Name="StartupOverlay" Background="{ThemeResource ShellBackgroundBrush}">
             <Border Width="640" Height="400"
                     HorizontalAlignment="Center" VerticalAlignment="Center"
-                    Background="#091118" BorderBrush="#65727B" BorderThickness="1" CornerRadius="7">
+                    Background="{ThemeResource ShellBackgroundBrush}" BorderBrush="{ThemeResource ShellBorderBrush}" BorderThickness="1" CornerRadius="7">
                 <Grid Margin="37,30,37,27">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="54" />
@@ -31,19 +31,19 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <Border Width="48" Height="48" CornerRadius="12" Background="#102521"
-                                BorderBrush="#167968" BorderThickness="1">
+                        <Border Width="48" Height="48" CornerRadius="12" Background="{ThemeResource ShellInputBrush}"
+                                BorderBrush="{ThemeResource ShellAccentBrush}" BorderThickness="1">
                             <Image Width="34" Height="34" Source="Assets/Square44x44Logo.scale-200.png" />
                         </Border>
                         <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
                             <TextBlock FontSize="18" FontWeight="SemiBold">
-                                <Run Text="fbs" Foreground="#E6EDF4" /><Run Text="DB" Foreground="#40D5B8" />
+                                <Run Text="fbs" Foreground="{ThemeResource ShellTextBrush}" /><Run Text="DB" Foreground="{ThemeResource ShellAccentBrush}" />
                             </TextBlock>
-                            <TextBlock Text="Oracle SQL workbench" Foreground="#8EA0B4" FontSize="11" />
+                            <TextBlock Text="Oracle SQL workbench" Foreground="{ThemeResource ShellMutedBrush}" FontSize="11" />
                         </StackPanel>
                         <Border Grid.Column="2" Padding="10,5" VerticalAlignment="Center" CornerRadius="12"
-                                Background="#0B141C" BorderBrush="#263645" BorderThickness="1">
-                            <TextBlock Text="v 0.1.0" Foreground="#A7B6C8" FontSize="9" FontFamily="Cascadia Code" />
+                                Background="{ThemeResource ShellInputBrush}" BorderBrush="{ThemeResource ShellBorderBrush}" BorderThickness="1">
+                            <TextBlock Text="v 0.1.0" Foreground="{ThemeResource ShellMutedBrush}" FontSize="9" FontFamily="Cascadia Code" />
                         </Border>
                     </Grid>
 
@@ -56,55 +56,55 @@
                             <Grid Height="20" ColumnSpacing="10">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="20" /><ColumnDefinition Width="*" /><ColumnDefinition Width="55" /></Grid.ColumnDefinitions>
                                 <Grid x:Name="WorkspaceStepMarker" Width="18" Height="18" VerticalAlignment="Center">
-                                    <Ellipse x:Name="WorkspaceStepPending" Stroke="#314252" StrokeThickness="1" />
-                                    <Ellipse x:Name="WorkspaceStepDone" Fill="#37D4B6" Visibility="Collapsed" />
-                                    <TextBlock x:Name="WorkspaceStepCheck" Text="✓" Foreground="#071714" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
-                                    <ProgressRing x:Name="WorkspaceStepRunning" IsActive="True" Foreground="#38D6B8" Visibility="Collapsed" />
+                                    <Ellipse x:Name="WorkspaceStepPending" Stroke="{ThemeResource ShellBorderBrush}" StrokeThickness="1" />
+                                    <Ellipse x:Name="WorkspaceStepDone" Fill="{ThemeResource ShellAccentBrush}" Visibility="Collapsed" />
+                                    <TextBlock x:Name="WorkspaceStepCheck" Text="✓" Foreground="{ThemeResource ShellOnAccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+                                    <ProgressRing x:Name="WorkspaceStepRunning" IsActive="True" Foreground="{ThemeResource ShellAccentBrush}" Visibility="Collapsed" />
                                 </Grid>
-                                <TextBlock x:Name="WorkspaceStepLabel" Grid.Column="1" Text="Reading workspace settings" Foreground="#9AAFC3" FontSize="11" VerticalAlignment="Center" />
-                                <TextBlock x:Name="WorkspaceStepState" Grid.Column="2" Text="" Foreground="#42D7B8" FontSize="8" FontFamily="Cascadia Code" CharacterSpacing="120" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                <TextBlock x:Name="WorkspaceStepLabel" Grid.Column="1" Text="Reading workspace settings" Foreground="{ThemeResource ShellMutedBrush}" FontSize="11" VerticalAlignment="Center" />
+                                <TextBlock x:Name="WorkspaceStepState" Grid.Column="2" Text="" Foreground="{ThemeResource ShellAccentBrush}" FontSize="8" FontFamily="Cascadia Code" CharacterSpacing="120" VerticalAlignment="Center" HorizontalAlignment="Right" />
                             </Grid>
                             <Grid Height="20" ColumnSpacing="10">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="20" /><ColumnDefinition Width="*" /><ColumnDefinition Width="55" /></Grid.ColumnDefinitions>
                                 <Grid x:Name="ConnectionsStepMarker" Width="18" Height="18" VerticalAlignment="Center">
-                                    <Ellipse x:Name="ConnectionsStepPending" Stroke="#314252" StrokeThickness="1" />
-                                    <Ellipse x:Name="ConnectionsStepDone" Fill="#37D4B6" Visibility="Collapsed" />
-                                    <TextBlock x:Name="ConnectionsStepCheck" Text="✓" Foreground="#071714" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
-                                    <ProgressRing x:Name="ConnectionsStepRunning" IsActive="True" Foreground="#38D6B8" Visibility="Collapsed" />
+                                    <Ellipse x:Name="ConnectionsStepPending" Stroke="{ThemeResource ShellBorderBrush}" StrokeThickness="1" />
+                                    <Ellipse x:Name="ConnectionsStepDone" Fill="{ThemeResource ShellAccentBrush}" Visibility="Collapsed" />
+                                    <TextBlock x:Name="ConnectionsStepCheck" Text="✓" Foreground="{ThemeResource ShellOnAccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+                                    <ProgressRing x:Name="ConnectionsStepRunning" IsActive="True" Foreground="{ThemeResource ShellAccentBrush}" Visibility="Collapsed" />
                                 </Grid>
-                                <TextBlock x:Name="ConnectionsStepLabel" Grid.Column="1" Text="Loading saved connections" Foreground="#9AAFC3" FontSize="11" VerticalAlignment="Center" />
-                                <TextBlock x:Name="ConnectionsStepState" Grid.Column="2" Foreground="#42D7B8" FontSize="8" FontFamily="Cascadia Code" CharacterSpacing="120" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                <TextBlock x:Name="ConnectionsStepLabel" Grid.Column="1" Text="Loading saved connections" Foreground="{ThemeResource ShellMutedBrush}" FontSize="11" VerticalAlignment="Center" />
+                                <TextBlock x:Name="ConnectionsStepState" Grid.Column="2" Foreground="{ThemeResource ShellAccentBrush}" FontSize="8" FontFamily="Cascadia Code" CharacterSpacing="120" VerticalAlignment="Center" HorizontalAlignment="Right" />
                             </Grid>
                             <Grid Height="20" ColumnSpacing="10">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="20" /><ColumnDefinition Width="*" /><ColumnDefinition Width="55" /></Grid.ColumnDefinitions>
                                 <Grid x:Name="EditorStepMarker" Width="18" Height="18" VerticalAlignment="Center">
-                                    <Ellipse x:Name="EditorStepPending" Stroke="#314252" StrokeThickness="1" />
-                                    <Ellipse x:Name="EditorStepDone" Fill="#37D4B6" Visibility="Collapsed" />
-                                    <TextBlock x:Name="EditorStepCheck" Text="✓" Foreground="#071714" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
-                                    <ProgressRing x:Name="EditorStepRunning" IsActive="True" Foreground="#38D6B8" />
+                                    <Ellipse x:Name="EditorStepPending" Stroke="{ThemeResource ShellBorderBrush}" StrokeThickness="1" />
+                                    <Ellipse x:Name="EditorStepDone" Fill="{ThemeResource ShellAccentBrush}" Visibility="Collapsed" />
+                                    <TextBlock x:Name="EditorStepCheck" Text="✓" Foreground="{ThemeResource ShellOnAccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+                                    <ProgressRing x:Name="EditorStepRunning" IsActive="True" Foreground="{ThemeResource ShellAccentBrush}" />
                                 </Grid>
-                                <TextBlock x:Name="EditorStepLabel" Grid.Column="1" Text="Starting SQL editor" Foreground="#F2F5F8" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                <TextBlock x:Name="EditorStepState" Grid.Column="2" Text="RUNNING" Foreground="#42D7B8" FontSize="8" FontFamily="Cascadia Code" CharacterSpacing="120" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                <TextBlock x:Name="EditorStepLabel" Grid.Column="1" Text="Starting SQL editor" Foreground="{ThemeResource ShellAccentBrush}" FontSize="11" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <TextBlock x:Name="EditorStepState" Grid.Column="2" Text="RUNNING" Foreground="{ThemeResource ShellAccentBrush}" FontSize="8" FontFamily="Cascadia Code" CharacterSpacing="120" VerticalAlignment="Center" HorizontalAlignment="Right" />
                             </Grid>
                             <Grid Height="20" ColumnSpacing="10">
                                 <Grid.ColumnDefinitions><ColumnDefinition Width="20" /><ColumnDefinition Width="*" /><ColumnDefinition Width="55" /></Grid.ColumnDefinitions>
                                 <Grid x:Name="DriverStepMarker" Width="18" Height="18" VerticalAlignment="Center">
-                                    <Ellipse x:Name="DriverStepPending" Stroke="#314252" StrokeThickness="1" />
-                                    <Ellipse x:Name="DriverStepDone" Fill="#37D4B6" Visibility="Collapsed" />
-                                    <TextBlock x:Name="DriverStepCheck" Text="✓" Foreground="#071714" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
-                                    <ProgressRing x:Name="DriverStepRunning" IsActive="True" Foreground="#38D6B8" Visibility="Collapsed" />
+                                    <Ellipse x:Name="DriverStepPending" Stroke="{ThemeResource ShellBorderBrush}" StrokeThickness="1" />
+                                    <Ellipse x:Name="DriverStepDone" Fill="{ThemeResource ShellAccentBrush}" Visibility="Collapsed" />
+                                    <TextBlock x:Name="DriverStepCheck" Text="✓" Foreground="{ThemeResource ShellOnAccentBrush}" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" />
+                                    <ProgressRing x:Name="DriverStepRunning" IsActive="True" Foreground="{ThemeResource ShellAccentBrush}" Visibility="Collapsed" />
                                 </Grid>
-                                <TextBlock x:Name="DriverStepLabel" Grid.Column="1" Text="Preparing Oracle driver" Foreground="#9AAFC3" FontSize="11" VerticalAlignment="Center" />
-                                <TextBlock x:Name="DriverStepState" Grid.Column="2" Foreground="#42D7B8" FontSize="8" FontFamily="Cascadia Code" CharacterSpacing="120" VerticalAlignment="Center" HorizontalAlignment="Right" />
+                                <TextBlock x:Name="DriverStepLabel" Grid.Column="1" Text="Preparing Oracle driver" Foreground="{ThemeResource ShellMutedBrush}" FontSize="11" VerticalAlignment="Center" />
+                                <TextBlock x:Name="DriverStepState" Grid.Column="2" Foreground="{ThemeResource ShellAccentBrush}" FontSize="8" FontFamily="Cascadia Code" CharacterSpacing="120" VerticalAlignment="Center" HorizontalAlignment="Right" />
                             </Grid>
                         </StackPanel>
 
                         <Grid x:Name="StartupDatabase" Grid.Column="1" Width="188" Height="232" HorizontalAlignment="Right" VerticalAlignment="Center" Opacity="0.72">
-                            <Border CornerRadius="46" BorderBrush="#182833" BorderThickness="1" />
-                            <Ellipse Height="68" VerticalAlignment="Top" Stroke="#182833" StrokeThickness="1" />
-                            <Ellipse Height="68" Margin="0,54,0,0" VerticalAlignment="Top" Stroke="#182833" StrokeThickness="1" />
-                            <Ellipse Height="68" Margin="0,112,0,0" VerticalAlignment="Top" Stroke="#182833" StrokeThickness="1" />
-                            <Ellipse Height="68" VerticalAlignment="Bottom" Stroke="#182833" StrokeThickness="1" />
+                            <Border CornerRadius="46" BorderBrush="{ThemeResource ShellAccentBrush}" BorderThickness="1" />
+                            <Ellipse Height="68" VerticalAlignment="Top" Stroke="{ThemeResource ShellAccentBrush}" StrokeThickness="1" />
+                            <Ellipse Height="68" Margin="0,54,0,0" VerticalAlignment="Top" Stroke="{ThemeResource ShellAccentBrush}" StrokeThickness="1" />
+                            <Ellipse Height="68" Margin="0,112,0,0" VerticalAlignment="Top" Stroke="{ThemeResource ShellAccentBrush}" StrokeThickness="1" />
+                            <Ellipse Height="68" VerticalAlignment="Bottom" Stroke="{ThemeResource ShellAccentBrush}" StrokeThickness="1" />
                         </Grid>
                     </Grid>
 
@@ -112,23 +112,30 @@
                         <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="4" /></Grid.RowDefinitions>
                         <Grid ColumnSpacing="8">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <TextBlock x:Name="StartupStatus" Text="Starting SQL editor…" Foreground="#D7E2EE" FontSize="10" FontFamily="Cascadia Code" />
-                            <TextBlock x:Name="StartupPercent" Grid.Column="1" Text="64%" Foreground="#42D7B8" FontSize="10" FontFamily="Cascadia Code" />
+                            <TextBlock x:Name="StartupStatus" Text="Starting SQL editor…" Foreground="{ThemeResource ShellAccentBrush}" FontSize="10" FontFamily="Cascadia Code" />
+                            <TextBlock x:Name="StartupPercent" Grid.Column="1" Text="64%" Foreground="{ThemeResource ShellAccentBrush}" FontSize="10" FontFamily="Cascadia Code" />
                         </Grid>
                         <ProgressBar x:Name="StartupProgress" Grid.Row="1" Minimum="0" Maximum="100" Value="64"
-                                     Height="4" Foreground="#39D6B7" Background="#17232D" />
+                                     Height="4" Foreground="{ThemeResource ShellAccentBrush}" Background="{ThemeResource ShellAccentBrush}" />
                     </Grid>
                 </Grid>
             </Border>
         </Grid>
-        <TextBlock
-            x:Name="EditorError"
+        <Border
+            x:Name="EditorErrorPanel"
             Visibility="Collapsed"
             HorizontalAlignment="Center"
             VerticalAlignment="Center"
-            MaxWidth="720"
-            TextWrapping="Wrap"
-            Foreground="#D8E1EE"
-            FontSize="14" />
+            MaxWidth="560" Margin="24" Padding="20" CornerRadius="8"
+            BorderThickness="1" BorderBrush="{ThemeResource ShellBorderBrush}"
+            Background="{ThemeResource ShellSurfaceBrush}">
+            <StackPanel Spacing="10">
+                <TextBlock Text="Unable to open the SQL workbench" FontSize="16" FontWeight="SemiBold"
+                           Foreground="{ThemeResource ShellTextBrush}" />
+                <TextBlock x:Name="EditorError" TextWrapping="Wrap" IsTextSelectionEnabled="True"
+                           Foreground="{ThemeResource ShellMutedBrush}" FontSize="12"
+                           AutomationProperties.LiveSetting="Assertive" />
+            </StackPanel>
+        </Border>
     </Grid>
 </Page>

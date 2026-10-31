@@ -22,6 +22,7 @@ public sealed partial class MainWindow : Window
     {
         Current = this;
         InitializeComponent();
+        ApplyTheme();
 
         Title = "fbsDB · Oracle SQL Workspace";
 
@@ -52,6 +53,38 @@ public sealed partial class MainWindow : Window
         Activate();
         var hwnd = WindowNative.GetWindowHandle(this);
         SetForegroundWindow(hwnd);
+    }
+
+    public void ApplyTheme()
+    {
+        if (WindowRoot is null) return;
+        WindowRoot.RequestedTheme = NativeTheme.RequestedTheme;
+        WindowRoot.Background = NativeTheme.Brush("--bg");
+        AppTitleBar.Background = NativeTheme.Brush("--chrome");
+        AppTitleBar.Foreground = NativeTheme.Brush("--foreground");
+        var titleBar = AppWindow.TitleBar;
+        titleBar.BackgroundColor = titleBar.ButtonBackgroundColor = NativeTheme.Color("--chrome");
+        titleBar.ForegroundColor = titleBar.ButtonForegroundColor = NativeTheme.Color("--foreground");
+        titleBar.InactiveBackgroundColor = titleBar.ButtonInactiveBackgroundColor = NativeTheme.Color("--chrome");
+        titleBar.InactiveForegroundColor = titleBar.ButtonInactiveForegroundColor = NativeTheme.Color("--muted");
+        titleBar.ButtonHoverBackgroundColor = NativeTheme.Color("--surface-raised");
+        titleBar.ButtonHoverForegroundColor = NativeTheme.Color("--foreground");
+        titleBar.ButtonPressedBackgroundColor = NativeTheme.Color("--line");
+        titleBar.ButtonPressedForegroundColor = NativeTheme.Color("--foreground");
+    }
+
+    public object ThemeSnapshot()
+    {
+        static string? Hex(Windows.UI.Color? color) => color is { } value ? $"#{value.R:x2}{value.G:x2}{value.B:x2}" : null;
+        return new
+        {
+            requestedTheme = WindowRoot.RequestedTheme.ToString(),
+            background = Hex((WindowRoot.Background as Microsoft.UI.Xaml.Media.SolidColorBrush)?.Color),
+            titleBar = Hex((AppTitleBar.Background as Microsoft.UI.Xaml.Media.SolidColorBrush)?.Color),
+            foreground = Hex((AppTitleBar.Foreground as Microsoft.UI.Xaml.Media.SolidColorBrush)?.Color),
+            captionBackground = Hex(AppWindow.TitleBar.ButtonBackgroundColor),
+            captionForeground = Hex(AppWindow.TitleBar.ButtonForegroundColor)
+        };
     }
 
     public void ShowWorkbench()

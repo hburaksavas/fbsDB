@@ -1,0 +1,29 @@
+.feedback-stack{position:fixed;z-index:17000;right:16px;bottom:28px;width:min(370px,calc(100vw - 32px));max-height:calc(100vh - 70px);display:flex;flex-direction:column;gap:8px;overflow:auto;pointer-events:none}
+.feedback-stack>*{pointer-events:auto}
+.feedback-notification{display:flex;align-items:flex-start;gap:10px;padding:12px;border:1px solid var(--line-strong);border-left:3px solid var(--accent-text);border-radius:7px;background:var(--surface-raised);color:var(--foreground);box-shadow:0 5px 18px var(--shadow-color);font-size:11px;animation:feedback-arrive .16s ease-out}
+.feedback-symbol{flex:none;color:var(--accent-text)}
+.feedback-notification[data-kind=error]{border-left-color:var(--danger)}
+[data-kind=error]>.feedback-symbol,[data-kind=error]>header>.feedback-symbol{color:var(--danger)}
+.feedback-notification[data-kind=warning]{border-left-color:var(--warning)}
+[data-kind=warning]>.feedback-symbol,[data-kind=warning]>header>.feedback-symbol{color:var(--warning)}
+[data-kind=success]>.feedback-symbol{color:var(--success)}
+[data-kind=progress]>.feedback-symbol{animation:feedback-spin 1.4s linear infinite}
+.feedback-copy{flex:1;min-width:0}.feedback-copy>strong{display:block;font-size:12px;font-weight:600;line-height:17px}.feedback-copy>small{display:block;color:var(--muted);margin-top:2px}
+.feedback-message{margin-top:4px;white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;max-height:180px;overflow:auto;color:var(--muted)}
+.feedback-message p{margin:0}.feedback-message pre{white-space:pre-wrap;overflow-wrap:anywhere;margin:0;font:11px/1.5 Consolas,monospace}
+.feedback-dismiss{display:grid;place-items:center;flex:none;width:22px;height:22px;padding:0;border:1px solid transparent;border-radius:4px;background:transparent;color:var(--muted)}
+.feedback-dismiss:hover{background:var(--hover-bg);color:var(--foreground)}
+.feedback-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}.feedback-actions button,.feedback-expand{border:1px solid var(--line);border-radius:4px;background:var(--surface);color:var(--foreground);padding:4px 8px;font-size:11px}.feedback-actions button:hover,.feedback-expand:hover{background:var(--hover-bg)}
+.feedback-dialog-scope>.modal-backdrop{z-index:16000}
+.feedback-dialog{width:min(430px,calc(100vw - 32px));max-height:calc(100vh - 48px);overflow:auto;border:1px solid var(--line-strong);border-radius:9px;background:var(--surface);color:var(--foreground);box-shadow:0 12px 40px var(--shadow-color);font-size:12px}
+.feedback-dialog>header{display:flex;align-items:center;gap:10px;padding:16px 18px 12px}.feedback-dialog h2{flex:1;margin:0;font-size:14px;font-weight:600}.feedback-dialog-body{padding:0 18px 16px;line-height:1.55;overflow-wrap:anywhere}.feedback-dialog-body p{margin:0 0 10px;color:var(--muted)}.feedback-dialog-body label{display:flex;flex-direction:column;gap:5px;margin-top:10px}.feedback-dialog-body input,.feedback-dialog-body select{width:100%;box-sizing:border-box}.feedback-dialog footer{display:flex;justify-content:flex-end;align-items:center;gap:8px;padding:11px 18px;border-top:1px solid var(--line);background:var(--surface-raised)}
+.feedback-dialog button.danger{color:var(--danger);border-color:var(--danger-border);background:var(--danger-bg)}
+.feedback-dialog form{display:contents}
+@keyframes feedback-arrive{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}@keyframes feedback-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.feedback-notification,[data-kind=progress]>.feedback-symbol{animation:none}}
+.desktop-shell[data-reduce-motion=true]~.feedback-stack .feedback-notification{animation:none}
+
+body:has(.desktop-shell[data-reduce-motion=true]) .feedback-notification,body:has(.desktop-shell[data-reduce-motion=true]) [data-kind=progress]>.feedback-symbol{animation:none}
+
+.feedback-dismiss:focus-visible,.feedback-actions button:focus-visible,.feedback-expand:focus-visible,.feedback-dialog button:focus-visible{outline:none;border-color:var(--accent-text)}
+.feedback-dialog footer button:not(.button-primary){display:inline-flex;align-items:center;justify-content:center;min-height:29px;padding:0 12px;border:1px solid var(--line);border-radius:5px;background:var(--surface);color:var(--foreground);font-size:11px}.feedback-dialog footer button:not(.button-primary):hover{background:var(--hover-bg)}.feedback-dialog footer button.danger{color:var(--danger);border-color:var(--danger-border);background:var(--danger-bg)}

@@ -3,6 +3,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
+import {productionStyles} from './productionStyles.mjs';
 
 const targets=await(await fetch(`${process.argv[2]||'http://127.0.0.1:9337'}/json/list`)).json();
 const target=targets.find(item=>item.type==='page'&&item.url.startsWith('https://fbsdb.local/'));
@@ -17,10 +18,10 @@ import React,{useState,useEffect} from 'react';import {createRoot} from 'react-d
 const files=Array.from({length:40},(_,i)=>({id:'tab-'+i,name:i%3===0?'a_very_long_reporting_query_'+i+'.sql':'query_'+i+'.sql',path:'D:/SQL/queries/query_'+i+'.sql',dirty:i%7===0}));
 function Harness(){const[tabs,setTabs]=useState(files),[active,setActive]=useState('tab-0'),[theme,setTheme]=useState('default');
 useEffect(()=>{window.tabHarness={theme:setTheme,select:setActive,one:()=>{setTabs([files[0]]);setActive(files[0].id)}}},[]);
-return <main className="desktop-shell" data-theme={theme} style={{'--accent':'#39b7a5'}}><section className="editor-workspace"><EditorTabs tabs={tabs} activeId={active} onActivate={setActive} onClose={id=>{setTabs(current=>current.filter(tab=>tab.id!==id));if(id===active)setActive(tabs.find(tab=>tab.id!==id)?.id)}} onNew={()=>{const id='new-'+tabs.length;setTabs(current=>[...current,{id,name:'New.sql',dirty:false}]);setActive(id)}} onSave={()=>{window.saved=true}}/><div data-editor-surface style={{flex:1,minHeight:0}}>Editor</div></section></main>}
+return <main className="desktop-shell" data-theme={theme}><section className="editor-workspace"><EditorTabs tabs={tabs} activeId={active} onActivate={setActive} onClose={id=>{setTabs(current=>current.filter(tab=>tab.id!==id));if(id===active)setActive(tabs.find(tab=>tab.id!==id)?.id)}} onNew={()=>{const id='new-'+tabs.length;setTabs(current=>[...current,{id,name:'New.sql',dirty:false}]);setActive(id)}} onSave={()=>{window.saved=true}}/><div data-editor-surface style={{flex:1,minHeight:0}}>Editor</div></section></main>}
 createRoot(document.getElementById('root')).render(<Harness/>);
 `},bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',minify:true,define:{'process.env.NODE_ENV':'"production"'}});
-const css=[readFileSync('src/styles.css','utf8'),readFileSync('src/editorTabs.css','utf8')].join('\n').replace(/@import[^;]+;/g,'')+'\nhtml,body,#root{min-width:0!important;width:100%;height:100%;margin:0}#root .desktop-shell{min-width:0;width:100%;height:100%}#root .editor-workspace{min-width:0;width:100%;height:100%}';
+const css=productionStyles()+'\nhtml,body,#root{min-width:0!important;width:100%;height:100%;margin:0}#root .desktop-shell{min-width:0;width:100%;height:100%}#root .editor-workspace{min-width:0;width:100%;height:100%}';
 const html=`<!doctype html><style>${css}</style><div id="root"></div><script>${bundled.outputFiles[0].text.replaceAll('</script','<\\/script')}</script>`;
 const frame='document.getElementById("editor-tabs-qa-frame")';
 const inner=expression=>evaluate(`(()=>{const frame=${frame};return frame.contentWindow.eval(${JSON.stringify(expression)})})()`);

@@ -1,3 +1,4 @@
+import {Feedback} from './Feedback';
 import { useMemo, useState } from "react";
 import { Activity, ChevronDown, ChevronRight, GitBranch, ListTree } from "lucide-react";
 
@@ -74,7 +75,7 @@ export function ExplainPlanView({ result, loading = false, error = "", mode = "d
   const selected = nodes.find(node => String(node.id) === String(selectedId)) || roots[0] || null;
 
   if (loading) return <div className="explain-plan-empty"><Activity size={20} className="connection-progress-spinner" /><b>Building execution plan…</b><span>Oracle is preparing the plan for the current statement.</span></div>;
-  if (error) return <div className="explain-plan-empty explain-plan-error"><b>Execution plan unavailable</b><span>{error}</span></div>;
+  if (error) return <Feedback title="Execution plan unavailable">{error}</Feedback>;
   if(result?.planKind==='runtime')return <section className="runtime-cursor-plan" aria-label="Executed cursor plan"><header><strong>Executed cursor plan · SQL ID {result.sqlId}</strong><p>Oracle cursor cache · ALLSTATS LAST · all child cursors. Last-execution statistics may reflect another session; this is not a measurement limited to this run.</p><p>Actual row and timing statistics are shown only when collected by Oracle. This action does not rerun SQL, collect new statistics or change session settings.</p></header><pre>{result.lines?.join('\n')||'No cached plan is available for this SQL ID.'}</pre></section>;
   if (!roots.length) return <div className="explain-plan-empty"><GitBranch size={20} /><b>No plan steps returned</b><span>Run Explain Plan for the current SQL statement.</span></div>;
 

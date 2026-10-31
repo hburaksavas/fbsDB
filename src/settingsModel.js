@@ -1,11 +1,19 @@
+import {defaultEditorShortcuts,normalizeEditorShortcuts} from './editorShortcuts.js';
 import {loadCompletionSettings,normalizeCompletionSettings,defaultCompletionSettings} from './editorCompletionSettings.js';
 import {defaultDockLayout,normalizeDockLayout,migrateDockLayout} from './dockLayout.js';
 import {detectedRegion,usesCommaDecimal} from './localeProfile.js';
+import {defaultSqlFormatterSettings,normalizeSqlFormatterSettings} from './sqlFormatterSettings.js';
 export const SETTINGS_KEY='fbsdb.settings.v2';
 const LEGACY_SETTINGS_KEY='fbsdb.settings.v1';
-const select=(label,value,choices,category='results')=>({label,default:value,choices,category,scopes:['user','workspace'],when:'New result sets'});
+const select=(label,value,choices,category='results')=>({label,default:value,choices,category,scopes:['results','export','notifications'].includes(category)?['user']:['user','workspace'],when:'New result sets'});
 const toggle=(label,value,category='results')=>({...select(label,value,null,category),type:'boolean'});
 export const settingDefinitions={
+  'notifications.info':{...select('Information duration (seconds)',5,null,'notifications'),type:'number',min:1,max:300,scopes:['user'],when:'Immediately'},
+  'notifications.success':{...select('Success duration (seconds)',4,null,'notifications'),type:'number',min:1,max:300,scopes:['user'],when:'Immediately'},
+  'notifications.warning':{...select('Warning duration (seconds)',10,null,'notifications'),type:'number',min:1,max:300,scopes:['user'],when:'Immediately'},
+  'notifications.error':{...select('Error duration (seconds)',15,null,'notifications'),type:'number',min:1,max:300,scopes:['user'],when:'Immediately'},
+  'notifications.progress':{...select('Progress duration (seconds)',60,null,'notifications'),type:'number',min:1,max:300,scopes:['user'],when:'Immediately'},
+  'notifications.max':{...select('Maximum notification duration (seconds)',60,null,'notifications'),type:'number',min:1,max:300,scopes:['user'],when:'Immediately'},
   'ui.layout':{label:'Panel layout',default:defaultDockLayout(),normalize:normalizeDockLayout,category:'general',scopes:['user'],when:'Immediately',hidden:true},
   'ui.density':{...select('Workbench density','compact',['compact','comfortable'],'general'),scopes:['user'],when:'Immediately',hidden:true},
   'ui.scale':{...select('Interface scale',100,[80,90,100,110,125,150],'accessibility'),scopes:['user'],when:'Immediately',hidden:true},
@@ -18,8 +26,9 @@ export const settingDefinitions={
   'editor.lineHighlight':{...toggle('Current line highlight',true,'editor'),scopes:['user'],when:'Immediately',hidden:true},
   'editor.wordWrap':{...toggle('Word wrap',false,'editor'),scopes:['user'],when:'Immediately',hidden:true},
   'ui.theme':{...select('Workbench theme','default',['default','dark','light'],'general'),scopes:['user'],when:'Immediately',hidden:true},
+  'ui.fontFamily':{...select('Interface font','DM Sans',['DM Sans','Segoe UI','Arial','Tahoma','Verdana'],'general'),scopes:['user'],when:'Immediately',hidden:true},
   'ui.connectionNotifications':{...toggle('Connection progress notifications',true,'general'),scopes:['user'],when:'Immediately'},
-  'ui.region':{...select('Regional formats','system',['system','en-US','tr-TR','de-DE','en-GB'],'general'),scopes:['user'],when:'Immediately'},
+  'ui.region':{...select('Regional formats','system',['system','en-US','tr-TR','de-DE','en-GB'],'results'),scopes:['user'],when:'New result sets',hidden:true},
   'ui.tokenColors':{label:'SQL token colors',default:{},category:'editor',scopes:['user'],when:'Immediately',hidden:true,normalize:value=>{
     if(!value||typeof value!=='object'||Array.isArray(value))return undefined;
     return Object.fromEntries(['default','dark','light'].filter(theme=>value[theme]&&typeof value[theme]==='object').map(theme=>[theme,Object.fromEntries(['keyword','string','comment','number'].filter(token=>/^#[0-9a-f]{6}$/i.test(value[theme][token]||'')).map(token=>[token,value[theme][token]]))]));
@@ -27,14 +36,14 @@ export const settingDefinitions={
   'editor.fontSize':{...select('Editor font size',13,null,'editor'),type:'number',min:10,max:24,scopes:['user'],when:'Immediately',hidden:true},
   'editor.tabSize':{...select('Indentation size',4,[2,4,8],'editor'),scopes:['user'],when:'Immediately',hidden:true},
   'editor.insertSpaces':{...toggle('Indent using spaces',true,'editor'),scopes:['user'],when:'Immediately',hidden:true},
-  'editor.queryTimeout':{...select('Query timeout in seconds',0,null,'editor'),type:'number',min:0,max:86400,scopes:['user'],when:'New executions',hidden:true},
-  'editor.shortcuts':{label:'Keyboard shortcuts',default:{run:'Ctrl+Enter',deleteLine:'Ctrl+D',format:'Ctrl+Shift+I'},normalize:value=>{
-    if(!value||typeof value!=='object'||Array.isArray(value))return undefined;
-    const pattern=/^(?:(?:Ctrl|Alt|Shift|Meta)\+){1,3}(?:Enter|Escape|Space|Tab|Backspace|Delete|[A-Z0-9])$/i;
-    const result={};for(const action of ['run','deleteLine','format']){const shortcut=value[action];if(typeof shortcut!=='string'||!pattern.test(shortcut))return undefined;result[action]=shortcut.replace(/ctrl/ig,'Ctrl').replace(/alt/ig,'Alt').replace(/shift/ig,'Shift').replace(/meta/ig,'Meta').replace(/enter/ig,'Enter').replace(/space/ig,'Space').replace(/escape/ig,'Escape').replace(/tab/ig,'Tab').replace(/backspace/ig,'Backspace').replace(/delete/ig,'Delete')}
-    if(new Set(Object.values(result).map(value=>value.toLowerCase())).size!==3)return undefined;return result;
-  },category:'editor',scopes:['user'],when:'Immediately',hidden:true},
-  'editor.completion':{label:'Oracle completion preferences',default:defaultCompletionSettings,normalize:value=>value&&typeof value==='object'&&!Array.isArray(value)?normalizeCompletionSettings(value):undefined,category:'editor',scopes:['user'],when:'Immediately',hidden:true},
+  'editor.cursorStyle':{...select('Cursor style','line',['line','block','underline'],'editor'),scopes:['user'],when:'Immediately',hidden:true},
+  'editor.cursorBlinking':{...select('Cursor blinking','smooth',['smooth','blink','solid'],'editor'),scopes:['user'],when:'Immediately',hidden:true},
+  'editor.folding':{...toggle('Code folding',true,'editor'),scopes:['user'],when:'Immediately',hidden:true},
+  'editor.bracketColors':{...toggle('Bracket colors',true,'editor'),scopes:['user'],when:'Immediately',hidden:true},
+  'editor.queryTimeout':{...select('Query timeout in seconds',0,null,'preferences'),type:'number',min:0,max:86400,scopes:['user'],when:'New executions',hidden:true},
+  'editor.sqlFormatter':{label:'SQL formatter',default:defaultSqlFormatterSettings,normalize:value=>value&&typeof value==='object'&&!Array.isArray(value)?normalizeSqlFormatterSettings(value):undefined,category:'formatter',scopes:['user'],when:'On format',hidden:true},
+  'editor.shortcuts':{label:'Keyboard shortcuts',default:defaultEditorShortcuts,normalize:normalizeEditorShortcuts,category:'shortcuts',scopes:['user'],when:'Immediately',hidden:true},
+  'editor.completion':{label:'Oracle completion preferences',default:defaultCompletionSettings,normalize:value=>value&&typeof value==='object'&&!Array.isArray(value)?normalizeCompletionSettings(value):undefined,category:'completion',scopes:['user'],when:'Immediately',hidden:true},
   'ui.motion':{...select('Interface motion','system',['system','reduce','full'],'accessibility'),scopes:['user'],when:'Immediately'},
   'privacy.historyLimit':{...select('Retained queries (reducing removes older history)',50,[0,10,25,50,100],'privacy'),scopes:['user'],when:'Immediately'},
   'results.density':select('Row density','compact',['compact','comfortable']),
@@ -115,7 +124,7 @@ const workspaceKey=root=>String(root||'').replaceAll('\\','/').replace(/\/$/,'')
 export function resolveSetting(settings,id,workspace,systemLocale){
   const definition=settingDefinitions[id];if(!definition)throw new Error('Unknown setting '+id);
   const scoped=settings.workspaces?.[workspaceKey(workspace)];
-  if(workspace&&Object.hasOwn(scoped||{},id))return {value:scoped[id],source:'workspace',when:definition.when};
+  if(definition.scopes.includes('workspace')&&workspace&&Object.hasOwn(scoped||{},id))return {value:scoped[id],source:'workspace',when:definition.when};
   if(Object.hasOwn(settings.user||{},id))return {value:settings.user[id],source:'user',when:definition.when};
   if(id==='ui.region')return {value:definition.default,source:'product',when:definition.when};
   const selected=resolveSetting(settings,'ui.region',workspace);
@@ -130,6 +139,18 @@ export function changeSetting(settings,id,value,scope='user',workspace){
   const next=structuredClone(settings),key=workspaceKey(workspace);const layer=scope==='workspace'?{...(Object.hasOwn(next.workspaces,key)?next.workspaces[key]:{})}:{...next.user};
   if(value===undefined)delete layer[id];else layer[id]=structuredClone(normalize(id,value));
   if(scope==='workspace')next.workspaces={...next.workspaces,[key]:layer};else next.user=layer;
+  return next;
+}
+// A region selection is an explicit reset of the related table-format choices.
+// Other workspaces retain their deliberate table overrides.
+export function changeRegionalFormats(settings,value,workspace){
+  const next=changeSetting(settings,'ui.region',value);
+  const regionalTableIds=['results.locale','results.sortLocale','results.grouping','results.dateFormat'];
+  for(const id of regionalTableIds){
+    delete next.user[id];
+    const layer=next.workspaces?.[workspaceKey(workspace)];
+    if(workspace&&layer)delete layer[id];
+  }
   return next;
 }
 export function newResultDefaults(settings,workspace,systemLocale){
@@ -147,7 +168,7 @@ export function saveResultDefaults(settings,options,scope='user',workspace){
   let next=settings;
   for(const id of Object.keys(settingDefinitions).filter(id=>id.startsWith('results.')||id.startsWith('export.'))){
     const value=id.startsWith('results.')?options[id.slice(8)]:options.exportSettings?.[id.slice(7)];
-    if(normalize(id,value)!==undefined)next=changeSetting(next,id,value,scope,workspace);
+    if(normalize(id,value)!==undefined)next=changeSetting(next,id,value,'user',workspace);
   }
   return next;
 }

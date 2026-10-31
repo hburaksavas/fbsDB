@@ -60,6 +60,12 @@ test('disabled signature hints do not start metadata requests', async () => {
   assert.equal(env.native.length, 0); env.dispose();
 });
 
+test('inline completion below the configured character threshold does not load metadata', async () => {
+  const env=harness('SELECT T',{settings:{inline:true,minCharacters:3}});
+  assert.deepEqual(await env.providers.inline.provideInlineCompletions(env.model,{column:9},{},null),{items:[]});
+  assert.equal(env.native.length,0);env.dispose();
+});
+
 test('read-only definition views use their originating physical session for metadata', async () => {
   const env = harness('SELECT o.i FROM app.orders o', { tabId: 'definition-a', originTabId: 'source-tab' });
   await env.providers.complete.provideCompletionItems(env.model, { column: 11 }, {}, null);

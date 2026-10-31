@@ -2,12 +2,17 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $localDotnet = Join-Path $repoRoot ".tools\dotnet"
 
-if (-not (Test-Path (Join-Path $localDotnet "dotnet.exe"))) {
-    & (Join-Path $PSScriptRoot "setup-dotnet.ps1")
-    if ($LASTEXITCODE -ne 0) { throw "The local .NET SDK setup failed." }
+$systemDotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue
+$useSystemDotnet = $false
+if ($systemDotnet) {
+    $systemVersion = & $systemDotnet.Source --version
+    $useSystemDotnet = $LASTEXITCODE -eq 0 -and $systemVersion -match '^10\.'
 }
 
-$env:PATH = "$localDotnet;$env:PATH"
+$previousPath = $env:PATH
+if (-not $useSystemDotnet) {
+    $env:PATH = "$localDotnet;$previousPath"
+}
 Push-Location $repoRoot
 try {
     & (Join-Path $PSScriptRoot "build-desktop.ps1")
@@ -18,4 +23,5 @@ try {
 }
 finally {
     Pop-Location
+    $env:PATH = $previousPath
 }

@@ -3,7 +3,7 @@ import { ChevronRight } from 'lucide-react';
 import { isNativeHost, sendNativeCommand } from './nativeBridge';
 import {translate as t} from './localeProfile';
 
-export function FileMenu({ workspace, onNew, onOpen, onSave, onOpenWorkspace, children,language='en' }) {
+export function FileMenu({ workspace, onNew, onOpen, onSave, onOpenWorkspace, onManageWorkspaces, children,connectionControl,language='en' }) {
   const [open, setOpen] = useState(false), root = useRef(null), trigger = useRef(null);
   useEffect(() => {
     if (!open) return;
@@ -26,12 +26,13 @@ export function FileMenu({ workspace, onNew, onOpen, onSave, onOpenWorkspace, ch
       <button role="menuitem" onClick={() => run(onNew)}>{t('New SQL File',language)}<kbd>Ctrl+N</kbd></button>
       <button role="menuitem" onClick={() => run(onOpen)}>{t('Open SQL File…',language)}<kbd>Ctrl+Shift+O</kbd></button>
       <button role="menuitem" onClick={() => run(onSave)}>{t('Save SQL File',language)}<kbd>Ctrl+S</kbd></button><hr/>
-      <button role="menuitem" disabled={!isNativeHost} onClick={() => run(onOpenWorkspace)}>{t('Open Folder / Workspace…',language)}</button>
+      <button role="menuitem" disabled={!isNativeHost} onClick={() => run(onOpenWorkspace)}>{t('Open workspace…',language)}</button>
       <button role="menuitem" disabled={!isNativeHost} onClick={() => run(() => sendNativeCommand('workspace.create'))}>{t('New Workspace Folder…',language)}</button>
+      <button role="menuitem" onClick={()=>run(onManageWorkspaces)}>Manage workspaces…</button>
       <div className="recent-workspaces-label">{t('Recent Workspaces',language)}<ChevronRight size={11}/></div>
-      {(workspace.recent || []).map(path => <button key={path} role="menuitem" className="recent-workspace-item" title={path} onClick={() => run(() => sendNativeCommand('workspace.openRecent', { path }))}><span>{path.split(/[\\/]/).filter(Boolean).at(-1)}</span><small>{path}</small></button>)}
+      {(workspace.catalog || (workspace.recent||[]).map(path=>({id:path,path,name:path.split(/[\\/]/).filter(Boolean).at(-1),available:true}))).slice(0,10).map(item => <button key={item.id} role="menuitem" className="recent-workspace-item" title={item.path} disabled={!item.available||item.active} onClick={() => run(() => sendNativeCommand('workspace.openRecent', { path:item.path }))}><span>{item.pinned?'★ ':''}{item.name}{!item.available?' · Unavailable':''}</span><small>{item.path}</small></button>)}
       {!workspace.recent?.length && <div className="recent-workspaces-empty">{t('No recent workspaces',language)}</div>}
       <hr/><button role="menuitem" disabled={!workspace.root || !isNativeHost} onClick={() => run(() => sendNativeCommand('workspace.close'))}>{t('Close Workspace',language)}</button>
     </div>}
-  </div>{children}</nav>;
+  </div>{children}{connectionControl&&<div className="ide-menubar-center">{connectionControl}</div>}</nav>;
 }

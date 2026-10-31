@@ -3,15 +3,18 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 
 const tooltipId = "fbsdb-app-tooltip";
 const editorSelector = ".monaco-editor, .editor-container";
+const findControlSelector = '.find-widget [role="button"][aria-label], .find-widget [role="checkbox"][aria-label]';
+const eligible = element => !element.closest(editorSelector) || element.matches(findControlSelector);
 
 function tooltipText(element) {
-  return element.getAttribute("title")?.trim()
-    || (element.matches("button[aria-label], [role='button'][aria-label]") ? element.getAttribute("aria-label")?.trim() : "")
+  return element.getAttribute("data-tooltip-content")?.trim()
+    || element.getAttribute("title")?.trim()
+    || (element.matches("button[aria-label], [role='button'][aria-label], [role='checkbox'][aria-label]") ? element.getAttribute("aria-label")?.trim() : "")
     || "";
 }
 
 function prepareTooltip(element) {
-  if (!(element instanceof Element) || element.closest(editorSelector)) return;
+  if (!(element instanceof Element) || !eligible(element)) return;
   const text = tooltipText(element);
   if (!text) return;
   element.dataset.appTooltip = text;
@@ -38,24 +41,29 @@ export function GlobalTooltip() {
       setTooltip(null);
     };
     const place = (element, text) => {
-      if (!element?.isConnected || element.closest(editorSelector)) return;
+      if (!element?.isConnected || !eligible(element)) return;
       const rect = element.getBoundingClientRect();
       const ids = new Set((element.getAttribute("aria-describedby") || "").split(/\s+/).filter(Boolean));
       ids.add(tooltipId);
       element.setAttribute("aria-describedby", [...ids].join(" "));
       activeElement.current = element;
       const shell = document.querySelector(".desktop-shell");
-      setTooltip({ text, theme: shell?.dataset.theme || "default", accent: getComputedStyle(shell || document.documentElement).getPropertyValue("--accent").trim() || "#39b7a5", left: rect.left + rect.width / 2, top: rect.top, maxWidth: 320, maxHeight: 320 });
+      setTooltip({ text, theme: shell?.dataset.theme || "default", accent: getComputedStyle(shell || document.documentElement).getPropertyValue("--accent").trim(), left: rect.left + rect.width / 2, top: rect.top, maxWidth: 320, maxHeight: 320 });
     };
     const schedule = (element, delay = 420) => {
       prepareTooltip(element);
       const text = element?.dataset.appTooltip;
-      if (!text || element.closest(editorSelector)) return;
+      if (!text || !eligible(element)) return;
       clearTimeout(timer.current);
       if (activeElement.current !== element) removeDescription(activeElement.current);
       timer.current = setTimeout(() => place(element, text), delay);
     };
-    const closestTarget = (target) => target instanceof Element ? target.closest("[data-app-tooltip]") : null;
+    const closestTarget = (target) => target instanceof Element ? target.closest(`[data-app-tooltip], ${findControlSelector}`) : null;
+    // Monaco's managed toolbar hover can overlap its own target. Handle only
+    // Find/Replace controls here; editor documentation hovers remain interactive.
+    const suppressFindHover = event => {
+      if (event.target instanceof Element && event.target.closest(findControlSelector)) event.stopPropagation();
+    };
     const onPointerOver = event => {
       const element = closestTarget(event.target);
       if (element && !element.contains(event.relatedTarget)) schedule(element);
@@ -73,7 +81,7 @@ export function GlobalTooltip() {
     };
     const prepareTree = root => {
       if (root instanceof Element) prepareTooltip(root);
-      root.querySelectorAll?.("[title], button[aria-label], [role='button'][aria-label]").forEach(prepareTooltip);
+      root.querySelectorAll?.("[data-tooltip-content], [title], button[aria-label], [role='button'][aria-label], [role='checkbox'][aria-label]").forEach(prepareTooltip);
     };
     prepareTree(document.body);
     const observer = new MutationObserver(records => {
@@ -82,21 +90,27 @@ export function GlobalTooltip() {
         else record.addedNodes.forEach(node => prepareTree(node));
       }
     });
-    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["title", "aria-label"] });
+    observer.observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["title", "aria-label", "data-tooltip-content"] });
+    const themeObserver=new MutationObserver(()=>{const shell=document.querySelector('.desktop-shell');setTooltip(current=>current?{...current,theme:shell?.dataset.theme||'default',accent:getComputedStyle(shell||document.documentElement).getPropertyValue('--accent').trim()}:current)});
+    const shell=document.querySelector('.desktop-shell');if(shell)themeObserver.observe(shell,{attributes:true,attributeFilter:['data-theme']});
     document.addEventListener("pointerover", onPointerOver, true);
+    document.addEventListener("mouseover", suppressFindHover, true);
     document.addEventListener("pointerout", onPointerOut, true);
     document.addEventListener("focusin", onFocusIn, true);
     document.addEventListener("focusout", onFocusOut, true);
+    document.addEventListener("pointerdown", hide, true);
     document.addEventListener("scroll", hide, true);
     window.addEventListener("resize", hide);
     return () => {
-      observer.disconnect();
+      observer.disconnect();themeObserver.disconnect();
       clearTimeout(timer.current);
       removeDescription(activeElement.current);
       document.removeEventListener("pointerover", onPointerOver, true);
+      document.removeEventListener("mouseover", suppressFindHover, true);
       document.removeEventListener("pointerout", onPointerOut, true);
       document.removeEventListener("focusin", onFocusIn, true);
       document.removeEventListener("focusout", onFocusOut, true);
+      document.removeEventListener("pointerdown", hide, true);
       document.removeEventListener("scroll", hide, true);
       window.removeEventListener("resize", hide);
     };
@@ -128,5 +142,5 @@ export function GlobalTooltip() {
   }, [tooltip]);
 
   if (!tooltip) return null;
-  return createPortal(<div ref={tooltipElement} id={tooltipId} className={`app-tooltip theme-${tooltip.theme}`} role="tooltip" style={{ left: tooltip.left, top: tooltip.top, maxWidth: tooltip.maxWidth, maxHeight: tooltip.maxHeight, "--accent": tooltip.accent }}>{tooltip.text}</div>, document.body);
+  return createPortal(<div ref={tooltipElement} id={tooltipId} className={`app-tooltip theme-scope theme-${tooltip.theme}`} data-theme={tooltip.theme} role="tooltip" style={{ left: tooltip.left, top: tooltip.top, maxWidth: tooltip.maxWidth, maxHeight: tooltip.maxHeight, "--accent": tooltip.accent }}>{tooltip.text}</div>, document.body);
 }

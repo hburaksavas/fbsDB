@@ -15,7 +15,13 @@ if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
 $localDotnet = Join-Path $repoRoot ".tools\dotnet"
 $previousPath = $env:PATH
 try {
-    if (Test-Path -LiteralPath (Join-Path $localDotnet "dotnet.exe")) {
+    $systemDotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue
+    $useSystemDotnet = $false
+    if ($systemDotnet) {
+        $systemVersion = & $systemDotnet.Source --version
+        $useSystemDotnet = $LASTEXITCODE -eq 0 -and $systemVersion -match '^10\.'
+    }
+    if (-not $useSystemDotnet -and (Test-Path -LiteralPath (Join-Path $localDotnet "dotnet.exe"))) {
         $env:PATH = "$localDotnet;$env:PATH"
     }
     # Keep the desktop launch flow, but skip compilation and package restore.

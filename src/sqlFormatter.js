@@ -51,25 +51,26 @@ export function formatOracleSql(source, style = {}) {
   if (isPlsqlSource(sql)) return formatOraclePlsql(sql, style).formatted;
   const tokens = tokenize(sql);
   if (!tokens.length) return sql;
-  const lines = [];
+  const lines = [], unit = style.insertSpaces === false ? '\t' : ' '.repeat([2,4,8].includes(style.tabSize) ? style.tabSize : 2);
+  const keyword = value => style.keywordCase === 'preserve' ? value : style.keywordCase === 'lower' ? value.toLowerCase() : value.toUpperCase();
   let line = "", indent = 0, depth = 0, whereMode = false;
-  const flush = () => { const value = line.trimEnd(); if (value.trim()) lines.push(`${"  ".repeat(Math.max(0, indent))}${value.trimStart()}`); line = ""; };
+  const flush = () => { const value = line.trimEnd(); if (value.trim()) lines.push(`${unit.repeat(Math.max(0, indent))}${value.trimStart()}`); line = ""; };
   const add = (value, space = true) => { if (space && line && !line.endsWith(" ") && !line.endsWith("(") && !line.endsWith(".")) line += " "; line += value; };
 
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i], upper = token.type === "word" ? token.value.toUpperCase() : "";
     const join = joinAt(tokens, i, depth);
-    if (join) { flush(); indent = 1; line = join.join(" "); i += join.length - 1; continue; }
+    if (join) { if(style.newlineBeforeJoin!==false){flush();indent=1} add(tokens.slice(i,i+join.length).map(t=>keyword(t.value)).join(" ")); i += join.length - 1; continue; }
     const clause = clauseAt(tokens, i, depth);
     if (clause) {
       flush(); indent = 0; whereMode = clause[0] === "WHERE";
-      line = clause.join(" ");
+      line = tokens.slice(i,i+clause.length).map(t=>keyword(t.value)).join(" ");
       i += clause.length - 1;
-      flush(); indent = 1;
+      if (style.newlineAfterClause !== false) { flush(); indent = 1; }
       continue;
     }
-    if (depth === 0 && whereMode && (upper === "AND" || upper === "OR")) { flush(); indent = 2; line = upper; continue; }
-    if (depth === 0 && upper === "ON") { flush(); indent = 1; line = "ON"; continue; }
+    if (depth === 0 && whereMode && style.newlineBeforeLogical !== false && (upper === "AND" || upper === "OR")) { flush(); indent = style.logicalIndent===1?1:2; line = keyword(token.value); continue; }
+    if (depth === 0 && upper === "ON" && style.newlineBeforeOn!==false) { flush(); indent = 1; line = keyword(token.value); continue; }
     if (token.type === "comment") { add(token.value, true); if (token.value.startsWith("--")) flush(); continue; }
     if (token.value === "(") {
       const prev = tokens[i - 1]?.value?.toUpperCase();
@@ -77,15 +78,16 @@ export function formatOracleSql(source, style = {}) {
     }
     if (token.value === ")") { line = line.trimEnd() + ")"; depth = Math.max(0, depth - 1); continue; }
     if (token.value === ",") {
+      if(depth===0&&style.newlineAfterComma!==false&&style.commaPosition==='leading'){flush();indent=1;line=', ';continue}
       line = line.trimEnd() + ",";
-      if (depth === 0) { flush(); indent = whereMode ? 1 : 1; }
+      if (depth === 0 && style.newlineAfterComma !== false) { flush(); indent = 1; }
       else line += " ";
       continue;
     }
     if (token.value === ".") { line = line.trimEnd() + "."; continue; }
     if (token.value === ";") { line = line.trimEnd() + ";"; flush(); indent = 0; whereMode = false; continue; }
     if (token.type === "operator") { add(token.value); line += " "; continue; }
-    const value = token.type === "word" && keywords.has(upper) ? upper : token.value;
+    const value = token.type === "word" && keywords.has(upper) ? keyword(token.value) : token.value;
     add(value, true);
   }
   flush();
@@ -102,5 +104,6 @@ export function formatOracleDocument(source, style = {}) {
     output.push(formatOracleSql(text, style).trimEnd()); previous = range.end;
   }
   const tail = source.slice(previous).trim(); if (tail) output.push(tail);
-  return { formatted: output.join('\n\n') + '\n' };
+  const blankLines = [0,1,2].includes(style.blankLinesBetweenStatements) ? style.blankLinesBetweenStatements : 1;
+  return { formatted: output.join('\n'.repeat(blankLines + 1)) + (style.finalNewline===false?'':'\n') };
 }

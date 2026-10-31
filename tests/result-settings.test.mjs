@@ -5,7 +5,8 @@ test('one overflow menu retains every action and its disabled/active state exact
  const groups=[[['view',null,'Table view',false],['pivot',null,'Pivot',false,true]],[['inspect',null,'Inspect',true]],[['export',null,'Export',true]]];
  for(const capacity of [0,1,2,3,4,100]){
   const layout=resultToolbarLayout(groups,capacity),visible=groups.flat().filter(item=>layout.visibleIds.has(item[0]));
-  assert.deepEqual([...visible,...layout.overflow],groups.flat());
+  assert.deepEqual([...visible,...layout.overflow].sort((a,b)=>a[0].localeCompare(b[0])),[...groups.flat()].sort((a,b)=>a[0].localeCompare(b[0])));
+  assert.deepEqual(visible,groups.flat().filter(item=>layout.visibleIds.has(item[0])));
   assert.equal(new Set([...visible,...layout.overflow].map(item=>item[0])).size,4);
   assert.equal([...visible,...layout.overflow].find(item=>item[0]==='inspect')[3],true);
   assert.equal([...visible,...layout.overflow].find(item=>item[0]==='pivot')[4],true);

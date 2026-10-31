@@ -1,0 +1,26 @@
+.settings-editor-group{display:block;padding:12px 10px 4px;color:var(--muted);font-size:10px;font-weight:600}
+.settings-frame nav button.settings-editor-child{padding-left:22px}
+.editor-style-settings,.editor-shortcuts-panel{display:grid;gap:10px}
+.editor-settings-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
+.editor-settings-fields label{display:grid;gap:5px;font-size:11px;color:var(--muted)}
+.editor-settings-fields input,.editor-settings-fields select,.editor-shortcuts-panel>input,.editor-shortcut-row input{height:30px;min-width:0;width:100%;border:1px solid var(--line);border-radius:5px;background:var(--input);color:var(--foreground);padding:0 8px}
+.editor-settings-fields input:focus,.editor-settings-fields select:focus,.editor-shortcuts-panel input:focus{border-color:var(--accent-border);outline:0;box-shadow:none}
+.editor-settings-toggles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;font-size:11px;color:var(--foreground)}
+.editor-settings-toggles label{display:flex;align-items:center;gap:6px}
+.editor-settings-toggles input{accent-color:var(--accent)}
+.editor-shortcuts-panel>small{font-size:10px;color:var(--muted)}
+.editor-shortcut-row{display:grid;grid-template-columns:minmax(100px,1fr) minmax(150px,1.3fr) auto auto;align-items:center;gap:7px;padding:7px 0;border-bottom:1px solid var(--line);font-size:11px;color:var(--foreground)}
+.editor-shortcut-row button{font-size:10px;padding:4px 7px}
+.formatter-presets{display:flex;align-items:center;gap:6px}
+.formatter-presets button[aria-pressed=true]{background:var(--selection-bg);color:var(--foreground);border-color:var(--accent-border)}
+.formatter-presets span{font-size:10px;color:var(--muted)}
+@media(max-width:720px){.editor-shortcut-row{grid-template-columns:minmax(80px,1fr) minmax(120px,1.5fr)}.editor-shortcut-row button{justify-self:start}}
+
+.settings-workspace .appearance-footer{justify-content:flex-end}
+
+.completion-settings{display:grid;gap:12px}
+.completion-settings fieldset{display:grid;gap:12px;min-width:0;margin:0;padding:10px 0 12px;border:0;border-bottom:1px solid var(--line)}
+.completion-settings legend{padding:0;font-size:11px;font-weight:600;color:var(--foreground)}
+.completion-settings .preference-toggle{display:flex;gap:6px}
+.completion-actions{display:flex;gap:8px}
+.completion-actions button{font-size:11px;padding:5px 9px}

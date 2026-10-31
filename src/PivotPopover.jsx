@@ -11,7 +11,7 @@ export function PivotOptionsPanel({ columns, options, onChange, onClose }) {
   const pivotRows = options.pivotRows || [];
 
   return <aside id="result-pivot-panel" className="result-pivot-panel" role="region" aria-label="Pivot options">
-    <header><div><strong>Pivot options</strong><span>Loaded rows only</span></div><button type="button" aria-label="Close pivot options" title="Close pivot options" onClick={onClose}><X size={15} /></button></header>
+    <header><div><strong>Pivot options</strong></div><button type="button" aria-label="Close pivot options" title="Close pivot options" onClick={onClose}><X size={15} /></button></header>
     <div className="result-pivot-content">
     <label className="result-pivot-enable"><input type="checkbox" checked={Boolean(options.pivot)} onChange={(event) => update({ pivot: event.target.checked, ...(event.target.checked ? { summary: false, transpose: false } : {}) })} />Enable pivot view</label>
     <div className="result-pivot-section">

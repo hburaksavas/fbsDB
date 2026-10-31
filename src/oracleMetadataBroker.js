@@ -12,6 +12,12 @@ export class OracleMetadataBroker {
     for (const job of [...session.jobs.values()]) this.cancel(job);
     session.jobs.clear(); this.onStatus(tabId, 'Oracle metadata refreshed.');
   }
+  invalidate(tabId,target) {
+    const session=this.session(tabId),suffix=completionObjectKey(target);
+    for(const key of session.cache.keys())if(key.endsWith(suffix))session.cache.delete(key);
+    for(const job of [...session.jobs.values()])if(job.key.endsWith(suffix))this.cancel(job);
+    session.cacheRevision++;
+  }
   cancel(job) {
     this.send('completion.cancel', { tabId: job.tabId, requestId: job.id });
     this.pending.delete(job.id); this.session(job.tabId).jobs.delete(job.key);

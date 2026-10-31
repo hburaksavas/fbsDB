@@ -27,12 +27,14 @@ public sealed partial class MainPage : Page
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _scriptRuns = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _resultExports = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _completionRequests = new();
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _schemaRequests = new();
     private readonly TnsProfileService _profiles = new();
     private readonly TabSessionRegistry _sessions = new();
     private readonly OracleSessionService _credentials = new();
     private static readonly AsyncLocal<TabSession?> CommandTab = new();
     private OracleSessionService _oracle => CommandTab.Value?.Oracle ?? _credentials;
     private readonly WorkspaceService _workspace = new();
+    private readonly SemaphoreSlim _workspaceCommands = new(1, 1);
     private double _interfaceScale = 1;
     private WorkspaceDevelopmentService? _development;
     private WorkspaceDevelopmentService Development => LazyInitializer.EnsureInitialized(ref _development, () => new(_workspace));
@@ -42,6 +44,8 @@ public sealed partial class MainPage : Page
     public MainPage()
     {
         InitializeComponent();
+        RequestedTheme = NativeTheme.RequestedTheme;
+        EditorWebView.DefaultBackgroundColor = NativeTheme.Color("--bg");
         _idleTimer = DispatcherQueue.CreateTimer();
         _idleTimer.Interval = TimeSpan.FromSeconds(30);
         _idleTimer.Tick += async (_, _) => {
@@ -135,7 +139,7 @@ public sealed partial class MainPage : Page
                 StopStartupAnimation();
                 StartupOverlay.Visibility = Visibility.Collapsed;
                 EditorError.Text = $"The editor bundle is missing: {editorPath}";
-                EditorError.Visibility = Visibility.Visible;
+                EditorErrorPanel.Visibility = Visibility.Visible;
                 MainWindow.Current?.ShowWorkbench();
                 return;
             }
@@ -149,7 +153,7 @@ public sealed partial class MainPage : Page
             StopStartupAnimation();
                 StartupOverlay.Visibility = Visibility.Collapsed;
             EditorError.Text = $"The editor could not start. Install or update Microsoft Edge WebView2 Runtime.\n\n{ex.Message}";
-            EditorError.Visibility = Visibility.Visible;
+            EditorErrorPanel.Visibility = Visibility.Visible;
             MainWindow.Current?.ShowWorkbench();
         }
     }
@@ -182,13 +186,14 @@ public sealed partial class MainPage : Page
         running.Visibility = isRunning ? Visibility.Visible : Visibility.Collapsed;
         state.Text = isDone ? "DONE" : isRunning ? "RUNNING" : string.Empty;
         label.FontWeight = isRunning ? Microsoft.UI.Text.FontWeights.SemiBold : Microsoft.UI.Text.FontWeights.Normal;
-        label.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(isRunning ? Microsoft.UI.Colors.White : Microsoft.UI.Colors.LightSlateGray);
+        label.Foreground = NativeTheme.Brush(isRunning ? "--foreground" : "--muted");
     }
 
     private async void OnWebMessageReceived(CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
     {
         string? requestId = null;
         string? receivedCommand = null;
+        var workspaceLock = false;
         try
         {
             if (!Uri.TryCreate(args.Source, UriKind.Absolute, out var source) || source.Host != "fbsdb.local") return;
@@ -231,8 +236,27 @@ public sealed partial class MainPage : Page
             if (command is "tab.close" or "connection.disconnect" && _resultExports.TryGetValue(tabId, out var closingExport)) closingExport.Cancel();
             if (command is "tab.close" or "connection.disconnect" or "connection.connect")
                 foreach (var request in _completionRequests.Where(item => item.Key.StartsWith(tabId + ":", StringComparison.Ordinal))) { try { request.Value.Cancel(); } catch (ObjectDisposedException) { } }
+            if (command is "tab.close" or "connection.disconnect" or "connection.connect")
+                foreach (var request in _schemaRequests.Where(item => item.Key.StartsWith(tabId + ":", StringComparison.Ordinal))) { try { request.Value.Cancel(); } catch (ObjectDisposedException) { } }
+            if (command?.StartsWith("workspace.", StringComparison.Ordinal) == true)
+            {
+                await _workspaceCommands.WaitAsync(); workspaceLock = true;
+                EnsureWorkspaceRoot(payload);
+            }
             switch (command)
             {
+                case "ui.setTheme":
+                    try
+                    {
+                        var selectedTheme = payload.GetProperty("theme").GetString() ?? "default";
+                        if (selectedTheme != ThemePaletteService.Normalize(selectedTheme)) throw new InvalidOperationException("Choose a supported interface theme.");
+                        NativeTheme.Apply(selectedTheme); RequestedTheme = NativeTheme.RequestedTheme;
+                        EditorWebView.DefaultBackgroundColor = NativeTheme.Color("--bg");
+                        await ThemePaletteService.SavePreferenceAsync(NativeTheme.SettingsPath, selectedTheme);
+                        Send(sender, new { type = "ui.theme", requestId = id, theme = selectedTheme, background = NativeTheme.Current.Tokens["--bg"], foreground = NativeTheme.Current.Tokens["--foreground"], accent = NativeTheme.Current.Tokens["--accent"], nativeTheme = RequestedTheme.ToString(), chrome = MainWindow.Current?.ThemeSnapshot() });
+                    }
+                    catch (Exception error) { Send(sender, new { type = "ui.theme", requestId = id, error = error.Message }); }
+                    break;
                 case "ui.setZoom":
                     if (payload.TryGetProperty("factor", out var zoom) && zoom.TryGetDouble(out var factor) && double.IsFinite(factor) && factor >= 0.8 && factor <= 1.5)
                     {
@@ -256,6 +280,22 @@ public sealed partial class MainPage : Page
                     try { await _sessions.CloseAsync(tabId); Send(sender, new { type = "tab.closed", requestId = id }); }
                     catch (Exception ex) { Send(sender, new { type = "tab.closeFailed", requestId = id, message = ex.Message, transactionPending = _oracle.HasPendingTransaction }); }
                     break;
+                case "workspace.tools.list":
+                case "workspace.tools.save":
+                    var toolRoot = _workspace.Root ?? throw new InvalidOperationException("Open a workspace to use mini tools.");
+                    if (!payload.TryGetProperty("root", out var toolRootValue) || toolRootValue.GetString() != toolRoot) throw new InvalidOperationException("The active workspace changed. Reopen mini tools.");
+                    if (command == "workspace.tools.list")
+                    {
+                        var catalog = await Task.Run(() => MiniToolService.ListAsync(toolRoot));
+                        Send(sender, new { type = command, requestId = id, root = toolRoot, catalog });
+                    }
+                    else
+                    {
+                        var toolDocument = payload.GetProperty("tool").Clone();
+                        var savedTool = await Task.Run(() => MiniToolService.SaveAsync(toolRoot, toolDocument));
+                        Send(sender, new { type = command, requestId = id, root = toolRoot, tool = savedTool });
+                    }
+                    break;
                 case "workspace.git":
                     try { var state = await Task.Run(() => Development.GitStateAsync()); Send(sender,new {type="workspace.git",requestId=id,state}); }
                     catch(Exception error){ Send(sender,new {type="workspace.git",requestId=id,error=error.Message}); }
@@ -268,7 +308,7 @@ public sealed partial class MainPage : Page
                 case "workspace.replaceApply":
                     try {
                         var excluded=payload.GetProperty("excluded").EnumerateArray().Select(item=>item.GetString()!).ToArray();
-                        if(command=="workspace.replacePreview") { var preview=await Task.Run(()=>Development.PreviewReplaceAsync(payload.GetProperty("search").GetString()!,payload.GetProperty("replacement").GetString()??"",payload.GetProperty("caseSensitive").GetBoolean(),excluded)); Send(sender,new {type="workspace.replacePreview",requestId=id,preview}); }
+                        if(command=="workspace.replacePreview") { var preview=await Task.Run(()=>Development.PreviewReplaceAsync(payload.GetProperty("search").GetString()!,payload.GetProperty("replacement").GetString()??"",payload.GetProperty("caseSensitive").GetBoolean(),excluded,payload.TryGetProperty("scope",out var replaceScope)?replaceScope.GetString():null)); Send(sender,new {type="workspace.replacePreview",requestId=id,preview}); }
                         else { var selected=payload.GetProperty("selected").EnumerateArray().Select(item=>item.GetString()!).ToArray();var result=await Task.Run(()=>Development.ApplyReplaceAsync(payload.GetProperty("previewId").GetString()!,selected,excluded)); Send(sender,new {type="workspace.replaceApply",requestId=id,result}); }
                     } catch(Exception error){ Send(sender,new {type=command,requestId=id,error=error.Message}); }
                     break;
@@ -295,6 +335,10 @@ public sealed partial class MainPage : Page
                 case "connection.list":
                     await SendProfilesAsync(sender, id);
                     break;
+                case "connection.organization":
+                    try { var organization = await Task.Run(() => _profiles.ChangeOrganizationAsync(payload)); await SendProfilesAsync(sender); Send(sender, new { type = "connection.organization", requestId = id, success = true, organization }); }
+                    catch (Exception error) { Send(sender, new { type = "connection.organization", requestId = id, success = false, message = error.Message }); }
+                    break;
                 case "connection.setGroup":
                     var profileId = payload.TryGetProperty("profileId", out var profileIdValue) ? profileIdValue.GetString() : null;
                     var group = payload.TryGetProperty("group", out var groupValue) && groupValue.ValueKind == JsonValueKind.String ? groupValue.GetString() : null;
@@ -304,6 +348,120 @@ public sealed partial class MainPage : Page
                     break;
                 case "tns.add":
                     await AddTnsFileAsync(sender);
+                    break;
+                case "file.poll":
+                    var allowedPaths = _sessions.Sessions.Where(tab => tab.FilePath is not null).Select(tab => tab.FilePath!).ToHashSet(StringComparer.OrdinalIgnoreCase);
+                    var watches = payload.GetProperty("files").EnumerateArray().Take(100).Select(item => (Path: item.GetProperty("path").GetString()!, Version: item.GetProperty("version").GetString(), HadError: item.TryGetProperty("hasError", out var watchError) && watchError.GetBoolean())).Where(item => allowedPaths.Contains(item.Path)).ToArray();
+                    var changes = await Task.Run(async () => {
+                        var found = new List<object>(); long bytes = 0; var processed = 0;
+                        foreach (var watch in watches) {
+                            var snapshot = await WorkspaceFileService.ReadAsync(watch.Path); processed++;
+                            bytes += snapshot.Content?.Length * 2L ?? 0;
+                            if (snapshot.Version != watch.Version || snapshot.Error is not null || watch.HadError) found.Add(new { path = watch.Path, expectedVersion = watch.Version, snapshot });
+                            if (bytes > 32 * 1024 * 1024) break;
+                        }
+                        return new { found, processed };
+                    });
+                    Send(sender, new { type = "file.changes", requestId = id, changes = changes.found, changes.processed });
+                    break;
+                case "workspace.worksets":
+                    var sets = await Task.Run(() => _workspace.ListWorksetsAsync());
+                    Send(sender, new { type = "workspace.worksets", requestId = id, root = _workspace.Root, worksets = sets });
+                    break;
+                case "workspace.worksetSave":
+                    var worksetId = payload.TryGetProperty("id", out var setId) ? setId.GetString() : null;
+                    IReadOnlyList<WorkspaceWorksetFile>? setFiles = payload.TryGetProperty("files", out var setFilesValue) ? setFilesValue.EnumerateArray().Select(file => new WorkspaceWorksetFile(file.GetProperty("path").GetString()!, file.GetProperty("line").GetInt32(), file.GetProperty("column").GetInt32())).ToArray() : null;
+                    await Task.Run(() => _workspace.SaveWorksetAsync(worksetId, payload.GetProperty("name").GetString()!, setFiles, payload.TryGetProperty("activePath", out var setActive) ? setActive.GetString() : null));
+                    Send(sender, new { type = "workspace.worksets", requestId = id, root = _workspace.Root, worksets = await _workspace.ListWorksetsAsync() });
+                    break;
+                case "workspace.worksetDelete":
+                    await _workspace.DeleteWorksetAsync(payload.GetProperty("id").GetString()!);
+                    Send(sender, new { type = "workspace.worksets", requestId = id, root = _workspace.Root, worksets = await _workspace.ListWorksetsAsync() });
+                    break;
+                case "workspace.worksetOpen":
+                    var workset = (await _workspace.ListWorksetsAsync()).Single(set => set.Id == payload.GetProperty("id").GetString());
+                    var openedSet = await Task.Run(async () => {
+                        var files = new List<object>(); var skipped = new List<string>(); long size = 0;
+                        foreach (var entry in workset.Files) {
+                            var snapshot = await WorkspaceFileService.ReadAsync(_workspace.ResolveWorksetFile(entry.Path));
+                            size += snapshot.Content?.Length * 2L ?? 0;
+                            if (snapshot.Missing || snapshot.Error is not null || size > 20 * 1024 * 1024) { skipped.Add(entry.Path + ": " + (snapshot.Error ?? (snapshot.Missing ? "File missing" : "Workset size limit"))); continue; }
+                            files.Add(new { path = snapshot.Path, content = snapshot.Content, diskVersion = snapshot.Version, fileName = Path.GetFileName(snapshot.Path), entry.Line, entry.Column });
+                        }
+                        return new { files, skipped };
+                    });
+                    Send(sender, new { type = "workspace.worksetOpened", requestId = id, root = _workspace.Root, workset, openedSet.files, openedSet.skipped });
+                    break;
+                case "workspace.moveEntries":
+                    var batchMoves = await Task.Run(() => _workspace.MoveEntriesAsync(payload.GetProperty("paths").EnumerateArray().Select(item => item.GetString()!).ToArray(), payload.GetProperty("destination").GetString()!));
+                    foreach (var tab in _sessions.Sessions)
+                        foreach (var move in batchMoves)
+                            if (WorkspaceService.RemapPath(tab.FilePath, move.Source, move.Destination) is { } remapped) { tab.FilePath = remapped; break; }
+                    Send(sender, new { type = "workspace.changed", requestId = id, root = _workspace.Root, moves = batchMoves });
+                    await SendWorkspaceAsync(sender);
+                    break;
+                case "workspace.recycleEntries":
+                    if (!payload.GetProperty("confirmed").GetBoolean()) throw new InvalidOperationException("Confirm moving the selected items to the Recycle Bin first.");
+                    var recyclePaths = _workspace.NormalizeSelection(payload.GetProperty("paths").EnumerateArray().Select(item => item.GetString()!));
+                    if (_sessions.Sessions.Any(tab => recyclePaths.Any(path => WorkspaceService.RemapPath(tab.FilePath, path, path) is not null))) throw new InvalidOperationException("Close all SQL tabs in the selected items first. Nothing was recycled.");
+                    var recycled = await Task.Run(() => _workspace.RecycleEntriesAsync(recyclePaths, (path, directory) => {
+                        if (directory) Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(path, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                        else Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(path, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                    }));
+                    Send(sender, new { type = "workspace.changed", requestId = id, root = _workspace.Root, removedPaths = recycled.Removed, error = recycled.Error is null ? null : $"{recycled.Removed.Count} items recycled. {recycled.Error}" });
+                    await SendWorkspaceAsync(sender);
+                    break;
+                case "workspace.update":
+                    await Task.Run(() => _workspace.UpdateRegistrationAsync(payload.GetProperty("id").GetString()!, payload.GetProperty("name").GetString()!, payload.GetProperty("description").GetString() ?? "", payload.GetProperty("pinned").GetBoolean()));
+                    await SendWorkspaceAsync(sender);
+                    Send(sender, new { type = "workspace.operation", requestId = id });
+                    break;
+                case "workspace.forget":
+                    await _workspace.ForgetAsync(payload.GetProperty("id").GetString()!);
+                    await SendWorkspaceAsync(sender);
+                    Send(sender, new { type = "workspace.operation", requestId = id });
+                    break;
+                case "workspace.pickLocation":
+                    var locationPicker = new FolderPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
+                    locationPicker.FileTypeFilter.Add("*");
+                    InitializeWithWindow.Initialize(locationPicker, WindowNative.GetWindowHandle(MainWindow.Current!));
+                    var location = await locationPicker.PickSingleFolderAsync();
+                    Send(sender, new { type = "workspace.location", requestId = id, path = location?.Path });
+                    break;
+                case "workspace.relocate":
+                    if (!payload.GetProperty("confirmed").GetBoolean()) throw new InvalidOperationException("Confirm the workspace location first.");
+                    await Task.Run(() => _workspace.RelocateAsync(payload.GetProperty("id").GetString()!, payload.GetProperty("path").GetString()!));
+                    await SendWorkspaceAsync(sender);
+                    Send(sender, new { type = "workspace.operation", requestId = id });
+                    break;
+                case "workspace.reveal":
+                    var revealPath = Path.GetFullPath(payload.GetProperty("path").GetString()!);
+                    if (!_workspace.Catalog.Any(w => string.Equals(w.Path, revealPath, StringComparison.OrdinalIgnoreCase))) _workspace.ValidateEntryPath(revealPath, true);
+                    if (!File.Exists(revealPath) && !Directory.Exists(revealPath)) throw new FileNotFoundException("The location is unavailable.");
+                    var reveal = new ProcessStartInfo("explorer.exe") { UseShellExecute = true };
+                    if (File.Exists(revealPath)) reveal.Arguments = "/select,\"" + revealPath + "\"";
+                    else reveal.ArgumentList.Add(revealPath);
+                    Process.Start(reveal);
+                    Send(sender, new { type = "workspace.operation", requestId = id });
+                    break;
+                case "workspace.duplicateEntry":
+                    EnsureWorkspaceRoot(payload);
+                    var duplicate = await Task.Run(() => _workspace.DuplicateEntryAsync(payload.GetProperty("path").GetString()!, payload.GetProperty("name").GetString()!));
+                    Send(sender, new { type = "workspace.changed", requestId = id, root = _workspace.Root, entry = duplicate });
+                    await SendWorkspaceAsync(sender);
+                    break;
+                case "workspace.recycleEntry":
+                    EnsureWorkspaceRoot(payload);
+                    var recyclePath = _workspace.ValidateEntryPath(payload.GetProperty("path").GetString()!);
+                    if (!payload.GetProperty("confirmed").GetBoolean()) throw new InvalidOperationException("Confirm moving this item to the Recycle Bin first.");
+                    if (_sessions.Sessions.Any(tab => WorkspaceService.RemapPath(tab.FilePath, recyclePath, recyclePath) is not null))
+                        throw new InvalidOperationException("Close the open SQL tabs in this item before moving it to the Recycle Bin. Save changes and resolve pending transactions first.");
+                    await Task.Run(() => _workspace.RecycleEntryAsync(recyclePath, (path, directory) => {
+                        if (directory) Microsoft.VisualBasic.FileIO.FileSystem.DeleteDirectory(path, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                        else Microsoft.VisualBasic.FileIO.FileSystem.DeleteFile(path, Microsoft.VisualBasic.FileIO.UIOption.OnlyErrorDialogs, Microsoft.VisualBasic.FileIO.RecycleOption.SendToRecycleBin);
+                    }));
+                    Send(sender, new { type = "workspace.changed", requestId = id, root = _workspace.Root, removed = recyclePath });
+                    await SendWorkspaceAsync(sender);
                     break;
                 case "workspace.open":
                     await OpenWorkspaceAsync(sender);
@@ -325,11 +483,13 @@ public sealed partial class MainPage : Page
                     Send(sender, new { type = "workspace.children", requestId = id, root = directoryRoot, path = directoryPath, entries = directoryEntries });
                     break;
                 case "workspace.createEntry":
+                    EnsureWorkspaceRoot(payload);
                     var entry = await Task.Run(() => _workspace.CreateEntryAsync(payload.GetProperty("parent").GetString()!, payload.GetProperty("name").GetString()!, payload.GetProperty("directory").GetBoolean()));
                     Send(sender, new { type = "workspace.changed", requestId = id, root = _workspace.Root, entry });
                     await SendWorkspaceAsync(sender);
                     break;
                 case "workspace.moveEntry":
+                    EnsureWorkspaceRoot(payload);
                     var movedSource = Path.GetFullPath(payload.GetProperty("path").GetString()!);
                     var destination = Path.GetFullPath(payload.GetProperty("destination").GetString()!);
                     await Task.Run(() => _workspace.MoveEntryAsync(movedSource, destination));
@@ -347,7 +507,7 @@ public sealed partial class MainPage : Page
                 case "workspace.search":
                 {
                     var query = payload.TryGetProperty("query", out var queryValue) && queryValue.ValueKind == JsonValueKind.String ? queryValue.GetString() ?? string.Empty : string.Empty;
-                    var search = await Task.Run(() => _workspace.SearchSqlFiles(query));
+                    var search = await Task.Run(() => _workspace.SearchSqlFiles(query, scope: payload.TryGetProperty("scope", out var searchScope) ? searchScope.GetString() : null));
                     await SendAsync(sender, new { type = "workspace.searchResults", requestId = id, results = search.Matches, search.Truncated });
                     break;
                 }
@@ -421,6 +581,10 @@ public sealed partial class MainPage : Page
                 case "sql.fetchNext":
                     await FetchSqlPageAsync(sender, id, payload);
                     break;
+                case "session.context":
+                    try { var context = await Task.Run(() => _oracle.ReadSessionContextAsync()); Send(sender, new { type = "session.context", requestId = id, epoch = payload.GetProperty("epoch").GetInt32(), context }); }
+                    catch (Exception error) { Send(sender, new { type = "session.context", requestId = id, epoch = payload.GetProperty("epoch").GetInt32(), error = error.Message }); }
+                    break;
                 case "session.nls":
                     try { var report=await Task.Run(()=>_oracle.ReadNlsAsync());Send(sender,new {type="session.nls",requestId=id,epoch=payload.TryGetProperty("epoch",out var epoch)?epoch.GetInt32():0,report}); }
                     catch(Exception error){Send(sender,new {type="session.nls",requestId=id,error=error.Message});}
@@ -466,12 +630,19 @@ public sealed partial class MainPage : Page
                     await Task.Run(() => _oracle.CommitAsync());
                     Send(sender, new { type = "transaction.state", state = "committed", pending = false, requestId = id });
                     break;
+                case "transaction.autoCommit":
+                    await Task.Run(() => _oracle.SetAutoCommitAsync(payload.GetProperty("enabled").GetBoolean()));
+                    Send(sender, new { type = "transaction.autoCommit", requestId = id, enabled = _oracle.AutoCommit });
+                    break;
                 case "transaction.rollback":
                     await Task.Run(() => _oracle.RollbackAsync());
                     Send(sender, new { type = "transaction.state", state = "rolled back", pending = false, requestId = id });
                     break;
                 case "schema.refresh":
                     await SendSchemaAsync(sender, id);
+                    break;
+                case "schema.cancel":
+                    if (payload.TryGetProperty("requestId", out var schemaRequestId) && _schemaRequests.TryGetValue($"{CommandTab.Value?.Id}:{schemaRequestId.GetString()}", out var schemaCancellation)) { try { schemaCancellation.Cancel(); } catch (ObjectDisposedException) { } }
                     break;
                 case "completion.vocabulary":
                     await SendCompletionVocabularyAsync(sender, id);
@@ -480,6 +651,7 @@ public sealed partial class MainPage : Page
                 case "completion.definition":
                 case "completion.systemObjects":
                 case "completion.objectAnalysis":
+                case "completion.objectDraftMetadata":
                 case "completion.plscope":
                     await SendLanguageMetadataAsync(sender, id, command, payload);
                     break;
@@ -505,6 +677,7 @@ public sealed partial class MainPage : Page
                 Send(sender, new { type = "workspace.error", requestId, message = ex.Message });
             else PostError(sender, requestId, ex.Message);
         }
+        finally { if (workspaceLock) _workspaceCommands.Release(); }
     }
 
     private async Task SendProfilesAsync(CoreWebView2 sender, string? requestId = null)
@@ -514,7 +687,7 @@ public sealed partial class MainPage : Page
         var response = await Task.Run(async () =>
         {
             var profiles = startupProfiles ?? await _profiles.GetProfilesAsync();
-            var groups = await _profiles.GetConnectionGroupsAsync();
+            var organization = await _profiles.GetOrganizationAsync();
             var items = new List<object>(profiles.Count);
             foreach (var p in profiles)
             {
@@ -522,13 +695,15 @@ public sealed partial class MainPage : Page
                 items.Add(new
                 {
                     id = p.Id, nls = p.Nls, name = p.Name, method = p.Method, targetType = p.TargetType, descriptor = p.Method == "descriptor" ? p.Descriptor : "", alias = p.Alias, user = p.User, available = p.Available, host = p.Host, port = p.Port, service = p.Service, source = p.Source,
-                    env = p.Environment, group = groups.TryGetValue(p.Id, out var customGroup) ? customGroup : null, duplicate = p.Duplicate,
+                    env = p.Environment, duplicate = p.Duplicate,
+                    folderId = organization["assignments"]?[p.Id]?["folderId"]?.GetValue<string>(),
+                    groups = organization["groups"]!.AsArray().OfType<System.Text.Json.Nodes.JsonObject>().Where(g => organization["assignments"]?[p.Id]?["groupIds"]?.AsArray().Any(id => id?.GetValue<string>() == g["id"]?.GetValue<string>()) == true).Select(g => g["name"]!.GetValue<string>()).ToArray(),
                     hasSavedCredentials = savedCredentials is not null, savedUser = savedCredentials?.User
                 });
             }
-            return items;
+            return new { items, organization };
         });
-        await SendAsync(sender, new { type = "connection.profiles", requestId, profiles = response, aliases = (await _profiles.GetAliasesAsync()).Select(a => new { id = a.Id, source = a.Source, host = a.Host, port = a.Port, service = a.Service, duplicate = a.Duplicate }) });
+        await SendAsync(sender, new { type = "connection.profiles", requestId, profiles = response.items, organization = response.organization, aliases = (await _profiles.GetAliasesAsync()).Select(a => new { id = a.Id, source = a.Source, host = a.Host, port = a.Port, service = a.Service, duplicate = a.Duplicate }) });
     }
 
     private async Task ManageConnectionAsync(CoreWebView2 sender, string? requestId, string command, JsonElement payload)
@@ -548,7 +723,7 @@ public sealed partial class MainPage : Page
             {
                 if (_sessions.Sessions.Any(tab => tab.Oracle.ProfileId == profileId)) throw new InvalidOperationException("Disconnect this profile in all tabs before editing it.");
                 var old = (await _profiles.GetProfilesAsync()).FirstOrDefault(p => p.Id == profileId);
-                profileId = await _profiles.SaveProfileAsync(string.IsNullOrEmpty(profileId) ? null : profileId, Read("name"), Read("alias"), Read("source"), Read("user"), Read("environment"), Read("method") is { Length: > 0 } method ? method : "tns", Read("host"), Read("port"), Read("service"), Read("targetType"), Read("descriptor"));
+                profileId = await _profiles.SaveProfileAsync(string.IsNullOrEmpty(profileId) ? null : profileId, Read("name"), Read("alias"), Read("source"), Read("user"), Read("environment"), Read("method") is { Length: > 0 } method ? method : "tns", Read("host"), Read("port"), Read("service"), Read("targetType"), Read("descriptor"), Read("folderId"), payload.TryGetProperty("groupIds", out var groupIds) ? groupIds.EnumerateArray().Select(g => g.GetString()!).ToArray() : null);
                 var updated = (await _profiles.GetProfilesAsync()).First(p => p.Id == profileId);
                 if (old is not null && (old.User != updated.User || old.Method != updated.Method || old.Source != updated.Source || old.Descriptor != updated.Descriptor)) await _oracle.DeleteCredentialsAsync(profileId);
                 if (!string.IsNullOrEmpty(Read("password")) && payload.TryGetProperty("remember", out var savePassword) && savePassword.ValueKind == JsonValueKind.True) await _oracle.SaveCredentialsAsync(profileId, Read("user"), Read("password"));
@@ -618,6 +793,7 @@ public sealed partial class MainPage : Page
             var type = payload.TryGetProperty("objectType", out var typeValue) ? typeValue.GetString() ?? "TABLE" : "TABLE";
             object result;
             if (command == "completion.systemObjects") result = await Task.Run(() => session.LoadSystemCompletionObjectsAsync(cancellation.Token));
+            else if (command == "completion.objectDraftMetadata") result = await Task.Run(() => session.LoadObjectDraftMetadataAsync(owner, name, type, cancellation.Token));
             else if (command == "completion.objectAnalysis") result = await Task.Run(() => session.LoadObjectAnalysisAsync(owner, name, type, cancellation.Token));
             else if (command == "completion.definition") result = await Task.Run(() => session.LoadCompletionDefinitionAsync(owner, name, type, payload.TryGetProperty("body", out var body) && body.ValueKind == JsonValueKind.True, cancellation.Token));
             else if (command == "completion.plscope") result = await Task.Run(() => session.LoadPlscopeAsync(owner, name, type, payload.TryGetProperty("member", out var member) ? member.GetString() : null, cancellation.Token));
@@ -627,6 +803,12 @@ public sealed partial class MainPage : Page
         catch (OperationCanceledException) { Send(sender, new { type = "completion.reply", requestId, epoch, cancelled = true }); }
         catch (Exception ex) { Send(sender, new { type = "completion.reply", requestId, epoch, error = ex.Message }); }
         finally { _completionRequests.TryRemove(key, out _); }
+    }
+
+    private void EnsureWorkspaceRoot(JsonElement payload)
+    {
+        if (payload.TryGetProperty("root", out var expected) && !string.Equals(expected.GetString(), _workspace.Root, StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException("The workspace changed. Retry in the current workspace.");
     }
 
     private async Task OpenWorkspaceAsync(CoreWebView2 sender)
@@ -651,6 +833,9 @@ public sealed partial class MainPage : Page
         var nameInput = new TextBox { PlaceholderText = "sql-workspace", Text = "sql-workspace" };
         var dialog = new ContentDialog
         {
+            RequestedTheme = NativeTheme.RequestedTheme,
+            Background = NativeTheme.Brush("--surface"),
+            Foreground = NativeTheme.Brush("--foreground"),
             Title = "Create SQL workspace",
             Content = nameInput,
             PrimaryButtonText = "Create workspace",
@@ -663,6 +848,7 @@ public sealed partial class MainPage : Page
         if (string.IsNullOrWhiteSpace(name) || name.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 || name is "." or "..")
             throw new InvalidOperationException("Enter a valid workspace folder name.");
         var path = Path.Combine(parent.Path, name);
+        if (Directory.Exists(path) || File.Exists(path)) throw new IOException("A folder or file with this name already exists.");
         Directory.CreateDirectory(path);
         await _workspace.SetRootAsync(path);
         await SendWorkspaceAsync(sender);
@@ -670,25 +856,32 @@ public sealed partial class MainPage : Page
 
     private async Task SendWorkspaceAsync(CoreWebView2 sender)
     {
+        try { EnsureWorkspaceWatcher(sender); }
+        catch (Exception watcherError) { _workspaceWatcher?.Dispose(); _workspaceWatcher = null; Debug.WriteLine("Workspace watcher: " + watcherError.Message); }
         var root = _workspace.Root;
+        var catalog = await Task.Run(() => _workspace.Catalog);
         var files = await Task.Run(() => _workspace.ListSqlFiles());
-        var entries = await Task.Run(() => _workspace.ListDirectory());
-        await SendAsync(sender, new { type = "workspace.state", root, name = root is null ? "No workspace" : Path.GetFileName(root), files, entries, recent = _workspace.Recent });
+        IReadOnlyList<WorkspaceEntry> entries = []; string? error = null;
+        try { entries = await Task.Run(() => _workspace.ListDirectory()); }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { error = ex.Message; }
+        if (root is not null && !Directory.Exists(root)) error = "Workspace folder unavailable. Locate it or retry.";
+        await SendAsync(sender, new { type = "workspace.state", root, name = _workspace.DisplayName, files, entries, recent = _workspace.Recent, catalog, error });
     }
 
     private async Task OpenSqlFilePathAsync(CoreWebView2 sender, JsonElement payload)
     {
         var path = payload.TryGetProperty("path", out var value) ? value.GetString() : null;
         if (string.IsNullOrWhiteSpace(path) || !File.Exists(path)) throw new FileNotFoundException("SQL file no longer exists.", path);
-        await OpenSqlFileAtPathAsync(sender, path);
+        await OpenSqlFileAtPathAsync(sender, path, payload.TryGetProperty("forceNew", out var forceNew) && forceNew.GetBoolean());
     }
 
-    private async Task OpenSqlFileAtPathAsync(CoreWebView2 sender, string path)
+    private async Task OpenSqlFileAtPathAsync(CoreWebView2 sender, string path, bool forceNew = false)
     {
         var filePath = Path.GetFullPath(path);
-        var content = await File.ReadAllTextAsync(filePath);
+        var snapshot = await Task.Run(() => WorkspaceFileService.ReadAsync(filePath));
+        if (snapshot.Missing || snapshot.Error is not null) throw new IOException(snapshot.Error ?? "The SQL file no longer exists.");
         var profileId = await _workspace.GetFileConnectionAsync(filePath);
-        Send(sender, new { type = "file.opened", path = filePath, fileName = Path.GetFileName(filePath), content, profileId });
+        Send(sender, new { type = "file.opened", path = filePath, fileName = Path.GetFileName(filePath), content = snapshot.Content, diskVersion = snapshot.Version, profileId, forceNew });
     }
 
     private async Task BindFileConnectionAsync(CoreWebView2 sender, string? requestId)
@@ -702,16 +895,22 @@ public sealed partial class MainPage : Page
 
     private async Task SendSchemaAsync(CoreWebView2 sender, string? requestId = null)
     {
-        Send(sender, new { type = "schema.loading" });
+        var tabId = CommandTab.Value!.Id;
+        using var cancellation = new CancellationTokenSource();
+        var key = $"{tabId}:{requestId}";
+        if (requestId is not null) _schemaRequests[key] = cancellation;
+        Send(sender, new { type = "schema.loading", requestId });
         try
         {
-            var snapshot = await Task.Run(() => _oracle.LoadSchemaAsync());
+            var snapshot = await Task.Run(() => _oracle.LoadSchemaAsync(cancellation.Token), cancellation.Token);
             await SendAsync(sender, new { type = "schema.loaded", requestId, schema = snapshot.Owner, objects = snapshot.Objects });
         }
+        catch (OperationCanceledException) { Send(sender, new { type = "schema.cancelled", requestId }); }
         catch (Exception ex)
         {
             Send(sender, new { type = "schema.error", requestId, message = ex.Message });
         }
+        finally { if (requestId is not null) _schemaRequests.TryRemove(key, out _); }
     }
 
     private async Task SendTableDetailsAsync(CoreWebView2 sender, string? requestId, JsonElement payload, bool objectDetails = false)
@@ -768,6 +967,7 @@ public sealed partial class MainPage : Page
     private async Task<bool> ExecuteSqlAsync(CoreWebView2 sender, string? requestId, JsonElement payload, CancellationToken cancellationToken = default, Action<SqlExecutionResult>? onResult = null, Action<string>? onError = null)
     {
         var sql = payload.TryGetProperty("sql", out var sqlValue) ? sqlValue.GetString() ?? string.Empty : string.Empty;
+        if (payload.TryGetProperty("miniTool", out var miniToolValue) && miniToolValue.ValueKind == JsonValueKind.True) MiniToolService.AssertSelect(sql);
         var rowLimit = (payload.TryGetProperty("pageSize", out var rowLimitValue) || payload.TryGetProperty("rowLimit", out rowLimitValue)) && rowLimitValue.TryGetInt32(out var requestedRowLimit)
             ? Math.Clamp(requestedRowLimit, 100, 10000)
             : 1000;
@@ -845,7 +1045,7 @@ public sealed partial class MainPage : Page
             picker.FileTypeChoices.Add(format.ToUpperInvariant(), new List<string> { format=="csv.gz"?".gz":extension });
             InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(MainWindow.Current!));
             var file = await picker.PickSaveFileAsync();
-            if (file is null) { Send(sender, new { type = "result.exportComplete", requestId, resultId, consumed, message = "Export cancelled." }); return; }
+            if (file is null) { Send(sender, new { type = "result.exportComplete", requestId, resultId, consumed, cancelled = true, success = false, message = "Export cancelled." }); return; }
             temporaryPath = file.Path + "." + Guid.NewGuid().ToString("N") + ".partial";
             var columns = payload.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString() ?? "").ToArray();
             var initialRows = payload.GetProperty("rows").EnumerateArray().Select(row => row.EnumerateArray().Select(cell => cell.ValueKind == JsonValueKind.Null ? null : cell.ValueKind == JsonValueKind.Number ? (object?)cell.GetDecimal() : cell.ValueKind==JsonValueKind.Object&&cell.TryGetProperty("base64",out var binary)?binary.GetString():cell.ValueKind == JsonValueKind.String ? cell.GetString() : cell.ToString()).ToArray());
@@ -870,10 +1070,10 @@ public sealed partial class MainPage : Page
                 await writer.FlushAsync(cancellation.Token);
             }
             cancellation.Token.ThrowIfCancellationRequested(); File.Move(temporaryPath, file.Path, true); temporaryPath = null;
-            Send(sender, new { type = "result.exportComplete", requestId, resultId, consumed, rowsWritten = count, message = $"Exported {count:N0} rows to {file.Name}." });
+            Send(sender, new { type = "result.exportComplete", requestId, resultId, consumed, success = true, rowsWritten = count, message = $"Exported {count:N0} rows to {file.Name}." });
         }
-        catch (OperationCanceledException) { Send(sender, new { type = "result.exportComplete", requestId, resultId, consumed, rowsWritten = count, message = "Export cancelled. Partial file removed." }); }
-        catch (Exception ex) { Send(sender, new { type = "result.exportComplete", requestId, resultId, consumed, message = "Export failed: " + ex.Message }); }
+        catch (OperationCanceledException) { Send(sender, new { type = "result.exportComplete", requestId, resultId, consumed, cancelled = true, success = false, rowsWritten = count, message = "Export cancelled. Partial file removed." }); }
+        catch (Exception ex) { Send(sender, new { type = "result.exportComplete", requestId, resultId, consumed, success = false, message = "Export failed: " + ex.Message }); }
         finally { if (temporaryPath is not null) { try { File.Delete(temporaryPath); } catch (IOException) { } } _resultExports.TryRemove(tabId, out _); }
     }
 
@@ -927,6 +1127,7 @@ public sealed partial class MainPage : Page
     {
         var node = JsonSerializer.SerializeToNode(value, WebJsonOptions)!.AsObject();
         if (tabId is not null) node["tabId"] = tabId;
+        if (CommandTab.Value is { } tab && tab.Id == tabId) node["autoCommit"] = tab.Oracle.AutoCommit;
         return node.ToJsonString();
     }
     private static void Send(CoreWebView2 sender, object value) => sender.PostWebMessageAsJson(SerializeReply(value, CommandTab.Value?.Id));
@@ -974,7 +1175,18 @@ public sealed partial class MainPage : Page
             Send(sender, new { type = "file.saveCancelled", requestId });
             return;
         }
-        await File.WriteAllTextAsync(file.Path, content, new UTF8Encoding(false));
+        var expectedVersion = string.Equals(path, file.Path, StringComparison.OrdinalIgnoreCase) && payload.TryGetProperty("diskVersion", out var diskVersionValue) ? diskVersionValue.GetString() : null;
+        if (expectedVersion is null && string.Equals(path, file.Path, StringComparison.OrdinalIgnoreCase))
+        {
+            var review = await Task.Run(() => WorkspaceFileService.ReadAsync(file.Path));
+            if (review.Missing || review.Error is not null || review.Content != content)
+            {
+                Send(sender, new { type = "file.conflict", requestId, path = file.Path, snapshot = review, baselineUnknown = true }); return;
+            }
+            expectedVersion = review.Version;
+        }
+        var savedSnapshot = await Task.Run(() => WorkspaceFileService.SaveAsync(file.Path, content, expectedVersion));
+        if (savedSnapshot.Conflict) { Send(sender, new { type = "file.conflict", requestId, path = file.Path, snapshot = savedSnapshot }); return; }
         _activeFilePath = file.Path;
         if (_oracle.ProfileId is { } profileId) await _workspace.SetFileConnectionAsync(file.Path, profileId);
         Send(sender, new
@@ -983,6 +1195,7 @@ public sealed partial class MainPage : Page
             requestId,
             path = file.Path,
             fileName = file.Name,
+            diskVersion = savedSnapshot.Version,
             profileId = _oracle.ProfileId
         });
         await SendWorkspaceAsync(sender);

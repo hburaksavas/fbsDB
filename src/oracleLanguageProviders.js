@@ -1,5 +1,6 @@
 import { oracleInlineCompletion } from './oracleInlineCompletion.js';
 import { monacoCompletionItems } from './oracleCompletionClient.js';
+import {automaticCompletionAllowed} from './oracleCompletion.js';
 
 const markdown = value => String(value || '').replace(/[\\`*_{}\[\]<>]/g, '\\$&');
 const rangeAt = (monaco, model, start, end = start + 1) => {
@@ -80,6 +81,7 @@ export function installOracleLanguageProviders({ monaco, editor, client, broker,
     async provideInlineCompletions(model, position, context, token) {
       if (!snapshot().settings.inline) return { items: [] };
       const source = model.getValue(), cursor = model.getOffsetAt(position), settings = snapshot().settings;
+      if(!automaticCompletionAllowed(source,cursor,settings))return {items:[]};
       const result = await prepare(model, position, token, 'complete');
       if (!result || token?.isCancellationRequested) return { items: [] };
       const candidate = oracleInlineCompletion(source, cursor, settings, result);
@@ -144,7 +146,7 @@ export function installOracleLanguageProviders({ monaco, editor, client, broker,
   disposables.push(editor.addAction({ id: 'fbsdb.plscopeReferences', label: 'Find PL/Scope references', contextMenuGroupId: 'navigation', contextMenuOrder: 4,
     async run() {
       const state = snapshot();
-      if (!state.settings.plscope) { onError('Enable PL/Scope reference lookup in Editor completion settings.'); return; }
+      if (!state.settings.plscope) { onError('Enable PL/Scope references in Settings > Completion.'); return; }
       if (!state.connected) { onError('Connect to Oracle to look up PL/Scope references.'); return; }
       const model = editor.getModel(), position = editor.getPosition(); if (!model || !position) return;
       const symbol = (await prepare(model, position, null, 'symbol'))?.symbol, target = symbol?.target || state.sourceObject;

@@ -1,6 +1,6 @@
-import { isNativeHost,sendNativeCommand } from './nativeBridge';
-
-export function TnsSourcesSettings({aliases}) {
-  const sources=[...new Set(aliases.map(alias=>alias.source))];
-  return <section><h3>TNS sources</h3><p>Oracle aliases are discovered from TNS_ADMIN and configured Oracle files. Basic and Custom connections can be used without TNS files.</p><div className="settings-tns-sources">{sources.map(source=><code key={source}>{source}</code>)}{!sources.length&&<p>No aliases discovered.</p>}</div><div className="nls-actions"><button type="button" disabled={!isNativeHost} onClick={()=>sendNativeCommand('connection.list')}>Refresh sources</button><button type="button" disabled={!isNativeHost} onClick={()=>sendNativeCommand('tns.add')}>Add TNS file</button></div></section>;
+import {RefreshCw,FilePlus2,FileCode2,TriangleAlert} from 'lucide-react';
+import {isNativeHost,sendNativeCommand} from './nativeBridge';
+export function TnsSourcesSettings({aliases=[]}){
+ const sources=[...new Set(aliases.map(alias=>alias.source))];
+ return <section className="connection-tns"><header><strong>TNS sources</strong><div><button className="button-secondary" disabled={!isNativeHost} onClick={()=>sendNativeCommand('connection.list')}><RefreshCw size={13}/>Refresh</button><button className="button-secondary" disabled={!isNativeHost} onClick={()=>sendNativeCommand('tns.add')}><FilePlus2 size={13}/>Add TNS file</button></div></header><div className="connection-tns-list">{sources.map(source=><details key={source} open><summary title={source}><FileCode2 size={14}/><span>{source.split(/[\\/]/).at(-1)}<small>{source}</small></span><b>{aliases.filter(alias=>alias.source===source).length}</b></summary><table><thead><tr><th>Alias</th><th>Target</th></tr></thead><tbody>{aliases.filter(alias=>alias.source===source).map(alias=><tr key={alias.id}><td>{alias.id}{alias.duplicate&&<TriangleAlert size={12} aria-label="Duplicate alias"/>}</td><td>{alias.host}{alias.port?':'+alias.port:''}{alias.service?'/'+alias.service:''}</td></tr>)}</tbody></table></details>)}{!sources.length&&<p className="connection-manager-hint">No TNS sources</p>}</div></section>;
 }

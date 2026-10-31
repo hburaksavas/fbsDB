@@ -87,7 +87,7 @@ public sealed class WorkspaceDevelopmentService(WorkspaceService workspace)
         if (bytes.AsSpan().StartsWith(new byte[] {0xfe,0xff})) return (new UnicodeEncoding(true,true,true).GetString(bytes,2,bytes.Length-2),new UnicodeEncoding(true,true,true),2);
         return (new UTF8Encoding(false,true).GetString(bytes),new UTF8Encoding(false,true),0);
     }
-    public async Task<WorkspaceReplacePreview> PreviewReplaceAsync(string search, string replacement, bool caseSensitive, IReadOnlyList<string> excluded)
+    public async Task<WorkspaceReplacePreview> PreviewReplaceAsync(string search, string replacement, bool caseSensitive, IReadOnlyList<string> excluded, string? scope = null)
     {
         if (string.IsNullOrEmpty(search)) throw new InvalidOperationException("Enter literal text to find.");
         await _gate.WaitAsync();
@@ -96,7 +96,7 @@ public sealed class WorkspaceDevelopmentService(WorkspaceService workspace)
             var excludedSet = excluded.Select(Path.GetFullPath).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var result = new List<WorkspaceReplaceFile>(); var plan = new List<Replacement>(); var skipped = new List<string>();
             long bytesScanned = 0;
-            foreach (var file in workspace.ListSqlFiles())
+            foreach (var file in workspace.ScopedSqlFiles(scope))
             {
                 if (excludedSet.Contains(file.Path)) { skipped.Add(file.RelativePath + ": unsaved editor changes"); continue; }
                 try
@@ -143,7 +143,7 @@ public sealed class WorkspaceDevelopmentService(WorkspaceService workspace)
                     var current = new byte[file.Original.Length]; await stream.ReadExactlyAsync(current);
                     if (!CryptographicOperations.FixedTimeEquals(SHA256.HashData(current),SHA256.HashData(file.Original))) throw new InvalidOperationException("File changed since preview.");
                     File.Replace(temporary,path,null); temporary=null;
-                    applied.Add(new(path,file.Text));
+                    applied.Add(new(path,file.Text,Convert.ToHexString(SHA256.HashData(file.Updated))));
                 }
                 catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException) { skipped.Add(file.Path+": "+error.Message); }
                 finally { if (temporary is not null && File.Exists(temporary)) File.Delete(temporary); }
@@ -158,5 +158,5 @@ public sealed record WorkspaceGitState(bool Repository,string Branch,IReadOnlyLi
 public sealed record WorkspaceGitDiff(string Path,string Diff,string Commit);
 public sealed record WorkspaceReplaceFile(string Path,string RelativePath,string Before,string After);
 public sealed record WorkspaceReplacePreview(string Id,IReadOnlyList<WorkspaceReplaceFile> Files,IReadOnlyList<string> Skipped);
-public sealed record WorkspaceReplacedFile(string Path,string Content);
+public sealed record WorkspaceReplacedFile(string Path,string Content,string? DiskVersion = null);
 public sealed record WorkspaceReplaceResult(IReadOnlyList<WorkspaceReplacedFile> Applied,IReadOnlyList<string> Skipped);

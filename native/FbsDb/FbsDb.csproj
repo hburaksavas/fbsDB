@@ -17,6 +17,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Content Include="..\..\src\themePalettes.json" Link="Assets\theme-palettes.json" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="WebContent\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>

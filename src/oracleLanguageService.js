@@ -117,9 +117,16 @@ function aliasFor(name, used) {
 }
 
 export function oracleLanguageCompletions(source, cursor, options = {}) {
+  const result=languageCompletions(source,cursor,options),settings=options.settings||{};
+  const enabled={keyword:settings.showKeywords, function:settings.showFunctions, field:settings.showColumns};
+  result.candidates=result.candidates.filter(candidate=>enabled[candidate.kind]!==false).slice(0,[50,100,200,300].includes(settings.maxSuggestions)?settings.maxSuggestions:300);
+  return result;
+}
+
+function languageCompletions(source, cursor, options = {}) {
   const objects = languageObjects(options), result = getOracleCompletions(source, cursor, { ...options, objects });
   const context = result.context; if (context.blocked || context.bind) return result;
-  if (options.automatic && !automaticCompletionAllowed(source, cursor)) return { ...result, candidates: [] };
+  if (options.automatic && !automaticCompletionAllowed(source, cursor,options.settings)) return { ...result, candidates: [] };
   const blankLine = !source.slice(source.lastIndexOf('\n', cursor - 1) + 1, cursor).trim();
   const settings = options.settings || {}, sources = contextSources(context, objects, options.currentSchema);
   const localTypes = plsqlTypeResolver(source, cursor, objects, options.currentSchema), path = plsqlMemberPath(source, cursor, context.start), localRecord = localTypes.fields(path);

@@ -1,0 +1,16 @@
+import {Database,Folder,FolderOpen,Settings2,Star} from 'lucide-react';
+import {folderOptions} from './connectionOrganization';
+import {connectionContextKey} from './ConnectionContextMenu';
+
+export function ConnectionFolders({folders,selected,onSelect,onContext}){
+ const entries=folderOptions(folders);
+ const branch=(parent=null,depth=0)=>entries.filter(f=>(f.parentId||null)===parent).map(f=><div key={f.id}><button type="button" className="connection-folder-row" style={{paddingLeft:10+depth*14}} aria-pressed={selected===f.id} onClick={()=>onSelect(f.id)} onContextMenu={e=>onContext?.(e,"folder",f)} onKeyDown={e=>connectionContextKey(e,event=>onContext?.(event,"folder",f))}><Folder size={14}/><span>{f.name}</span></button>{branch(f.id,depth+1)}</div>);
+ return <nav className="connection-folders" aria-label="Connection folders"><button type="button" className="connection-folder-row" aria-pressed={selected===''} onClick={()=>onSelect('')}><FolderOpen size={14}/>All connections</button><button type="button" className="connection-folder-row" aria-pressed={selected==='__root__'} onClick={()=>onSelect('__root__')}><Database size={14}/>Unfiled</button>{branch()}</nav>;
+}
+
+export function ConnectionTree({items,organization,selected,favorites=[],onSelect,onManage,onToggleFavorite,onContext,contextId}){
+ const entries=folderOptions(organization.folders);
+ const profiles=folder=>items.filter(p=>(p.folderId||null)===folder).map(p=><div className="connection-tree-profile" key={p.id}><button type="button" className="connection-tree-entry" data-connection-profile={p.id} data-context-selected={contextId===p.id||undefined} aria-current={selected?.id===p.id?'true':undefined} onClick={()=>onSelect(p)} onKeyDown={e=>connectionContextKey(e,event=>onContext?.(event,"profile",p))} onContextMenu={event=>{event.preventDefault();event.stopPropagation();onContext?.(event,"profile",p)}} title={[p.name||p.id,p.user,p.host,p.service,...p.groups||[]].filter(Boolean).join(' · ')}><Database size={13}/><span><b>{p.name||p.id}</b><small>{p.user||p.env}{p.groups?.length?` · ${p.groups.join(', ')}`:''}</small></span></button><button type="button" className="connection-tree-action" aria-label={`Edit ${p.name||p.id}`} title="Edit connection definition" onClick={()=>onManage(p)}><Settings2 size={12}/></button><button type="button" className="connection-tree-action" aria-label={`Favorite ${p.name||p.id}`} aria-pressed={favorites.includes(p.id)} onClick={()=>onToggleFavorite(p.id)}><Star size={12}/></button></div>);
+ const branch=(parent=null,depth=0)=>depth>100?null:entries.filter(f=>(f.parentId||null)===parent).map(f=><details open key={f.id} className="connection-tree-folder"><summary data-context-selected={contextId===f.id||undefined} onContextMenu={e=>onContext?.(e,"folder",f)} onKeyDown={e=>connectionContextKey(e,event=>onContext?.(event,"folder",f))}><Folder size={13}/><span>{f.name}</span></summary><div>{profiles(f.id)}{branch(f.id,depth+1)}</div></details>);
+ return <div className="connection-tree" aria-label="Saved connections" tabIndex={0} onContextMenu={e=>onContext?.(e,"background")} onKeyDown={e=>{if(e.target===e.currentTarget)connectionContextKey(e,event=>onContext?.(event,"background"))}}>{profiles(null)}{branch()}{!items.length&&<p className="connection-manager-hint">No matching connections.</p>}</div>;
+}

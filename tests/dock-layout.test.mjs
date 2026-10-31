@@ -28,7 +28,7 @@ test('corrupt layouts recover missing panels, exclude duplicates and clamp sizes
 
 test('layout migration is global, preserves old sizes once and survives workspace switches and restart', () => {
   const entries = new Map([['fbsdb.sidebarWidth', '320'], ['fbsdb.resultsHeight', '42'], ['fbsdb.explorerSectionHeights', '{"connections":300}']]);
-  const storage = { getItem: key => entries.get(key) ?? null, setItem: (key, value) => entries.set(key, value) };
+  const storage = { getItem: key => entries.get(key) ?? null, setItem: (key, value) => entries.set(key, value), removeItem: key => entries.delete(key) };
   let settings = loadSettings(storage);
   assert.equal(resolveSetting(settings, 'ui.layout').value.widths.left, 320);
   assert.equal(resolveSetting(settings, 'ui.layout').value.resultsHeight, 42);
@@ -68,7 +68,7 @@ test('panel visibility replaces legacy collapsed headings while retaining group 
 test('earlier docking settings retain separately stored folder expansions and inspector width once', () => {
   const earlier = defaultDockLayout(); delete earlier.expandedPaths; delete earlier.inspectorWidth;
   const data = new Map([[SETTINGS_KEY, JSON.stringify({version:1,migrations:{legacyPreferences:1,dockLayout:1},user:{'ui.layout':earlier},workspaces:{}})],['fbsdb.explorerExpandedPaths','{"D:/SQL/queries":true}'],['fbsdb.resultsInspectorWidth','360']]);
-  const storage = {getItem:key=>data.get(key)??null,setItem:(key,value)=>data.set(key,value)};
+  const storage = {getItem:key=>data.get(key)??null,setItem:(key,value)=>data.set(key,value),removeItem:key=>data.delete(key)};
   let settings=loadSettings(storage);
   assert.deepEqual(resolveSetting(settings,'ui.layout').value.expandedPaths,{'D:/SQL/queries':true});
   assert.equal(resolveSetting(settings,'ui.layout').value.inspectorWidth,360);

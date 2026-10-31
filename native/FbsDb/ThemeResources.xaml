@@ -1,0 +1,21 @@
+<!-- Generated from src/themePalettes.json. Runtime theme selection replaces these brushes. -->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Color x:Key="ShellBackgroundColor">#10151d</Color>
+    <SolidColorBrush x:Key="ShellBackgroundBrush" Color="{ThemeResource ShellBackgroundColor}" />
+    <Color x:Key="ShellSurfaceColor">#111923</Color>
+    <SolidColorBrush x:Key="ShellSurfaceBrush" Color="{ThemeResource ShellSurfaceColor}" />
+    <Color x:Key="ShellInputColor">#0e151d</Color>
+    <SolidColorBrush x:Key="ShellInputBrush" Color="{ThemeResource ShellInputColor}" />
+    <Color x:Key="ShellChromeColor">#111720</Color>
+    <SolidColorBrush x:Key="ShellChromeBrush" Color="{ThemeResource ShellChromeColor}" />
+    <Color x:Key="ShellBorderColor">#354456</Color>
+    <SolidColorBrush x:Key="ShellBorderBrush" Color="{ThemeResource ShellBorderColor}" />
+    <Color x:Key="ShellTextColor">#dbe3ed</Color>
+    <SolidColorBrush x:Key="ShellTextBrush" Color="{ThemeResource ShellTextColor}" />
+    <Color x:Key="ShellMutedColor">#9cacc0</Color>
+    <SolidColorBrush x:Key="ShellMutedBrush" Color="{ThemeResource ShellMutedColor}" />
+    <Color x:Key="ShellAccentColor">#39b7a5</Color>
+    <SolidColorBrush x:Key="ShellAccentBrush" Color="{ThemeResource ShellAccentColor}" />
+    <Color x:Key="ShellOnAccentColor">#071b18</Color>
+    <SolidColorBrush x:Key="ShellOnAccentBrush" Color="{ThemeResource ShellOnAccentColor}" />
+</ResourceDictionary>

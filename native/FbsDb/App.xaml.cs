@@ -36,8 +36,10 @@ public partial class App : Application
     /// Invoked when the application is launched.
     /// </summary>
     /// <param name="args">Details about the launch request and process.</param>
-    protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
+    protected override async void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
+        var theme = await Services.ThemePaletteService.ReadPreferenceAsync(NativeTheme.SettingsPath);
+        NativeTheme.Apply(theme);
         _window = new MainWindow();
         ((MainWindow)_window).ShowStartupSplash();
     }

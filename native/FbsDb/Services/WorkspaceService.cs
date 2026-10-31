@@ -3,14 +3,14 @@ using System.Text.Json.Nodes;
 
 namespace FbsDb.Services;
 
-public sealed class WorkspaceService
+public sealed partial class WorkspaceService
 {
     private readonly string _appSettingsPath;
     private string? _root;
     private string[] _recent = [];
     public IReadOnlyList<string> Recent => _recent;
 
-    public WorkspaceService() : this(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "fbsDB", "settings.json")) { }
+    public WorkspaceService() : this(Environment.GetEnvironmentVariable("FBSDB_WORKSPACE_SETTINGS_PATH") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "fbsDB", "settings.json")) { }
 
     public WorkspaceService(string appSettingsPath) => _appSettingsPath = Path.GetFullPath(appSettingsPath);
 
@@ -18,38 +18,35 @@ public sealed class WorkspaceService
 
     public async Task RestoreAsync()
     {
-        if (!File.Exists(_appSettingsPath)) return;
-        try
-        {
-            using var document = JsonDocument.Parse(await File.ReadAllTextAsync(_appSettingsPath));
-            if (document.RootElement.TryGetProperty("lastWorkspace", out var value) && value.GetString() is { } path && Directory.Exists(path)) _root = path;
-            if (document.RootElement.TryGetProperty("recentWorkspaces", out var recent) && recent.ValueKind == JsonValueKind.Array)
-                _recent = recent.EnumerateArray().Where(item => item.ValueKind == JsonValueKind.String).Select(item => item.GetString()!).Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase).Take(10).ToArray();
-            if (_root is not null) _recent = new[] { _root }.Concat(_recent).Distinct(StringComparer.OrdinalIgnoreCase).Take(10).ToArray();
-        }
-        catch (Exception ex) when (ex is IOException or JsonException or UnauthorizedAccessException) { }
+        var settings = await NativeSettingsStore.ReadAsync(_appSettingsPath);
+        _catalog = settings["workspaceCatalog"]?.Deserialize<List<WorkspaceRegistration>>(CatalogJson) ?? [];
+        if (settings["recentWorkspaces"] is JsonArray recent)
+            foreach (var item in recent)
+                if (item?.GetValue<string>() is { } path && !_catalog.Any(w => SamePath(w.Path, path)))
+                    _catalog.Add(new(Guid.NewGuid().ToString("N"), Path.GetFullPath(path), Path.GetFileName(path), "", false, null));
+        _root = settings["lastWorkspace"]?.GetValue<string>();
+        if (_root is not null && !_catalog.Any(w => SamePath(w.Path, _root)))
+            _catalog.Add(new(Guid.NewGuid().ToString("N"), _root, Path.GetFileName(_root), "", false, null));
+        if (_root is not null && !Directory.Exists(_root)) _root = null;
+        RefreshRecent();
     }
 
     public async Task SetRootAsync(string root)
     {
-        var selected=Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
-        if (!Directory.Exists(selected)) throw new DirectoryNotFoundException("The workspace folder no longer exists.");
-        var gate=NativeSettingsStore.Gate(_appSettingsPath);await gate.WaitAsync();
-        try{var settings=await NativeSettingsStore.ReadAsync(_appSettingsPath);var recent=new[]{selected}.Concat(_recent).Distinct(StringComparer.OrdinalIgnoreCase).Take(10).ToArray();settings["lastWorkspace"]=selected;settings["recentWorkspaces"]=JsonSerializer.SerializeToNode(recent);await NativeSettingsStore.WriteAsync(_appSettingsPath,settings);_root=selected;_recent=recent;}
-        finally{gate.Release();}
+        var selected = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+        if (!Directory.Exists(selected)) throw new DirectoryNotFoundException("The workspace folder is unavailable. Locate it or retry.");
+        var existing = _catalog.FirstOrDefault(w => SamePath(w.Path, selected));
+        var registration = (existing ?? new(Guid.NewGuid().ToString("N"), selected, Path.GetFileName(selected), "", false, null)) with { LastOpened = DateTimeOffset.UtcNow };
+        var next = _catalog.Where(w => w.Id != registration.Id).Append(registration).ToList();
+        await SaveCatalogAsync(next, selected);
     }
 
-    public async Task CloseAsync()
-    {
-        var gate = NativeSettingsStore.Gate(_appSettingsPath); await gate.WaitAsync();
-        try { var settings = await NativeSettingsStore.ReadAsync(_appSettingsPath); settings["lastWorkspace"] = null; await NativeSettingsStore.WriteAsync(_appSettingsPath, settings); _root = null; }
-        finally { gate.Release(); }
-    }
+    public Task CloseAsync() => SaveCatalogAsync(_catalog, null);
 
     // Enumerate only one level. Expanding a folder must not scan the whole workspace.
     public IReadOnlyList<WorkspaceEntry> ListDirectory(string? path = null)
     {
-        if (_root is null) return [];
+        if (_root is null || !Directory.Exists(_root)) return [];
         var folder = SafePath(path ?? _root, allowRoot: true);
         return Directory.EnumerateFileSystemEntries(folder).Select(item => new FileInfo(item))
             .Where(item => !item.Name.StartsWith('.') && item.Name is not ("bin" or "obj" or "node_modules") && !item.Attributes.HasFlag(FileAttributes.ReparsePoint))
@@ -82,12 +79,9 @@ public sealed class WorkspaceService
         try
         {
             var settings = await NativeSettingsStore.ReadAsync(configPath);
-            var entries = settings["fileConnections"] as JsonObject;
-            if (entries is not null)
-                foreach (var key in entries.Select(item => item.Key).ToArray())
-                    if (RemapPath(key, source, target) is { } mapped) { entries[mapped] = entries[key]?.DeepClone(); entries.Remove(key); }
+            RemapReferences(settings, [new(source, target)]);
             if (directory) Directory.Move(source, target); else File.Move(source, target);
-            try { if (entries is not null) await NativeSettingsStore.WriteAsync(configPath, settings); }
+            try { if (settings.ContainsKey("fileConnections") || settings.ContainsKey("worksets")) await NativeSettingsStore.WriteAsync(configPath, settings); }
             catch { if (directory) Directory.Move(target, source); else File.Move(target, source); throw; }
         }
         finally { gate.Release(); }
@@ -135,11 +129,11 @@ public sealed class WorkspaceService
         return result.OrderBy(f => f.RelativePath, StringComparer.OrdinalIgnoreCase).ToArray();
     }
 
-    public WorkspaceSearchResult SearchSqlFiles(string query, int limit = 300)
+    public WorkspaceSearchResult SearchSqlFiles(string query, int limit = 300, string? scope = null)
     {
         var matches = new List<WorkspaceSearchMatch>();
         if (string.IsNullOrWhiteSpace(query) || _root is null) return new WorkspaceSearchResult(matches, false);
-        var files = ListSqlFiles();
+        var files = ScopedSqlFiles(scope);
         const int fileLimit = 5000;
         const long totalByteLimit = 256L * 1024 * 1024;
         var truncated = files.Count > fileLimit;

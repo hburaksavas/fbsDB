@@ -32,7 +32,7 @@ try
     await workspace.SetFileConnectionAsync(firstSql, "FBSDB_SMOKE");
     var preserved = JsonNode.Parse(await File.ReadAllTextAsync(workspaceConfig))!;
     Require(preserved["display"]?["density"]?.GetValue<string>() == "compact", "Unrelated workspace settings were lost.");
-    Require(preserved[NativeSettingsStore.VersionKey]?.GetValue<int>() == 1, "Legacy settings were not versioned.");
+    Require(preserved[NativeSettingsStore.VersionKey]?.GetValue<int>() == NativeSettingsStore.CurrentVersion, "Legacy settings were not versioned.");
     await Task.WhenAll(workspace.SetFileConnectionAsync(firstSql, "FBSDB_SMOKE"), workspace.SetFileConnectionAsync(secondSql, "SECOND"));
     Require(await workspace.GetFileConnectionAsync(secondSql) == "SECOND", "Concurrent workspace writes lost a profile.");
     await workspace.SetFileConnectionAsync(secondSql, "");
@@ -75,6 +75,48 @@ try
     Require(document.RootElement.TryGetProperty("fileConnections", out _), "Workspace profile settings were not written.");
     Require(!document.RootElement.ToString().Contains("password", StringComparison.OrdinalIgnoreCase), "Credentials must never be stored in workspace settings.");
 
+    var registration = workspace.Catalog.Single();
+    await workspace.UpdateRegistrationAsync(registration.Id, "Reporting", "Team SQL", true);
+    Require(workspace.DisplayName == "Reporting" && Directory.Exists(workspaceRoot), "Display name must not rename the folder.");
+    var duplicate = await workspace.DuplicateEntryAsync(firstSql, "first copy.sql");
+    Require(await File.ReadAllTextAsync(duplicate.Path) == await File.ReadAllTextAsync(firstSql), "Duplicate must preserve SQL bytes.");
+    var duplicateCollision = false;
+    try { await workspace.DuplicateEntryAsync(firstSql, "first copy.sql"); } catch (IOException) { duplicateCollision = true; }
+    Require(duplicateCollision, "Duplicate must never overwrite existing files.");
+    Require(workspace.SearchSqlFiles("SELECT 2", scope: Path.GetDirectoryName(firstSql)).Matches.Count == 0, "Scoped search escaped its folder.");
+    Require(workspace.SearchSqlFiles("SELECT 1", scope: Path.GetDirectoryName(firstSql)).Matches.Count == 2, "Scoped search did not find nested SQL files.");
+    await workspace.SetFileConnectionAsync(duplicate.Path, "DUPLICATE_PROFILE");
+    var recycleFailed = false;
+    try { await workspace.RecycleEntryAsync(duplicate.Path, (_, _) => throw new IOException("Fixture recycle failure")); } catch (IOException) { recycleFailed = true; }
+    Require(recycleFailed && File.Exists(duplicate.Path) && await workspace.GetFileConnectionAsync(duplicate.Path) == "DUPLICATE_PROFILE", "Failed recycle must keep file and connection reference.");
+    var fixtureTrash = Path.Combine(root, "fixture-trash.sql");
+    await workspace.RecycleEntryAsync(duplicate.Path, (path, directory) => { Require(!directory, "Expected a SQL file."); File.Move(path, fixtureTrash); });
+    Require(File.Exists(fixtureTrash) && await workspace.GetFileConnectionAsync(duplicate.Path) is null, "Successful recycle did not remove the obsolete profile reference.");
+    var rootRecycleRejected = false;
+    try { workspace.ValidateRecyclePath(workspaceRoot); } catch (InvalidOperationException) { rootRecycleRejected = true; }
+    Require(rootRecycleRejected, "The workspace root must never be recycled through entry operations.");
+    var outsideRejected = false;
+    try { workspace.ValidateEntryPath(Path.Combine(root, "outside.sql")); } catch (InvalidOperationException) { outsideRejected = true; }
+    Require(outsideRejected, "Entry operations escaped the active workspace.");
+    var otherRoot = Path.Combine(root, "other"); Directory.CreateDirectory(otherRoot);
+    await workspace.SetRootAsync(otherRoot);
+    var otherRegistration = workspace.Catalog.Single(w => w.Active);
+    Directory.Delete(otherRoot);
+    var missing = new WorkspaceService(settingsFile); await missing.RestoreAsync();
+    Require(missing.Root is null && missing.Catalog.Count == 2 && !missing.Catalog.Single(w => w.Id == otherRegistration.Id).Available, "Missing workspaces must remain registered.");
+    var relocated = Path.Combine(root, "relocated"); Directory.CreateDirectory(relocated);
+    await missing.RelocateAsync(otherRegistration.Id, relocated);
+    Require(missing.Catalog.Single(w => w.Id == otherRegistration.Id).Path == relocated, "Relocation changed workspace identity.");
+    await missing.ForgetAsync(otherRegistration.Id);
+    Require(Directory.Exists(relocated) && missing.Catalog.Count == 1, "Forget must retain the physical folder.");
+    await missing.SetRootAsync(workspaceRoot);
+    Require(missing.Catalog.Single().Pinned && missing.DisplayName == "Reporting", "Workspace properties were not persisted.");
+    await missing.ForgetAsync(registration.Id);
+    Require(missing.Root is null && missing.Catalog.Count == 0 && File.Exists(firstSql) && File.Exists(workspaceConfig), "Forgetting the active workspace must only remove its registration.");
+    var forgotten = new WorkspaceService(settingsFile); await forgotten.RestoreAsync();
+    Require(forgotten.Catalog.Count == 0, "Forgotten workspace returned after reload.");
+
+    await workspace.SetRootAsync(workspaceRoot);
     foreach (var invalid in new[]{"{\"fbsdbSettingsVersion\":99}","{\"fbsdbSettingsVersion\":{}}","{broken"})
     {
         await File.WriteAllTextAsync(workspaceConfig, invalid);
@@ -83,7 +125,7 @@ try
         catch (Exception exception) when (exception is InvalidOperationException or JsonException) { rejected = true; }
         Require(rejected && await File.ReadAllTextAsync(workspaceConfig) == invalid, "Unsupported or corrupt settings were overwritten.");
     }
-    Console.WriteLine("Workspace smoke checks passed: directory tree, create/move, profile remapping, collisions, traversal, recents/close, restore, concurrent settings writes and corruption preservation.");
+    Console.WriteLine("Workspace smoke checks passed: directory tree, create/move, profile remapping, collisions, traversal, catalog/pins/properties, missing folders, relocation, forget, duplicate/scoped search, recents/close, restore, concurrent settings writes and corruption preservation.");
 }
 finally
 {
