@@ -25,6 +25,18 @@ public sealed partial class MainPage
             var payload = Context.Payload;
             switch (command)
             {
+                case "script.sourceReviewed":
+                    var accepted = Host._scriptSourceReviews.Approve(tabId,payload.GetProperty("scriptRequestId").GetString()!,payload.GetProperty("index").GetInt32(),payload.GetProperty("reviewNonce").GetString()!,payload.GetProperty("reviewId").GetString()!);
+                    Send(sender,new {type="script.reviewAccepted",requestId=id,accepted});
+                    break;
+                case "source.review":
+                    try
+                    {
+                        var sourceReview = await Task.Run(() => _oracle.ReviewSourceAsync(payload.GetProperty("sql").GetString()!));
+                        Send(sender, new { type = "source.review", requestId = id, review = sourceReview });
+                    }
+                    catch (Exception error) { Send(sender, new { type = "source.review.error", requestId = id, message = error.Message, connected = _oracle.IsConnected }); }
+                    break;
                 case "tab.close":
                     try { await _sessions.CloseAsync(tabId); Send(sender, new { type = "tab.closed", requestId = id }); }
                     catch (Exception ex) { Send(sender, new { type = "tab.closeFailed", requestId = id, message = ex.Message, transactionPending = _oracle.HasPendingTransaction }); }
@@ -66,7 +78,7 @@ public sealed partial class MainPage
                     if (_resultExports.TryGetValue(tabId, out var exportCancellation)) exportCancellation.Cancel();
                     break;
                 case "result.openUrl":
-                    if(Uri.TryCreate(payload.GetProperty("url").GetString(),UriKind.Absolute,out var url)&&url.Scheme is "http" or "https")await Windows.System.Launcher.LaunchUriAsync(url);
+                    if(Uri.TryCreate(payload.GetProperty("url").GetString(),UriKind.Absolute,out var url)&&url.Scheme is "http" or "https" or "mailto")await Windows.System.Launcher.LaunchUriAsync(url);
                     break;
                 case "result.columnDefinition": {
                     var column=payload.GetProperty("column");var definition=await Task.Run(()=>_oracle.GetColumnDefinitionAsync(column.GetProperty("sourceSchema").GetString()??"",column.GetProperty("sourceTable").GetString()??"",column.GetProperty("sourceColumn").GetString()??column.GetProperty("name").GetString()!));Send(sender,new{type="result.columnDefinition",requestId=id,definition});break;
@@ -80,6 +92,27 @@ public sealed partial class MainPage
                 case "result.primaryKey": {
                     var metadata=await Task.Run(()=>_oracle.GetPrimaryKeyAsync(payload.GetProperty("schema").GetString()??"",payload.GetProperty("table").GetString()??""));
                     Send(sender,new{type="result.primaryKey",requestId=id,metadata.Schema,metadata.Table,metadata.Columns,message="No primary key found."});break;
+                }
+                case "result.constraintInfo": {
+                    var constraintOwner = payload.GetProperty("owner").GetString() ?? "";
+                    var constraintName = payload.GetProperty("name").GetString() ?? "";
+                    try
+                    {
+                        var info = await Task.Run(() => _oracle.GetConstraintInfoAsync(constraintOwner, constraintName));
+                        Send(sender, new { type = "result.constraintInfo", requestId = id, tabId, owner = constraintOwner, name = constraintName, found = info is not null, constraintType = info?.Type, condition = info?.Condition, columns = info?.Columns ?? [], referenced = info?.ReferencedConstraint });
+                    }
+                    catch (Exception ex) { Send(sender, new { type = "result.constraintInfo", requestId = id, tabId, owner = constraintOwner, name = constraintName, found = false, error = ex.Message }); }
+                    break;
+                }
+                case "result.editIdentity": {
+                    // Primary key columns of the single source table; editing needs a reliable row identity and never guesses one.
+                    try
+                    {
+                        var identity = await Task.Run(() => _oracle.GetPrimaryKeyAsync("\"" + (payload.GetProperty("schema").GetString() ?? "").Replace("\"", "\"\"") + "\"", "\"" + (payload.GetProperty("table").GetString() ?? "").Replace("\"", "\"\"") + "\""));
+                        Send(sender, new { type = "result.editIdentity", requestId = id, tabId, schema = payload.GetProperty("schema").GetString(), table = payload.GetProperty("table").GetString(), columns = identity.Columns.Select(column => column.Name).ToArray() });
+                    }
+                    catch (Exception ex) { Send(sender, new { type = "result.editIdentity", requestId = id, tabId, schema = payload.GetProperty("schema").GetString(), table = payload.GetProperty("table").GetString(), columns = Array.Empty<string>(), error = ex.Message }); }
+                    break;
                 }
                 case "result.lookupSql": {
                     var schema=payload.GetProperty("schema").GetString()??"";var table=payload.GetProperty("table").GetString()??"";
@@ -153,6 +186,16 @@ public sealed partial class MainPage
                 case "sql.execute":
                     await ExecuteSqlAsync(sender, id, payload);
                     break;
+                case "sql.stopApplyDml":
+                    // Only stops sending new statements; the one already running finishes and is reported.
+                    if (_gridApplies.TryGetValue(tabId, out var applying)) { try { applying.Cancel(); } catch (ObjectDisposedException) { } }
+                    break;
+                case "sql.applyDml":
+                    await ApplyGridDmlAsync(sender, id, payload);
+                    break;
+                case "sql.evaluate":
+                    await EvaluateExpressionAsync(sender, id, payload);
+                    break;
                 case "sql.explain":
                     await ExplainSqlAsync(sender, id, payload);
                     break;
@@ -162,8 +205,16 @@ public sealed partial class MainPage
                     Send(sender, new { type = "sql.cancelled", requestId = id, complete = !active, active, transactionPending = _oracle.HasPendingTransaction });
                     break;
                 case "transaction.commit":
-                    await Task.Run(() => _oracle.CommitAsync());
-                    Send(sender, new { type = "transaction.state", state = "committed", pending = false, requestId = id });
+                    try
+                    {
+                        await Task.Run(() => _oracle.CommitAsync());
+                        Send(sender, new { type = "transaction.state", state = "committed", pending = false, requestId = id });
+                    }
+                    catch (Exception ex) when (!_oracle.IsConnected)
+                    {
+                        // The connection failed during Commit: Oracle may or may not have committed, so neither success nor failure is claimed.
+                        Send(sender, new { type = "transaction.state", state = "commit outcome unknown", pending = true, unconfirmed = true, message = ex.Message, requestId = id });
+                    }
                     break;
                 case "transaction.autoCommit":
                     await Task.Run(() => _oracle.SetAutoCommitAsync(payload.GetProperty("enabled").GetBoolean()));
@@ -357,9 +408,21 @@ public sealed partial class MainPage
                     var statement = statements[index];
                     var sql = statement.GetProperty("sql").GetString() ?? "";
                     var offset = statement.TryGetProperty("start", out var start) ? start.GetInt32() : 0;
+                    string? sourceReviewId = null;
+                    if (OracleSqlUnit.CompilationTarget(sql) is not null)
+                    {
+                        var pending = Host._scriptSourceReviews.Begin(tabId,requestId ?? "",index);
+                        try
+                        {
+                            Send(sender,new {type="script.sourceReviewRequired",requestId,index,sql,offset,reviewNonce=pending.Nonce,transactionPending=_oracle.HasPendingTransaction});
+                            sourceReviewId = await pending.Completion.Task.WaitAsync(cancellation.Token);
+                        }
+                        catch (OperationCanceledException) { cancellation.Cancel(); break; }
+                        finally { Host._scriptSourceReviews.Remove(tabId); }
+                    }
                     Send(sender, new { type = "script.step", requestId, index, sql, offset, status = "Running", transactionPending = _oracle.HasPendingTransaction });
                     var timer = Stopwatch.StartNew();
-                    var step = JsonSerializer.SerializeToElement(new { sql, scriptIndex = index, parameters = statement.TryGetProperty("parameters", out var parameters) ? parameters : JsonSerializer.SerializeToElement(Array.Empty<object>()), pageSize = payload.TryGetProperty("pageSize", out var page) ? page.GetInt32() : 1000, timeoutSeconds = payload.TryGetProperty("timeoutSeconds", out var timeout) ? timeout.GetInt32() : 0 });
+                    var step = JsonSerializer.SerializeToElement(new { sql, sourceReviewId, scriptIndex = index, parameters = statement.TryGetProperty("parameters", out var parameters) ? parameters : JsonSerializer.SerializeToElement(Array.Empty<object>()), pageSize = payload.TryGetProperty("pageSize", out var page) ? page.GetInt32() : 1000, timeoutSeconds = payload.TryGetProperty("timeoutSeconds", out var timeout) ? timeout.GetInt32() : 0 });
                     SqlExecutionResult? stepResult = null; string? stepError = null;
                     var success = await ExecuteSqlAsync(sender, requestId, step, cancellation.Token, result => stepResult = result, error => stepError = error);
                     completed++; if (!success) failed++;
@@ -369,6 +432,7 @@ public sealed partial class MainPage
             }
             finally
             {
+                Host._scriptSourceReviews.Remove(tabId);
                 _scriptRuns.TryRemove(tabId, out _);
                 Send(sender, new { type = "script.completed", requestId, completed, failed, cancelled = cancellation.IsCancellationRequested, transactionPending = _oracle.HasPendingTransaction });
             }
@@ -389,7 +453,8 @@ public sealed partial class MainPage
                     var name = item.TryGetProperty("name", out var nameValue) ? nameValue.GetString() : null;
                     var type = item.TryGetProperty("type", out var typeValue) ? typeValue.GetString() : null;
                     var value = item.TryGetProperty("value", out var valueValue) && valueValue.ValueKind == JsonValueKind.String ? valueValue.GetString() : null;
-                    if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(type)) parameters.Add(new SqlBindParameter(name, type, value));
+                    var direction = item.TryGetProperty("direction", out var directionValue) ? directionValue.GetString() ?? "IN" : "IN";
+                    if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(type)) parameters.Add(new SqlBindParameter(name, type, value, direction));
                 }
             }
             if (OracleSqlUnit.CompilationTarget(sql) is null && payload.TryGetProperty("previousResultId", out var previousResult) && previousResult.ValueKind == JsonValueKind.String) await _oracle.CloseResultAsync(previousResult.GetString()!);
@@ -398,7 +463,8 @@ public sealed partial class MainPage
             var stageTab = Context.Tab;
             int? scriptIndex = payload.TryGetProperty("scriptIndex",out var scriptIndexValue) ? scriptIndexValue.GetInt32() : null;
             var progress = new Progress<string>(stage => sender.PostWebMessageAsJson(SerializeReply(new { type = "sql.stage", requestId, stage, scriptIndex }, stageTab)));
-            try { result = await Task.Run(() => _oracle.ExecuteAsync(sql, parameters, rowLimit, cancellationToken, timeoutSeconds: timeout, progress: progress)); }
+            var sourceReviewId = payload.TryGetProperty("sourceReviewId", out var reviewValue) && reviewValue.ValueKind == JsonValueKind.String ? reviewValue.GetString() : null;
+            try { result = await Task.Run(() => _oracle.ExecuteAsync(sql, parameters, rowLimit, cancellationToken, timeoutSeconds: timeout, progress: progress, sourceReviewId: sourceReviewId)); }
             catch (TimeoutException ex)
             {
                 onError?.Invoke(ex.Message);
@@ -414,7 +480,7 @@ public sealed partial class MainPage
             catch (Exception ex)
             {
                 onError?.Invoke(ex.Message);
-                Send(sender, new { type = "host.error", requestId, message = ex.Message, transactionPending = _oracle.HasPendingTransaction });
+                Send(sender, new { type = "host.error", requestId, message = ex.Message, transactionPending = _oracle.HasPendingTransaction, connected = _oracle.IsConnected });
                 return false;
             }
             onResult?.Invoke(result);
@@ -423,7 +489,7 @@ public sealed partial class MainPage
                 try
                 {
                     var compilation = await Task.Run(() => _oracle.LoadCompilationDiagnosticsAsync(sql, cancellationToken));
-                    await SendAsync(sender, new { type = "sql.compilation", requestId, compilation, result.ElapsedMs, result.TransactionPending, result.Output });
+                    await SendAsync(sender, new { type = "sql.compilation", requestId, compilation, result.ElapsedMs, result.TransactionPending, result.Output, sqlVersion = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(sql))) });
                     var successful = compilation is null || !compilation.Errors.Any(error => error.Attribute == "ERROR");
                     if (!successful) onError?.Invoke("Oracle compilation errors are available in Problems.");
                     return successful;
@@ -434,10 +500,109 @@ public sealed partial class MainPage
             await SendAsync(sender, new
             {
                 type = "sql.result", requestId, result.Columns, result.Rows, result.RowsAffected,
-                result.ElapsedMs, result.ReturnedRows, result.Truncated, result.TransactionPending, result.Output, result.SqlId, result.ResultId, result.HasMore, result.PageSize, result.Offset,
-                profileId = _oracle.ProfileId
+                result.ElapsedMs, result.ReturnedRows, result.Truncated, result.TransactionPending, result.Output, result.OutParameters, result.SqlId, result.ResultId, result.HasMore, result.PageSize, result.Offset,
+                profileId = _oracle.ProfileId, sqlVersion = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(Encoding.UTF8.GetBytes(sql)))
             });
             return true;
+        }
+
+        // Applies staged grid edits one statement at a time in the tab's session, after a savepoint. It stops at the first failure or unexpected
+        // row count; by default it then rolls back to the savepoint (earlier unrelated session work is untouched). It never commits and refuses to
+        // run while auto commit is on, because a half-applied batch could not be taken back.
+        private async Task ApplyGridDmlAsync(CoreWebView2 sender, string? requestId, JsonElement payload)
+        {
+            var tabId = Context.Tab.Id;
+            void Refuse(string message) => Send(sender, new { type = "sql.dmlApplied", requestId, tabId, outcomes = Array.Empty<object>(), transactionPending = _oracle.HasPendingTransaction, autoCommit = _oracle.AutoCommit, error = message });
+            if (_oracle.AutoCommit) { Refuse("Turn auto commit off before applying grid edits, so the whole batch can be committed or rolled back together."); return; }
+            var items = payload.GetProperty("statements").EnumerateArray().ToList();
+            if (items.Count > GridDmlGuard.MaxStatements) { Refuse($"At most {GridDmlGuard.MaxStatements} statements can be applied at once."); return; }
+            var timeout = payload.TryGetProperty("timeoutSeconds", out var timeoutValue) && timeoutValue.TryGetInt32(out var seconds) ? Math.Clamp(seconds, 1, 300) : 60;
+            var keepOnFailure = payload.TryGetProperty("onFailure", out var policy) && policy.GetString() == "keep";
+            var outcomes = new List<Dictionary<string, object?>>();
+            var stopped = false;
+            var stoppedByUser = false;
+            const string savepoint = "fbsdb_grid_batch";
+            using var stop = new CancellationTokenSource();
+            _gridApplies[tabId] = stop;
+            try {
+            try { await Task.Run(() => _oracle.ExecuteAsync("SAVEPOINT " + savepoint, null, 1, default, timeoutSeconds: timeout)); }
+            catch (Exception ex) { Refuse("The batch could not start: " + ex.Message); return; }
+            for (var index = 0; index < items.Count; index++)
+            {
+                if (stopped) { outcomes.Add(new() { ["index"] = index, ["status"] = "skipped" }); continue; }
+                if (stop.IsCancellationRequested) { stoppedByUser = true; stopped = true; outcomes.Add(new() { ["index"] = index, ["status"] = "skipped" }); continue; }
+                try
+                {
+                    var item = items[index];
+                    var sql = item.GetProperty("sql").GetString() ?? string.Empty;
+                    GridDmlGuard.Assert(sql);
+                    var parameters = new List<SqlBindParameter>();
+                    if (item.TryGetProperty("binds", out var binds) && binds.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var bind in binds.EnumerateArray())
+                        {
+                            var name = bind.TryGetProperty("name", out var nameValue) ? nameValue.GetString() : null;
+                            var type = bind.TryGetProperty("type", out var typeValue) ? typeValue.GetString() : null;
+                            var value = bind.TryGetProperty("value", out var valueValue) && valueValue.ValueKind == JsonValueKind.String ? valueValue.GetString() : null;
+                            if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(type)) parameters.Add(new SqlBindParameter(name, type, value));
+                        }
+                    }
+                    var expected = item.TryGetProperty("expectRows", out var expectValue) && expectValue.TryGetInt32(out var expectedRows) ? expectedRows : 1;
+                    var result = await Task.Run(() => _oracle.ExecuteAsync(sql, parameters, 1, default, timeoutSeconds: timeout));
+                    var affected = result.RowsAffected ?? 0;
+                    if (affected != expected) { outcomes.Add(new() { ["index"] = index, ["status"] = "mismatch", ["rowsAffected"] = affected, ["expected"] = expected }); stopped = true; }
+                    else outcomes.Add(new() { ["index"] = index, ["status"] = "applied", ["rowsAffected"] = affected });
+                }
+                catch (Exception ex) { outcomes.Add(new() { ["index"] = index, ["status"] = "failed", ["error"] = ex.Message }); stopped = true; }
+            }
+            string? recovery = null;
+            if (stoppedByUser)
+            {
+                recovery = $"Stopped by you: {outcomes.Count(o => (string?)o["status"] == "applied")} statement(s) were applied and are in your open transaction (Commit or Rollback decides them); the rest were not sent and remain drafts. Nothing was committed or retried.";
+            }
+            else if (stopped && !keepOnFailure)
+            {
+                try
+                {
+                    await Task.Run(() => _oracle.ExecuteAsync("ROLLBACK TO SAVEPOINT " + savepoint, null, 1, default, timeoutSeconds: timeout));
+                    foreach (var outcome in outcomes.Where(o => (string?)o["status"] == "applied")) outcome["status"] = "rolledBack";
+                    recovery = "The batch was rolled back to its starting point; other work in this session was not touched.";
+                }
+                catch (Exception ex) { recovery = "The batch could not be rolled back automatically (" + ex.Message + "). Use Rollback to discard the session's pending work."; }
+            }
+            Send(sender, new { type = "sql.dmlApplied", requestId, tabId, outcomes, transactionPending = _oracle.HasPendingTransaction, autoCommit = _oracle.AutoCommit, recovery, stoppedByUser });
+            } finally { _gridApplies.TryRemove(tabId, out _); }
+        }
+
+        // Runs one explicit "SELECT (expression) FROM dual" in the tab's session; the result never reaches the result grid or history.
+        private async Task EvaluateExpressionAsync(CoreWebView2 sender, string? requestId, JsonElement payload)
+        {
+            var sql = payload.TryGetProperty("sql", out var sqlValue) ? sqlValue.GetString() ?? string.Empty : string.Empty;
+            var tabId = Context.Tab.Id;
+            try
+            {
+                MiniToolService.AssertSelect(sql);
+                var parameters = new List<SqlBindParameter>();
+                if (payload.TryGetProperty("parameters", out var values) && values.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var item in values.EnumerateArray())
+                    {
+                        var name = item.TryGetProperty("name", out var nameValue) ? nameValue.GetString() : null;
+                        var type = item.TryGetProperty("type", out var typeValue) ? typeValue.GetString() : null;
+                        var value = item.TryGetProperty("value", out var valueValue) && valueValue.ValueKind == JsonValueKind.String ? valueValue.GetString() : null;
+                        if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(type)) parameters.Add(new SqlBindParameter(name, type, value));
+                    }
+                }
+                var timeout = payload.TryGetProperty("timeoutSeconds", out var timeoutValue) && timeoutValue.TryGetInt32(out var seconds) ? Math.Clamp(seconds, 1, 300) : 30;
+                var limit = payload.TryGetProperty("rowLimit", out var limitValue) && limitValue.TryGetInt32(out var requestedLimit) ? Math.Clamp(requestedLimit, 1, 50) : 1;
+                var result = await Task.Run(() => _oracle.ExecuteAsync(sql, parameters, limit, default, timeoutSeconds: timeout));
+                if (result.ResultId is { } resultId) await _oracle.CloseResultAsync(resultId);
+                Send(sender, new { type = "sql.evaluated", requestId, tabId, columns = result.Columns, rows = result.Rows, elapsedMs = result.ElapsedMs, transactionPending = result.TransactionPending, truncated = result.Truncated || result.HasMore });
+            }
+            catch (Exception ex)
+            {
+                Send(sender, new { type = "sql.evaluated", requestId, tabId, error = ex.Message, transactionPending = _oracle.HasPendingTransaction });
+            }
         }
 
         private async Task ExportResultAsync(CoreWebView2 sender, string? requestId, JsonElement payload)
@@ -447,6 +612,7 @@ public sealed partial class MainPage
             if (!_resultExports.TryAdd(tabId, cancellation)) throw new InvalidOperationException("An export is already running for this SQL tab.");
             var resultId = payload.TryGetProperty("resultId", out var idValue) ? idValue.GetString() : null;
             var consumed = false; var count = 0; string? temporaryPath = null;
+            var clock = System.Diagnostics.Stopwatch.StartNew(); long bytes = 0;
             try {
                 var format=payload.TryGetProperty("format",out var formatValue)?formatValue.GetString()??"csv":"csv";
                 if(format is not ("csv" or "csv.gz" or "xlsx"))throw new InvalidOperationException("Unsupported export format.");
@@ -467,6 +633,7 @@ public sealed partial class MainPage
                     count=materialized.Length;
                 } else {
                     await using var fileStream=File.Create(temporaryPath);
+                    var measured = fileStream;
                     await using Stream stream=format=="csv.gz"?new System.IO.Compression.GZipStream(fileStream,System.IO.Compression.CompressionLevel.Optimal,true):fileStream;
                     var csvOptions=payload.TryGetProperty("csvOptions",out var csvValue)?JsonSerializer.Deserialize<CsvExportOptions>(csvValue.GetRawText(),WebJsonOptions):null;
                     var encodingName=csvValue.ValueKind==JsonValueKind.Object&&csvValue.TryGetProperty("encoding",out var encodingValue)?encodingValue.GetString():"utf-8";
@@ -476,11 +643,12 @@ public sealed partial class MainPage
                     await using var writer=new StreamWriter(stream,encoding,1024,true);
                     count = await ResultCsvExporter.WriteAsync(writer, columns, initialRows,
                         hasMore && !string.IsNullOrEmpty(resultId) ? async token => { consumed = true; return await Task.Run(() => _oracle.FetchNextPageAsync(resultId, 1000, token)); } : null,
-                        written => SendAsync(sender, new { type = "result.exportProgress", requestId, resultId, rowsWritten = written, message = $"{written:N0} rows written…" }), cancellation.Token,csvOptions);
+                        written => SendAsync(sender, new { type = "result.exportProgress", requestId, resultId, rowsWritten = written, bytesWritten = measured.Length, elapsedMs = clock.ElapsedMilliseconds, message = $"{written:N0} rows written…" }), cancellation.Token,csvOptions);
                     await writer.FlushAsync(cancellation.Token);
                 }
                 cancellation.Token.ThrowIfCancellationRequested(); File.Move(temporaryPath, file.Path, true); temporaryPath = null;
-                Send(sender, new { type = "result.exportComplete", requestId, resultId, consumed, success = true, rowsWritten = count, message = $"Exported {count:N0} rows to {file.Name}." });
+                bytes = new FileInfo(file.Path).Length;
+                Send(sender, new { type = "result.exportComplete", requestId, resultId, consumed, success = true, rowsWritten = count, bytesWritten = bytes, elapsedMs = clock.ElapsedMilliseconds, message = $"Exported {count:N0} rows to {file.Name}." });
             }
             catch (OperationCanceledException) { Send(sender, new { type = "result.exportComplete", requestId, resultId, consumed, cancelled = true, success = false, rowsWritten = count, message = "Export cancelled. Partial file removed." }); }
             catch (Exception ex) { Send(sender, new { type = "result.exportComplete", requestId, resultId, consumed, success = false, message = "Export failed: " + ex.Message }); }

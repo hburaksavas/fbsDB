@@ -34,6 +34,7 @@ export function buildServerFilter(sql, columns, options={}, existingParameters=[
   const insensitive=!(rule.caseSensitive??options.caseSensitive)&&(!rule.kind||rule.kind==='text');
   const left=insensitive?`LOWER(${column})`:column;
   const right=value=>{const b=bind(value,rule.kind);return insensitive?`LOWER(${b})`:b};
+  if(op==='in'){const values=(rule.values||[]).slice(0,1000);const list=values.length?`${column} IN (${values.map(value=>bind(value)).join(', ')})`:'';return [list,rule.includeNull?`${column} IS NULL`:''].filter(Boolean).join(' OR ').replace(/^(.* OR .*)$/,'($1)')||'1 = 0'}
   if(op==='between')return `${left} BETWEEN ${right(rule.value)} AND ${right(rule.to)}`;
   const operators={equals:'=',notEquals:'<>',gt:'>',gte:'>=',lt:'<',lte:'<='};
   if(operators[op])return `${left} ${operators[op]} ${right(rule.value)}`;

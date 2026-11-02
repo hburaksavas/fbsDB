@@ -74,10 +74,18 @@ try {
 
   await check('first-use guide: visible, dismissible and remembered across reloads', async () => {
     await cdp.until(`document.getElementById('getting-started-title')`, 'Getting started guide');
+    assert.equal(await cdp.evaluate(`document.querySelectorAll('.welcome-template-grid button').length`),3);
+    assert.ok(await cdp.evaluate(`document.querySelector('[aria-label="Welcome workspace hub"]').textContent.includes('Pinned workspaces')&&document.querySelector('[aria-label="Welcome workspace hub"]').textContent.includes('Recent projects')`));
+    await cdp.click('[aria-label="Show workspace hub on startup"]');
     await cdp.textClick('[aria-labelledby="getting-started-title"] button', 'Start working');
     assert.equal(await cdp.evaluate(`localStorage.getItem('fbsdb.onboardingSeen')`),'true');
     await cdp.call('Page.reload');
     await cdp.until(`window.__desktopRegression?.ready && ${editor}`, 'Restart after onboarding');
+    await cdp.until(`document.getElementById('getting-started-title')`,'Opt-in startup hub');
+    assert.equal(await cdp.evaluate(`document.querySelector('[aria-label="Show workspace hub on startup"]').checked`),true);
+    await cdp.click('[aria-label="Show workspace hub on startup"]');
+    await cdp.textClick('[aria-labelledby="getting-started-title"] button','Start working');
+    await cdp.call('Page.reload');await cdp.until(`window.__desktopRegression?.ready && ${editor}`,'Restart with startup hub disabled');
     assert.equal(await cdp.evaluate(`!!document.getElementById('getting-started-title')`),false);
   });
 

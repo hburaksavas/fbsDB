@@ -36,7 +36,16 @@ try {
  try{await service.GitDiffAsync(outside);throw new Exception("outside Git access accepted");}catch(InvalidOperationException){}
  var renamed=Path.Combine(root,"renamed.sql");await Git("mv","workspace/a file.sql","workspace/renamed.sql");
  state=await service.GitStateAsync();Check(state.Files.Any(file=>file.Path==renamed)&&state.Files.All(file=>!file.RelativePath.StartsWith("workspace/")),"rename NUL parsing and root-relative conversion");
- Console.WriteLine("Workspace Git / replace checks passed.");
+ foreach(var extension in new[]{".pks",".pkb",".prc",".fnc",".trg"}) {
+  var source=await workspace.CreateEntryAsync(root,"oracle_source"+extension,false);
+  state=await service.GitStateAsync();Check(state.Files.Any(file=>file.Path==source.Path),"Oracle source missing from Git status");
+  diff=await service.GitDiffAsync(source.Path);Check(diff.Diff.Contains("CREATE OR REPLACE"),"Oracle source missing from Git diff");
+  preview=await service.PreviewReplaceAsync("oracle_source","updated_source",true,[],root);
+  Check(preview.Files.Any(file=>file.Path==source.Path),"Oracle source missing from replace preview");
+  applied=await service.ApplyReplaceAsync(preview.Id,[source.Path],[]);
+  Check(applied.Applied.Count==1&&(await File.ReadAllTextAsync(source.Path)).Contains("updated_source"),"Oracle source replace failed");
+ }
+ Console.WriteLine("Workspace Git / replace checks passed, including Oracle source extensions.");
 } finally {
  var checkedRoot=Path.GetFullPath(temporaryRoot);
  if(checkedRoot.StartsWith(Path.GetFullPath(Path.GetTempPath()),StringComparison.OrdinalIgnoreCase)&&Path.GetFileName(checkedRoot).StartsWith("fbsdb-workspace-development-",StringComparison.Ordinal)){foreach(var file in Directory.EnumerateFiles(checkedRoot,"*",SearchOption.AllDirectories))File.SetAttributes(file,FileAttributes.Normal);Directory.Delete(checkedRoot,true);}

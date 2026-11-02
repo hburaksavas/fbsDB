@@ -10,6 +10,7 @@ export function EditorSessionStatus({ editor, tabId, connection, startedAt, ...s
   }, [editor, tabId]);
   return <>
     {state.executionTarget&&<span className="execution-target-status" role="status">{state.executing?'Running':'SQL target'}: {state.executionTarget}</span>}
+    {state.sourceEdited&&<span className="source-edited-status">Changed since last execution</span>}
     <span className="editor-position">Ln {position.lineNumber}, Col {position.column}</span>
   </>;
 }

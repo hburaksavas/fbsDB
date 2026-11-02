@@ -1,10 +1,11 @@
 import {useFeedbackState,Feedback} from './Feedback';
 import { useState } from 'react';
-import { editorShortcutActions,defaultEditorShortcuts,shortcutFromEvent,shortcutProblem } from './editorShortcuts.js';
+import { editorShortcutActions,defaultEditorShortcuts,shortcutFromEvent,shortcutProblem,keymapPresets,presetShortcuts,activePreset } from './editorShortcuts.js';
 export function EditorShortcutSettings({value,onChange,disabled,...props}) {
   const [error,setError]=useFeedbackState('',{title:'Shortcut unavailable'}),[query,setQuery]=useState('');
   const change=(id,key)=>{const problem=shortcutProblem(value,id,key);setError(problem);if(!problem)onChange({...value,[id]:key})};
   return <section {...props} className="editor-shortcuts-panel">
+    <label className="keymap-preset">Keymap preset<select aria-label="Keymap preset" disabled={disabled} value={activePreset(value)||'custom'} onChange={e=>{const mapped=presetShortcuts(e.target.value);if(mapped){setError('');onChange(mapped)}}}>{keymapPresets.map(preset=><option key={preset.id} value={preset.id}>{preset.label}</option>)}{!activePreset(value)&&<option value="custom">Custom</option>}</select></label>
     <input aria-label="Search shortcuts" placeholder="Search shortcuts" value={query} onChange={e=>setQuery(e.target.value)}/>
     <small>Focus a shortcut and press the new key combination.</small>
     {error&&<Feedback title="Shortcut unavailable">{error}</Feedback>}

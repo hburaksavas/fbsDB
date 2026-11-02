@@ -3,7 +3,7 @@ import { useInspectorWidth } from './useInspectorWidth';
 
 export function TransposePivotInspector(props) {
   const sizing=useInspectorWidth();
-  return <aside className="result-inspector transpose-pivot-inspector" style={{'--inspector-width':`${sizing.width}px`}}><span className="result-inspector-resizer" role="separator" aria-label="Resize pivot options" aria-orientation="vertical" tabIndex={0} onPointerDown={sizing.onPointerDown} onKeyDown={sizing.onKeyDown}/><PivotOptionsPanel {...props}/></aside>;
+  return <aside className="result-inspector transpose-pivot-inspector" style={{'--inspector-width':`${sizing.width}px`}}><span className="result-inspector-resizer" role="separator" aria-disabled={sizing.locked||undefined} aria-label="Resize pivot options" aria-orientation="vertical" tabIndex={0} onPointerDown={sizing.onPointerDown} onKeyDown={sizing.onKeyDown}/><PivotOptionsPanel {...props}/></aside>;
 }
 
 export function PivotOptionsPanel({ columns, options, onChange, onClose }) {

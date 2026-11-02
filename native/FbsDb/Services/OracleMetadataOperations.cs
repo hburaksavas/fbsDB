@@ -77,6 +77,23 @@ public sealed partial class OracleSessionService
             if(columns.Count==0||columns.Any(c=>!values.ContainsKey(c.Name)))throw new InvalidOperationException("Enter every primary-key value.");
             return "SELECT * FROM "+QuoteIdentifier(schema)+"."+QuoteIdentifier(table)+" WHERE "+string.Join(" AND ",columns.Select(c=>QuoteIdentifier(c.Name)+" = "+KeyLiteral(values[c.Name],c.Type)))+";";
         }
+        // What a named constraint requires (CHECK condition, key columns), so a rejected value can be explained without reading the DDL.
+        public async Task<ConstraintInfo?> GetConstraintInfoAsync(string owner,string name) {
+            await _gate.WaitAsync();try {
+                if(_connection?.State!=System.Data.ConnectionState.Open)throw new InvalidOperationException("Connect before reading constraint metadata.");
+                using var command=_connection.CreateCommand();command.BindByName=true;
+                command.CommandText=@"SELECT c.constraint_type,c.search_condition_vc,c.r_constraint_name FROM all_constraints c WHERE c.owner=:o AND c.constraint_name=:n";
+                command.Parameters.Add("o",OracleDbType.Varchar2).Value=NormalizeIdentifier(owner.Trim());command.Parameters.Add("n",OracleDbType.Varchar2).Value=NormalizeIdentifier(name.Trim());
+                string? type=null,condition=null,referenced=null;
+                using(var reader=await command.ExecuteReaderAsync()){if(await reader.ReadAsync()){type=reader.GetString(0);condition=reader.IsDBNull(1)?null:reader.GetString(1);referenced=reader.IsDBNull(2)?null:reader.GetString(2);}}
+                if(type is null)return null;
+                using var columnsCommand=_connection.CreateCommand();columnsCommand.BindByName=true;
+                columnsCommand.CommandText=@"SELECT column_name FROM all_cons_columns WHERE owner=:o AND constraint_name=:n ORDER BY position";
+                columnsCommand.Parameters.Add("o",OracleDbType.Varchar2).Value=NormalizeIdentifier(owner.Trim());columnsCommand.Parameters.Add("n",OracleDbType.Varchar2).Value=NormalizeIdentifier(name.Trim());
+                var columns=new List<string>();using(var reader=await columnsCommand.ExecuteReaderAsync()){while(await reader.ReadAsync())columns.Add(reader.GetString(0));}
+                return new(owner,name,type,condition,referenced,columns);
+            }finally{Touch(); _gate.Release();}
+        }
         public async Task<PrimaryKeyInfo> GetPrimaryKeyAsync(string schema,string table) {
             await _gate.WaitAsync();try {
                 if(_connection?.State!=System.Data.ConnectionState.Open)throw new InvalidOperationException("Connect before reading primary-key metadata.");

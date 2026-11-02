@@ -12,3 +12,37 @@
 .desktop-shell[data-theme="light"] .compact-editor-tabs{--tabs-surface:var(--chrome);--tabs-active:var(--hover-bg);--tabs-text:var(--foreground);--tabs-muted:var(--muted);--tabs-border:var(--line)}
 
 .file-tab-error{display:flex;align-items:center;flex:none;color:var(--danger)}
+
+/* Calm tab title: the name keeps priority, the path suffix shrinks first and secondary
+   state sits in one quiet cluster of text/shape markers. Details live in the preview. */
+.compact-editor-tabs .file-tab{max-width:220px}.compact-editor-tabs .file-tab-select{gap:4px}
+.compact-editor-tabs .file-tab-name{flex:0 1 auto;min-width:4ch}
+.compact-editor-tabs .file-tab-path{flex:0 4 auto;min-width:0;max-width:72px;margin-left:0;font-size:8px}
+.compact-editor-tabs .package-tab-label{flex:0 0 auto;margin:0;font-size:8px;font-weight:600;letter-spacing:.02em;color:var(--tabs-muted)}
+.file-tab-status{display:inline-flex;align-items:center;flex:0 0 auto;gap:4px;margin-left:auto;padding-left:2px}.file-tab-status:empty{display:none}
+.file-tab-status .tab-connection-badge{gap:1px}.file-tab-status .tab-connection-badge:not([data-pending]):is([data-state=connected]){color:var(--dim)}.file-tab-status .source-edited-marker{font-size:9px;line-height:1}
+.environment-badge.compact,.environment-badge.compact[data-env]{padding:0;border:0;border-radius:2px;background:none;font-size:8px;font-weight:600;letter-spacing:.03em;line-height:11px}
+.environment-badge.compact[data-env=PROD][data-env]{padding:0 3px;background:var(--danger-bg)}
+.environment-badge.compact.environment-dot[data-env]{width:5px;height:5px;min-width:5px;padding:0;border-radius:50%;background:currentColor}
+.tab-source-preview>p>.environment-badge{margin-right:3px}.tab-source-preview-flags{color:var(--warning)}
+
+.tab-source-preview{position:fixed;z-index:160;pointer-events:none;max-width:min(430px,90vw);width:400px;padding:10px;border:1px solid var(--line-strong);border-radius:5px;box-shadow:0 6px 24px var(--shadow-color);background:var(--surface-raised);color:var(--text);font-size:11px}.tab-source-preview>small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}.tab-source-preview p{margin:6px 0}.tab-source-preview pre{margin:6px 0 0;white-space:pre-wrap;overflow-wrap:anywhere;max-height:160px;overflow:hidden;background:var(--input);padding:7px}
+.open-editors-vertical{height:100%;min-height:0;display:flex;flex-direction:column}.open-editors-filter{padding:4px 6px}.open-editors-filter input{width:100%;box-sizing:border-box;min-width:0;height:25px;padding:3px 5px;font-size:10px;background:var(--input);color:var(--text);border:1px solid var(--line);border-radius:3px}.open-editors-vertical>.open-editors-list{flex:1;min-height:0;overflow:auto}
+.new-query-split{display:flex;align-items:center}.new-query-split .new-query-more{width:16px;min-width:16px;margin-left:-2px}.new-query-menu{position:fixed;z-index:130;width:260px}.new-query-menu button{display:flex;justify-content:space-between;gap:8px}.new-query-menu small{color:var(--muted);font-size:10px}.new-query-menu-label{padding:4px 8px 2px;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.file-tab.multi-selected{box-shadow:inset 0 0 0 1px var(--accent);background:var(--hover-bg)}
+.file-tab.preview .file-tab-select{font-style:italic}.file-tab.preview[data-dirty] .file-tab-select{font-style:normal}
+.file-tab.scratch .file-tab-select::before{content:"✎ ";opacity:.7}.file-tab.scratch{border-style:dashed}
+
+.tab-group-chip{display:inline-flex;align-items:center;flex:0 0 auto;align-self:stretch;margin:0 1px 0 4px;padding:0 4px;border-radius:4px 4px 0 0;color:var(--text);font-size:10px;background:var(--panel2)}
+.tab-group-chip[data-group-color=teal]{box-shadow:inset 0 -2px 0 var(--highlight-teal-bg)}
+.tab-group-chip[data-group-color=amber]{box-shadow:inset 0 -2px 0 var(--highlight-amber-bg)}
+.tab-group-chip[data-group-color=rose]{box-shadow:inset 0 -2px 0 var(--highlight-rose-bg)}
+.tab-group-toggle{display:inline-flex;gap:3px;align-items:center;padding:0 3px;font-size:10px;color:inherit;background:transparent;border:0}
+.tab-group-toggle small{color:var(--muted)}
+.tab-group-edit{display:inline-flex;flex-direction:column}
+.tab-group-edit input{width:110px;font-size:10px}
+.tab-group-edit small{color:var(--text);font-size:9px}
+.file-tab[data-group-color=teal]{box-shadow:inset 0 -2px 0 var(--highlight-teal-bg)}
+.file-tab[data-group-color=amber]{box-shadow:inset 0 -2px 0 var(--highlight-amber-bg)}
+.file-tab[data-group-color=rose]{box-shadow:inset 0 -2px 0 var(--highlight-rose-bg)}
+.editor-tabs-menu-separator{height:1px;margin:4px 0;background:var(--line)}

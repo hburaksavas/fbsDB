@@ -34,7 +34,7 @@ export function documentSessionsReducer(state, action) {
         const change = tab.externalChange;
         if (action.reload && change.missing) return tab;
         return { ...tab, content: action.reload ? change.content : tab.content,
-          dirty: !action.reload, path: !action.reload && change.missing ? null : tab.path,
+          dirty: !action.reload,savedContent:change.missing?'':change.content, path: !action.reload && change.missing ? null : tab.path,
           diskVersion: change.version, externalChange: null };
       }) };
     default:

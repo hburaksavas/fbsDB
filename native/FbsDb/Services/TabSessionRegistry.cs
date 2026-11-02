@@ -19,6 +19,14 @@ public sealed class TabSessionRegistry : IDisposable
         if (_closed.ContainsKey(id)) throw new InvalidOperationException("This SQL tab has been closed.");
         return _tabs.GetOrAdd(id, key => new TabSession(key));
     }
+    // A fresh frontend may reuse its starter identity after the old tab was
+    // fully closed. Ordinary commands still pass through Get's tombstone check.
+    public TabSession InitializeUiTab(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id) || id.Length > 250) throw new InvalidOperationException("Invalid SQL tab identity.");
+        _closed.TryRemove(id, out _);
+        return Get(id);
+    }
     public async Task CloseAsync(string id)
     {
         if (!_tabs.TryGetValue(id, out var tab)) return;

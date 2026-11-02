@@ -185,6 +185,17 @@ public sealed partial class OracleSessionService
         await _gate.WaitAsync(token);
         try
         {
+            if (type == "PLSQL FRAME")
+            {
+                await using var lookup = CompletionCommand("SELECT DISTINCT object_type FROM all_objects WHERE owner=:owner AND object_name=:name AND object_type IN ('PACKAGE','PACKAGE BODY','TYPE','TYPE BODY','PROCEDURE','FUNCTION','TRIGGER')", owner, name);
+                var types = new List<string>();
+                await using (var reader = await lookup.ExecuteReaderAsync(token)) while (await reader.ReadAsync(token)) types.Add(reader.GetString(0));
+                if (types.Contains("PACKAGE BODY")) types.Remove("PACKAGE");
+                if (types.Contains("TYPE BODY")) types.Remove("TYPE");
+                if (types.Count != 1) throw new InvalidOperationException(types.Count == 0 ? "Stack source is unavailable or inaccessible." : "Several object types share this stack name; source navigation is ambiguous.");
+                body = types[0].EndsWith(" BODY", StringComparison.Ordinal);
+                type = types[0].Replace(" BODY", "");
+            }
             if (type is "PACKAGE" or "PROCEDURE" or "FUNCTION" or "TRIGGER" or "TYPE")
             {
                 var sourceType = body && type is "PACKAGE" or "TYPE" ? type + " BODY" : type;
@@ -192,7 +203,7 @@ public sealed partial class OracleSessionService
                 command.Parameters.Add("sourceType", OracleDbType.Varchar2).Value = sourceType;
                 var source = new StringBuilder();
                 await using var reader = await command.ExecuteReaderAsync(token);
-                while (await reader.ReadAsync(token)) source.Append(reader.GetString(0));
+                while (await reader.ReadAsync(token)) { source.Append(reader.GetString(0)); if (source.Length > 4_000_000) throw new InvalidOperationException("Source exceeds the navigation limit."); }
                 if (source.Length == 0) throw new InvalidOperationException("Source is unavailable or this account does not have permission to read it.");
                 return new CompletionDefinition(owner, name, sourceType, source.ToString());
             }

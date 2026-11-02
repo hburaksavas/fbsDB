@@ -7,6 +7,22 @@ test('workbench and IDE dialogs render with disconnected session and explicit co
   const output=await build({stdin:{contents:`
     import React from 'react';import {renderToString} from 'react-dom/server';
     import {App} from './src/App.jsx';
+    import {EditorTabs} from './src/EditorTabs.jsx';
+    import {EnvironmentBadge,TabConnectionBadge,ResultSourceProvenance} from './src/ExecutionContextBadges.jsx';
+    import {TabPreviewContent} from './src/TabPreview.jsx';
+    const previewTab={id:'calm',name:'Query 1',content:'SELECT 1 FROM dual;',sourceEdited:true,queryFailed:true,latestStatus:'Connected to internal-profile-id',connection:{state:'connected',environment:'DEV',text:'Connected',profileName:'Development'}};
+    export const calmTabs=renderToString(<EditorTabs tabs={[previewTab]} activeId="calm" onActivate={()=>{}} onClose={()=>{}} onNew={()=>{}}/>);
+    export const preview=renderToString(<TabPreviewContent tab={previewTab}/>);
+
+    export const environment=renderToString(<EnvironmentBadge environment="PROD" profileName="Live" saved/>);
+    export const pendingTab=renderToString(<TabConnectionBadge connection={{state:'connected',pending:true,short:'TX',text:'Connected · transaction pending',profileName:'Live'}}/>);
+    export const changedResult=renderToString(<ResultSourceProvenance result={{editorSnapshot:'SELECT 1',executedProfileId:'prod',executedConnectionGeneration:1,executedProfile:'Live',sqlVersion:'1234567890123456'}} document={{id:'q',content:'SELECT 2'}} connection={{profileId:'prod',generation:2}}/>);
+
+    export const groupedTabs=renderToString(<EditorTabs tabs={[{id:'spec',name:'spec.pks',dirty:true},{id:'query',name:'query.sql'},{id:'body',name:'body.pkb'}]} activeId="body" packageGroups={[['spec','body']]} onActivate={()=>{}} onClose={()=>{}} onNew={()=>{}}/>);
+    import {OracleSourceHeader} from './src/OracleSourceHeader.jsx';
+    export const packageHeader=renderToString(<OracleSourceHeader source={{declaration:{type:'PACKAGE',name:'billing'}}} related={{target:{name:'billing.pkb'}}} onSwitch={()=>{}}/>);
+    export const packageAmbiguous=renderToString(<OracleSourceHeader source={{declaration:{type:'PACKAGE BODY',name:'billing'}}} related={{target:null,reason:'Several sources match'}} onSwitch={()=>{}}/>);
+    export const sourceMismatch=renderToString(<OracleSourceHeader source={{expectedType:'PACKAGE',declaration:{type:'PROCEDURE',name:'billing'},warning:'The extension suggests PACKAGE, but the source declares PROCEDURE.'}} related={{target:null}} onSwitch={()=>{}}/>);
     import {IdeCommandPalette} from './src/IdeCommandPalette.jsx';
     import {OracleObjectDialog} from './src/OracleObjectDialog.jsx';
     import {WorkspaceDevelopmentDialog} from './src/WorkspaceDevelopmentDialog.jsx';
@@ -23,6 +39,36 @@ test('workbench and IDE dialogs render with disconnected session and explicit co
   `,resolveDir:process.cwd(),loader:'jsx'},bundle:true,write:false,format:'cjs',platform:'node',jsx:'automatic',logLevel:'silent',banner:{js:`globalThis.window={innerHeight:900,chrome:{webview:{postMessage(){}}}};globalThis.document={activeElement:null};globalThis.localStorage={getItem(){return null},setItem(){}};`}});
   const module={exports:{}};
   new Function('module','exports','require',output.outputFiles[0].text)(module,module.exports,createRequire(import.meta.url));
+  assert.match(module.exports.environment,/data-env="PROD"/);
+  assert.match(module.exports.environment,/saved/);
+  assert.match(module.exports.calmTabs,/lucide-plug/);
+  assert.match(module.exports.calmTabs,/environment-dot/);
+  assert.match(module.exports.calmTabs,/aria-label="DEV"/);
+  assert.doesNotMatch(module.exports.calmTabs,/>DEV<|source-edited-marker|>Δ</);
+  assert.match(module.exports.calmTabs,/file-tab-error/);
+  assert.match(module.exports.preview,/Development/);
+  assert.match(module.exports.preview,/Edited since last execution/);
+  assert.match(module.exports.preview,/SELECT 1 FROM dual;/);
+  assert.doesNotMatch(module.exports.preview,/Latest status|internal-profile-id|No execution yet/);
+
+  assert.match(module.exports.pendingTab,/aria-label="Connected · transaction pending"/);
+  assert.match(module.exports.pendingTab,/>TX</);
+  assert.match(module.exports.changedResult,/different execution context/);
+  assert.match(module.exports.changedResult,/Editor also changed/);
+  assert.match(module.exports.changedResult,/123456789012/);
+  assert.equal((module.exports.groupedTabs.match(/role="tab"/g)||[]).length,2);
+  assert.match(module.exports.groupedTabs,/Close both package sources/);
+  assert.doesNotMatch(module.exports.groupedTabs,/class="package-tab-label"/);
+  assert.match(module.exports.groupedTabs,/aria-label="body\.pkb, unsaved, package specification and body"/);
+  assert.match(module.exports.groupedTabs,/dirty-dot/);
+  assert.match(module.exports.packageHeader.replace(/<!--.*?-->/g,''),/Switch to body/);
+  assert.match(module.exports.packageHeader,/Alt\+O/);
+  assert.doesNotMatch(module.exports.packageHeader,/disabled/);
+  assert.match(module.exports.packageAmbiguous,/disabled=""/);
+  assert.match(module.exports.packageAmbiguous,/Several sources match/);
+  assert.match(module.exports.sourceMismatch,/role="status"/);
+  assert.match(module.exports.sourceMismatch,/declares PROCEDURE/);
+  assert.doesNotMatch(module.exports.sourceMismatch,/<button/);
   assert.match(module.exports.html,/Disconnected/);
   assert.match(module.exports.html,/Open Editors/);
   assert.match(module.exports.html,/aria-label="Application menu"/);

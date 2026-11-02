@@ -1,5 +1,27 @@
 using FbsDb.Services;
 
+var sourceGate = new ScriptSourceReviewGate();
+var firstReview = sourceGate.Begin("review-a","run-1",0);
+if (sourceGate.Approve("review-b","run-1",0,firstReview.Nonce,"token") || sourceGate.Approve("review-a","run-2",0,firstReview.Nonce,"token") || sourceGate.Approve("review-a","run-1",1,firstReview.Nonce,"token")) throw new Exception("Cross-run source review released the script.");
+if (firstReview.Completion.Task.IsCompleted) throw new Exception("Script continued without approval.");
+if (!sourceGate.Approve("review-a","run-1",0,firstReview.Nonce,"token") || await firstReview.Completion.Task != "token" || sourceGate.Approve("review-a","run-1",0,firstReview.Nonce,"replay")) throw new Exception("Review acknowledgement was lost or replayed.");
+sourceGate.Remove("review-a");
+var secondReview = sourceGate.Begin("review-a","run-1",1);
+if (sourceGate.Approve("review-a","run-1",1,firstReview.Nonce,"old-token")) throw new Exception("Old source review nonce released a later step.");
+sourceGate.Remove("review-a");
+if (!secondReview.Completion.Task.IsCanceled) throw new Exception("Cancelling a script left its source review pending.");
+
+using (var reloadRegistry = new TabSessionRegistry())
+{
+    var starter = reloadRegistry.Get("tab-1");
+    await reloadRegistry.CloseAsync("tab-1");
+    try { reloadRegistry.Get("tab-1"); throw new Exception("Closed starter accepted a stale command."); } catch(InvalidOperationException) { }
+    var fresh = reloadRegistry.InitializeUiTab("tab-1");
+    if (ReferenceEquals(starter,fresh)||fresh.Oracle.IsConnected) throw new Exception("UI initialization reused a closed physical Oracle session.");
+    await reloadRegistry.CloseAsync("tab-1");
+    try { reloadRegistry.Get("tab-1"); throw new Exception("Closing the fresh starter lost tombstone protection."); } catch(InvalidOperationException) { }
+}
+
 async Task Reject<T>(Func<Task> operation) where T : Exception
 {
     try { await operation().WaitAsync(TimeSpan.FromSeconds(5)); }
@@ -17,6 +39,9 @@ await Reject<InvalidOperationException>(() => a.LoadTableDetailsAsync("T"));
 await Reject<InvalidOperationException>(() => a.GetColumnDefinitionAsync("APP", "T", "ID"));
 await Reject<InvalidOperationException>(() => a.GetPrimaryKeyAsync("APP", "T"));
 await Reject<InvalidOperationException>(() => a.FetchNextPageAsync("stale", 100));
+await Reject<InvalidOperationException>(() => a.ReviewSourceAsync("CREATE OR REPLACE PROCEDURE demo AS BEGIN NULL; END;"));
+await Reject<InvalidOperationException>(() => a.ReviewSourceAsync("SELECT 1 FROM dual"));
+await Reject<OperationCanceledException>(() => a.ReviewSourceAsync("CREATE PROCEDURE demo AS BEGIN NULL; END;", cancelled.Token));
 await a.CloseResultAsync("stale").WaitAsync(TimeSpan.FromSeconds(5));
 await a.SetAutoCommitAsync(true).WaitAsync(TimeSpan.FromSeconds(5));
 if (!a.AutoCommit || b.AutoCommit || a.HasPendingTransaction || b.HasPendingTransaction || a.IsConnected || b.IsConnected)

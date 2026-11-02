@@ -1,3 +1,4 @@
+import {FilteredMenuItems} from './FilteredMenuItems.jsx';
 import {useFeedbackState,Feedback} from './Feedback';
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
@@ -32,11 +33,11 @@ export function OracleObjectMenu({context,favorite,onAction,onClose}){
  return createPortal(<div ref={root} className="connection-context-menu oracle-object-menu theme-scope" data-theme={theme} role="menu" aria-label="Oracle object context menu" aria-busy={busy||undefined} onContextMenu={e=>e.preventDefault()}>
   <header><Database size={13}/><span>{context.item.owner}.{context.item.name}</span></header>
   {page&&<button type="button" role="menuitem" disabled={busy} onClick={()=>{setPage(null);setError('')}}><ChevronLeft size={14}/><span>Back</span></button>}
-  {items.map((action,index)=>{
+  <FilteredMenuItems key={page||'main'}>{items.map((action,index)=>{
    if(action.separator)return <hr key={'sep'+index}/>;
    const Icon=icons[action.icon]||BookOpen;
    return <button key={action.id} type="button" role="menuitem" disabled={busy} aria-haspopup={action.children?'menu':undefined} onClick={()=>action.children?(setPage(action.id),setError('')):invoke(action.id)}><Icon size={14}/><span>{action.label}</span>{action.children&&<ChevronRight size={12}/>}</button>;
   })}
-  {busy&&<Feedback kind="progress" title="Oracle object">Loading metadata…</Feedback>}{error&&<Feedback title="Object action failed">{error}</Feedback>}
+  </FilteredMenuItems>{busy&&<Feedback kind="progress" title="Oracle object">Loading metadata…</Feedback>}{error&&<Feedback title="Object action failed">{error}</Feedback>}
  </div>,document.body);
 }

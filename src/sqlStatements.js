@@ -1,3 +1,28 @@
+function startsPlsql(text, start) {
+  let at=start;
+  const label=/^<<\s*(?:"(?:[^"]|"")+"|[\w$#]+)\s*>>/.exec(text.slice(at));
+  if(label)at+=label[0].length;
+  const word=()=>{
+    while(at<text.length){
+      if(/\s/.test(text[at])){at++;continue;}
+      if(text.startsWith('--',at)){const end=text.indexOf('\n',at+2);at=end<0?text.length:end+1;continue;}
+      if(text.startsWith('/*',at)){const end=text.indexOf('*/',at+2);at=end<0?text.length:end+2;continue;}
+      break;
+    }
+    const match=/^[A-Za-z_$#][A-Za-z0-9_$#]*/.exec(text.slice(at));
+    if(!match)return '';
+    at+=match[0].length;return match[0].toUpperCase();
+  };
+  let first=word();
+  const types=['PROCEDURE','FUNCTION','PACKAGE','TRIGGER','TYPE'];
+  if(['DECLARE','BEGIN',...types].includes(first))return true;
+  if(first!=='CREATE')return false;
+  first=word();
+  if(first==='OR'){if(word()!=='REPLACE')return false;first=word();}
+  if(['EDITIONABLE','NONEDITIONABLE'].includes(first))first=word();
+  return types.includes(first);
+}
+
 // Statement ranges share offsets with Monaco's model, including comments and literals.
 export function getSqlStatements(text) {
   const statements = [];
@@ -18,7 +43,7 @@ export function getSqlStatements(text) {
     if (start === null) {
       if (ch === ';') { i++; continue; }
       start = i;
-      plsql = /^(?:DECLARE|BEGIN|PROCEDURE|FUNCTION|PACKAGE|TRIGGER|TYPE|CREATE\s+(?:OR\s+REPLACE\s+)?(?:(?:NON)?EDITIONABLE\s+)?(?:PROCEDURE|FUNCTION|PACKAGE|TRIGGER|TYPE))\b/i.test(text.slice(i).replace(/^<<\s*(?:"(?:[^"]|"")+"|[\w$#]+)\s*>>\s*/, ''));
+      plsql = startsPlsql(text,i);
     }
     if ((ch === 'q' || ch === 'Q') && next === "'" && text[i + 2]) {
       const open = text[i + 2], close = ({ '[': ']', '{': '}', '(': ')', '<': '>' })[open] || open;

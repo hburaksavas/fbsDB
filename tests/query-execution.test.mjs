@@ -107,3 +107,23 @@ test('single DDL requires explicit confirmation and cannot run over a pending tr
  f.actions.executeStatement('DROP TABLE x');assert.equal(f.commands.length,0);assert.equal(prompts,1);assert.match(f.statuses.at(-1).value,/Commit or roll back/);
  f.sessions.a.transactionPending=false;f.actions.executeStatement('DROP TABLE x');assert.equal(f.commands.length,1);
 });
+
+test('Run routes source compilation to review before any SQL command is sent',()=>{
+  const f=fixture(),sql='CREATE OR REPLACE PROCEDURE demo AS BEGIN NULL; END;';
+  f.documents.edit(sql);let review;
+  f.ports.ui.reviewSource=(statement,target)=>{review={statement,target};return true};
+  f.actions.runQuery();
+  assert.equal(review.statement,sql);
+  assert.equal(f.commands.length,0);
+  const request=f.actions.executeStatement(sql,[],false,{ddlConfirmed:true,sourceReviewId:'review-token',executedSql:sql,statementOffset:0});
+  assert.equal(f.commands[0].payload.sourceReviewId,'review-token');
+  assert.equal(f.operations.metadata.get('a').statementOffset,0);
+  assert.equal(f.operations.owners.get(request),'a');
+});
+
+test('metadata read-only views cannot send hidden-editor SQL, scripts or direct executions',()=>{
+  const f=fixture();f.ports.ui.readOnly=true;
+  f.actions.runQuery();f.actions.executeStatement('SELECT 1 FROM dual;');
+  f.ports.ui.scriptDialog={tabId:'a',source:'SELECT 1 FROM dual;'};f.actions.startScript([{sql:'SELECT 1 FROM dual;'}],[],false);
+  assert.equal(f.commands.length,0);
+});

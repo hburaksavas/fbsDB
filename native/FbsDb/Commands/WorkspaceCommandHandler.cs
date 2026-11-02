@@ -25,6 +25,53 @@ public sealed partial class MainPage
             var payload = Context.Payload;
             switch (command)
             {
+                case "workspace.binds.load":
+                case "workspace.binds.save":
+                    var bindRoot = _workspace.Root ?? throw new InvalidOperationException("Open a workspace to share bind forms.");
+                    var bindPath = payload.GetProperty("path").GetString()!;
+                    BindFormDocument? bindForm;
+                    if (command == "workspace.binds.load") bindForm = await Task.Run(() => BindFormService.LoadAsync(bindRoot, bindPath));
+                    else
+                    {
+                        var submitted = payload.GetProperty("definitions").EnumerateArray().Select(item => new BindFormDefinition(
+                            item.GetProperty("name").GetString() ?? "", item.TryGetProperty("type", out var bindType) ? bindType.GetString() ?? "VARCHAR2" : "VARCHAR2",
+                            item.TryGetProperty("label", out var bindLabel) ? bindLabel.GetString() ?? "" : "", item.TryGetProperty("description", out var bindDescription) ? bindDescription.GetString() ?? "" : "",
+                            item.TryGetProperty("required", out var bindRequired) && bindRequired.ValueKind == JsonValueKind.True,
+                            item.TryGetProperty("defaultValue", out var bindDefault) && bindDefault.ValueKind == JsonValueKind.String ? bindDefault.GetString() : null)).ToArray();
+                        bindForm = await Task.Run(() => BindFormService.SaveAsync(bindRoot, bindPath, submitted));
+                    }
+                    Send(sender, new { type = "workspace.binds", requestId = id, path = bindPath, operation = command == "workspace.binds.load" ? "load" : "save", definitions = bindForm?.Definitions ?? Array.Empty<BindFormDefinition>() });
+                    break;
+                case "workspace.runs.list":
+                case "workspace.runs.save":
+                    var runRoot = _workspace.Root ?? throw new InvalidOperationException("Open a workspace to save or load call definitions.");
+                    if (payload.GetProperty("root").GetString() != runRoot) throw new InvalidOperationException("The workspace changed. Reopen run configurations.");
+                    if (command == "workspace.runs.list")
+                    {
+                        var runCatalog = await Task.Run(() => RunConfigurationService.ListAsync(runRoot));
+                        Send(sender, new { type = "workspace.runs.list", requestId = id, root = runRoot, catalog = runCatalog });
+                    }
+                    else
+                    {
+                        var runDocument = payload.GetProperty("configuration").Clone();
+                        var savedConfiguration = await Task.Run(() => RunConfigurationService.SaveAsync(runRoot, runDocument));
+                        Send(sender, new { type = "workspace.runs.saved", requestId = id, root = runRoot, configuration = savedConfiguration });
+                    }
+                    break;
+                case "workspace.projectRules":
+                case "workspace.projectRules.save":
+                    var rulesRoot = payload.GetProperty("root").GetString()!;
+                    var rulesSnapshot = command == "workspace.projectRules"
+                        ? await _workspace.GetProjectRulesAsync(rulesRoot)
+                        : await _workspace.SaveProjectRulesAsync(rulesRoot, payload.GetProperty("rules").Deserialize<WorkspaceProjectRules>(WebJsonOptions)!, payload.GetProperty("revision").GetString()!);
+                    Send(sender, new { type = "workspace.projectRules", requestId = id, root = rulesRoot, snapshot = rulesSnapshot });
+                    if (command == "workspace.projectRules.save") await SendWorkspaceAsync(sender);
+                    break;
+                case "workspace.sources":
+                    var sourceRoot = payload.GetProperty("root").GetString()!;
+                    var sources = await Task.Run(() => _workspace.ReadSourceFilesAsync(sourceRoot));
+                    Send(sender, new { type = "workspace.sources", requestId = id, sources });
+                    break;
                 case "workspace.tools.list":
                 case "workspace.tools.save":
                     var toolRoot = _workspace.Root ?? throw new InvalidOperationException("Open a workspace to use mini tools.");
@@ -182,6 +229,12 @@ public sealed partial class MainPage
                     Send(sender, new { type = "workspace.changed", requestId = id, root = _workspace.Root, entry });
                     await SendWorkspaceAsync(sender);
                     break;
+                case "workspace.createFile":
+                    EnsureWorkspaceRoot(payload);
+                    var created = await Task.Run(() => _workspace.CreateFileWithContentAsync(payload.GetProperty("relativePath").GetString()!, payload.GetProperty("content").GetString()!));
+                    Send(sender, new { type = "workspace.changed", requestId = id, root = _workspace.Root, entry = created });
+                    await SendWorkspaceAsync(sender);
+                    break;
                 case "workspace.moveEntry":
                     EnsureWorkspaceRoot(payload);
                     var movedSource = Path.GetFullPath(payload.GetProperty("path").GetString()!);
@@ -193,7 +246,7 @@ public sealed partial class MainPage
                     await SendWorkspaceAsync(sender);
                     break;
                 case "workspace.create":
-                    await CreateWorkspaceAsync(sender);
+                    await CreateWorkspaceAsync(sender,payload.TryGetProperty("template",out var templateValue)?templateValue.GetString()??"blank":"blank");
                     break;
                 case "workspace.refresh":
                     await SendWorkspaceAsync(sender);
@@ -220,7 +273,7 @@ public sealed partial class MainPage
             await SendWorkspaceAsync(sender);
         }
 
-        private async Task CreateWorkspaceAsync(CoreWebView2 sender)
+        private async Task CreateWorkspaceAsync(CoreWebView2 sender,string template)
         {
             var picker = new FolderPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
             picker.FileTypeFilter.Add("*");
@@ -247,7 +300,7 @@ public sealed partial class MainPage
                 throw new InvalidOperationException("Enter a valid workspace folder name.");
             var path = Path.Combine(parent.Path, name);
             if (Directory.Exists(path) || File.Exists(path)) throw new IOException("A folder or file with this name already exists.");
-            Directory.CreateDirectory(path);
+            await WorkspaceTemplates.CreateAsync(path,template);
             await _workspace.SetRootAsync(path);
             await SendWorkspaceAsync(sender);
         }

@@ -1,0 +1,12 @@
+import {useState} from 'react';
+import {captureLayout,layoutPresets,normalizeSavedLayouts} from './savedLayouts.js';
+import {PANEL_LABELS} from './dockLayout.js';
+function LayoutPreview({entry}){
+ const l=entry.layout,side=name=>!entry.focus&&l.visible?l.groups.filter(g=>g.side===name).filter(g=>g.panels.some(p=>!l.hidden.includes(p))):[];
+ return <span className="layout-miniature" aria-hidden="true">{side('left').length>0&&<span className="layout-mini-side">{side('left').map(g=><span key={g.id}>{PANEL_LABELS[g.active]}</span>)}</span>}<span className="layout-mini-center"><span>Editor</span>{!entry.focus&&!l.resultsCollapsed&&<span style={{flexBasis:`${l.resultsHeight}%`}}>Results</span>}</span>{side('right').length>0&&<span className="layout-mini-side">{side('right').map(g=><span key={g.id}>{PANEL_LABELS[g.active]}</span>)}</span>}</span>;
+}
+export function SavedLayouts({saved,layout,focus,onSave,onApply,readOnly}){
+ const [name,setName]=useState(''),[error,setError]=useState('');
+ const entries=normalizeSavedLayouts(saved).entries;
+ return <div className="saved-layouts"><p className="view-description">Preview an arrangement, then choose Apply. Ctrl+Alt+1/2/3 opens the three presets.</p>{[...layoutPresets(),...entries].map((entry,index)=><div className="saved-layout-entry" key={entry.id}><LayoutPreview entry={entry}/><span>{entry.name}{index<3&&<small>Ctrl+Alt+{index+1}</small>}</span><button role="menuitem" disabled={readOnly} aria-label={`Apply layout ${entry.name}`} onClick={()=>onApply(entry)}>Apply</button>{index>=3&&<button aria-label={`Delete layout ${entry.name}`} disabled={readOnly} onClick={()=>onSave({version:1,entries:entries.filter(e=>e.id!==entry.id)})}>Delete</button>}</div>)}<form onSubmit={event=>{event.preventDefault();const label=name.trim();if(!label){setError('Enter a layout name.');return}if(entries.some(e=>e.name.toLowerCase()===label.toLowerCase())){setError('Choose a unique layout name.');return}if(entries.length>=12){setError('Remove a saved layout before adding another (maximum 12).');return}onSave({version:1,entries:[...entries,{id:`saved-${Date.now().toString(36)}`,name:label,...captureLayout(layout,focus)}]});setName('');setError('')}}><label>Layout name<input aria-label="Saved layout name" maxLength={60} value={name} disabled={readOnly} onChange={e=>setName(e.target.value)}/></label><button disabled={readOnly} type="submit">Save current layout</button></form>{error&&<p role="alert">{error}</p>}</div>;
+}

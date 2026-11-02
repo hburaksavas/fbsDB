@@ -1,3 +1,4 @@
+import {FilteredMenuItems} from './FilteredMenuItems.jsx';
 import {useLayoutEffect,useRef} from 'react';
 import {createPortal} from 'react-dom';
 
@@ -32,6 +33,6 @@ export function WorkspaceMenu({context,items,onClose,label='Workspace actions'})
   },[context]);
   const parent=context.trigger.closest('[role="dialog"]')||context.trigger.closest('.desktop-shell')||document.body;
   return createPortal(<div ref={ref} className="workspace-actions-menu" role="menu" aria-label={label} onContextMenu={e=>e.preventDefault()}>
-    {items.map((item,index)=>item.separator?<hr key={index}/>:<button key={item.id||item.label} type="button" role="menuitem" disabled={item.disabled} data-danger={item.danger||undefined} title={item.title} onClick={()=>{onClose();item.run()}}>{item.icon&&<item.icon size={14}/>}<span>{item.label}</span>{item.detail&&<small>{item.detail}</small>}</button>)}
-  </div>,parent);
+    <FilteredMenuItems>{items.map((item,index)=>item.separator?<hr key={index}/>:<button key={item.id||item.label} type="button" role="menuitem" disabled={item.disabled} data-danger={item.danger||undefined} title={item.title} onClick={()=>{onClose();item.run()}}>{item.icon&&<item.icon size={14}/>}<span>{item.label}</span>{item.detail&&<small>{item.detail}</small>}</button>)}
+  </FilteredMenuItems></div>,parent);
 }

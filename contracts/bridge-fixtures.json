@@ -469,5 +469,360 @@
         "tools": []
       }
     }
+  },
+  {
+    "name": "source discovery needs explicit workspace root",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "sources",
+      "tabId": "tab-1",
+      "command": "workspace.sources",
+      "payload": {
+        "root": "C:/work"
+      }
+    }
+  },
+  {
+    "name": "source discovery rejects missing workspace root",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "sources",
+      "tabId": "tab-1",
+      "command": "workspace.sources",
+      "payload": {}
+    }
+  },
+  {
+    "name": "source discovery reports incomplete scope",
+    "direction": "reply",
+    "valid": true,
+    "message": {
+      "type": "workspace.sources",
+      "requestId": "sources",
+      "sources": {
+        "root": "C:/work",
+        "files": [],
+        "skipped": [
+          "large.pkb"
+        ],
+        "truncated": true
+      }
+    }
+  },
+  {
+    "name": "source discovery rejects missing scope status",
+    "direction": "reply",
+    "valid": false,
+    "message": {
+      "type": "workspace.sources",
+      "requestId": "sources",
+      "sources": {
+        "root": "C:/work",
+        "files": []
+      }
+    }
+  },
+  {
+    "name": "project rules saves need root rules and revision",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "rules",
+      "tabId": "tab-1",
+      "command": "workspace.projectRules.save",
+      "payload": {
+        "root": "C:/work",
+        "rules": {
+          "version": 1,
+          "associations": [
+            {
+              "extension": ".sql",
+              "type": "SQL"
+            }
+          ],
+          "packagePairs": [],
+          "testPatterns": []
+        },
+        "revision": "version"
+      }
+    }
+  },
+  {
+    "name": "project rules reject missing source associations",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "rules",
+      "tabId": "tab-1",
+      "command": "workspace.projectRules.save",
+      "payload": {
+        "root": "C:/work",
+        "rules": {
+          "version": 1
+        },
+        "revision": "version"
+      }
+    }
+  },
+  {
+    "name": "project rules reject save without revision",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "rules",
+      "tabId": "tab-1",
+      "command": "workspace.projectRules.save",
+      "payload": {
+        "root": "C:/work",
+        "rules": {
+          "version": 1,
+          "associations": [
+            {
+              "extension": ".sql",
+              "type": "SQL"
+            }
+          ],
+          "packagePairs": [],
+          "testPatterns": []
+        }
+      }
+    }
+  },
+  {
+    "name": "source review requires SQL and stays on the Oracle handler",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "review",
+      "tabId": "tab-1",
+      "command": "source.review",
+      "payload": {
+        "sql": "CREATE PROCEDURE demo AS BEGIN NULL; END;"
+      }
+    }
+  },
+  {
+    "name": "source review rejects missing SQL",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "review",
+      "tabId": "tab-1",
+      "command": "source.review",
+      "payload": {}
+    }
+  },
+  {
+    "name": "reviewed compilation carries an opaque review token",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "compile",
+      "tabId": "tab-1",
+      "command": "sql.execute",
+      "payload": {
+        "sql": "CREATE PROCEDURE demo AS BEGIN NULL; END;",
+        "sourceReviewId": "review-token"
+      }
+    }
+  },
+  {
+    "name": "source review reply identifies server version and context",
+    "direction": "reply",
+    "valid": true,
+    "message": {
+      "type": "source.review",
+      "requestId": "review",
+      "review": {
+        "reviewId": "review-token",
+        "sql": "CREATE PROCEDURE demo AS BEGIN NULL; END;",
+        "reviewedAt": "2026-11-01T00:00:00Z",
+        "snapshot": {
+          "owner": "APP",
+          "name": "DEMO",
+          "type": "PROCEDURE",
+          "source": "",
+          "exists": false,
+          "version": "v1",
+          "context": "PDB/EDITION",
+          "profileId": "DEV"
+        }
+      }
+    }
+  },
+  {
+    "name": "run configuration saves preserve structured definitions",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "save-call",
+      "tabId": "tab-1",
+      "command": "workspace.runs.save",
+      "payload": {
+        "root": "C:/work",
+        "configuration": {
+          "version": 1,
+          "id": "",
+          "name": "Pay",
+          "owner": "APP",
+          "packageName": "BILLING",
+          "routineName": "PAY",
+          "kind": "PROCEDURE",
+          "returnBindType": "",
+          "parameters": [
+            {
+              "name": "P_OUT",
+              "oracleType": "NUMBER",
+              "bindType": "NUMBER",
+              "mode": "OUT"
+            }
+          ],
+          "revision": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "run configuration saves require a workspace",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "save-call",
+      "tabId": "tab-1",
+      "command": "workspace.runs.save",
+      "payload": {
+        "configuration": {
+          "version": 1,
+          "id": "",
+          "name": "Pay",
+          "owner": "APP",
+          "packageName": "BILLING",
+          "routineName": "PAY",
+          "kind": "PROCEDURE",
+          "returnBindType": "",
+          "parameters": [
+            {
+              "name": "P_OUT",
+              "oracleType": "NUMBER",
+              "bindType": "NUMBER",
+              "mode": "OUT"
+            }
+          ],
+          "revision": 0
+        }
+      }
+    }
+  },
+  {
+    "name": "OUT binds retain direction on execution",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "call",
+      "tabId": "tab-1",
+      "command": "sql.execute",
+      "payload": {
+        "sql": "BEGIN demo(:out); END;",
+        "parameters": [
+          {
+            "name": "out",
+            "type": "NUMBER",
+            "value": null,
+            "direction": "OUT"
+          }
+        ]
+      }
+    }
+  },
+  {
+    "name": "NULL output parameters retain an explicit value field",
+    "direction": "reply",
+    "valid": true,
+    "message": {
+      "type": "sql.result",
+      "columns": [],
+      "rows": [],
+      "outParameters": [
+        {
+          "name": "P_OUT",
+          "type": "NUMBER",
+          "value": null
+        }
+      ]
+    }
+  },
+  {
+    "name": "paused script source review acknowledgement",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "review-ack",
+      "tabId": "a",
+      "command": "script.sourceReviewed",
+      "payload": {
+        "scriptRequestId": "run1",
+        "index": 1,
+        "reviewNonce": "nonce",
+        "reviewId": "token"
+      }
+    }
+  },
+  {
+    "name": "paused script review requires step nonce",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "review-ack",
+      "tabId": "a",
+      "command": "script.sourceReviewed",
+      "payload": {
+        "scriptRequestId": "run1",
+        "index": 1,
+        "reviewId": "token"
+      }
+    }
+  },
+  {
+    "name": "workspace template oracle-package",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "r-template-oracle-package",
+      "tabId": "a",
+      "command": "workspace.create",
+      "payload": {
+        "template": "oracle-package"
+      }
+    }
+  },
+  {
+    "name": "workspace template unknown",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "r-template-unknown",
+      "tabId": "a",
+      "command": "workspace.create",
+      "payload": {
+        "template": "unknown"
+      }
+    }
   }
 ]

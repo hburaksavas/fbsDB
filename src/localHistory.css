@@ -1,0 +1,10 @@
+.local-history{max-width:min(1000px,96vw)}
+.local-history p{margin:4px 0 0;font-size:11px;color:var(--muted)}
+.local-history-body{display:grid;grid-template-columns:220px 1fr;gap:12px;padding:8px 18px;height:min(60vh,520px)}
+.local-history-list{list-style:none;margin:0;padding:0;overflow:auto;border-right:1px solid var(--line)}
+.local-history-list button{display:grid;width:100%;text-align:left;padding:6px 8px;border:0;border-bottom:1px solid var(--line);background:transparent;color:inherit;font-size:11px}
+.local-history-list button[aria-pressed=true]{background:var(--hover-bg)}
+.local-history-list small{color:var(--muted)}
+.local-history-diff{display:flex;flex-direction:column;min-width:0;min-height:0}
+.local-history-editor{flex:1;min-height:0;border:1px solid var(--line)}
+.local-history-legend{margin:4px 0 0}

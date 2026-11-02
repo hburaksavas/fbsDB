@@ -11,6 +11,7 @@ export function EditorStyleSettings({settings,onChange,...props}) {
       {select('editor.cursorStyle','Cursor style',['line','block','underline'])}
       {select('editor.cursorBlinking','Cursor blinking',['smooth','blink','solid'])}
     </div>
-    <div className="editor-settings-toggles">{[['insertSpaces','Indent with spaces'],['lineNumbers','Line numbers'],['lineHighlight','Current line highlight'],['indentGuides','Indent guides'],['whitespace','Visible whitespace'],['wordWrap','Word wrap'],['minimap','Minimap'],['folding','Code folding'],['bracketColors','Bracket colors']].map(([id,label])=><label key={id}><input type="checkbox" disabled={settings.readOnly} checked={value('editor.'+id)} onChange={e=>update('editor.'+id,e.target.checked)}/>{label}</label>)}</div>
+    <p>Semantic highlighting resolves parameters, local variables, columns/record fields and members in the visible source range. Unresolved symbols retain syntax colors. Limit: 100,000 source characters, 2,000 identifiers and 64 metadata resolutions per range.</p>
+    <div className="editor-settings-toggles">{[['semanticHighlighting','Semantic symbol highlighting'],['overviewRuler','Editor overview ruler'],['stickyHeaders','Sticky code headers'],['insertSpaces','Indent with spaces'],['lineNumbers','Line numbers'],['lineHighlight','Current line highlight'],['indentGuides','Indent guides'],['whitespace','Visible whitespace'],['wordWrap','Word wrap'],['minimap','Minimap'],['folding','Code folding'],['bracketColors','Bracket colors']].map(([id,label])=><label key={id}><input type="checkbox" disabled={settings.readOnly} checked={value('editor.'+id)} onChange={e=>update('editor.'+id,e.target.checked)}/>{label}</label>)}</div>
   </section>;
 }

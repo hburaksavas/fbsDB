@@ -3,7 +3,7 @@ export const PANEL_LABELS = { editors: 'Open Editors', files: 'Explorer', connec
 const clamp = (value, min, max, fallback) => Number.isFinite(value) ? Math.max(min, Math.min(max, value)) : fallback;
 export function defaultDockLayout() {
   const groups = PANEL_IDS.map((panel, i) => ({ id: `group-${panel}`, side: 'left', panels: [panel], active: panel, height: [100, 220, 220, 280][i] }));
-  return { version: 1, visible: true, hidden: [], widths: { left: 258, right: 258 }, inspectorWidth: 280, expandedPaths: {}, resultsHeight: 34, resultsCollapsed: false, groups, trees: { left: dockSplit('y', groups.map(group => dockLeaf(group.id)), groups.map(group => group.height)), right: null } };
+  return { version: 1, locked:false, visible: true, hidden: [], widths: { left: 258, right: 258 }, inspectorWidth: 280, expandedPaths: {}, resultsHeight: 34, resultsCollapsed: false, groups, trees: { left: dockSplit('y', groups.map(group => dockLeaf(group.id)), groups.map(group => group.height)), right: null } };
 }
 export function normalizeDockLayout(value) {
   if (!value || value.version !== 1 || !Array.isArray(value.groups)) return defaultDockLayout();
@@ -24,7 +24,7 @@ export function normalizeDockLayout(value) {
   }
   const expandedPaths = value.expandedPaths && typeof value.expandedPaths === 'object' && !Array.isArray(value.expandedPaths) ? Object.fromEntries(Object.entries(value.expandedPaths).filter(([path, open]) => path.length < 2000 && open === true).slice(0, 2000)) : {};
   const trees = Object.fromEntries(['left','right'].map(side => [side, repairDockTree(value.trees?.[side], groups.filter(group => group.side === side))]));
-  return { version: 1, visible: value.visible !== false, hidden: [...new Set((Array.isArray(value.hidden) ? value.hidden : []).filter(panel => PANEL_IDS.includes(panel)))], widths: { left: clamp(value.widths?.left, 180, 520, defaults.widths.left), right: clamp(value.widths?.right, 180, 520, defaults.widths.right) }, inspectorWidth: clamp(value.inspectorWidth, 220, 560, 280), expandedPaths, resultsHeight: clamp(value.resultsHeight, 15, 70, 34), resultsCollapsed: value.resultsCollapsed === true, groups, trees };
+  return { version: 1, locked:value.locked===true, visible: value.visible !== false, hidden: [...new Set((Array.isArray(value.hidden) ? value.hidden : []).filter(panel => PANEL_IDS.includes(panel)))], widths: { left: clamp(value.widths?.left, 180, 520, defaults.widths.left), right: clamp(value.widths?.right, 180, 520, defaults.widths.right) }, inspectorWidth: clamp(value.inspectorWidth, 220, 560, 280), expandedPaths, resultsHeight: clamp(value.resultsHeight, 15, 70, 34), resultsCollapsed: value.resultsCollapsed === true, groups, trees };
 }
 export function migrateDockLayout(storage) {
   const next = defaultDockLayout();
@@ -37,6 +37,7 @@ export function migrateDockLayout(storage) {
 }
 export function moveDockPanel(layout, panel, side, targetId = null, placement = 'end', tabIndex = null) {
   const next = normalizeDockLayout(layout);
+  if (next.locked) return next;
   if (!PANEL_IDS.includes(panel) || !['left', 'right'].includes(side)) return next;
   const source = next.groups.find(group => group.panels.includes(panel)), target = next.groups.find(group => group.id === targetId);
   if (target === source && (source.panels.length === 1 || placement === 'merge' && tabIndex == null)) return next;

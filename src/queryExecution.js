@@ -22,11 +22,11 @@ export function createQueryExecution(getPorts) {
   const actions = {
     runQuery(statementOverride) {
       const p = getPorts(), { owner, session, view } = active(p);
-      if (p.documents.active?.readOnly) return;
+      if (p.documents.active?.readOnly||p.ui.readOnly) return;
       if (view.streamState?.busy) { p.session.status('Finish or cancel the streaming export before executing SQL.', owner); return; }
       if (session.executing || session.scriptRun?.running || p.ui.pendingBind || p.operations.pages.has(owner)) return;
       if (!p.native) { p.session.status('Connect to an Oracle profile in the desktop app to execute SQL.', owner); return; }
-      if (!connected(session.activeConnection)) { p.ui.showConnections(); return; }
+      if (!connected(session.activeConnection)||session.connectionLost) { p.ui.showConnections(); return; }
       const editor = p.editor.current, model = editor?.getModel(), position = editor?.getPosition() ?? p.editor.lastPosition;
       const selection = editor?.getSelection();
       const target = executionTarget(model?.getValue() || p.documents.text, {
@@ -38,11 +38,13 @@ export function createQueryExecution(getPorts) {
       const statement = target?.sql;
       if (!statement?.trim()) { p.session.status('Place the cursor in a SQL statement or select SQL to run.', owner); return; }
       p.editor.flash(target);
-      if (getOracleBindNames(statement).length) { p.ui.bind(statement); return; }
+      if (p.ui.reviewSource?.(statement, target)) return;
+      if (getOracleBindNames(statement).length) { if (p.ui.inlineBinds?.(statement)) return; p.ui.bind(statement); return; }
       return actions.executeStatement(statement);
     },
     executeStatement(statement, parameters = [], miniTool = false, executionContext = {}) {
       const p = getPorts(), { owner, session, view } = active(p), operations = p.operations;
+      if(p.documents.active?.readOnly||p.ui.readOnly)return;
       if (isDdl(statement)) {
         if (session.transactionPending) { p.session.status('Commit or roll back pending changes before running DDL. DDL commits automatically.', owner); return; }
         if (!executionContext.ddlConfirmed && !p.ui.confirmDdl?.({statement,parameters,miniTool,owner,profileId:session.activeConnection?.id})) return;
@@ -62,15 +64,17 @@ export function createQueryExecution(getPorts) {
       operations.metadata.set(owner, { statementOffset, fileName: p.documents.active?.name,
         executedAt: new Date().toISOString(), requestStartedAtPerf: performance.now(),
         executedProfile: session.activeConnection?.name || session.activeConnection?.id,
+        executedProfileId:session.activeConnection?.id,executedTabId:owner,executedConnectionGeneration:session.connectionGeneration??0,executedContext:session.sessionContext?{...session.sessionContext}:null,
         editorSnapshot: snapshot, executedSql: statement, executedParameters: parameters,
         executionPageSize: p.settings.pageSize, workspaceRoot: p.settings.workspaceRoot, ...executionContext });
       operations.lastOwner = owner; operations.pages.delete(owner);
       p.results.update(owner, 'selectedResultKey', null); p.results.update(owner, 'pageError', '');
-      p.results.update(owner, 'resultTab', 'Results');
+      if (p.settings.activateResults !== false) p.results.update(owner, 'resultTab', 'Results');
       set(p, owner, { fetchingPage: false, executionKind: 'query', executing: true, cancelling: false });
       p.history.start(owner, statement, session.activeConnection?.id);
       p.session.status('Executing Oracle statement…', owner); p.ui.bind(null);
       const requestId = p.send('sql.execute', { tabId: owner, sql: statement, parameters, miniTool,
+        ...(executionContext.sourceReviewId ? {sourceReviewId:executionContext.sourceReviewId} : {}),
         timeoutSeconds: p.settings.timeout, pageSize: p.settings.pageSize,
         previousResultId: (view.resultSets || []).some(item => item.pinned && item.result.resultId === view.queryResult?.resultId) ? null : view.queryResult?.resultId || null });
       operations.owners.set(requestId, owner); operations.running.set(owner, { requestId, startedAt: Date.now(), status: 'running' });
@@ -81,11 +85,11 @@ export function createQueryExecution(getPorts) {
     },
     explainQuery() {
       const p = getPorts(), { owner, session } = active(p);
-      if (p.documents.active?.readOnly) return;
+      if (p.documents.active?.readOnly||p.ui.readOnly) return;
       p.results.update(owner, 'resultTab', 'Explain');
       if (session.executing || session.scriptRun?.running) return;
       if (!p.native) { p.results.update(owner, 'explainMessage', 'Connect to an Oracle profile in the desktop app to inspect an execution plan.'); return; }
-      if (!connected(session.activeConnection)) { p.ui.showConnections(); p.session.status('Connect to an Oracle profile before explaining SQL.', owner); return; }
+      if (!connected(session.activeConnection)||session.connectionLost) { p.ui.showConnections(); p.session.status('Connect to an Oracle profile before explaining SQL.', owner); return; }
       const editor = p.editor.current, model = editor?.getModel(), position = editor?.getPosition() ?? p.editor.lastPosition;
       const selection = editor?.getSelection();
       let statement = selection && !selection.isEmpty() ? model.getValueInRange(selection) : '';
@@ -115,7 +119,7 @@ export function createQueryExecution(getPorts) {
     },
     startScript(statements, parameters, continueOnError) {
       const p = getPorts(), dialog = p.ui.scriptDialog;
-      if (!dialog) return;
+      if (!dialog||p.ui.readOnly||p.documents.active?.readOnly) return;
       const owner = dialog.tabId, session = p.readSession(owner), view = p.results.tabs[owner] || {}, profile = session.activeConnection;
       if (!p.native || view.streamState?.busy || session.executing || session.scriptRun?.running || session.fetchingPage || session.connecting || !connected(profile)) return;
       if (view.queryResult) p.results.update(owner, 'resultSets', sets => [...(sets || []), { key: `before-script-${crypto.randomUUID()}`, label: 'Before script', pinned: true, result: view.queryResult, view: view.queryView || {} }]);
@@ -123,6 +127,7 @@ export function createQueryExecution(getPorts) {
       p.operations.scripts.set(owner, run); p.session.update('scriptRun', run, owner);
       p.operations.metadata.set(owner, { fileName: p.documents.tabs.find(tab => tab.id === owner)?.name,
         editorSnapshot: dialog.source, executedProfile: profile.name || profile.id,
+        executedProfileId:profile.id,executedTabId:owner,executedConnectionGeneration:session.connectionGeneration??0,executedContext:session.sessionContext?{...session.sessionContext}:null,
         executionPageSize: p.settings.scriptPageSize, workspaceRoot: p.settings.workspaceRoot });
       run.requestId = p.send('script.execute', { tabId: owner, continueOnError, timeoutSeconds: p.settings.timeout,
         pageSize: p.settings.scriptPageSize, statements: statements.map(statement => ({ ...statement,

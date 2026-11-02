@@ -26,7 +26,9 @@ public sealed partial class MainPage : Page
     private readonly Microsoft.UI.Xaml.Media.Animation.Storyboard StartupEntrance = new();
     private readonly Microsoft.UI.Xaml.Media.Animation.Storyboard StartupBreathing = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _scriptRuns = new();
+    private readonly ScriptSourceReviewGate _scriptSourceReviews = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _resultExports = new();
+    private readonly ConcurrentDictionary<string, CancellationTokenSource> _gridApplies = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _completionRequests = new();
     private readonly ConcurrentDictionary<string, CancellationTokenSource> _schemaRequests = new();
     private readonly TnsProfileService _profiles = new();
@@ -42,6 +44,7 @@ public sealed partial class MainPage : Page
     public MainPage()
     {
         InitializeComponent();
+        WorkspaceFileService.PreviousVersionCaptured = (path, previous) => LocalHistoryService.Capture(path, previous);
         RequestedTheme = NativeTheme.RequestedTheme;
         EditorWebView.DefaultBackgroundColor = NativeTheme.Color("--bg");
         _idleTimer = DispatcherQueue.CreateTimer();
@@ -202,7 +205,7 @@ public sealed partial class MainPage : Page
             var type = root.TryGetProperty("type", out var typeValue) ? typeValue.GetString() : null;
             if (type == "ui.ready")
             {
-                tab = _sessions.Get(tabId);
+                tab = _sessions.InitializeUiTab(tabId);
                 UpdateStartupProgress(3, 3, "Preparing Oracle driver…", 88);
                 sender.PostWebMessageAsJson("{\"type\":\"host.ready\"}");
                 await SendProfilesAsync(sender);
@@ -219,9 +222,11 @@ public sealed partial class MainPage : Page
             requestId = root.TryGetProperty("id", out var idValue) && idValue.ValueKind == JsonValueKind.String ? idValue.GetString() : null;
             var envelope = NativeBridgeContract.ReadCommand(root);
             tabId = envelope.TabId;
-            tab = _sessions.Get(tabId);
             var id = envelope.Id;
             var command = envelope.Command;
+            // UI preferences and locale are process-wide and may arrive before
+            // ui.ready after a WebView reload. They need no SQL tab/session.
+            tab = _sessions.Get(NativeBridgeContract.HandlerFor(command) == "ui" ? "ui-bootstrap" : tabId);
             receivedCommand = command;
             // Cancellation must reach its token without waiting for the operation's session gate.
             if (NativeBridgeContract.RequiresSessionResume(command)) {
@@ -304,13 +309,16 @@ public sealed partial class MainPage : Page
         try { EnsureWorkspaceWatcher(sender); }
         catch (Exception watcherError) { _workspaceWatcher?.Dispose(); _workspaceWatcher = null; Debug.WriteLine("Workspace watcher: " + watcherError.Message); }
         var root = _workspace.Root;
+        await _workspace.LoadProjectRulesAsync();
+        var projectRules = _workspace.ProjectRules;
+        var fileConnections = await _workspace.GetFileConnectionsAsync();
         var catalog = await Task.Run(() => _workspace.Catalog);
         var files = await Task.Run(() => _workspace.ListSqlFiles());
         IReadOnlyList<WorkspaceEntry> entries = []; string? error = null;
         try { entries = await Task.Run(() => _workspace.ListDirectory()); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { error = ex.Message; }
         if (root is not null && !Directory.Exists(root)) error = "Workspace folder unavailable. Locate it or retry.";
-        await SendAsync(sender, new { type = "workspace.state", root, name = _workspace.DisplayName, files, entries, recent = _workspace.Recent, catalog, error }, tab);
+        await SendAsync(sender, new { type = "workspace.state", root, name = _workspace.DisplayName, files, entries, recent = _workspace.Recent, catalog, error, projectRules, fileConnections }, tab);
     }
 
     private static readonly JsonSerializerOptions WebJsonOptions = NativeBridgeContract.JsonOptions;

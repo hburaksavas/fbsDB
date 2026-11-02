@@ -31,6 +31,9 @@ public static class WorkspaceFileService
         catch (Exception error) when (error is IOException or UnauthorizedAccessException) { return new(path, "unavailable", null, Error: error.Message); }
     }
 
+    // Receives the replaced content of an existing file (local history); failures there never affect the save.
+    public static Action<string, byte[]>? PreviousVersionCaptured;
+
     // Keep the version check and write under the same exclusive handle.
     public static async Task<WorkspaceFileSnapshot> SaveAsync(string path, string content, string? expectedVersion)
     {
@@ -45,6 +48,7 @@ public static class WorkspaceFileService
         if (expectedVersion is not null && Version(previous) != expectedVersion)
             return new(path, Version(previous), Decode(previous), Conflict: true);
         stream.Position = 0; await stream.WriteAsync(bytes); stream.SetLength(bytes.Length); await stream.FlushAsync();
+        if (expectedVersion is not null && !previous.AsSpan().SequenceEqual(bytes)) { try { PreviousVersionCaptured?.Invoke(path, previous); } catch (Exception) { } }
         return new(path, Version(bytes), content);
     }
 }

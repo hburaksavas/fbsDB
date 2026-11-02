@@ -94,7 +94,7 @@ public sealed partial class WorkspaceService
 
     private string WorksetPath(string relative)
     {
-        if (Path.IsPathRooted(relative) || !relative.EndsWith(".sql", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Worksets contain only relative SQL paths inside this workspace.");
+        if (Path.IsPathRooted(relative) || !IsWorkspaceSourceFile(relative)) throw new InvalidOperationException("Worksets contain only relative Oracle source paths inside this workspace.");
         return SafePath(Path.Combine(_root ?? throw new InvalidOperationException("Open a workspace first."), relative));
     }
 

@@ -1,3 +1,6 @@
+import { docAtWord } from './docComments.js';
+import {semanticTokenTypes} from './semanticTokensLegend.js';
+import {outlineDocumentSymbols} from './outlineModel.js';
 import { oracleInlineCompletion } from './oracleInlineCompletion.js';
 import { monacoCompletionItems } from './oracleCompletionClient.js';
 import {automaticCompletionAllowed, getOracleCompletionContext} from './oracleCompletionContext.js';
@@ -8,12 +11,13 @@ const rangeAt = (monaco, model, start, end = start + 1) => {
   return new monaco.Range(a.lineNumber, a.column, b.lineNumber, b.column);
 };
 
-export function installOracleLanguageProviders({ monaco, editor, client, broker, snapshot, onDefinition, onReveal, onError, onPlscope, definitionModels, acceptanceCommand }) {
+export function installOracleLanguageProviders({ monaco, editor, client, broker, snapshot, onDefinition, onReveal, onError, onPlscope, definitionModels, acceptanceCommand, onBeforeNavigate }) {
   const disposables = [];
   let disposed = false, lastRefresh = '';
   const prepare = async (model, position, token, mode, manual = false) => {
-    const state = snapshot(), revision = client.revision, version = model.getVersionId(), source = model.getValue(), cursor = model.getOffsetAt(position);
-    const valid = () => !disposed && client.revision === revision && !token?.isCancellationRequested && !model.isDisposed() && model.getVersionId() === version && snapshot().tabId === state.tabId && snapshot().originTabId === state.originTabId;
+    const state = snapshot();if(state.languageFeatures?.completion===false)return null;
+    const revision = client.revision, version = model.getVersionId(), source = model.getValue(), cursor = model.getOffsetAt(position);
+    const valid = () => !disposed && client.revision === revision && !token?.isCancellationRequested && !model.isDisposed() && model.getVersionId() === version && snapshot().tabId === state.tabId && snapshot().originTabId === state.originTabId&&snapshot().languageFeatures?.completion!==false;
     const context = getOracleCompletionContext(source, cursor);
     const qualified = !!context.qualifier && !context.relation;
     let analysis = await client.request('analyze', source, cursor, token, { mode });
@@ -66,6 +70,18 @@ export function installOracleLanguageProviders({ monaco, editor, client, broker,
     return valid() ? { ...result, incomplete } : null;
   };
 
+  if(monaco.languages.registerDocumentRangeSemanticTokensProvider)disposables.push(monaco.languages.registerDocumentRangeSemanticTokensProvider('sql',{
+    getLegend:()=>({tokenTypes:semanticTokenTypes,tokenModifiers:[]}),
+    async provideDocumentRangeSemanticTokens(model,range,token){
+      const state=snapshot();if(!state.semanticHighlighting||state.languageFeatures?.completion===false)return {data:new Uint32Array()};
+      const version=model.getVersionId(),source=model.getValue();
+      const result=await client.request('semantic',source,0,token,{start:model.getOffsetAt({lineNumber:range.startLineNumber,column:range.startColumn}),end:model.getOffsetAt({lineNumber:range.endLineNumber,column:range.endColumn})});
+      if(disposed||token?.isCancellationRequested||model.isDisposed()||model.getVersionId()!==version||snapshot().tabId!==state.tabId)return {data:new Uint32Array()};
+      let previousLine=0,previousColumn=0;const data=[];
+      for(const item of result.semantic?.tokens||[]){const position=model.getPositionAt(item.start),line=position.lineNumber-1,column=position.column-1;data.push(line-previousLine,line===previousLine?column-previousColumn:column,item.end-item.start,semanticTokenTypes.indexOf(item.type),0);previousLine=line;previousColumn=column}
+      return {data:new Uint32Array(data)};
+    },releaseDocumentSemanticTokens(){}
+  }));
   disposables.push(monaco.languages.registerCompletionItemProvider('sql', {
     triggerCharacters: ['.'],
     async provideCompletionItems(model, position, context, token) {
@@ -85,7 +101,7 @@ export function installOracleLanguageProviders({ monaco, editor, client, broker,
   }));
   disposables.push(monaco.languages.registerInlineCompletionsProvider('sql', {
     async provideInlineCompletions(model, position, context, token) {
-      if (!snapshot().settings.inline) return { items: [] };
+      if (snapshot().languageFeatures?.completion===false||!snapshot().settings.inline) return { items: [] };
       const source = model.getValue(), cursor = model.getOffsetAt(position), settings = snapshot().settings;
       if(!automaticCompletionAllowed(source,cursor,settings))return {items:[]};
       const result = await prepare(model, position, token, 'complete');
@@ -101,7 +117,7 @@ export function installOracleLanguageProviders({ monaco, editor, client, broker,
       if (!snapshot().settings.signatureHelp) return null;
       const result = await prepare(model, position, token, 'signature');
       if (!result?.signature) return null;
-      return { value: { ...result.signature, signatures: result.signature.signatures.map(signature => ({ ...signature, documentation: signature.documentation ? { value: `[Oracle documentation](${signature.documentation})` } : undefined })) }, dispose() {} };
+      return { value: { ...result.signature, signatures: result.signature.signatures.map(signature => ({ ...signature, documentation: {value:[signature.documentationText,signature.documentation?`[Oracle documentation](${signature.documentation})`:null].filter(Boolean).join('\n\n')} })) }, dispose() {} };
     },
   }));
   disposables.push(monaco.languages.registerHoverProvider('sql', {
@@ -111,10 +127,19 @@ export function installOracleLanguageProviders({ monaco, editor, client, broker,
       return symbol ? { range: rangeAt(monaco, model, symbol.start, symbol.end), contents: symbol.contents } : null;
     },
   }));
+  // Renders /** ... */ documentation of routines declared in the same source, on the declaration and on calls by name.
+  disposables.push(monaco.languages.registerHoverProvider('sql', {
+    provideHover(model, position) {
+      const word = model.getWordAtPosition(position);
+      if (!word || snapshot().languageFeatures?.hover === false) return null;
+      const markdown = docAtWord(model.getValue(), word.word, model.getOffsetAt(position));
+      return markdown ? { range: new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn), contents: [{ value: markdown }] } : null;
+    },
+  }));
   const definition = async (model, position, token, body = false) => {
     const state = snapshot(), symbol = (await prepare(model, position, token, 'symbol'))?.symbol;
     if (!symbol) return null;
-    if (symbol.localStart != null && !body) return { uri: model.uri, range: rangeAt(monaco, model, symbol.localStart) };
+    if (symbol.localStart != null && !body) {onBeforeNavigate?.();return { uri: model.uri, range: rangeAt(monaco, model, symbol.localStart) };}
     if (!symbol.target || !state.connected) return null;
     const source = await broker.load(state.originTabId, { ...symbol.target, body }, token, 'definition');
     if (!source?.text || token?.isCancellationRequested || snapshot().tabId !== state.tabId) return null;
@@ -133,6 +158,26 @@ export function installOracleLanguageProviders({ monaco, editor, client, broker,
     return { uri, range: targetRange };
   };
   disposables.push(monaco.languages.registerDefinitionProvider('sql', { provideDefinition: definition }));
+  const structure=async(model,token)=>{
+    const state=snapshot();if(state.languageFeatures?.outline===false)return null;
+    const version=model.getVersionId(),source=model.getValue(),result=await client.request('outline',source,0,token);
+    return !disposed&&!token?.isCancellationRequested&&!model.isDisposed()&&model.getVersionId()===version&&snapshot().tabId===state.tabId&&snapshot().languageFeatures?.outline!==false?result?.outline:null;
+  };
+  disposables.push(monaco.languages.registerDocumentSymbolProvider('sql',{
+    async provideDocumentSymbols(model,token){const outline=await structure(model,token);return outline?outlineDocumentSymbols(outline,offset=>model.getPositionAt(offset),monaco.languages.SymbolKind):[]}
+  }));
+  disposables.push(monaco.languages.registerFoldingRangeProvider('sql',{
+    async provideFoldingRanges(model,context,token){const outline=await structure(model,token);return (outline||[]).filter(item=>item.kind!=='Statement').flatMap(item=>{const start=model.getPositionAt(item.start).lineNumber,end=model.getPositionAt(item.end).lineNumber;return end>start?[{start,end,kind:item.kind==='Region'?monaco.languages.FoldingRangeKind.Region:undefined}]:[]})}
+  }));
+  disposables.push(monaco.languages.registerReferenceProvider('sql', {
+    async provideReferences(model,position,context,token) {
+      const result=await prepare(model,position,token,'references'),report=result?.references;
+      if(!report)return [];
+      onError([report.scope,report.reason].filter(Boolean).join(' '));
+      return report.locations.filter(item=>context.includeDeclaration||!item.declaration).map(item=>({uri:model.uri,range:rangeAt(monaco,model,item.start,item.end)}));
+    }
+  }));
+
   if (monaco.editor.registerEditorOpener) disposables.push(monaco.editor.registerEditorOpener({
     openCodeEditor(sourceEditor, resource, selection) {
       const source = definitionModels.get(resource.toString());

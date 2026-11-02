@@ -1,0 +1,9 @@
+.inline-bind-zone{overflow:hidden}
+.inline-bind-bar{display:flex;gap:10px;align-items:center;height:34px;padding:0 8px;overflow-x:auto;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:11px}
+.inline-bind-field{display:inline-flex;gap:4px;align-items:center;white-space:nowrap}
+.inline-bind-field input[type=text],.inline-bind-field input[type=datetime-local]{width:130px}
+.inline-bind-null{display:inline-flex;gap:2px;align-items:center;color:var(--muted)}
+.inline-bind-usage{background:var(--highlight-teal-bg);outline:1px solid var(--accent)}
+.inline-bind-pick{font-size:10px;padding:0 5px}
+.picker-choice{display:block;width:100%;text-align:left;background:transparent;color:var(--text);border:0;padding:2px 0}
+.picker-choice:disabled{color:var(--muted)}

@@ -6,14 +6,15 @@ import { ModalBackdrop } from './ModalBackdrop';
 import { useDialogFocus } from './ConnectionManager';
 import { isNativeHost, sendNativeCommand, subscribeNativeMessages } from './nativeBridge';
 import { bindTypes } from './bindDefinitions';
-import { miniToolFromResult, normalizeMiniTool } from './miniTools';
+import { miniToolFromResult, normalizeMiniTool, validateToolName } from './miniTools';
 
 export function MiniToolsDialog({ root, tabId, sourceResult, result, profiles, profile, connected, busy, status, outcome, onConnect, onRun, onCancelRun, onFetchMore, onClose }) {
   const ref = useRef(null), requests = useRef(new Map());
   useDialogFocus(ref, onClose);
   const [tools, setTools] = useState([]), [draft, setDraft] = useState(null), [values, setValues] = useState({});
   const [notice, setNotice] = useState(''), [error, setError] = useFeedbackState('',{title:'SQL mini tools'}), [saving, setSaving] = useState(false);
-  const [runId, setRunId] = useState(null);
+  const [runId, setRunId] = useState(null), [renaming, setRenaming] = useState(null), renamingRef = useRef(null);
+  renamingRef.current = renaming;
   const command = (name, payload = {}) => {
     const id = sendNativeCommand(name, { ...payload, root, tabId });
     if (id) requests.current.set(id, name);
@@ -24,7 +25,7 @@ export function MiniToolsDialog({ root, tabId, sourceResult, result, profiles, p
       const operation = requests.current.get(message.requestId);
       if (!operation) return;
       requests.current.delete(message.requestId);
-      if (message.type === 'workspace.error' || message.type === 'host.error') { setError(message.message); setSaving(false); return; }
+      if (message.type === 'workspace.error' || message.type === 'host.error') { if (renamingRef.current) setRenaming({ ...renamingRef.current, error: message.message, saving: false }); else setError(message.message); setSaving(false); return; }
       if (message.root !== root) return;
       if (operation === 'workspace.tools.list') {
         const valid = [];
@@ -36,7 +37,7 @@ export function MiniToolsDialog({ root, tabId, sourceResult, result, profiles, p
       } else if (operation === 'workspace.tools.save') {
         const tool = normalizeMiniTool(message.tool);
         setDraft(tool); setTools(current => [...current.filter(t => t.id !== tool.id), tool]);
-        setSaving(false); setNotice('Saved SQL and view definition without values, results, or connection details.');
+        setSaving(false); setRenaming(null); setNotice('Saved SQL and view definition without values, results, or connection details.');
       }
     });
     if (isNativeHost && root) command('workspace.tools.list');
@@ -67,7 +68,19 @@ export function MiniToolsDialog({ root, tabId, sourceResult, result, profiles, p
     <header className="appearance-header"><div><div className="eyebrow">SQL TOOLKIT</div><h2 id="mini-tools-title">SQL mini tools</h2><p>Share .fbsdb/tools with your workspace. Each user connects with their own Oracle profile.</p></div><button className="icon-button" aria-label="Close mini tools" onClick={onClose}><X size={17}/></button></header>
     <div className="mini-tools-body"><aside aria-label="Workspace mini tools">
       <button className="button-secondary" disabled={!root || !isNativeHost || busy || saving} onClick={() => { try { choose(miniToolFromResult(sourceResult)); } catch (e) { setError(e.message); } }}>Save SELECT as tool</button>
-      {tools.map(tool => <button key={tool.id} disabled={busy || saving} className={`mini-tool-item ${draft?.id === tool.id ? 'selected' : ''}`} onClick={() => choose(tool)}>{tool.name}</button>)}
+      {tools.map(tool => renaming?.id === tool.id
+        ? <span key={tool.id} className="mini-tool-rename"><input autoFocus data-escape-local aria-label="Tool name" aria-invalid={Boolean(renaming.error) || undefined} disabled={renaming.saving} value={renaming.value} onChange={event => setRenaming({ ...renaming, value: event.target.value, error: '' })} onFocus={event => event.target.select()} onBlur={() => { if (!renaming.saving) setRenaming(null); }} onKeyDown={event => {
+            event.stopPropagation();
+            if (event.key === 'Escape') { event.preventDefault(); setRenaming(null); }
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              const checked = validateToolName(tools, renaming.value, tool.id);
+              if (checked.error) { setRenaming({ ...renaming, error: checked.error }); return; }
+              if (checked.name === tool.name) { setRenaming(null); return; }
+              try { const renamed = normalizeMiniTool({ ...tool, name: checked.name }); setRenaming({ ...renaming, error: '', saving: true }); command('workspace.tools.save', { tool: renamed }); } catch (e) { setRenaming({ ...renaming, error: e.message }); }
+            }
+          }}/>{renaming.error && <small role="alert">{renaming.error}</small>}</span>
+        : <button key={tool.id} disabled={busy || saving} className={`mini-tool-item ${draft?.id === tool.id ? 'selected' : ''}`} title="F2 or double-click to rename" onClick={() => choose(tool)} onDoubleClick={() => setRenaming({ id: tool.id, value: tool.name, error: '' })} onKeyDown={event => { if (event.key === 'F2') { event.preventDefault(); setRenaming({ id: tool.id, value: tool.name, error: '' }); } }}>{tool.name}</button>)}
       {!tools.length && <p>No saved tools in this workspace.</p>}
     </aside><div className="mini-tool-content">
       {!isNativeHost || !root ? <p>Open a workspace in the desktop app to save and run mini tools.</p> : !draft ? <p>Select a saved tool, or run a SELECT and choose “Save SELECT as tool”. Opening a tool does not execute SQL.</p> : <>

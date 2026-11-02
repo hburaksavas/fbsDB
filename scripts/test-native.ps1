@@ -17,6 +17,7 @@ $nativeTestProjects = @(
     'tests/ConnectionOrganizationSmoke/FbsDb.ConnectionOrganizationSmoke.csproj'
     'tests/ConnectionSmoke/FbsDb.ConnectionSmoke.csproj'
     'tests/MiniToolsSmoke/FbsDb.MiniToolsSmoke.csproj'
+    'tests/RunConfigurationsSmoke/RunConfigurationsSmoke.csproj'
     'tests/native-sql/NativeSqlTests.csproj'
     'tests/SessionServicesSmoke/SessionServicesSmoke.csproj'
     'tests/ThemePaletteSmoke/FbsDb.ThemePaletteSmoke.csproj'

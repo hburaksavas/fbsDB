@@ -2,18 +2,20 @@ import { getSqlStatements } from './sqlStatements.js';
 
 const searchText = value => String(value).normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replaceAll('ı','i');
 
-export const searchKinds = ['All', 'Open editors', 'Files', 'Oracle objects', 'Connections', 'History', 'Commands'];
+export const searchKinds = ['All', 'Open editors', 'Files', 'Symbols', 'Oracle objects', 'Connections', 'History', 'Settings', 'Commands'];
 
-export function workbenchSearch({ mode = 'files', query = '', category = 'All', files = [], objects = [], connections = [], history = [], commands = [], outline = [] }) {
+export function workbenchSearch({ mode = 'files', query = '', category = 'All', files = [], objects = [], connections = [], history = [], commands = [], outline = [], settings = [] }) {
   const entries = mode === 'outline' ? outline.map(item => ({ ...item, id: `outline:${item.start}:${item.depth}`, label: item.name, detail: item.kind, kind: 'outline', category: 'Outline' })) : [
     ...files.map(item => ({ ...item, id: `file:${item.tabId || item.path}`, label: item.name || item.relativePath, detail: [item.path, item.profileName || item.connectionProfileId].filter(Boolean).join(' · '), kind: 'file', category: item.tabId ? 'Open editors' : 'Files' })),
     ...objects.map(item => ({ ...item, id: `object:${item.owner}.${item.name}:${item.type}`, label: `${item.owner}.${item.name}`, detail: item.type, kind: 'object', category: 'Oracle objects' })),
     ...connections.map(item => ({ ...item, id: `connection:${item.id}`, profileId: item.id, label: item.name || item.id, detail: item.env, kind: 'connection', category: 'Connections' })),
     ...history.map(item => ({ ...item, id: `history:${item.id}`, label: item.sql.replace(/\s+/g, ' ').slice(0, 120), detail: `${item.profile} · ${item.status}`, kind: 'history', category: 'History' })),
-    ...(mode === 'commands' ? commands.map(item => ({ ...item, kind: 'command', category: 'Commands' })) : []),
+    ...outline.map(item=>({...item,id:`symbol:${item.start}:${item.depth}`,label:item.name,detail:item.kind+' · current source',kind:'outline',category:'Symbols'})),
+    ...settings.map(item=>({...item,id:'setting:'+item.id,settingId:item.id,kind:'setting',category:'Settings'})),
+    ...commands.map(item => ({ ...item, kind: 'command', category: 'Commands' })),
   ];
   const words = searchText(query.trim()).split(/\s+/).filter(Boolean);
-  const matches = entries.filter(item => (category === 'All' || item.category === category) && words.every(word => searchText(`${item.label} ${item.detail || ''} ${item.kind === 'history' ? item.sql : ''}`).includes(word)));
+  const matches = entries.filter(item => (category === 'All' || item.category === category) && words.every(word => searchText(`${item.label} ${item.detail || ''} ${item.settingId||''} ${item.kind === 'history' ? item.sql : ''}`).includes(word)));
   const groups = mode === 'commands' ? ['Commands', ...searchKinds.slice(1, -1)] : mode === 'outline' ? ['Outline'] : searchKinds.slice(1);
   // Give each source a bounded share, so large schemas cannot bury other types.
   return groups.flatMap(group => matches.filter(item => item.category === group).slice(0, category === 'All' ? 40 : 300));

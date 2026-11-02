@@ -20,6 +20,7 @@ export function ModalBackdrop({ onClose, children, className = "", ...props }) {
         return;
       }
       if (event.key !== "Escape" || event.isComposing) return;
+      if (event.target?.closest?.("[data-escape-local]")) return;
       event.preventDefault();
       event.stopImmediatePropagation();
       if (!event.repeat) close.current?.();

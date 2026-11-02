@@ -12,3 +12,4 @@
 :is(.desktop-shell,.theme-scope)[data-theme] .db-icon.mint{color:var(--success)}
 :is(.desktop-shell,.theme-scope)[data-theme] .connection-dot.neutral{background:var(--muted)}
 :is(.desktop-shell,.theme-scope)[data-theme] .connection-context-menu button>svg{color:inherit}
+.tree-name-overlay{position:fixed;z-index:140;pointer-events:none;box-sizing:border-box;background:var(--surface);color:var(--foreground);border:1px solid var(--line);border-radius:3px;box-shadow:0 4px 14px var(--shadow-color);overflow-wrap:anywhere}

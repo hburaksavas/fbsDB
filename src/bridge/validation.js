@@ -6,6 +6,7 @@ function validate(value, schema, path) {
   const types = schema.type == null ? null : Array.isArray(schema.type) ? schema.type : [schema.type];
   const matches = !types || types.includes(kind) || types.includes('integer') && kind === 'number' && Number.isInteger(value);
   if (!matches || kind === 'number' && !Number.isFinite(value)) throw new TypeError(`${path} has an invalid type.`);
+  if (schema.enum && !schema.enum.includes(value)) throw new TypeError(`${path} is not an allowed value.`);
   if (kind === 'number' && (schema.minimum != null && value < schema.minimum || schema.maximum != null && value > schema.maximum)) throw new TypeError(`${path} is out of range.`);
   if (kind === 'object') {
     for (const key of schema.required || []) if (!(key in value)) throw new TypeError(`${path}.${key} is required.`);

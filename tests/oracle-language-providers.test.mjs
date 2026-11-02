@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {sqlOutline} from '../src/editorNavigation.js';
 import { installOracleLanguageProviders } from '../src/oracleLanguageProviders.js';
 import { oracleLanguageCompletions, languageMetadataTargets, oracleSignatureHelp, oracleSymbolInfo } from '../src/oracleLanguageService.js';
 
@@ -11,7 +12,7 @@ function harness(text, override = {}) {
   const state = { tabId: 'a', originTabId: 'a', connected: true, busy: false, settings: { inline: true, signatureHelp: true }, ...override };
   const register = (name, provider) => { providers[name] = provider; return { dispose() {} }; };
   const monaco = {
-    languages: { CompletionItemKind: { Class: 7, Field: 4, Keyword: 17, Function: 1, Variable: 5, Snippet: 27 }, CompletionItemInsertTextRule: { InsertAsSnippet: 4 }, registerCompletionItemProvider: (_, provider) => register('complete', provider), registerInlineCompletionsProvider: (_, provider) => register('inline', provider), registerSignatureHelpProvider: (_, provider) => register('signature', provider), registerHoverProvider: (_, provider) => register('hover', provider), registerDefinitionProvider: (_, provider) => register('definition', provider) },
+    languages: { CompletionItemKind: { Class: 7, Field: 4, Keyword: 17, Function: 1, Variable: 5, Snippet: 27 }, CompletionItemInsertTextRule: { InsertAsSnippet: 4 }, registerCompletionItemProvider: (_, provider) => register('complete', provider), registerInlineCompletionsProvider: (_, provider) => register('inline', provider), registerSignatureHelpProvider: (_, provider) => register('signature', provider), registerHoverProvider: (_, provider) => register('hover', provider), registerDefinitionProvider: (_, provider) => register('definition', provider),registerReferenceProvider: (_,provider)=>register('references',provider),registerDocumentSymbolProvider:(_,provider)=>register('documentSymbols',provider),registerFoldingRangeProvider:(_,provider)=>register('folding',provider),FoldingRangeKind:{Region:{value:'region'}} },
     Range: class Range { constructor(startLineNumber, startColumn, endLineNumber, endColumn) { Object.assign(this, { startLineNumber, startColumn, endLineNumber, endColumn }); } },
     editor: { registerEditorOpener: provider => register('opener', provider) },
   };
@@ -20,6 +21,7 @@ function harness(text, override = {}) {
     if (type === 'analyze') return { targets: languageMetadataTargets(value, cursor, options, extra.mode) };
     if (type === 'complete') return oracleLanguageCompletions(value, cursor, options);
     if (type === 'signature') return { signature: oracleSignatureHelp(value, cursor, options) };
+    if(type==='outline')return {outline:sqlOutline(value)};
     if (type === 'symbol') return { symbol: oracleSymbolInfo(value, cursor, options) };
   } };
   const broker = { version: () => "a:0:1", objects: () => metadata, systemObjects: () => [], async load(tabId, target, token, kind = 'metadata') { native.push({ tabId, target, kind }); const value = override.load ? await override.load(tabId, target, token, kind) : table; if (value) metadata.push(value); return value; } };

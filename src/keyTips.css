@@ -1,0 +1,2 @@
+.key-tips-layer{position:fixed;inset:0;z-index:2147483000;pointer-events:none}
+.key-tip{position:fixed;min-width:14px;height:14px;padding:0 3px;display:grid;place-items:center;border:1px solid var(--line);border-radius:3px;background:var(--accent);color:var(--on-accent);font:700 10px/1 var(--font-ui, inherit)}

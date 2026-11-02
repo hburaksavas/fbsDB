@@ -1,5 +1,8 @@
+import {normalizeSavedLayouts} from './savedLayouts.js';
 import {defaultEditorShortcuts,normalizeEditorShortcuts} from './editorShortcuts.js';
+import {defaultStatusIndicators,normalizeStatusIndicators} from './statusBarModel.js';
 import {loadCompletionSettings,normalizeCompletionSettings,defaultCompletionSettings} from './editorCompletionSettings.js';
+import {defaultToolbarPrefs,normalizeToolbarPrefs} from './toolbarPrefs.js';
 import {defaultDockLayout,normalizeDockLayout,migrateDockLayout} from './dockLayout.js';
 import {detectedRegion,usesCommaDecimal} from './localeProfile.js';
 import {defaultSqlFormatterSettings,normalizeSqlFormatterSettings} from './sqlFormatterSettings.js';
@@ -13,7 +16,12 @@ export const settingDefinitions={
   'notifications.warning':{...select('Warning duration (seconds)',10,null,'notifications'),type:'number',min:1,max:300,scopes:['user'],when:'Immediately'},
   'notifications.error':{...select('Error duration (seconds)',15,null,'notifications'),type:'number',min:1,max:300,scopes:['user'],when:'Immediately'},
   'notifications.progress':{...select('Progress duration (seconds)',60,null,'notifications'),type:'number',min:1,max:300,scopes:['user'],when:'Immediately'},
+  'notifications.activateResults':{...toggle('Switch to the Results tab when a query runs',true,'notifications'),scopes:['user'],when:'Next execution'},
+  'notifications.completionSound':{...select('Completion sound (off, unfocused, always)','off',['off','unfocused','always'],'notifications'),scopes:['user'],when:'Next execution'},
+  'notifications.windowAttention':{...select('Flash the taskbar when a query finishes (off, unfocused, always)','off',['off','unfocused','always'],'notifications'),scopes:['user'],when:'Next execution'},
+  'notifications.longQuerySeconds':{...select('Only for queries running at least (seconds)',10,null,'notifications'),type:'number',min:0,max:3600,scopes:['user'],when:'Next execution'},
   'notifications.max':{...select('Maximum notification duration (seconds)',60,null,'notifications'),type:'number',min:1,max:300,scopes:['user'],when:'Immediately'},
+  'ui.savedLayouts':{label:'Saved panel layouts',default:{version:1,entries:[]},normalize:normalizeSavedLayouts,category:'general',scopes:['user'],when:'Immediately',hidden:true},
   'ui.layout':{label:'Panel layout',default:defaultDockLayout(),normalize:normalizeDockLayout,category:'general',scopes:['user'],when:'Immediately',hidden:true},
   'ui.density':{...select('Workbench density','compact',['compact','comfortable'],'general'),scopes:['user'],when:'Immediately',hidden:true},
   'ui.scale':{...select('Interface scale',100,[80,90,100,110,125,150],'accessibility'),scopes:['user'],when:'Immediately',hidden:true},
@@ -27,6 +35,13 @@ export const settingDefinitions={
   'editor.wordWrap':{...toggle('Word wrap',false,'editor'),scopes:['user'],when:'Immediately',hidden:true},
   'ui.theme':{...select('Workbench theme','default',['default','dark','light'],'general'),scopes:['user'],when:'Immediately',hidden:true},
   'ui.fontFamily':{...select('Interface font','DM Sans',['DM Sans','Segoe UI','Arial','Tahoma','Verdana'],'general'),scopes:['user'],when:'Immediately',hidden:true},
+  'ui.startupWorkspaceHub':{...toggle('Show workspace hub on startup',false,'preferences'),scopes:['user'],when:'Next startup'},
+  'ui.shortcutCoach':{...toggle('Show shortcut hints after menu use',false,'preferences'),scopes:['user'],when:'Immediately'},
+  'ui.toolbars':{label:'Toolbar actions moved to overflow',default:defaultToolbarPrefs,normalize:normalizeToolbarPrefs,category:'preferences',scopes:['user'],when:'Immediately',hidden:true},
+  'editor.inlineBinds':{...toggle('Enter query bind values beside the SQL instead of a dialog',false,'editor'),scopes:['user'],when:'Immediately'},
+  'ui.iconTheme':{label:'Icon theme',default:'default',normalize:value=>typeof value==='string'&&value.length>0&&value.length<=60?value:'default',category:'preferences',scopes:['user'],when:'Immediately',hidden:true},
+  'ui.keyTips':{...toggle('Keyboard access letters: tap Alt to label controls',true,'preferences'),scopes:['user'],when:'Immediately'},
+  'ui.doubleShiftSearch':{...toggle('Search Everywhere with double Shift',false,'preferences'),scopes:['user'],when:'Immediately'},
   'ui.connectionNotifications':{...toggle('Connection progress notifications',true,'general'),scopes:['user'],when:'Immediately'},
   'ui.region':{...select('Regional formats','system',['system','en-US','tr-TR','de-DE','en-GB'],'results'),scopes:['user'],when:'New result sets',hidden:true},
   'ui.tokenColors':{label:'SQL token colors',default:{},category:'editor',scopes:['user'],when:'Immediately',hidden:true,normalize:value=>{
@@ -38,16 +53,26 @@ export const settingDefinitions={
   'editor.insertSpaces':{...toggle('Indent using spaces',true,'editor'),scopes:['user'],when:'Immediately',hidden:true},
   'editor.cursorStyle':{...select('Cursor style','line',['line','block','underline'],'editor'),scopes:['user'],when:'Immediately',hidden:true},
   'editor.cursorBlinking':{...select('Cursor blinking','smooth',['smooth','blink','solid'],'editor'),scopes:['user'],when:'Immediately',hidden:true},
+  'editor.semanticHighlighting':{...toggle('Semantic symbol highlighting',false,'editor'),scopes:['user'],when:'Immediately'},
+  'editor.overviewRuler':{...toggle('Editor overview ruler',true,'editor'),scopes:['user'],when:'Immediately'},
+  'editor.stickyHeaders':{...toggle('Sticky code headers',true,'editor'),scopes:['user'],when:'Immediately',hidden:true},
   'editor.folding':{...toggle('Code folding',true,'editor'),scopes:['user'],when:'Immediately',hidden:true},
   'editor.bracketColors':{...toggle('Bracket colors',true,'editor'),scopes:['user'],when:'Immediately',hidden:true},
   'editor.queryTimeout':{...select('Query timeout in seconds',0,null,'preferences'),type:'number',min:0,max:86400,scopes:['user'],when:'New executions',hidden:true},
   'editor.sqlFormatter':{label:'SQL formatter',default:defaultSqlFormatterSettings,normalize:value=>value&&typeof value==='object'&&!Array.isArray(value)?normalizeSqlFormatterSettings(value):undefined,category:'formatter',scopes:['user'],when:'On format',hidden:true},
+  'editor.codeLenses':{...toggle('Code lenses above packages and routines',true,'editor'),scopes:['user'],when:'Immediately',hidden:true},
+  'privacy.consoleBindValues':{...toggle('Keep bind values in the run console for this session',false,'privacy'),scopes:['user'],when:'Next execution'},
+  'ui.previewTabs':{...toggle('Open Explorer files in a preview tab on single click',true,'preferences'),scopes:['user'],when:'Immediately'},
+  'ui.statusIndicators':{label:'Editor status bar indicators',default:defaultStatusIndicators,normalize:normalizeStatusIndicators,category:'preferences',scopes:['user'],when:'Immediately',hidden:true},
   'editor.shortcuts':{label:'Keyboard shortcuts',default:defaultEditorShortcuts,normalize:normalizeEditorShortcuts,category:'shortcuts',scopes:['user'],when:'Immediately',hidden:true},
   'editor.completion':{label:'Oracle completion preferences',default:defaultCompletionSettings,normalize:value=>value&&typeof value==='object'&&!Array.isArray(value)?normalizeCompletionSettings(value):undefined,category:'completion',scopes:['user'],when:'Immediately',hidden:true},
   'ui.motion':{...select('Interface motion','system',['system','reduce','full'],'accessibility'),scopes:['user'],when:'Immediately'},
   'privacy.historyDays':{...select('History retention in days (0 = no expiry)',0,[0,1,7,30,90],'privacy'),scopes:['user'],when:'Immediately'},
   'privacy.excludedProfiles':{...select('Disable history for profile IDs (comma separated)','',null,'privacy'),type:'text',maxLength:2000,scopes:['user'],when:'Immediately'},
   'privacy.historyLimit':{...select('Retained queries (reducing removes older history)',50,[0,10,25,50,100],'privacy'),scopes:['user'],when:'Immediately'},
+  'results.budgetRows':{...select('Stop loading remaining rows after this many rows (0 = no limit)',0,null),type:'number',min:0,max:50000000},
+  'results.budgetMemoryMb':{...select('Stop loading remaining rows near this client memory estimate in MB (0 = no limit)',0,null),type:'number',min:0,max:16384},
+  'results.budgetAction':select('When a loading budget is reached','stop',['stop','warn']),
   'results.density':select('Row density','compact',['compact','comfortable']),
   'results.wrap':toggle('Wrap cell text',false),
   'results.crosshair':toggle('Highlight hovered row and column',true),

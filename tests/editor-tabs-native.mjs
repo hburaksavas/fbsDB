@@ -15,7 +15,7 @@ socket.addEventListener('message',event=>{const message=JSON.parse(event.data);i
 function evaluate(expression){return new Promise((resolve,reject)=>{const id=++sequence;pending.set(id,{resolve,reject});socket.send(JSON.stringify({id,method:'Runtime.evaluate',params:{expression,returnByValue:true,awaitPromise:true}}))}).then(result=>{if(result.exceptionDetails)throw Error(result.exceptionDetails.exception?.description||result.exceptionDetails.text);return result.result.value})}
 const bundled=await build({stdin:{resolveDir:process.cwd(),loader:'jsx',contents:`
 import React,{useState,useEffect} from 'react';import {createRoot} from 'react-dom/client';import {EditorTabs} from './src/EditorTabs.jsx';
-const files=Array.from({length:40},(_,i)=>({id:'tab-'+i,name:i%3===0?'a_very_long_reporting_query_'+i+'.sql':'query_'+i+'.sql',path:'D:/SQL/queries/query_'+i+'.sql',dirty:i%7===0}));
+const files=Array.from({length:40},(_,i)=>({id:'tab-'+i,name:i%3===0?'a_very_long_reporting_query_'+i+'.sql':'query_'+i+'.sql',path:'D:/SQL/queries/query_'+i+'.sql',dirty:i%7===0,content:'SELECT 1 FROM dual;',sourceEdited:true,latestStatus:'Connected to internal-profile-id',connection:{state:'connected',environment:'DEV',text:'Connected',profileName:'Development'}}));
 function Harness(){const[tabs,setTabs]=useState(files),[active,setActive]=useState('tab-0'),[theme,setTheme]=useState('default');
 useEffect(()=>{window.tabHarness={theme:setTheme,select:setActive,one:()=>{setTabs([files[0]]);setActive(files[0].id)}}},[]);
 return <main className="desktop-shell" data-theme={theme}><section className="editor-workspace"><EditorTabs tabs={tabs} activeId={active} onActivate={setActive} onClose={id=>{setTabs(current=>current.filter(tab=>tab.id!==id));if(id===active)setActive(tabs.find(tab=>tab.id!==id)?.id)}} onNew={()=>{const id='new-'+tabs.length;setTabs(current=>[...current,{id,name:'New.sql',dirty:false}]);setActive(id)}} onSave={()=>{window.saved=true}}/><div data-editor-surface style={{flex:1,minHeight:0}}>Editor</div></section></main>}
@@ -31,7 +31,7 @@ const snapshot=()=>inner(`(()=>{const strip=document.querySelector('.compact-edi
 try{
   await evaluate(`(()=>{document.getElementById('editor-tabs-qa-frame')?.remove();const frame=document.createElement('iframe');frame.id='editor-tabs-qa-frame';frame.style.cssText='position:fixed;left:-10000px;top:0;width:900px;height:260px;border:0;pointer-events:none';frame.srcdoc=${JSON.stringify(html)};document.body.appendChild(frame)})()`);
   await waitFor(`!!window.tabHarness&&document.querySelectorAll('.file-tab').length===40&&!!document.querySelector('[aria-label="Scroll tabs right"]')`);
-  let state=await snapshot();assert.equal(state.height,28);assert.equal(state.width,state.pageWidth);assert.equal(state.activeVisible,true);assert.equal(state.scrollbar,'none');assert.ok(state.scrollHeight<=state.clientHeight);assert.ok(state.maxTabWidth<=176);
+  let state=await snapshot();assert.equal(state.height,28);assert.equal(state.width,state.pageWidth);assert.equal(state.activeVisible,true);assert.equal(state.scrollbar,'none');assert.ok(state.scrollHeight<=state.clientHeight);assert.ok(state.maxTabWidth<=220);
   const fixedX=state.actionsX;
   await click('[aria-label="Open editors (40)"]');
   assert.equal(await inner(`document.querySelectorAll('.editor-tabs-menu [role="menuitem"]').length`),40);
@@ -47,4 +47,15 @@ try{
   await click('[aria-label="Close New.sql"]');await waitFor(`document.querySelectorAll('.file-tab').length===40`);state=await snapshot();assert.equal(state.activeVisible,true);
   await inner(`window.tabHarness.one()`);await waitFor(`document.querySelectorAll('.file-tab').length===1&&!document.querySelector('[aria-label="Scroll tabs right"]')`);state=await snapshot();assert.equal(state.height,28);assert.equal(state.activeVisible,true);
   console.log('PASS closing tabs and returning to a single tab preserves layout');
+  assert.equal(await inner(`!!document.querySelector('.file-tab.active .lucide-plug')`),true);
+  assert.equal(await inner(`document.querySelector('.file-tab.active .environment-dot').textContent`),'');
+  assert.equal(await inner(`!!document.querySelector('.file-tab.active .file-tab-select .dirty-dot')`),true);
+  assert.equal(await inner(`getComputedStyle(document.querySelector('.file-tab.active .file-tab-close')).opacity`),'1');
+  await inner(`document.querySelector('.file-tab.active [role=tab]').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',altKey:true,bubbles:true}))`);
+  await waitFor(`!!document.querySelector('.tab-source-preview')`);
+  const preview=await inner(`document.querySelector('.tab-source-preview').textContent`);
+  assert.match(preview,/Development/);assert.match(preview,/Edited since last execution/);assert.match(preview,/SELECT 1 FROM dual/);
+  assert.doesNotMatch(preview,/Latest status|internal-profile-id|No execution yet/);
+  console.log('PASS connected icon, quiet environment, unsaved dot and source preview without latest status');
+
 }finally{await evaluate(`${frame}?.remove()`);socket.close()}

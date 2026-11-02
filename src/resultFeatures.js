@@ -6,6 +6,7 @@ export function isExpandableResultValue(column,value){return /\b(CLOB|NCLOB|BLOB
 export function matchesCondition(value, rule) {
   if (rule.op === 'null') return value == null;
   if (rule.op === 'notNull') return value != null;
+  if (rule.op === 'in') return value == null ? Boolean(rule.includeNull) : (rule.values || []).includes(String(value));
   if (value == null) return false;
   const normalize=v=>foldResultText(v,rule.locale,rule.caseSensitive);
   const text = normalize(value), query = normalize(rule.value??'');

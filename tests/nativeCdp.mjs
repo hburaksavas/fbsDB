@@ -60,8 +60,8 @@ export async function connectNativePage(endpoint, timeoutMs = 45000) {
     frame: () => api.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))'),
     async key(key, modifiers = 0) {
       const code = /^[a-z]$/i.test(key) ? `Key${key.toUpperCase()}` : key;
-      const windowsVirtualKeyCode = { Enter: 13, Escape: 27, Tab: 9 }[key] || key.toUpperCase().charCodeAt(0);
-      await api.call('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode, modifiers });
+      const windowsVirtualKeyCode = { Shift:16,Control:17,Alt:18,Meta:91,Enter: 13, Escape: 27, Tab: 9,Home:36,End:35,PageUp:33,PageDown:34,ArrowLeft:37,ArrowUp:38,ArrowRight:39,ArrowDown:40 }[key] || (/^F\d+$/.test(key)?111+Number(key.slice(1)):key.toUpperCase().charCodeAt(0));
+      await api.call('Input.dispatchKeyEvent', { type: 'keyDown', key, code, text:key==='Enter'?'\r':undefined, windowsVirtualKeyCode, modifiers });
       await api.call('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode, modifiers });
       await api.frame();
     },

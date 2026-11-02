@@ -1,0 +1,9 @@
+.compare-dialog{max-width:min(1000px,96vw)}
+.compare-dialog.dragging{outline:2px dashed var(--accent);outline-offset:-6px}
+.compare-dialog p{margin:4px 0 0;font-size:11px;color:var(--muted)}
+.compare-controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:8px 18px 0}
+.compare-side{display:flex;gap:8px;align-items:center;font-size:11px}
+.compare-side span{display:flex;gap:4px}
+.compare-summary{padding:0 18px}
+.compare-editor{height:min(52vh,460px);margin:6px 18px;border:1px solid var(--line)}
+.compare-drop{display:grid;place-items:center;height:100%;color:var(--muted);font-size:12px}

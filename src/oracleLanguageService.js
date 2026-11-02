@@ -1,3 +1,4 @@
+import {inspectAnchoredType,metadataFreshness} from './anchoredTypeInspection.js';
 import { automaticCompletionAllowed, resolveCompletionSources } from './oracleCompletion.js';
 import { getOracleCompletionContext, getOracleCompletions, getOracleVocabulary, lexOracle, completionMatch, formatCompletionKeyword } from './oracleCompletion.js';
 import { plsqlTypeResolver, plsqlMemberPath } from './plsqlTypes.js';
@@ -68,7 +69,7 @@ export function languageMetadataTargets(source, cursor, options = {}, mode = 'co
       add(resolveObject(names.at(-2), names.length > 2 ? names.at(-3) : null, objects, options.currentSchema, callableContainers));
     }
   }
-  if (mode === 'hover' || mode === 'definition' || mode === 'symbol') {
+  if (mode === 'hover' || mode === 'definition' || mode === 'symbol' || mode === 'references') {
     const token = lexOracle(source).find(token => token.kind === 'identifier' && token.start < cursor && cursor <= token.end);
     add(resolveObject(key(token), context.qualifierPath?.at(-1)?.key, objects, options.currentSchema));
   }
@@ -92,6 +93,20 @@ function signatureLabel(name, routine) {
   return `${name}(${(routine.parameters || []).map(parameter => `${parameter.name}${parameter.mode && parameter.mode !== 'IN' ? ' ' + parameter.mode : ''}${parameter.type ? ' ' + parameter.type : ''}${parameter.optional ? ' DEFAULT …' : ''}`).join(', ')})${routine.returnType ? ' RETURN ' + routine.returnType : ''}`;
 }
 
+function routineDocumentation(source,routine,path,container) {
+  let description=routine.description||container?.comment||'';
+  if(Number.isInteger(routine.start)) {
+    const tokens=lexOracle(source.slice(0,routine.start)),header=tokens.findLastIndex(token=>isWord(token,'PROCEDURE')||isWord(token,'FUNCTION'));
+    const comments=[];let boundary=tokens[header]?.start;
+    for(let index=header-1;index>=0&&tokens[index].kind==='comment'&&source.slice(tokens[index].end,boundary).trim()==='';index--){comments.unshift(tokens[index].value);boundary=tokens[index].start;}
+    description=comments.join('\n').replace(/^\s*-- ?/gm,'').replace(/^\/\*+|\*+\/$/g,'').replace(/^\s*\* ?/gm,'').trim().slice(0,4000)||description;
+  }
+  const args=(routine.parameters||[]).map((parameter,index)=>`${routine.builtin?'':id(parameter.key||parameter.name)+' => '}:arg_${index+1}`).join(', ');
+  const invocation=path.map(part=>id(part.key||part.name)).join('.')+'('+args+')';
+  const example=routine.builtin?`SELECT ${invocation} FROM dual;`:`BEGIN\n  ${routine.returnType?':return_value := ':''}${invocation};\nEND;`;
+  return [description?markdown(description):'No routine documentation is available.', 'Example call (bind values and types must be supplied):', '```sql\n'+example+'\n```'].join('\n\n');
+}
+
 export function oracleSignatureHelp(source, cursor, options = {}) {
   const call = oracleCallContext(source, cursor); if (!call) return null;
   const objects = languageObjects(options), name = call.path.at(-1).key;
@@ -102,11 +117,11 @@ export function oracleSignatureHelp(source, cursor, options = {}) {
   if (!signatures.length) return null;
   const results = signatures.map(routine => {
     const label = signatureLabel(call.path.map(part => part.name).join('.'), routine);
-    const namedIndex = call.argumentName ? routine.parameters.findIndex(parameter => parameter.name.toUpperCase() === call.argumentName) : -1;
+    const namedIndex = call.argumentName ? routine.parameters.findIndex(parameter => (parameter.key||parameter.name) === call.argumentName) : -1;
     const args = lexOracle(source.slice(call.open + 1, cursor)).filter(token => token.kind !== 'comment'), first = args[0];
     const expected = routine.parameters[0]?.type || '', actual = first?.kind === 'number' ? 'NUMBER' : first?.kind === 'string' ? 'CHAR' : isWord(first, 'TRUE') || isWord(first, 'FALSE') ? 'BOOLEAN' : '';
     const mismatch = actual && expected && !(actual === 'NUMBER' ? /NUMBER|INTEGER|INT|FLOAT|DECIMAL|DOUBLE/i.test(expected) : new RegExp(actual, 'i').test(expected)) ? 4 : 0;
-    return { label, parameters: routine.parameters.map(parameter => ({ label: parameter.name, documentation: `${parameter.mode || 'IN'} ${parameter.type || ''}${parameter.optional ? ' · optional' : ''}` })), allowNamedArguments: !routine.builtin, activeParameter: Math.max(0, namedIndex < 0 ? Math.min(call.argumentIndex, Math.max(0, routine.parameters.length - 1)) : namedIndex), score: (call.argumentName ? namedIndex < 0 ? 10 : 0 : call.argumentIndex >= routine.parameters.length && routine.parameters.at(-1)?.name !== '…' ? 10 : 0) + mismatch, documentation: routine.documentation };
+    return { label, parameters: routine.parameters.map(parameter => ({ label: parameter.name, documentation: `${parameter.mode || 'IN'} ${parameter.type || ''}${parameter.optional ? ' · optional' : ''}` })), allowNamedArguments: !routine.builtin, activeParameter: Math.max(0, namedIndex < 0 ? Math.min(call.argumentIndex, Math.max(0, routine.parameters.length - 1)) : namedIndex), score: (call.argumentName ? namedIndex < 0 ? 10 : 0 : call.argumentIndex >= routine.parameters.length && routine.parameters.at(-1)?.name !== '…' ? 10 : 0) + mismatch, documentation: routine.documentation, documentationText:routineDocumentation(source,routine,call.path,container) };
   });
   const activeSignature = results.reduce((best, item, index) => item.score < results[best].score ? index : best, 0);
   return { signatures: results, activeSignature, activeParameter: results[activeSignature].activeParameter };
@@ -211,7 +226,7 @@ export function oracleSymbolInfo(source, cursor, options = {}) {
   const localTypes = plsqlTypeResolver(source, token.end, objects, options.currentSchema), memberPath = plsqlMemberPath(source, token.end, token.start), localRecord = localTypes.fields(memberPath);
   if (memberPath.length && localRecord.symbol) {
     const field = localRecord.fields.find(field => (field.key || field.name) === key(token));
-    if (field) return { lookupName: key(token), start: token.start, end: token.end, contents: [{ value: `\`\`\`sql\n${field.name} ${field.type || 'Record field'}\n\`\`\`` }], localStart: localRecord.type?.object ? null : field.start ?? localRecord.symbol.start, target: localRecord.type?.object ? { owner: localRecord.type.object.owner, name: localRecord.type.object.name, type: localRecord.type.object.type, column: field.name } : null };
+    if (field) return { lookupName: key(token), start: token.start, end: token.end, contents: [{ value: `\`\`\`sql\n${field.name} ${field.type || 'Record field'}\n\`\`\`` },...(localRecord.type?.object?[{value:metadataFreshness(localRecord.type.object)}]:[])], localStart: localRecord.type?.object ? null : field.start ?? localRecord.symbol.start, target: localRecord.type?.object ? { owner: localRecord.type.object.owner, name: localRecord.type.object.name, type: localRecord.type.object.type, column: field.name } : null };
   }
   const name = key(token), sources = contextSources(context, objects, options.currentSchema);
   const local = [...context.locals].reverse().find(local => (local.key || local.name.toUpperCase()) === name);
@@ -228,15 +243,44 @@ export function oracleSymbolInfo(source, cursor, options = {}) {
     else object = resolveObject(name, null, objects, options.currentSchema);
   }
   let contents = [], localStart = null;
-  if (local) { contents = [{ value: `\`\`\`sql\n${local.name} ${local.type}\n\`\`\`` }]; localStart = local.start; }
+  if (local) {
+    const overloads=local.kind==='routine'?plsqlVisibleRoutines(source,cursor).filter(routine=>routine.key===name):[];
+    contents=overloads.length?overloads.flatMap(routine=>[{value:'```sql\n'+signatureLabel(local.name,routine)+'\n```'},{value:routineDocumentation(source,routine,[{key:routine.key,name:routine.name}],null)}]):[{ value: `\`\`\`sql\n${local.name} ${local.type}\n\`\`\`` }];
+    const anchored=inspectAnchoredType(local.type,source,token.end,objects,options.currentSchema);
+    if(anchored){
+      const text=anchored.error?anchored.error:anchored.resolvedType?'Resolved type: '+anchored.resolvedType:'Record fields:\n'+anchored.fields.map(field=>`${id(field.name)} ${field.displayType||field.type||'type unavailable'}`).join('\n')+(anchored.truncated?'\nFirst 200 fields shown.':'');
+      contents.push({value:markdown(text)});
+      contents.push({value:anchored.local?'Derived from a local declaration.':metadataFreshness(anchored.object)});
+    }
+    localStart = local.start;
+  }
   else if (cte || alias?.object?.type === 'CTE') { const item = cte || context.ctes.find(cte => cte.nameKey === alias.ref.nameKey); contents = [{ value: markdown(item?.name || token.value) + ' · common table expression' }]; localStart = item?.start; }
   else if (alias && !context.qualifier) { object = alias.object; localStart = alias.ref.aliasStart ?? alias.ref.start; contents = [{ value: markdown(alias.ref.alias || alias.ref.name) + ' → ' + markdown(object ? `${object.owner || ''}.${object.name || alias.ref.name}` : alias.ref.name) }]; }
-  else if (member) contents = object.members.filter(item => item.name === name).map(item => ({ value: `\`\`\`sql\n${signatureLabel(member.name, item)}\n\`\`\`` }));
+  else if (member) contents = object.members.filter(item => item.name === name).flatMap(item => [{ value: `\`\`\`sql\n${signatureLabel(member.name, item)}\n\`\`\`` },{value:routineDocumentation(source,item,[{key:object.owner},{key:object.name},{key:item.name}],object)}]);
   else if (column) contents = [{ value: `\`\`\`sql\n${column.name} ${column.type}${column.nullable === false ? ' NOT NULL' : ''}\n\`\`\`` }, { value: markdown(column.comment) }];
   else if (object) contents = [{ value: markdown(`${object.owner}.${object.name}`) + ' · ' + markdown(object.type) }, { value: markdown(object.comment) }];
   else {
     const entry = getOracleVocabulary(options.version || 19).find(entry => entry.name === name);
     if (entry) contents = [{ value: markdown(entry.name) + ' · Oracle ' + markdown(entry.kind) }, ...(entry.documentation ? [{ value: `[Oracle documentation](${entry.documentation})` }] : [])];
   }
-  return contents.length ? { lookupName: key(token), start: token.start, end: token.end, contents: contents.filter(item => item.value), localStart, target: object && object.type !== 'CTE' && object.type !== 'SUBQUERY' ? { owner: object.owner, name: object.name, type: object.type, member: member?.name, column: column?.name } : null } : null;
+  return contents.length ? { lookupName: key(token), start: token.start, end: token.end, contents: contents.filter(item => item.value), localStart, localKind:local?.kind||null, target: object && object.type !== 'CTE' && object.type !== 'SUBQUERY' ? { owner: object.owner, name: object.name, type: object.type, member: member?.name, column: column?.name } : null } : null;
+}
+
+
+export function oracleReferenceLocations(source,cursor,options={}) {
+  const scope='Current document; dynamic SQL and server-side references are excluded. Use PL/Scope for collected server references.';
+  if(source.length>100000)return {locations:[],truncated:true,scope,reason:'Reference search is limited to 100,000 source characters.'};
+  const symbol=oracleSymbolInfo(source,cursor,options);
+  if(!symbol)return {locations:[],scope};
+  const identity=item=>item?.localStart!=null?JSON.stringify(['local',item.localStart,item.lookupName]):item?.target?JSON.stringify(['oracle',item.target.owner,item.target.type,item.target.name,item.target.member||null,item.target.column||null]):null;
+  const target=identity(symbol);if(!target)return {locations:[],scope};
+  if(plsqlVisibleRoutines(source,cursor).filter(routine=>routine.key===symbol.lookupName).length>1&&symbol.localStart!=null)
+    return {locations:[],scope,reason:'Local overload references require PL/Scope or an unambiguous signature.'};
+  const candidates=lexOracle(source).filter(token=>token.kind==='identifier'&&key(token)===symbol.lookupName);
+  const locations=[];
+  for(const token of candidates.slice(0,128)) {
+    const match=oracleSymbolInfo(source,token.start+Math.min(1,token.end-token.start),options);
+    if(identity(match)===target)locations.push({start:token.start,end:token.end,declaration:token.start===symbol.localStart});
+  }
+  return {locations,scope,truncated:candidates.length>128,reason:candidates.length>128?'Only the first 128 same-name candidates were inspected.':null};
 }

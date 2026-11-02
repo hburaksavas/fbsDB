@@ -56,7 +56,7 @@ export class OracleMetadataBroker {
     const valid = message.epoch === job.epoch && session.epoch === job.epoch;
     const value = valid && !message.cancelled && !message.error ? message.result : null;
     if (valid && !message.cancelled) {
-      session.cacheRevision++; session.cache.delete(job.key); session.cache.set(job.key, { value, expires: Date.now() + (message.error ? 10000 : 300000) });
+      session.cacheRevision++; session.cache.delete(job.key); session.cache.set(job.key, { value,fetchedAt:Date.now(), expires: Date.now() + (message.error ? 10000 : 300000) });
       while (session.cache.size > 256) session.cache.delete(session.cache.keys().next().value);
       const definitions = [...session.cache.keys()].filter(key => key.startsWith('definition:'));
       for (const key of definitions.slice(0, Math.max(0, definitions.length - 32))) session.cache.delete(key);
@@ -66,7 +66,7 @@ export class OracleMetadataBroker {
     for (const consumer of job.consumers) consumer.finish(value);
     job.consumers.clear(); return true;
   }
-  objects(tabId) { return [...this.session(tabId).cache.entries()].filter(([key, item]) => key.startsWith('metadata:') && item.expires > Date.now() && item.value).map(([, item]) => item.value); }
+  objects(tabId) { return [...this.session(tabId).cache.entries()].filter(([key, item]) => key.startsWith('metadata:') && item.expires > Date.now() && item.value).map(([, item]) => ({...item.value,metadataFetchedAt:item.fetchedAt,metadataExpiresAt:item.expires})); }
   systemObjects(tabId) { return [...this.session(tabId).cache.entries()].find(([key, item]) => key.startsWith('systemObjects:') && item.expires > Date.now() && item.value)?.[1].value || []; }
   version(tabId) {
     const session = this.session(tabId);

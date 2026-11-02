@@ -48,7 +48,11 @@ public sealed partial class OracleSessionService
             var text = new System.Text.StringBuilder();
             await using var sourceReader = await source.ExecuteReaderAsync(token);
             while (await sourceReader.ReadAsync(token)) text.Append(sourceReader.GetString(0));
-            return new PlsqlCompilationReport(owner, target.Name, target.Type, text.ToString(), errors);
+            await sourceReader.DisposeAsync();
+            OracleSourceSnapshot? snapshot = null;
+            try { snapshot = await ReadSourceSnapshotUnderGateAsync(sql, token); }
+            catch (Exception error) when (error is OracleException or InvalidOperationException) { }
+            return new PlsqlCompilationReport(owner, target.Name, target.Type, text.ToString(), errors) { Snapshot = snapshot?.Source == text.ToString() ? snapshot : null };
         }
         finally { Touch(); _gate.Release(); }
     }
@@ -83,6 +87,9 @@ public sealed partial class OracleSessionService
 }
 
 public sealed record PlsqlCompilationError(int Line, int Position, string Text, string Attribute, int? Number);
-public sealed record PlsqlCompilationReport(string Owner, string Name, string Type, string Source, IReadOnlyList<PlsqlCompilationError> Errors);
+public sealed record PlsqlCompilationReport(string Owner, string Name, string Type, string Source, IReadOnlyList<PlsqlCompilationError> Errors)
+{
+    public OracleSourceSnapshot? Snapshot { get; init; }
+}
 public sealed record PlscopeReference(string Owner, string ObjectName, string ObjectType, string Name, string Type, string Usage, int Line, int Column);
 public sealed record PlscopeReport(string? Settings, IReadOnlyList<PlscopeReference> References, bool Truncated);

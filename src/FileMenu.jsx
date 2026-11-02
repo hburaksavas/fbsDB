@@ -1,3 +1,4 @@
+import {FilteredMenuItems} from './FilteredMenuItems.jsx';
 import { useEffect, useRef, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { isNativeHost, sendNativeCommand } from './nativeBridge';
@@ -23,7 +24,7 @@ export function FileMenu({ workspace, onNew, onOpen, onSave, onOpenWorkspace, on
       event.preventDefault(); const items = [...root.current.querySelectorAll('[role="menuitem"]:not(:disabled)')], index = items.indexOf(document.activeElement);
       items[event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length]?.focus();
     }}>
-      <button role="menuitem" onClick={() => run(onNew)}>{t('New SQL File',language)}<kbd>Ctrl+N</kbd></button>
+      <FilteredMenuItems><button role="menuitem" onClick={() => run(onNew)}>{t('New SQL File',language)}<kbd>Ctrl+N</kbd></button>
       <button role="menuitem" onClick={() => run(onOpen)}>{t('Open SQL File…',language)}<kbd>Ctrl+Shift+O</kbd></button>
       <button role="menuitem" onClick={() => run(onSave)}>{t('Save SQL File',language)}<kbd>Ctrl+S</kbd></button><hr/>
       <button role="menuitem" disabled={!isNativeHost} onClick={() => run(onOpenWorkspace)}>{t('Open workspace…',language)}</button>
@@ -33,6 +34,6 @@ export function FileMenu({ workspace, onNew, onOpen, onSave, onOpenWorkspace, on
       {(workspace.catalog || (workspace.recent||[]).map(path=>({id:path,path,name:path.split(/[\\/]/).filter(Boolean).at(-1),available:true}))).slice(0,10).map(item => <button key={item.id} role="menuitem" className="recent-workspace-item" title={item.path} disabled={!item.available||item.active} onClick={() => run(() => sendNativeCommand('workspace.openRecent', { path:item.path }))}><span>{item.pinned?'★ ':''}{item.name}{!item.available?' · Unavailable':''}</span><small>{item.path}</small></button>)}
       {!workspace.recent?.length && <div className="recent-workspaces-empty">{t('No recent workspaces',language)}</div>}
       <hr/><button role="menuitem" disabled={!workspace.root || !isNativeHost} onClick={() => run(() => sendNativeCommand('workspace.close'))}>{t('Close Workspace',language)}</button>
-    </div>}
+    </FilteredMenuItems></div>}
   </div>{children}{connectionControl&&<div className="ide-menubar-center">{connectionControl}</div>}</nav>;
 }

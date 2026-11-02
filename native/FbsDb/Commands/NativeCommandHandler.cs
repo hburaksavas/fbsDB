@@ -28,6 +28,7 @@ public sealed partial class MainPage
         protected WorkspaceService _workspace => Host._workspace;
         protected WorkspaceDevelopmentService Development => Host.Development;
         protected ConcurrentDictionary<string, CancellationTokenSource> _scriptRuns => Host._scriptRuns;
+        protected ConcurrentDictionary<string, CancellationTokenSource> _gridApplies => Host._gridApplies;
         protected ConcurrentDictionary<string, CancellationTokenSource> _resultExports => Host._resultExports;
         protected ConcurrentDictionary<string, CancellationTokenSource> _completionRequests => Host._completionRequests;
         protected ConcurrentDictionary<string, CancellationTokenSource> _schemaRequests => Host._schemaRequests;

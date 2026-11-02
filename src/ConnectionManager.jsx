@@ -17,7 +17,7 @@ export function useDialogFocus(ref, onClose, enabled = true) {
     const elements = () => [...root.querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]')].filter(e => e.getClientRects().length);
     (root.querySelector("input:not(:disabled), select:not(:disabled)") || elements()[0])?.focus();
     const key = event => {
-      if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); close.current?.(); }
+      if (event.key === "Escape") { if (event.target?.closest?.("[data-escape-local]")) return; event.preventDefault(); event.stopPropagation(); close.current?.(); }
       if (event.key === "Tab") {
         const items = elements(), first = items[0], last = items.at(-1);
         if (!items.length) { event.preventDefault(); return; }

@@ -20,6 +20,7 @@ test('a delayed save retains newer editor text and its unsaved state without clo
   const id = saves.start(send, document, () => { closed = true; });
   const result = saves.saved(reply(id), { ...document, content: 'SELECT 2' });
   assert.equal(result.document.content, 'SELECT 2');
+  assert.equal(result.document.savedContent,'SELECT 1');
   assert.equal(result.document.dirty, true);
   assert.equal(result.document.diskVersion, 'v2');
   result.afterSave?.();

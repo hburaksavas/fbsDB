@@ -35,7 +35,7 @@ export class DocumentSaves {
       document: {
         ...currentDocument, path: message.path ?? null,
         name: message.fileName || currentDocument.name,
-        dirty: !unchanged, diskVersion: message.diskVersion ?? null,
+        dirty: !unchanged,savedContent:pending.document.content, diskVersion: message.diskVersion ?? null,
         externalChange: null,
         connectionProfileId: message.profileId ?? currentDocument.connectionProfileId,
       },

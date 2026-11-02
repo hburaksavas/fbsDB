@@ -43,6 +43,19 @@ public sealed partial class MainPage
                 case "file.save":
                     await SaveSqlFileAsync(sender, id, payload);
                     break;
+                case "file.history.list":
+                case "file.history.read":
+                {
+                    var historyPath = payload.GetProperty("path").GetString()!;
+                    if (!_sessions.Sessions.Any(tab => string.Equals(tab.FilePath, historyPath, StringComparison.OrdinalIgnoreCase))) throw new InvalidOperationException("Open the file to inspect its local history.");
+                    if (command == "file.history.list") Send(sender, new { type = "file.history", requestId = id, operation = "list", path = historyPath, entries = await Task.Run(() => LocalHistoryService.List(historyPath)) });
+                    else
+                    {
+                        var versionId = payload.GetProperty("id").GetString()!;
+                        Send(sender, new { type = "file.history", requestId = id, operation = "read", path = historyPath, id = versionId, content = await Task.Run(() => LocalHistoryService.Read(historyPath, versionId)) });
+                    }
+                    break;
+                }
                 case "file.bindConnection":
                     await BindFileConnectionAsync(sender, id);
                     break;
@@ -93,7 +106,7 @@ public sealed partial class MainPage
         private async Task OpenSqlFileAsync(CoreWebView2 sender)
         {
             var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
-            picker.FileTypeFilter.Add(".sql");
+            foreach (var extension in _workspace.WorkspaceSourceExtensions) picker.FileTypeFilter.Add(extension);
             InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(MainWindow.Current!));
             var file = await picker.PickSingleFileAsync();
             if (file is null) return;
@@ -116,7 +129,9 @@ public sealed partial class MainPage
             {
                 var picker = new FileSavePicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
                 picker.SuggestedFileName = save.FileName ?? "query.sql";
-                picker.FileTypeChoices.Add("SQL file", new List<string> { ".sql" });
+                var suggestedExtension = Path.GetExtension(save.FileName ?? "query.sql").ToLowerInvariant();
+                var extensions = _workspace.WorkspaceSourceExtensions.OrderBy(extension => extension == suggestedExtension ? 0 : 1).ToList();
+                picker.FileTypeChoices.Add("Oracle source file", extensions);
                 InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(MainWindow.Current!));
                 file = await picker.PickSaveFileAsync();
             }

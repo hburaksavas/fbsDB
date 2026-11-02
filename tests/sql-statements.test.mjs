@@ -20,3 +20,11 @@ test('caret immediately after delimiter selects the preceding statement', () => 
  assert.equal(getStatementAtCursor(sql, end), 'SELECT 1 FROM dual;');
  assert.equal(getStatementAtCursor(sql, end + 1), 'SELECT 2 FROM dual;');
 });
+
+test('comments between CREATE header keywords retain PL/SQL statement boundaries', () => {
+  const source='CREATE /* note */ OR -- replace\nREPLACE NONEDITIONABLE /* package */ PACKAGE BODY demo AS PROCEDURE run IS BEGIN NULL; END; END;\n/\nSELECT 1 FROM dual;';
+  const statements=getSqlStatements(source);
+  assert.equal(statements.length,2);
+  assert.ok(statements[0].sql.includes('NULL; END; END;'));
+  assert.equal(statements[1].sql,'SELECT 1 FROM dual;');
+});

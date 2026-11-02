@@ -14,6 +14,12 @@ namespace FbsDb;
 
 public sealed partial class MainPage
 {
+    [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+    private struct FlashWindowInfo { public uint Size; public IntPtr Window; public uint Flags; public uint Count; public uint Timeout; }
+    [System.Runtime.InteropServices.DllImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static extern bool FlashWindowEx(ref FlashWindowInfo info);
+
     private sealed class UiCommandHandler(MainPage host, NativeCommandContext context) : NativeCommandHandler(host, context)
     {
         public override async Task HandleAsync()
@@ -44,6 +50,32 @@ public sealed partial class MainPage
                         Host.ApplyInterfaceScale();
                     }
                     break;
+                case "ui.setTaskbarProgress":
+                    if (MainWindow.Current is { } progressWindow)
+                        TaskbarProgress.TrySet(WindowNative.GetWindowHandle(progressWindow), payload.GetProperty("state").GetString() switch { "indeterminate" => TaskbarProgress.State.Indeterminate, "error" => TaskbarProgress.State.Error, _ => TaskbarProgress.State.None });
+                    break;
+                case "ui.requestAttention":
+                    // Flashes the taskbar button until the window is focused; it never steals focus.
+                    if (MainWindow.Current is { } window)
+                    {
+                        var info = new FlashWindowInfo { Size = (uint)System.Runtime.InteropServices.Marshal.SizeOf<FlashWindowInfo>(), Window = WindowNative.GetWindowHandle(window), Flags = 0x2 | 0xC, Count = 0, Timeout = 0 };
+                        FlashWindowEx(ref info);
+                    }
+                    break;
+                case "ui.openTerminal":
+                {
+                    string? Text(string name) => payload.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+                    var plan = ExternalTerminalService.Build(Text("tool") ?? "", Text("userName"), Text("identifier"), Text("directory"), Text("tnsSource"), name => ExternalTerminalService.FindOnPath(name));
+                    string message;
+                    if (plan.Error is null)
+                    {
+                        try { ExternalTerminalService.Start(plan); message = "Opened an external terminal in the project directory. It has its own session and transaction."; }
+                        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { plan = plan with { Error = ex.Message }; message = ex.Message; }
+                    }
+                    else message = plan.Error;
+                    Send(sender, new { type = "ui.terminal", requestId = id, tabId, opened = plan.Error is null, message });
+                    break;
+                }
                 case "system.locale":
                     Send(sender, new
                     {

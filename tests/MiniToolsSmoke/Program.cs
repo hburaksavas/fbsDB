@@ -40,6 +40,9 @@ try
     Require(catalog.GetProperty("tools").GetArrayLength() == 1 && catalog.GetProperty("errors").GetArrayLength() == 1, "Invalid file blocked valid tools.");
     using var newer = JsonDocument.Parse(text.Replace("\"version\": 1", "\"version\": 2"));
     Reject(() => MiniToolService.Normalize(newer.RootElement));
+    foreach (var good in new[] { "UPDATE \"APP\".\"T\" SET \"A\" = :c1 WHERE \"ID\" = :uk1", "DELETE FROM \"T\" WHERE \"ID\" = :dk1", "INSERT INTO \"APP\".\"T\" (\"A\") VALUES (:i1)" }) FbsDb.Services.GridDmlGuard.Assert(good);
+    foreach (var bad in new[] { "", "SELECT 1 FROM dual", "DROP TABLE \"T\"", "UPDATE T SET A = 1", "DELETE FROM \"T\" WHERE \"ID\" = :a; DELETE FROM \"U\" WHERE 1=1", "UPDATE \"T\" SET \"A\" = 1 -- x", "BEGIN NULL; END;" })
+        Reject(() => FbsDb.Services.GridDmlGuard.Assert(bad));
     Console.WriteLine("PASS SELECT classification, definition-only persistence, workspace transfer, corrupt files and format versions.");
 }
 finally { if (Directory.Exists(root)) Directory.Delete(root, true); }

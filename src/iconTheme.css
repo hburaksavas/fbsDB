@@ -1,0 +1,8 @@
+.themed-icon-default{display:inline-flex;align-items:center}
+.icon-letter{display:inline-grid;place-items:center;border:1px solid currentColor;border-radius:3px;font-weight:700;line-height:1;font-family:var(--ui-font-family, inherit);flex:0 0 auto}
+:is(.desktop-shell,.theme-scope)[data-theme] .icon-mono .oracle-object-icon.oracle-object-icon{color:var(--muted)}
+.icon-theme-settings{margin-top:14px;border-top:1px solid var(--line);padding-top:10px;display:grid;gap:6px;font-size:11px}
+.icon-theme-settings h4{margin:0;font-size:11px}
+.icon-theme-preview{display:flex;gap:10px;align-items:center;padding:4px 0}
+.icon-theme-actions{display:flex;gap:6px;flex-wrap:wrap}
+.icon-theme-settings small{color:var(--muted);font-size:10px;word-break:break-word}

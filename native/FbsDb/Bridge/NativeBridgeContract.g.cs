@@ -8,7 +8,7 @@ namespace FbsDb.Bridge;
 public static partial class NativeBridgeContract
 {
     private const string SchemaJson = """
-{"version":1,"models":{"SqlBindParameter":{"type":"object","properties":{"name":{"type":"string"},"type":{"type":"string"},"value":{"type":["string","null"]}},"required":["name","type"]},"FileSnapshot":{"type":"object","properties":{"path":{"type":["string","null"]},"content":{"type":["string","null"]},"version":{"type":"string"},"missing":{"type":"boolean"},"error":{"type":["string","null"]},"conflict":{"type":"boolean"}},"required":["path","version"]},"FileWatch":{"type":"object","properties":{"path":{"type":"string"},"version":{"type":["string","null"]},"hasError":{"type":"boolean"}},"required":["path","version"]},"ScriptStatement":{"type":"object","properties":{"sql":{"type":"string"},"start":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"parameters":{"type":"array","items":{"$ref":"SqlBindParameter"}}},"required":["sql"]},"SqlColumn":{"type":"object","properties":{"name":{"type":"string"},"type":{"type":"string"},"temporalKind":{"type":["string","null"]}},"required":["name","type"]}},"commands":{"analysis.begin":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"analysis.end":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"completion.cancel":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"requestId":{"type":"string"},"tabId":{"type":"string"}},"required":["requestId"]}},"completion.definition":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"epoch":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"owner":{"type":["string","null"]},"name":{"type":["string","null"]},"objectType":{"type":["string","null"]},"body":{"type":"boolean"},"member":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"completion.metadata":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"epoch":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"owner":{"type":["string","null"]},"name":{"type":["string","null"]},"objectType":{"type":["string","null"]},"body":{"type":"boolean"},"member":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"completion.objectAnalysis":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"epoch":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"owner":{"type":["string","null"]},"name":{"type":["string","null"]},"objectType":{"type":["string","null"]},"body":{"type":"boolean"},"member":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"completion.objectDraftMetadata":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"epoch":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"owner":{"type":["string","null"]},"name":{"type":["string","null"]},"objectType":{"type":["string","null"]},"body":{"type":"boolean"},"member":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"completion.plscope":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"epoch":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"owner":{"type":["string","null"]},"name":{"type":["string","null"]},"objectType":{"type":["string","null"]},"body":{"type":"boolean"},"member":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"completion.systemObjects":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"epoch":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"owner":{"type":["string","null"]},"name":{"type":["string","null"]},"objectType":{"type":["string","null"]},"body":{"type":"boolean"},"member":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"completion.vocabulary":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"connection.connect":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"profileId":{"type":"string"},"user":{"type":["string","null"]},"password":{"type":["string","null"]},"remember":{"type":"boolean"},"tabId":{"type":"string"}},"required":["profileId"]}},"connection.delete":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"groupIds":{"type":"array"},"remember":{"type":"boolean"},"tabId":{"type":"string"},"profileId":{"type":["string","null"]},"name":{"type":["string","null"]},"alias":{"type":["string","null"]},"source":{"type":["string","null"]},"user":{"type":["string","null"]},"environment":{"type":["string","null"]},"method":{"type":["string","null"]},"host":{"type":["string","null"]},"port":{"type":["string","null"]},"service":{"type":["string","null"]},"targetType":{"type":["string","null"]},"descriptor":{"type":["string","null"]},"folderId":{"type":["string","null"]},"password":{"type":["string","null"]}},"required":[]}},"connection.disconnect":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"connection.list":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"connection.nls.save":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"profileId":{"type":"string"},"overrides":{"type":"object"},"user":{"type":["string","null"]},"password":{"type":["string","null"]},"tabId":{"type":"string"}},"required":["profileId","overrides"]}},"connection.nls.test":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"profileId":{"type":"string"},"overrides":{"type":"object"},"user":{"type":["string","null"]},"password":{"type":["string","null"]},"tabId":{"type":"string"}},"required":["profileId","overrides"]}},"connection.organization":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"},"operation":{"type":"string"},"id":{"type":"string"},"name":{"type":"string"},"parentId":{"type":"string"},"profileId":{"type":"string"},"folderId":{"type":"string"},"groupIds":{"type":"array","items":{"type":"string"}}},"required":["operation"]}},"connection.save":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"groupIds":{"type":"array"},"remember":{"type":"boolean"},"tabId":{"type":"string"},"profileId":{"type":["string","null"]},"name":{"type":["string","null"]},"alias":{"type":["string","null"]},"source":{"type":["string","null"]},"user":{"type":["string","null"]},"environment":{"type":["string","null"]},"method":{"type":["string","null"]},"host":{"type":["string","null"]},"port":{"type":["string","null"]},"service":{"type":["string","null"]},"targetType":{"type":["string","null"]},"descriptor":{"type":["string","null"]},"folderId":{"type":["string","null"]},"password":{"type":["string","null"]}},"required":[]}},"connection.setGroup":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"profileId":{"type":["string","null"]},"group":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"connection.test":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"groupIds":{"type":"array"},"remember":{"type":"boolean"},"tabId":{"type":"string"},"profileId":{"type":["string","null"]},"name":{"type":["string","null"]},"alias":{"type":["string","null"]},"source":{"type":["string","null"]},"user":{"type":["string","null"]},"environment":{"type":["string","null"]},"method":{"type":["string","null"]},"host":{"type":["string","null"]},"port":{"type":["string","null"]},"service":{"type":["string","null"]},"targetType":{"type":["string","null"]},"descriptor":{"type":["string","null"]},"folderId":{"type":["string","null"]},"password":{"type":["string","null"]}},"required":[]}},"file.activate":{"handler":"file","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"file.bindConnection":{"handler":"file","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"file.new":{"handler":"file","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"file.open":{"handler":"file","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"file.openPath":{"handler":"file","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":["string","null"]},"forceNew":{"type":"boolean"},"tabId":{"type":"string"}},"required":["path"]}},"file.poll":{"handler":"file","resumeSession":false,"payload":{"type":"object","properties":{"files":{"type":"array","items":{"$ref":"FileWatch"}},"tabId":{"type":"string"}},"required":["files"]}},"file.save":{"handler":"file","resumeSession":false,"payload":{"type":"object","properties":{"content":{"type":"string"},"path":{"type":["string","null"]},"fileName":{"type":["string","null"]},"diskVersion":{"type":["string","null"]},"tabId":{"type":"string"}},"required":["content"]}},"result.cancelExport":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"result.children":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"column":{"type":"object"},"rowValues":{"type":"object"},"tabId":{"type":"string"}},"required":["column","rowValues"]}},"result.columnDefinition":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"column":{"type":"object"},"tabId":{"type":"string"}},"required":["column"]}},"result.export":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"resultId":{"type":["string","null"]},"format":{"type":["string","null"]},"fileName":{"type":["string","null"]},"columns":{"type":"array"},"rows":{"type":"array"},"hasMore":{"type":"boolean"},"includeMetadata":{"type":"boolean"},"csvOptions":{"type":"object"},"tabId":{"type":"string"}},"required":["columns","rows"]}},"result.exportSql":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"sql":{"type":"string"},"tabId":{"type":"string"}},"required":["sql"]}},"result.lookupSql":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"schema":{"type":"string"},"table":{"type":"string"},"values":{"type":"object"},"tabId":{"type":"string"},"columns":{"type":"array"}},"required":["schema","table","values"]}},"result.openSql":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"sql":{"type":"string"},"tabId":{"type":"string"}},"required":["sql"]}},"result.openUrl":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"url":{"type":"string"},"tabId":{"type":"string"}},"required":["url"]}},"result.primaryKey":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"schema":{"type":"string"},"table":{"type":"string"},"tabId":{"type":"string"}},"required":["schema","table"]}},"result.related":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"column":{"type":"object"},"value":{},"rowValues":{"type":"object"},"tabId":{"type":"string"}},"required":["column","value"]}},"result.updateDraft":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"columns":{"type":"array"},"rows":{"type":"array"},"tabId":{"type":"string"}},"required":["columns","rows"]}},"schema.cancel":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"}},"required":["requestId"]}},"schema.objectDetails":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"tableName":{},"name":{"type":["string","null"]},"owner":{"type":["string","null"]},"objectType":{"type":["string","null"]},"type":{},"tabId":{"type":"string"}},"required":[]}},"schema.refresh":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"schema.tableDetails":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"tableName":{},"name":{"type":["string","null"]},"owner":{"type":["string","null"]},"objectType":{"type":["string","null"]},"type":{},"tabId":{"type":"string"}},"required":[]}},"script.execute":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"statements":{"type":"array","items":{"$ref":"ScriptStatement"}},"continueOnError":{"type":"boolean"},"pageSize":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"timeoutSeconds":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"tabId":{"type":"string"}},"required":["statements"]}},"session.context":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"epoch":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"tabId":{"type":"string"}},"required":["epoch"]}},"session.nls":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"epoch":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"tabId":{"type":"string"}},"required":[]}},"sql.cancel":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"sql.closeResult":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"resultId":{"type":"string"},"tabId":{"type":"string"}},"required":["resultId"]}},"sql.execute":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"sql":{"type":"string"},"miniTool":{"type":"boolean"},"pageSize":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"rowLimit":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"parameters":{"type":"array","items":{"$ref":"SqlBindParameter"}},"previousResultId":{},"timeoutSeconds":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"scriptIndex":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"tabId":{"type":"string"}},"required":["sql"]}},"sql.explain":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"sql":{"type":"string"},"tabId":{"type":"string"}},"required":["sql"]}},"sql.fetchNext":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"resultId":{"type":"string"},"pageSize":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"tabId":{"type":"string"}},"required":["resultId"]}},"sql.runtimePlan":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"sqlId":{"type":"string"},"tabId":{"type":"string"}},"required":["sqlId"]}},"system.locale":{"handler":"ui","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"tab.close":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"tns.add":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"transaction.autoCommit":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"enabled":{"type":"boolean"},"tabId":{"type":"string"}},"required":["enabled"]}},"transaction.commit":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"transaction.rollback":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"ui.setTheme":{"handler":"ui","resumeSession":false,"payload":{"type":"object","properties":{"theme":{},"tabId":{"type":"string"}},"required":["theme"]}},"ui.setZoom":{"handler":"ui","resumeSession":false,"payload":{"type":"object","properties":{"factor":{"type":"number"},"tabId":{"type":"string"}},"required":[]}},"workspace.children":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"tabId":{"type":"string"}},"required":["path"]}},"workspace.close":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"workspace.create":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"workspace.createEntry":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"parent":{},"name":{"type":"string"},"directory":{"type":"boolean"},"tabId":{"type":"string"}},"required":["parent","name","directory"]}},"workspace.duplicateEntry":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"name":{"type":"string"},"tabId":{"type":"string"}},"required":["path","name"]}},"workspace.forget":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"id":{"type":"string"},"tabId":{"type":"string"}},"required":["id"]}},"workspace.git":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"workspace.gitDiff":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"tabId":{"type":"string"}},"required":["path"]}},"workspace.moveEntries":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"paths":{"type":"array"},"destination":{},"tabId":{"type":"string"}},"required":["paths","destination"]}},"workspace.moveEntry":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"destination":{},"tabId":{"type":"string"}},"required":["path","destination"]}},"workspace.open":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"workspace.openRecent":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"tabId":{"type":"string"}},"required":["path"]}},"workspace.pickLocation":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"workspace.recycleEntries":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"confirmed":{"type":"boolean"},"paths":{"type":"array"},"tabId":{"type":"string"}},"required":["confirmed","paths"]}},"workspace.recycleEntry":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"confirmed":{"type":"boolean"},"tabId":{"type":"string"}},"required":["path","confirmed"]}},"workspace.refresh":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"workspace.relocate":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"confirmed":{"type":"boolean"},"id":{"type":"string"},"path":{"type":"string"},"tabId":{"type":"string"}},"required":["confirmed","id","path"]}},"workspace.replaceApply":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"excluded":{"type":"array"},"search":{},"replacement":{"type":["string","null"]},"caseSensitive":{"type":"boolean"},"scope":{"type":["string","null"]},"selected":{"type":"array"},"previewId":{"type":"string"},"tabId":{"type":"string"}},"required":["excluded","selected","previewId"]}},"workspace.replacePreview":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"excluded":{"type":"array"},"search":{},"replacement":{"type":"string"},"caseSensitive":{"type":"boolean"},"scope":{"type":["string","null"]},"selected":{"type":"array"},"previewId":{"type":["string","null"]},"tabId":{"type":"string"}},"required":["excluded","search","replacement","caseSensitive"]}},"workspace.reveal":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"tabId":{"type":"string"}},"required":["path"]}},"workspace.search":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"query":{"type":["string","null"]},"scope":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"workspace.tools.list":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"root":{"type":"string"},"tool":{"type":"object"},"tabId":{"type":"string"}},"required":["root"]}},"workspace.tools.save":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"root":{"type":"string"},"tool":{"type":"object"},"tabId":{"type":"string"}},"required":["tool","root"]}},"workspace.update":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"id":{"type":"string"},"name":{"type":"string"},"description":{},"pinned":{"type":"boolean"},"tabId":{"type":"string"}},"required":["id","name","description","pinned"]}},"workspace.worksetDelete":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"id":{"type":"string"},"tabId":{"type":"string"}},"required":["id"]}},"workspace.worksetOpen":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"id":{"type":"string"},"tabId":{"type":"string"}},"required":["id"]}},"workspace.worksetSave":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"id":{"type":["string","null"]},"files":{"type":"array"},"name":{"type":"string"},"activePath":{"type":["string","null"]},"tabId":{"type":"string"}},"required":["name"]}},"workspace.worksets":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}}},"replies":{"analysis.state":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"enabled":{},"transactionPending":{}},"required":[]},"completion.reply":{"type":"object","properties":{"epoch":{"type":"number"},"result":{},"error":{"type":"string"},"cancelled":{"type":"boolean"},"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":["epoch"]},"completion.vocabulary":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"profileId":{},"version":{},"words":{},"error":{}},"required":[]},"connection.connected":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"serverVersion":{},"profile":{}},"required":[]},"connection.disconnected":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"connection.groupSaved":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"profileId":{},"group":{}},"required":[]},"connection.inactive":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"connection.managed":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"operation":{},"profileId":{},"success":{},"diagnostics":{},"message":{}},"required":[]},"connection.nls.save":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"profileId":{"type":"string"},"success":{"type":"boolean"},"error":{"type":"string"},"report":{"type":"object"}},"required":[]},"connection.nls.test":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"profileId":{"type":"string"},"success":{"type":"boolean"},"error":{"type":"string"},"report":{"type":"object"}},"required":[]},"connection.organization":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"success":{},"organization":{},"message":{}},"required":[]},"connection.profiles":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"profiles":{},"organization":{},"aliases":{}},"required":[]},"connection.resumed":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"file.changes":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"changes":{},"processed":{}},"required":[]},"file.conflict":{"type":"object","properties":{"path":{"type":"string"},"snapshot":{"$ref":"FileSnapshot"},"baselineUnknown":{"type":"boolean"},"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":["path","snapshot"]},"file.connectionBound":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"path":{},"profileId":{}},"required":[]},"file.opened":{"type":"object","properties":{"path":{"type":"string"},"fileName":{"type":"string"},"content":{"type":"string"},"diskVersion":{"type":"string"},"profileId":{"type":["string","null"]},"forceNew":{"type":"boolean"},"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":["path","fileName","content","diskVersion"]},"file.saveCancelled":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"file.saved":{"type":"object","properties":{"path":{"type":"string"},"fileName":{"type":"string"},"diskVersion":{"type":"string"},"profileId":{"type":["string","null"]},"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":["path","fileName","diskVersion"]},"host.error":{"type":"object","properties":{"message":{"type":"string"},"transactionPending":{"type":["boolean","null"]},"explain":{"type":"boolean"},"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":["message"]},"host.ready":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"result.children":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"links":{},"message":{}},"required":[]},"result.columnDefinition":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"definition":{}},"required":[]},"result.exportComplete":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"resultId":{},"consumed":{},"cancelled":{},"success":{},"message":{},"rowsWritten":{}},"required":[]},"result.exportProgress":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"resultId":{},"rowsWritten":{},"message":{}},"required":[]},"result.primaryKey":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"schema":{},"table":{},"columns":{},"message":{}},"required":[]},"result.related":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"sql":{},"message":{}},"required":[]},"result.sqlExported":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"cancelled":{}},"required":[]},"schema.cancelled":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"schema.error":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"message":{},"tableName":{},"owner":{},"objectType":{}},"required":[]},"schema.loaded":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"schema":{},"objects":{}},"required":[]},"schema.loading":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"schema.object":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"item":{"type":"object"}},"required":[]},"schema.table":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"item":{"type":"object"}},"required":[]},"script.completed":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"completed":{},"failed":{},"cancelled":{},"transactionPending":{}},"required":[]},"script.started":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"count":{}},"required":[]},"script.step":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"index":{},"sql":{},"offset":{},"status":{},"transactionPending":{},"elapsedMs":{},"rowsAffected":{},"returnedRows":{},"resultId":{},"error":{}},"required":[]},"session.context":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"epoch":{},"context":{},"error":{}},"required":[]},"session.nls":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"epoch":{},"report":{},"error":{}},"required":[]},"sql.cancelled":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"complete":{},"active":{},"transactionPending":{}},"required":[]},"sql.compilation":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"compilation":{},"elapsedMs":{},"transactionPending":{},"output":{},"metadataError":{}},"required":[]},"sql.explainResult":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"columns":{"type":"array","items":{"$ref":"SqlColumn"}},"rows":{"type":"array","items":{"type":"array"}},"elapsedMs":{"type":"number"},"returnedRows":{"type":"number"},"transactionPending":{"type":"boolean"},"profileId":{},"resultId":{"type":["string","null"]},"hasMore":{"type":"boolean"}},"required":["columns","rows"]},"sql.page":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"columns":{"type":"array","items":{"$ref":"SqlColumn"}},"rows":{"type":"array","items":{"type":"array"}},"elapsedMs":{"type":"number"},"returnedRows":{"type":"number"},"transactionPending":{"type":"boolean"},"resultId":{"type":["string","null"]},"hasMore":{"type":"boolean"},"pageSize":{},"offset":{}},"required":["columns","rows"]},"sql.pageError":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"resultId":{},"message":{}},"required":[]},"sql.result":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"columns":{"type":"array","items":{"$ref":"SqlColumn"}},"rows":{"type":"array","items":{"type":"array"}},"rowsAffected":{},"elapsedMs":{"type":"number"},"returnedRows":{"type":"number"},"truncated":{},"transactionPending":{"type":"boolean"},"output":{},"sqlId":{},"resultId":{"type":["string","null"]},"hasMore":{"type":"boolean"},"pageSize":{},"offset":{},"profileId":{}},"required":["columns","rows"]},"sql.runtimePlan":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"sqlId":{},"lines":{},"error":{}},"required":[]},"sql.stage":{"type":"object","properties":{"stage":{"type":"string"},"scriptIndex":{"type":["number","null"]},"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":["stage"]},"sql.timeout":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"message":{},"timeoutSeconds":{},"transactionPending":{}},"required":[]},"system.locale":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"uiLanguage":{},"region":{},"datePattern":{},"decimalSeparator":{},"thousandSeparator":{}},"required":[]},"tab.closeFailed":{"type":"object","properties":{"message":{"type":"string"},"transactionPending":{"type":"boolean"},"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":["message","transactionPending"]},"tab.closed":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"transaction.autoCommit":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"enabled":{}},"required":[]},"transaction.state":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"state":{},"pending":{}},"required":[]},"ui.theme":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"theme":{},"background":{},"foreground":{},"accent":{},"nativeTheme":{},"chrome":{},"error":{}},"required":[]},"workspace.changed":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"root":{},"moves":{},"removedPaths":{},"error":{},"entry":{},"removed":{},"source":{},"destination":{}},"required":[]},"workspace.children":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"root":{},"path":{},"entries":{}},"required":[]},"workspace.error":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"message":{}},"required":[]},"workspace.git":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"state":{},"error":{}},"required":[]},"workspace.gitDiff":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"diff":{},"error":{}},"required":[]},"workspace.location":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"path":{}},"required":[]},"workspace.operation":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"workspace.replaceApply":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"result":{},"error":{"type":"string"}},"required":[]},"workspace.replacePreview":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"preview":{},"error":{"type":"string"}},"required":[]},"workspace.searchResults":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"results":{},"truncated":{}},"required":[]},"workspace.state":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"root":{},"name":{},"files":{},"entries":{},"recent":{},"catalog":{},"error":{}},"required":[]},"workspace.tools.list":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"root":{"type":"string"},"catalog":{"type":"object","properties":{"tools":{"type":"array","items":{"type":"object"}},"errors":{"type":"array","items":{"type":"string"}}},"required":["tools","errors"]},"tool":{"type":"object"}},"required":[]},"workspace.tools.save":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"root":{"type":"string"},"catalog":{"type":"object","properties":{"tools":{"type":"array","items":{"type":"object"}},"errors":{"type":"array","items":{"type":"string"}}},"required":["tools","errors"]},"tool":{"type":"object"}},"required":[]},"workspace.worksetOpened":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"root":{},"workset":{},"files":{},"skipped":{}},"required":[]},"workspace.worksets":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"root":{},"worksets":{}},"required":[]}}}
+{"version":1,"models":{"SqlBindParameter":{"type":"object","properties":{"name":{"type":"string"},"type":{"type":"string"},"value":{"type":["string","null"]},"direction":{"type":"string"}},"required":["name","type"]},"FileSnapshot":{"type":"object","properties":{"path":{"type":["string","null"]},"content":{"type":["string","null"]},"version":{"type":"string"},"missing":{"type":"boolean"},"error":{"type":["string","null"]},"conflict":{"type":"boolean"}},"required":["path","version"]},"FileWatch":{"type":"object","properties":{"path":{"type":"string"},"version":{"type":["string","null"]},"hasError":{"type":"boolean"}},"required":["path","version"]},"ScriptStatement":{"type":"object","properties":{"sql":{"type":"string"},"start":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"parameters":{"type":"array","items":{"$ref":"SqlBindParameter"}}},"required":["sql"]},"SqlColumn":{"type":"object","properties":{"name":{"type":"string"},"type":{"type":"string"},"temporalKind":{"type":["string","null"]}},"required":["name","type"]},"ProjectRules":{"type":"object","properties":{"version":{"type":"integer"},"associations":{"type":"array","items":{"type":"object","properties":{"extension":{"type":"string"},"type":{"type":"string"}},"required":["extension","type"]}},"packagePairs":{"type":"array","items":{"type":"object","properties":{"specification":{"type":"string"},"body":{"type":"string"}},"required":["specification","body"]}},"testPatterns":{"type":"array","items":{"type":"string"}},"project":{"$ref":"ProjectOptions"}},"required":["version","associations","packagePairs","testPatterns"]},"RoutineRunParameter":{"type":"object","properties":{"name":{"type":"string"},"oracleType":{"type":"string"},"bindType":{"type":"string"},"mode":{"type":"string"},"optional":{"type":"boolean"},"useDefault":{"type":"boolean"},"sensitive":{"type":"boolean"}},"required":["name","oracleType","bindType","mode"]},"RoutineRunConfiguration":{"type":"object","properties":{"version":{"type":"integer"},"id":{"type":"string"},"name":{"type":"string"},"owner":{"type":"string"},"packageName":{"type":"string"},"routineName":{"type":"string"},"kind":{"type":"string"},"returnBindType":{"type":"string"},"parameters":{"type":"array","items":{"$ref":"RoutineRunParameter"}},"revision":{"type":"integer"}},"required":["version","id","name","owner","packageName","routineName","kind","returnBindType","parameters"]},"ProjectOptions":{"type":"object","properties":{"areas":{"type":"object","properties":{"packages":{"type":"string"},"migrations":{"type":"string"},"scripts":{"type":"string"},"tests":{"type":"string"}},"required":["packages","migrations","scripts","tests"]},"connectionIds":{"type":"array","items":{"type":"string"}},"defaultConnectionId":{"type":["string","null"]},"variables":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"type":{"type":"string"},"required":{"type":"boolean"},"description":{"type":"string"}},"required":["name","type"]}},"run":{"type":"object","properties":{"timeoutSeconds":{"type":"integer"},"pageSize":{"type":"integer"},"continueOnError":{"type":"boolean"}},"required":["timeoutSeconds","pageSize","continueOnError"]}},"required":["areas","connectionIds","variables","run"]}},"commands":{"analysis.begin":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"analysis.end":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"completion.cancel":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"requestId":{"type":"string"},"tabId":{"type":"string"}},"required":["requestId"]}},"completion.definition":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"epoch":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"owner":{"type":["string","null"]},"name":{"type":["string","null"]},"objectType":{"type":["string","null"]},"body":{"type":"boolean"},"member":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"completion.metadata":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"epoch":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"owner":{"type":["string","null"]},"name":{"type":["string","null"]},"objectType":{"type":["string","null"]},"body":{"type":"boolean"},"member":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"completion.objectAnalysis":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"epoch":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"owner":{"type":["string","null"]},"name":{"type":["string","null"]},"objectType":{"type":["string","null"]},"body":{"type":"boolean"},"member":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"completion.objectDraftMetadata":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"epoch":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"owner":{"type":["string","null"]},"name":{"type":["string","null"]},"objectType":{"type":["string","null"]},"body":{"type":"boolean"},"member":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"completion.plscope":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"epoch":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"owner":{"type":["string","null"]},"name":{"type":["string","null"]},"objectType":{"type":["string","null"]},"body":{"type":"boolean"},"member":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"completion.systemObjects":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"epoch":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"owner":{"type":["string","null"]},"name":{"type":["string","null"]},"objectType":{"type":["string","null"]},"body":{"type":"boolean"},"member":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"completion.vocabulary":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"connection.connect":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"profileId":{"type":"string"},"user":{"type":["string","null"]},"password":{"type":["string","null"]},"remember":{"type":"boolean"},"tabId":{"type":"string"}},"required":["profileId"]}},"connection.delete":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"groupIds":{"type":"array"},"remember":{"type":"boolean"},"tabId":{"type":"string"},"profileId":{"type":["string","null"]},"name":{"type":["string","null"]},"alias":{"type":["string","null"]},"source":{"type":["string","null"]},"user":{"type":["string","null"]},"environment":{"type":["string","null"]},"method":{"type":["string","null"]},"host":{"type":["string","null"]},"port":{"type":["string","null"]},"service":{"type":["string","null"]},"targetType":{"type":["string","null"]},"descriptor":{"type":["string","null"]},"folderId":{"type":["string","null"]},"password":{"type":["string","null"]}},"required":[]}},"connection.disconnect":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"connection.list":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"connection.nls.save":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"profileId":{"type":"string"},"overrides":{"type":"object"},"user":{"type":["string","null"]},"password":{"type":["string","null"]},"tabId":{"type":"string"}},"required":["profileId","overrides"]}},"connection.nls.test":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"profileId":{"type":"string"},"overrides":{"type":"object"},"user":{"type":["string","null"]},"password":{"type":["string","null"]},"tabId":{"type":"string"}},"required":["profileId","overrides"]}},"connection.organization":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"},"operation":{"type":"string"},"id":{"type":"string"},"name":{"type":"string"},"parentId":{"type":"string"},"profileId":{"type":"string"},"folderId":{"type":"string"},"groupIds":{"type":"array","items":{"type":"string"}}},"required":["operation"]}},"connection.save":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"groupIds":{"type":"array"},"remember":{"type":"boolean"},"tabId":{"type":"string"},"profileId":{"type":["string","null"]},"name":{"type":["string","null"]},"alias":{"type":["string","null"]},"source":{"type":["string","null"]},"user":{"type":["string","null"]},"environment":{"type":["string","null"]},"method":{"type":["string","null"]},"host":{"type":["string","null"]},"port":{"type":["string","null"]},"service":{"type":["string","null"]},"targetType":{"type":["string","null"]},"descriptor":{"type":["string","null"]},"folderId":{"type":["string","null"]},"password":{"type":["string","null"]}},"required":[]}},"connection.setGroup":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"profileId":{"type":["string","null"]},"group":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"connection.test":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"groupIds":{"type":"array"},"remember":{"type":"boolean"},"tabId":{"type":"string"},"profileId":{"type":["string","null"]},"name":{"type":["string","null"]},"alias":{"type":["string","null"]},"source":{"type":["string","null"]},"user":{"type":["string","null"]},"environment":{"type":["string","null"]},"method":{"type":["string","null"]},"host":{"type":["string","null"]},"port":{"type":["string","null"]},"service":{"type":["string","null"]},"targetType":{"type":["string","null"]},"descriptor":{"type":["string","null"]},"folderId":{"type":["string","null"]},"password":{"type":["string","null"]}},"required":[]}},"file.activate":{"handler":"file","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"file.bindConnection":{"handler":"file","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"file.history.list":{"handler":"file","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"tabId":{"type":"string"}},"required":["path"]}},"file.history.read":{"handler":"file","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"id":{"type":"string"},"tabId":{"type":"string"}},"required":["path","id"]}},"file.new":{"handler":"file","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"file.open":{"handler":"file","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"file.openPath":{"handler":"file","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":["string","null"]},"forceNew":{"type":"boolean"},"tabId":{"type":"string"}},"required":["path"]}},"file.poll":{"handler":"file","resumeSession":false,"payload":{"type":"object","properties":{"files":{"type":"array","items":{"$ref":"FileWatch"}},"tabId":{"type":"string"}},"required":["files"]}},"file.save":{"handler":"file","resumeSession":false,"payload":{"type":"object","properties":{"content":{"type":"string"},"path":{"type":["string","null"]},"fileName":{"type":["string","null"]},"diskVersion":{"type":["string","null"]},"tabId":{"type":"string"}},"required":["content"]}},"result.cancelExport":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"result.children":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"column":{"type":"object"},"rowValues":{"type":"object"},"tabId":{"type":"string"}},"required":["column","rowValues"]}},"result.columnDefinition":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"column":{"type":"object"},"tabId":{"type":"string"}},"required":["column"]}},"result.export":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"resultId":{"type":["string","null"]},"format":{"type":["string","null"]},"fileName":{"type":["string","null"]},"columns":{"type":"array"},"rows":{"type":"array"},"hasMore":{"type":"boolean"},"includeMetadata":{"type":"boolean"},"csvOptions":{"type":"object"},"tabId":{"type":"string"}},"required":["columns","rows"]}},"result.exportSql":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"sql":{"type":"string"},"tabId":{"type":"string"}},"required":["sql"]}},"result.lookupSql":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"schema":{"type":"string"},"table":{"type":"string"},"values":{"type":"object"},"tabId":{"type":"string"},"columns":{"type":"array"}},"required":["schema","table","values"]}},"result.openSql":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"sql":{"type":"string"},"tabId":{"type":"string"}},"required":["sql"]}},"result.openUrl":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"url":{"type":"string"},"tabId":{"type":"string"}},"required":["url"]}},"result.primaryKey":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"schema":{"type":"string"},"table":{"type":"string"},"tabId":{"type":"string"}},"required":["schema","table"]}},"result.related":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"column":{"type":"object"},"value":{},"rowValues":{"type":"object"},"tabId":{"type":"string"}},"required":["column","value"]}},"result.updateDraft":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"columns":{"type":"array"},"rows":{"type":"array"},"tabId":{"type":"string"}},"required":["columns","rows"]}},"schema.cancel":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"}},"required":["requestId"]}},"schema.objectDetails":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"tableName":{},"name":{"type":["string","null"]},"owner":{"type":["string","null"]},"objectType":{"type":["string","null"]},"type":{},"tabId":{"type":"string"}},"required":[]}},"schema.refresh":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"schema.tableDetails":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"tableName":{},"name":{"type":["string","null"]},"owner":{"type":["string","null"]},"objectType":{"type":["string","null"]},"type":{},"tabId":{"type":"string"}},"required":[]}},"script.execute":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"statements":{"type":"array","items":{"$ref":"ScriptStatement"}},"continueOnError":{"type":"boolean"},"pageSize":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"timeoutSeconds":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"tabId":{"type":"string"}},"required":["statements"]}},"script.sourceReviewed":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"scriptRequestId":{"type":"string"},"index":{"type":"integer","minimum":0,"maximum":1999},"reviewNonce":{"type":"string"},"reviewId":{"type":"string"},"tabId":{"type":"string"}},"required":["scriptRequestId","index","reviewNonce","reviewId"]}},"session.context":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"epoch":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"tabId":{"type":"string"}},"required":["epoch"]}},"session.nls":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"epoch":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"tabId":{"type":"string"}},"required":[]}},"source.review":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"sql":{"type":"string"}},"required":["sql"]}},"sql.cancel":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"sql.closeResult":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"resultId":{"type":"string"},"tabId":{"type":"string"}},"required":["resultId"]}},"sql.execute":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"sql":{"type":"string"},"miniTool":{"type":"boolean"},"pageSize":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"rowLimit":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"parameters":{"type":"array","items":{"$ref":"SqlBindParameter"}},"previousResultId":{},"timeoutSeconds":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"scriptIndex":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"tabId":{"type":"string"},"sourceReviewId":{"type":"string"}},"required":["sql"]}},"sql.explain":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"sql":{"type":"string"},"tabId":{"type":"string"}},"required":["sql"]}},"sql.fetchNext":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"resultId":{"type":"string"},"pageSize":{"type":"integer","minimum":-2147483648,"maximum":2147483647},"tabId":{"type":"string"}},"required":["resultId"]}},"sql.runtimePlan":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"sqlId":{"type":"string"},"tabId":{"type":"string"}},"required":["sqlId"]}},"system.locale":{"handler":"ui","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"tab.close":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"tns.add":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"transaction.autoCommit":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"enabled":{"type":"boolean"},"tabId":{"type":"string"}},"required":["enabled"]}},"transaction.commit":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"transaction.rollback":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"ui.requestAttention":{"handler":"ui","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"ui.setTaskbarProgress":{"handler":"ui","resumeSession":false,"payload":{"type":"object","properties":{"state":{"type":"string","enum":["none","indeterminate","error"]},"tabId":{"type":"string"}},"required":["state"]}},"ui.setTheme":{"handler":"ui","resumeSession":false,"payload":{"type":"object","properties":{"theme":{},"tabId":{"type":"string"}},"required":["theme"]}},"ui.setZoom":{"handler":"ui","resumeSession":false,"payload":{"type":"object","properties":{"factor":{"type":"number"},"tabId":{"type":"string"}},"required":[]}},"workspace.binds.load":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"tabId":{"type":"string"}},"required":["path"]}},"workspace.binds.save":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"definitions":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"type":{"type":"string"},"label":{"type":"string"},"description":{"type":"string"},"required":{"type":"boolean"},"defaultValue":{"type":["string","null"]}},"required":["name"]}},"tabId":{"type":"string"}},"required":["path","definitions"]}},"workspace.children":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"tabId":{"type":"string"}},"required":["path"]}},"workspace.close":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"workspace.create":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"},"template":{"type":"string","enum":["blank","oracle-package","migrations"]}},"required":[]}},"workspace.createEntry":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"parent":{},"name":{"type":"string"},"directory":{"type":"boolean"},"tabId":{"type":"string"}},"required":["parent","name","directory"]}},"workspace.createFile":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"relativePath":{"type":"string"},"content":{"type":"string"},"tabId":{"type":"string"}},"required":["relativePath","content"]}},"workspace.duplicateEntry":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"name":{"type":"string"},"tabId":{"type":"string"}},"required":["path","name"]}},"workspace.forget":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"id":{"type":"string"},"tabId":{"type":"string"}},"required":["id"]}},"workspace.git":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"workspace.gitDiff":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"tabId":{"type":"string"}},"required":["path"]}},"workspace.moveEntries":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"paths":{"type":"array"},"destination":{},"tabId":{"type":"string"}},"required":["paths","destination"]}},"workspace.moveEntry":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"destination":{},"tabId":{"type":"string"}},"required":["path","destination"]}},"workspace.open":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"workspace.openRecent":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"tabId":{"type":"string"}},"required":["path"]}},"workspace.pickLocation":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"workspace.projectRules":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"root":{"type":"string"}},"required":["root"]}},"workspace.projectRules.save":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"root":{"type":"string"},"rules":{"$ref":"ProjectRules"},"revision":{"type":"string"}},"required":["root","rules","revision"]}},"workspace.recycleEntries":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"confirmed":{"type":"boolean"},"paths":{"type":"array"},"tabId":{"type":"string"}},"required":["confirmed","paths"]}},"workspace.recycleEntry":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"confirmed":{"type":"boolean"},"tabId":{"type":"string"}},"required":["path","confirmed"]}},"workspace.refresh":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"workspace.relocate":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"confirmed":{"type":"boolean"},"id":{"type":"string"},"path":{"type":"string"},"tabId":{"type":"string"}},"required":["confirmed","id","path"]}},"workspace.replaceApply":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"excluded":{"type":"array"},"search":{},"replacement":{"type":["string","null"]},"caseSensitive":{"type":"boolean"},"scope":{"type":["string","null"]},"selected":{"type":"array"},"previewId":{"type":"string"},"tabId":{"type":"string"}},"required":["excluded","selected","previewId"]}},"workspace.replacePreview":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"excluded":{"type":"array"},"search":{},"replacement":{"type":"string"},"caseSensitive":{"type":"boolean"},"scope":{"type":["string","null"]},"selected":{"type":"array"},"previewId":{"type":["string","null"]},"tabId":{"type":"string"}},"required":["excluded","search","replacement","caseSensitive"]}},"workspace.reveal":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"path":{"type":"string"},"tabId":{"type":"string"}},"required":["path"]}},"workspace.runs.list":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"root":{"type":"string"}},"required":["root"]}},"workspace.runs.save":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"root":{"type":"string"},"configuration":{"$ref":"RoutineRunConfiguration"}},"required":["root","configuration"]}},"workspace.search":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"query":{"type":["string","null"]},"scope":{"type":["string","null"]},"tabId":{"type":"string"}},"required":[]}},"workspace.sources":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"root":{"type":"string"}},"required":["root"]}},"workspace.tools.list":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"root":{"type":"string"},"tool":{"type":"object"},"tabId":{"type":"string"}},"required":["root"]}},"workspace.tools.save":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"root":{"type":"string"},"tool":{"type":"object"},"tabId":{"type":"string"}},"required":["tool","root"]}},"workspace.update":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"id":{"type":"string"},"name":{"type":"string"},"description":{},"pinned":{"type":"boolean"},"tabId":{"type":"string"}},"required":["id","name","description","pinned"]}},"workspace.worksetDelete":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"id":{"type":"string"},"tabId":{"type":"string"}},"required":["id"]}},"workspace.worksetOpen":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"id":{"type":"string"},"tabId":{"type":"string"}},"required":["id"]}},"workspace.worksetSave":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"id":{"type":["string","null"]},"files":{"type":"array"},"name":{"type":"string"},"activePath":{"type":["string","null"]},"tabId":{"type":"string"}},"required":["name"]}},"workspace.worksets":{"handler":"workspace","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}},"ui.openTerminal":{"handler":"ui","resumeSession":false,"payload":{"type":"object","properties":{"tool":{"type":"string","enum":["sqlcl","sqlplus","shell"]},"directory":{"type":"string"},"userName":{"type":"string"},"identifier":{"type":"string"},"tnsSource":{"type":"string"}},"required":["tool","directory"]}},"sql.evaluate":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"sql":{"type":"string"},"parameters":{"type":"array"},"timeoutSeconds":{"type":"integer"},"rowLimit":{"type":"integer"}},"required":["sql"]}},"result.editIdentity":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"schema":{"type":"string"},"table":{"type":"string"}},"required":["schema","table"]}},"sql.applyDml":{"handler":"oracle","resumeSession":true,"payload":{"type":"object","properties":{"statements":{"type":"array"},"timeoutSeconds":{"type":"integer"},"onFailure":{"type":"string","enum":["rollback","keep"]}},"required":["statements"]}},"result.constraintInfo":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"owner":{"type":"string"},"name":{"type":"string"}},"required":["owner","name"]}},"sql.stopApplyDml":{"handler":"oracle","resumeSession":false,"payload":{"type":"object","properties":{"tabId":{"type":"string"}},"required":[]}}},"replies":{"analysis.state":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"enabled":{},"transactionPending":{}},"required":[]},"completion.reply":{"type":"object","properties":{"epoch":{"type":"number"},"result":{},"error":{"type":"string"},"cancelled":{"type":"boolean"},"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":["epoch"]},"completion.vocabulary":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"profileId":{},"version":{},"words":{},"error":{}},"required":[]},"connection.connected":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"serverVersion":{},"profile":{}},"required":[]},"connection.disconnected":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"connection.groupSaved":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"profileId":{},"group":{}},"required":[]},"connection.inactive":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"connection.managed":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"operation":{},"profileId":{},"success":{},"diagnostics":{},"message":{}},"required":[]},"connection.nls.save":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"profileId":{"type":"string"},"success":{"type":"boolean"},"error":{"type":"string"},"report":{"type":"object"}},"required":[]},"connection.nls.test":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"profileId":{"type":"string"},"success":{"type":"boolean"},"error":{"type":"string"},"report":{"type":"object"}},"required":[]},"connection.organization":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"success":{},"organization":{},"message":{}},"required":[]},"connection.profiles":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"profiles":{},"organization":{},"aliases":{}},"required":[]},"connection.resumed":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"file.changes":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"changes":{},"processed":{}},"required":[]},"file.conflict":{"type":"object","properties":{"path":{"type":"string"},"snapshot":{"$ref":"FileSnapshot"},"baselineUnknown":{"type":"boolean"},"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":["path","snapshot"]},"file.connectionBound":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"path":{},"profileId":{}},"required":[]},"file.opened":{"type":"object","properties":{"path":{"type":"string"},"fileName":{"type":"string"},"content":{"type":"string"},"diskVersion":{"type":"string"},"profileId":{"type":["string","null"]},"forceNew":{"type":"boolean"},"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":["path","fileName","content","diskVersion"]},"file.saveCancelled":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"file.saved":{"type":"object","properties":{"path":{"type":"string"},"fileName":{"type":"string"},"diskVersion":{"type":"string"},"profileId":{"type":["string","null"]},"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":["path","fileName","diskVersion"]},"host.error":{"type":"object","properties":{"message":{"type":"string"},"transactionPending":{"type":["boolean","null"]},"explain":{"type":"boolean"},"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"connected":{"type":"boolean"}},"required":["message"]},"host.ready":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"result.children":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"links":{},"message":{}},"required":[]},"result.columnDefinition":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"definition":{}},"required":[]},"result.exportComplete":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"resultId":{},"consumed":{},"cancelled":{},"success":{},"message":{},"rowsWritten":{},"bytesWritten":{"type":"integer"},"elapsedMs":{"type":"integer"}},"required":[]},"result.exportProgress":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"resultId":{},"rowsWritten":{},"message":{},"bytesWritten":{"type":"integer"},"elapsedMs":{"type":"integer"}},"required":[]},"result.primaryKey":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"schema":{},"table":{},"columns":{},"message":{}},"required":[]},"result.related":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"sql":{},"message":{}},"required":[]},"result.sqlExported":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"cancelled":{}},"required":[]},"schema.cancelled":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"schema.error":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"message":{},"tableName":{},"owner":{},"objectType":{}},"required":[]},"schema.loaded":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"schema":{},"objects":{}},"required":[]},"schema.loading":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"schema.object":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"item":{"type":"object"}},"required":[]},"schema.table":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"item":{"type":"object"}},"required":[]},"script.completed":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"completed":{},"failed":{},"cancelled":{},"transactionPending":{}},"required":[]},"script.started":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"count":{}},"required":[]},"script.step":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"index":{},"sql":{},"offset":{},"status":{},"transactionPending":{},"elapsedMs":{},"rowsAffected":{},"returnedRows":{},"resultId":{},"error":{}},"required":[]},"session.context":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"epoch":{},"context":{},"error":{}},"required":[]},"session.nls":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"epoch":{},"report":{},"error":{}},"required":[]},"sql.cancelled":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"complete":{},"active":{},"transactionPending":{}},"required":[]},"sql.compilation":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"compilation":{},"elapsedMs":{},"transactionPending":{},"output":{},"metadataError":{},"sqlVersion":{"type":"string"}},"required":[]},"sql.explainResult":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"columns":{"type":"array","items":{"$ref":"SqlColumn"}},"rows":{"type":"array","items":{"type":"array"}},"elapsedMs":{"type":"number"},"returnedRows":{"type":"number"},"transactionPending":{"type":"boolean"},"profileId":{},"resultId":{"type":["string","null"]},"hasMore":{"type":"boolean"}},"required":["columns","rows"]},"sql.page":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"columns":{"type":"array","items":{"$ref":"SqlColumn"}},"rows":{"type":"array","items":{"type":"array"}},"elapsedMs":{"type":"number"},"returnedRows":{"type":"number"},"transactionPending":{"type":"boolean"},"resultId":{"type":["string","null"]},"hasMore":{"type":"boolean"},"pageSize":{},"offset":{}},"required":["columns","rows"]},"sql.pageError":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"resultId":{},"message":{}},"required":[]},"sql.result":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"columns":{"type":"array","items":{"$ref":"SqlColumn"}},"rows":{"type":"array","items":{"type":"array"}},"rowsAffected":{},"elapsedMs":{"type":"number"},"returnedRows":{"type":"number"},"truncated":{},"transactionPending":{"type":"boolean"},"output":{},"sqlId":{},"resultId":{"type":["string","null"]},"hasMore":{"type":"boolean"},"pageSize":{},"offset":{},"profileId":{},"outParameters":{"type":"array","items":{"type":"object","properties":{"name":{"type":"string"},"type":{"type":"string"},"value":{}},"required":["name","type","value"]}},"sqlVersion":{"type":"string"}},"required":["columns","rows"]},"sql.runtimePlan":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"sqlId":{},"lines":{},"error":{}},"required":[]},"sql.stage":{"type":"object","properties":{"stage":{"type":"string"},"scriptIndex":{"type":["number","null"]},"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":["stage"]},"sql.timeout":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"message":{},"timeoutSeconds":{},"transactionPending":{}},"required":[]},"system.locale":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"uiLanguage":{},"region":{},"datePattern":{},"decimalSeparator":{},"thousandSeparator":{}},"required":[]},"tab.closeFailed":{"type":"object","properties":{"message":{"type":"string"},"transactionPending":{"type":"boolean"},"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":["message","transactionPending"]},"tab.closed":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"transaction.autoCommit":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"enabled":{}},"required":[]},"transaction.state":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"state":{},"pending":{},"unconfirmed":{"type":"boolean"},"message":{"type":"string"}},"required":[]},"ui.theme":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"theme":{},"background":{},"foreground":{},"accent":{},"nativeTheme":{},"chrome":{},"error":{}},"required":[]},"workspace.changed":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"root":{},"moves":{},"removedPaths":{},"error":{},"entry":{},"removed":{},"source":{},"destination":{}},"required":[]},"workspace.children":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"root":{},"path":{},"entries":{}},"required":[]},"workspace.error":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"message":{}},"required":[]},"workspace.git":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"state":{},"error":{}},"required":[]},"workspace.gitDiff":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"diff":{},"error":{}},"required":[]},"workspace.location":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"path":{}},"required":[]},"workspace.operation":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"}},"required":[]},"workspace.replaceApply":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"result":{},"error":{"type":"string"}},"required":[]},"workspace.replacePreview":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"preview":{},"error":{"type":"string"}},"required":[]},"workspace.searchResults":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"results":{},"truncated":{}},"required":[]},"workspace.state":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"root":{},"name":{},"files":{},"entries":{},"recent":{},"catalog":{},"error":{},"projectRules":{"$ref":"ProjectRules"},"fileConnections":{"type":"object"}},"required":[]},"workspace.tools.list":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"root":{"type":"string"},"catalog":{"type":"object","properties":{"tools":{"type":"array","items":{"type":"object"}},"errors":{"type":"array","items":{"type":"string"}}},"required":["tools","errors"]},"tool":{"type":"object"}},"required":[]},"workspace.tools.save":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"root":{"type":"string"},"catalog":{"type":"object","properties":{"tools":{"type":"array","items":{"type":"object"}},"errors":{"type":"array","items":{"type":"string"}}},"required":["tools","errors"]},"tool":{"type":"object"}},"required":[]},"workspace.worksetOpened":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"root":{},"workset":{},"files":{},"skipped":{}},"required":[]},"workspace.worksets":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"root":{},"worksets":{}},"required":[]},"workspace.sources":{"type":"object","properties":{"requestId":{"type":["string","null"]},"sources":{"type":"object","properties":{"root":{"type":"string"},"files":{"type":"array","items":{"type":"object","properties":{"path":{"type":"string"},"name":{"type":"string"},"content":{"type":"string"},"connectionProfileId":{"type":["string","null"]}},"required":["path","name","content"]}},"skipped":{"type":"array","items":{"type":"string"}},"truncated":{"type":"boolean"}},"required":["root","files","skipped","truncated"]}},"required":["requestId","sources"]},"workspace.projectRules":{"type":"object","properties":{"requestId":{"type":["string","null"]},"root":{"type":"string"},"snapshot":{"type":"object","properties":{"rules":{"$ref":"ProjectRules"},"revision":{"type":"string"}},"required":["rules","revision"]}},"required":["requestId","root","snapshot"]},"source.review":{"type":"object","properties":{"requestId":{"type":["string","null"]},"review":{"type":"object","properties":{"reviewId":{"type":"string"},"sql":{"type":"string"},"reviewedAt":{"type":"string"},"snapshot":{"type":"object","properties":{"owner":{"type":"string"},"name":{"type":"string"},"type":{"type":"string"},"source":{"type":"string"},"exists":{"type":"boolean"},"version":{"type":"string"},"context":{"type":"string"},"profileId":{"type":["string","null"]}},"required":["owner","name","type","source","exists","version","context"]}},"required":["reviewId","snapshot","sql","reviewedAt"]}},"required":["requestId","review"]},"source.review.error":{"type":"object","properties":{"requestId":{"type":["string","null"]},"message":{"type":"string"},"connected":{"type":"boolean"}},"required":["requestId","message"]},"workspace.runs.list":{"type":"object","properties":{"requestId":{"type":["string","null"]},"root":{"type":"string"},"catalog":{"type":"object","properties":{"configurations":{"type":"array","items":{"$ref":"RoutineRunConfiguration"}},"errors":{"type":"array","items":{"type":"string"}}},"required":["configurations","errors"]}},"required":["requestId","root","catalog"]},"workspace.runs.saved":{"type":"object","properties":{"requestId":{"type":["string","null"]},"root":{"type":"string"},"configuration":{"$ref":"RoutineRunConfiguration"}},"required":["requestId","root","configuration"]},"script.sourceReviewRequired":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"index":{"type":"integer"},"sql":{"type":"string"},"offset":{"type":"integer"},"reviewNonce":{"type":"string"},"transactionPending":{"type":"boolean"}},"required":["requestId","index","sql","offset","reviewNonce","transactionPending"]},"script.reviewAccepted":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"accepted":{"type":"boolean"}},"required":["requestId","accepted"]},"workspace.binds":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"path":{"type":"string"},"operation":{"type":"string"},"definitions":{"type":"array"}},"required":["path","definitions"]},"file.history":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"autoCommit":{"type":"boolean"},"operation":{"type":"string"},"path":{"type":"string"},"id":{"type":"string"},"entries":{"type":"array"},"content":{"type":["string","null"]}},"required":["operation","path"]},"ui.terminal":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"opened":{"type":"boolean"},"message":{"type":"string"}},"required":["opened","message"]},"sql.evaluated":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"columns":{"type":"array"},"rows":{"type":"array"},"elapsedMs":{"type":"integer"},"transactionPending":{"type":"boolean"},"error":{"type":"string"},"truncated":{"type":"boolean"}},"required":[]},"result.editIdentity":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"schema":{"type":"string"},"table":{"type":"string"},"columns":{"type":"array"},"error":{"type":"string"}},"required":[]},"sql.dmlApplied":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"outcomes":{"type":"array"},"transactionPending":{"type":"boolean"},"autoCommit":{"type":"boolean"},"error":{"type":"string"},"recovery":{"type":["string","null"]},"stoppedByUser":{"type":"boolean"}},"required":[]},"result.constraintInfo":{"type":"object","properties":{"requestId":{"type":["string","null"]},"tabId":{"type":"string"},"owner":{"type":"string"},"name":{"type":"string"},"found":{"type":"boolean"},"constraintType":{"type":["string","null"]},"condition":{"type":["string","null"]},"columns":{"type":"array"},"referenced":{"type":["string","null"]},"error":{"type":"string"}},"required":[]}}}
 """;
 }
 
@@ -20,6 +20,8 @@ public sealed record BridgeSqlBindParameter
     public required string Type { get; init; }
     [JsonPropertyName("value")]
     public string? Value { get; init; }
+    [JsonPropertyName("direction")]
+    public string? Direction { get; init; }
 }
 public sealed record BridgeFileSnapshot
 {
@@ -62,6 +64,72 @@ public sealed record BridgeSqlColumn
     public required string Type { get; init; }
     [JsonPropertyName("temporalKind")]
     public string? TemporalKind { get; init; }
+}
+public sealed record BridgeProjectRules
+{
+    [JsonPropertyName("version")]
+    public required int Version { get; init; }
+    [JsonPropertyName("associations")]
+    public required JsonElement[] Associations { get; init; }
+    [JsonPropertyName("packagePairs")]
+    public required JsonElement[] PackagePairs { get; init; }
+    [JsonPropertyName("testPatterns")]
+    public required string[] TestPatterns { get; init; }
+    [JsonPropertyName("project")]
+    public BridgeProjectOptions? Project { get; init; }
+}
+public sealed record BridgeRoutineRunParameter
+{
+    [JsonPropertyName("name")]
+    public required string Name { get; init; }
+    [JsonPropertyName("oracleType")]
+    public required string OracleType { get; init; }
+    [JsonPropertyName("bindType")]
+    public required string BindType { get; init; }
+    [JsonPropertyName("mode")]
+    public required string Mode { get; init; }
+    [JsonPropertyName("optional")]
+    public bool? Optional { get; init; }
+    [JsonPropertyName("useDefault")]
+    public bool? UseDefault { get; init; }
+    [JsonPropertyName("sensitive")]
+    public bool? Sensitive { get; init; }
+}
+public sealed record BridgeRoutineRunConfiguration
+{
+    [JsonPropertyName("version")]
+    public required int Version { get; init; }
+    [JsonPropertyName("id")]
+    public required string Id { get; init; }
+    [JsonPropertyName("name")]
+    public required string Name { get; init; }
+    [JsonPropertyName("owner")]
+    public required string Owner { get; init; }
+    [JsonPropertyName("packageName")]
+    public required string PackageName { get; init; }
+    [JsonPropertyName("routineName")]
+    public required string RoutineName { get; init; }
+    [JsonPropertyName("kind")]
+    public required string Kind { get; init; }
+    [JsonPropertyName("returnBindType")]
+    public required string ReturnBindType { get; init; }
+    [JsonPropertyName("parameters")]
+    public required BridgeRoutineRunParameter[] Parameters { get; init; }
+    [JsonPropertyName("revision")]
+    public int? Revision { get; init; }
+}
+public sealed record BridgeProjectOptions
+{
+    [JsonPropertyName("areas")]
+    public required JsonElement Areas { get; init; }
+    [JsonPropertyName("connectionIds")]
+    public required string[] ConnectionIds { get; init; }
+    [JsonPropertyName("defaultConnectionId")]
+    public string? DefaultConnectionId { get; init; }
+    [JsonPropertyName("variables")]
+    public required JsonElement[] Variables { get; init; }
+    [JsonPropertyName("run")]
+    public required JsonElement Run { get; init; }
 }
 public sealed record AnalysisBeginPayload
 {
@@ -387,6 +455,22 @@ public sealed record FileBindConnectionPayload
     [JsonPropertyName("tabId")]
     public string? TabId { get; init; }
 }
+public sealed record FileHistoryListPayload
+{
+    [JsonPropertyName("path")]
+    public required string Path { get; init; }
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+}
+public sealed record FileHistoryReadPayload
+{
+    [JsonPropertyName("path")]
+    public required string Path { get; init; }
+    [JsonPropertyName("id")]
+    public required string Id { get; init; }
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+}
 public sealed record FileNewPayload
 {
     [JsonPropertyName("tabId")]
@@ -586,6 +670,19 @@ public sealed record ScriptExecutePayload
     [JsonPropertyName("tabId")]
     public string? TabId { get; init; }
 }
+public sealed record ScriptSourceReviewedPayload
+{
+    [JsonPropertyName("scriptRequestId")]
+    public required string ScriptRequestId { get; init; }
+    [JsonPropertyName("index")]
+    public required int Index { get; init; }
+    [JsonPropertyName("reviewNonce")]
+    public required string ReviewNonce { get; init; }
+    [JsonPropertyName("reviewId")]
+    public required string ReviewId { get; init; }
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+}
 public sealed record SessionContextPayload
 {
     [JsonPropertyName("epoch")]
@@ -599,6 +696,11 @@ public sealed record SessionNlsPayload
     public int? Epoch { get; init; }
     [JsonPropertyName("tabId")]
     public string? TabId { get; init; }
+}
+public sealed record SourceReviewPayload
+{
+    [JsonPropertyName("sql")]
+    public required string Sql { get; init; }
 }
 public sealed record SqlCancelPayload
 {
@@ -632,6 +734,8 @@ public sealed record SqlExecutePayload
     public int? ScriptIndex { get; init; }
     [JsonPropertyName("tabId")]
     public string? TabId { get; init; }
+    [JsonPropertyName("sourceReviewId")]
+    public string? SourceReviewId { get; init; }
 }
 public sealed record SqlExplainPayload
 {
@@ -688,6 +792,18 @@ public sealed record TransactionRollbackPayload
     [JsonPropertyName("tabId")]
     public string? TabId { get; init; }
 }
+public sealed record UiRequestAttentionPayload
+{
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+}
+public sealed record UiSetTaskbarProgressPayload
+{
+    [JsonPropertyName("state")]
+    public required string State { get; init; }
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+}
 public sealed record UiSetThemePayload
 {
     [JsonPropertyName("theme")]
@@ -699,6 +815,22 @@ public sealed record UiSetZoomPayload
 {
     [JsonPropertyName("factor")]
     public double? Factor { get; init; }
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+}
+public sealed record WorkspaceBindsLoadPayload
+{
+    [JsonPropertyName("path")]
+    public required string Path { get; init; }
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+}
+public sealed record WorkspaceBindsSavePayload
+{
+    [JsonPropertyName("path")]
+    public required string Path { get; init; }
+    [JsonPropertyName("definitions")]
+    public required JsonElement[] Definitions { get; init; }
     [JsonPropertyName("tabId")]
     public string? TabId { get; init; }
 }
@@ -718,6 +850,8 @@ public sealed record WorkspaceCreatePayload
 {
     [JsonPropertyName("tabId")]
     public string? TabId { get; init; }
+    [JsonPropertyName("template")]
+    public string? Template { get; init; }
 }
 public sealed record WorkspaceCreateEntryPayload
 {
@@ -727,6 +861,15 @@ public sealed record WorkspaceCreateEntryPayload
     public required string Name { get; init; }
     [JsonPropertyName("directory")]
     public required bool Directory { get; init; }
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+}
+public sealed record WorkspaceCreateFilePayload
+{
+    [JsonPropertyName("relativePath")]
+    public required string RelativePath { get; init; }
+    [JsonPropertyName("content")]
+    public required string Content { get; init; }
     [JsonPropertyName("tabId")]
     public string? TabId { get; init; }
 }
@@ -792,6 +935,20 @@ public sealed record WorkspacePickLocationPayload
 {
     [JsonPropertyName("tabId")]
     public string? TabId { get; init; }
+}
+public sealed record WorkspaceProjectRulesPayload
+{
+    [JsonPropertyName("root")]
+    public required string Root { get; init; }
+}
+public sealed record WorkspaceProjectRulesSavePayload
+{
+    [JsonPropertyName("root")]
+    public required string Root { get; init; }
+    [JsonPropertyName("rules")]
+    public required BridgeProjectRules Rules { get; init; }
+    [JsonPropertyName("revision")]
+    public required string Revision { get; init; }
 }
 public sealed record WorkspaceRecycleEntriesPayload
 {
@@ -872,6 +1029,18 @@ public sealed record WorkspaceRevealPayload
     [JsonPropertyName("tabId")]
     public string? TabId { get; init; }
 }
+public sealed record WorkspaceRunsListPayload
+{
+    [JsonPropertyName("root")]
+    public required string Root { get; init; }
+}
+public sealed record WorkspaceRunsSavePayload
+{
+    [JsonPropertyName("root")]
+    public required string Root { get; init; }
+    [JsonPropertyName("configuration")]
+    public required BridgeRoutineRunConfiguration Configuration { get; init; }
+}
 public sealed record WorkspaceSearchPayload
 {
     [JsonPropertyName("query")]
@@ -880,6 +1049,11 @@ public sealed record WorkspaceSearchPayload
     public string? Scope { get; init; }
     [JsonPropertyName("tabId")]
     public string? TabId { get; init; }
+}
+public sealed record WorkspaceSourcesPayload
+{
+    [JsonPropertyName("root")]
+    public required string Root { get; init; }
 }
 public sealed record WorkspaceToolsListPayload
 {
@@ -940,6 +1114,58 @@ public sealed record WorkspaceWorksetSavePayload
     public string? TabId { get; init; }
 }
 public sealed record WorkspaceWorksetsPayload
+{
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+}
+public sealed record UiOpenTerminalPayload
+{
+    [JsonPropertyName("tool")]
+    public required string Tool { get; init; }
+    [JsonPropertyName("directory")]
+    public required string Directory { get; init; }
+    [JsonPropertyName("userName")]
+    public string? UserName { get; init; }
+    [JsonPropertyName("identifier")]
+    public string? Identifier { get; init; }
+    [JsonPropertyName("tnsSource")]
+    public string? TnsSource { get; init; }
+}
+public sealed record SqlEvaluatePayload
+{
+    [JsonPropertyName("sql")]
+    public required string Sql { get; init; }
+    [JsonPropertyName("parameters")]
+    public JsonElement[]? Parameters { get; init; }
+    [JsonPropertyName("timeoutSeconds")]
+    public int? TimeoutSeconds { get; init; }
+    [JsonPropertyName("rowLimit")]
+    public int? RowLimit { get; init; }
+}
+public sealed record ResultEditIdentityPayload
+{
+    [JsonPropertyName("schema")]
+    public required string Schema { get; init; }
+    [JsonPropertyName("table")]
+    public required string Table { get; init; }
+}
+public sealed record SqlApplyDmlPayload
+{
+    [JsonPropertyName("statements")]
+    public required JsonElement[] Statements { get; init; }
+    [JsonPropertyName("timeoutSeconds")]
+    public int? TimeoutSeconds { get; init; }
+    [JsonPropertyName("onFailure")]
+    public string? OnFailure { get; init; }
+}
+public sealed record ResultConstraintInfoPayload
+{
+    [JsonPropertyName("owner")]
+    public required string Owner { get; init; }
+    [JsonPropertyName("name")]
+    public required string Name { get; init; }
+}
+public sealed record SqlStopApplyDmlPayload
 {
     [JsonPropertyName("tabId")]
     public string? TabId { get; init; }
@@ -1269,6 +1495,8 @@ public sealed record HostErrorReply
     public string? TabId { get; init; }
     [JsonPropertyName("autoCommit")]
     public bool? AutoCommit { get; init; }
+    [JsonPropertyName("connected")]
+    public bool? Connected { get; init; }
 }
 public sealed record HostReadyReply
 {
@@ -1331,6 +1559,10 @@ public sealed record ResultExportCompleteReply
     public JsonElement? Message { get; init; }
     [JsonPropertyName("rowsWritten")]
     public JsonElement? RowsWritten { get; init; }
+    [JsonPropertyName("bytesWritten")]
+    public int? BytesWritten { get; init; }
+    [JsonPropertyName("elapsedMs")]
+    public int? ElapsedMs { get; init; }
 }
 public sealed record ResultExportProgressReply
 {
@@ -1348,6 +1580,10 @@ public sealed record ResultExportProgressReply
     public JsonElement? RowsWritten { get; init; }
     [JsonPropertyName("message")]
     public JsonElement? Message { get; init; }
+    [JsonPropertyName("bytesWritten")]
+    public int? BytesWritten { get; init; }
+    [JsonPropertyName("elapsedMs")]
+    public int? ElapsedMs { get; init; }
 }
 public sealed record ResultPrimaryKeyReply
 {
@@ -1612,6 +1848,8 @@ public sealed record SqlCompilationReply
     public JsonElement? Output { get; init; }
     [JsonPropertyName("metadataError")]
     public JsonElement? MetadataError { get; init; }
+    [JsonPropertyName("sqlVersion")]
+    public string? SqlVersion { get; init; }
 }
 public sealed record SqlExplainResultReply
 {
@@ -1722,6 +1960,10 @@ public sealed record SqlResultReply
     public JsonElement? Offset { get; init; }
     [JsonPropertyName("profileId")]
     public JsonElement? ProfileId { get; init; }
+    [JsonPropertyName("outParameters")]
+    public JsonElement[]? OutParameters { get; init; }
+    [JsonPropertyName("sqlVersion")]
+    public string? SqlVersion { get; init; }
 }
 public sealed record SqlRuntimePlanReply
 {
@@ -1846,6 +2088,10 @@ public sealed record TransactionStateReply
     public JsonElement? State { get; init; }
     [JsonPropertyName("pending")]
     public JsonElement? Pending { get; init; }
+    [JsonPropertyName("unconfirmed")]
+    public bool? Unconfirmed { get; init; }
+    [JsonPropertyName("message")]
+    public string? Message { get; init; }
 }
 public sealed record UiThemeReply
 {
@@ -2052,6 +2298,10 @@ public sealed record WorkspaceStateReply
     public JsonElement? Catalog { get; init; }
     [JsonPropertyName("error")]
     public JsonElement? Error { get; init; }
+    [JsonPropertyName("projectRules")]
+    public BridgeProjectRules? ProjectRules { get; init; }
+    [JsonPropertyName("fileConnections")]
+    public JsonElement? FileConnections { get; init; }
 }
 public sealed record WorkspaceToolsListReply
 {
@@ -2120,4 +2370,231 @@ public sealed record WorkspaceWorksetsReply
     public JsonElement? Root { get; init; }
     [JsonPropertyName("worksets")]
     public JsonElement? Worksets { get; init; }
+}
+public sealed record WorkspaceSourcesReply
+{
+    [JsonPropertyName("type")]
+    public string Type => "workspace.sources";
+    [JsonPropertyName("requestId")]
+    public required string? RequestId { get; init; }
+    [JsonPropertyName("sources")]
+    public required JsonElement Sources { get; init; }
+}
+public sealed record WorkspaceProjectRulesReply
+{
+    [JsonPropertyName("type")]
+    public string Type => "workspace.projectRules";
+    [JsonPropertyName("requestId")]
+    public required string? RequestId { get; init; }
+    [JsonPropertyName("root")]
+    public required string Root { get; init; }
+    [JsonPropertyName("snapshot")]
+    public required JsonElement Snapshot { get; init; }
+}
+public sealed record SourceReviewReply
+{
+    [JsonPropertyName("type")]
+    public string Type => "source.review";
+    [JsonPropertyName("requestId")]
+    public required string? RequestId { get; init; }
+    [JsonPropertyName("review")]
+    public required JsonElement Review { get; init; }
+}
+public sealed record SourceReviewErrorReply
+{
+    [JsonPropertyName("type")]
+    public string Type => "source.review.error";
+    [JsonPropertyName("requestId")]
+    public required string? RequestId { get; init; }
+    [JsonPropertyName("message")]
+    public required string Message { get; init; }
+    [JsonPropertyName("connected")]
+    public bool? Connected { get; init; }
+}
+public sealed record WorkspaceRunsListReply
+{
+    [JsonPropertyName("type")]
+    public string Type => "workspace.runs.list";
+    [JsonPropertyName("requestId")]
+    public required string? RequestId { get; init; }
+    [JsonPropertyName("root")]
+    public required string Root { get; init; }
+    [JsonPropertyName("catalog")]
+    public required JsonElement Catalog { get; init; }
+}
+public sealed record WorkspaceRunsSavedReply
+{
+    [JsonPropertyName("type")]
+    public string Type => "workspace.runs.saved";
+    [JsonPropertyName("requestId")]
+    public required string? RequestId { get; init; }
+    [JsonPropertyName("root")]
+    public required string Root { get; init; }
+    [JsonPropertyName("configuration")]
+    public required BridgeRoutineRunConfiguration Configuration { get; init; }
+}
+public sealed record ScriptSourceReviewRequiredReply
+{
+    [JsonPropertyName("type")]
+    public string Type => "script.sourceReviewRequired";
+    [JsonPropertyName("requestId")]
+    public required string? RequestId { get; init; }
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+    [JsonPropertyName("index")]
+    public required int Index { get; init; }
+    [JsonPropertyName("sql")]
+    public required string Sql { get; init; }
+    [JsonPropertyName("offset")]
+    public required int Offset { get; init; }
+    [JsonPropertyName("reviewNonce")]
+    public required string ReviewNonce { get; init; }
+    [JsonPropertyName("transactionPending")]
+    public required bool TransactionPending { get; init; }
+}
+public sealed record ScriptReviewAcceptedReply
+{
+    [JsonPropertyName("type")]
+    public string Type => "script.reviewAccepted";
+    [JsonPropertyName("requestId")]
+    public required string? RequestId { get; init; }
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+    [JsonPropertyName("accepted")]
+    public required bool Accepted { get; init; }
+}
+public sealed record WorkspaceBindsReply
+{
+    [JsonPropertyName("type")]
+    public string Type => "workspace.binds";
+    [JsonPropertyName("requestId")]
+    public string? RequestId { get; init; }
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+    [JsonPropertyName("autoCommit")]
+    public bool? AutoCommit { get; init; }
+    [JsonPropertyName("path")]
+    public required string Path { get; init; }
+    [JsonPropertyName("operation")]
+    public string? Operation { get; init; }
+    [JsonPropertyName("definitions")]
+    public required JsonElement[] Definitions { get; init; }
+}
+public sealed record FileHistoryReply
+{
+    [JsonPropertyName("type")]
+    public string Type => "file.history";
+    [JsonPropertyName("requestId")]
+    public string? RequestId { get; init; }
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+    [JsonPropertyName("autoCommit")]
+    public bool? AutoCommit { get; init; }
+    [JsonPropertyName("operation")]
+    public required string Operation { get; init; }
+    [JsonPropertyName("path")]
+    public required string Path { get; init; }
+    [JsonPropertyName("id")]
+    public string? Id { get; init; }
+    [JsonPropertyName("entries")]
+    public JsonElement[]? Entries { get; init; }
+    [JsonPropertyName("content")]
+    public string? Content { get; init; }
+}
+public sealed record UiTerminalReply
+{
+    [JsonPropertyName("type")]
+    public string Type => "ui.terminal";
+    [JsonPropertyName("requestId")]
+    public string? RequestId { get; init; }
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+    [JsonPropertyName("opened")]
+    public required bool Opened { get; init; }
+    [JsonPropertyName("message")]
+    public required string Message { get; init; }
+}
+public sealed record SqlEvaluatedReply
+{
+    [JsonPropertyName("type")]
+    public string Type => "sql.evaluated";
+    [JsonPropertyName("requestId")]
+    public string? RequestId { get; init; }
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+    [JsonPropertyName("columns")]
+    public JsonElement[]? Columns { get; init; }
+    [JsonPropertyName("rows")]
+    public JsonElement[]? Rows { get; init; }
+    [JsonPropertyName("elapsedMs")]
+    public int? ElapsedMs { get; init; }
+    [JsonPropertyName("transactionPending")]
+    public bool? TransactionPending { get; init; }
+    [JsonPropertyName("error")]
+    public string? Error { get; init; }
+    [JsonPropertyName("truncated")]
+    public bool? Truncated { get; init; }
+}
+public sealed record ResultEditIdentityReply
+{
+    [JsonPropertyName("type")]
+    public string Type => "result.editIdentity";
+    [JsonPropertyName("requestId")]
+    public string? RequestId { get; init; }
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+    [JsonPropertyName("schema")]
+    public string? Schema { get; init; }
+    [JsonPropertyName("table")]
+    public string? Table { get; init; }
+    [JsonPropertyName("columns")]
+    public JsonElement[]? Columns { get; init; }
+    [JsonPropertyName("error")]
+    public string? Error { get; init; }
+}
+public sealed record SqlDmlAppliedReply
+{
+    [JsonPropertyName("type")]
+    public string Type => "sql.dmlApplied";
+    [JsonPropertyName("requestId")]
+    public string? RequestId { get; init; }
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+    [JsonPropertyName("outcomes")]
+    public JsonElement[]? Outcomes { get; init; }
+    [JsonPropertyName("transactionPending")]
+    public bool? TransactionPending { get; init; }
+    [JsonPropertyName("autoCommit")]
+    public bool? AutoCommit { get; init; }
+    [JsonPropertyName("error")]
+    public string? Error { get; init; }
+    [JsonPropertyName("recovery")]
+    public string? Recovery { get; init; }
+    [JsonPropertyName("stoppedByUser")]
+    public bool? StoppedByUser { get; init; }
+}
+public sealed record ResultConstraintInfoReply
+{
+    [JsonPropertyName("type")]
+    public string Type => "result.constraintInfo";
+    [JsonPropertyName("requestId")]
+    public string? RequestId { get; init; }
+    [JsonPropertyName("tabId")]
+    public string? TabId { get; init; }
+    [JsonPropertyName("owner")]
+    public string? Owner { get; init; }
+    [JsonPropertyName("name")]
+    public string? Name { get; init; }
+    [JsonPropertyName("found")]
+    public bool? Found { get; init; }
+    [JsonPropertyName("constraintType")]
+    public string? ConstraintType { get; init; }
+    [JsonPropertyName("condition")]
+    public string? Condition { get; init; }
+    [JsonPropertyName("columns")]
+    public JsonElement[]? Columns { get; init; }
+    [JsonPropertyName("referenced")]
+    public string? Referenced { get; init; }
+    [JsonPropertyName("error")]
+    public string? Error { get; init; }
 }

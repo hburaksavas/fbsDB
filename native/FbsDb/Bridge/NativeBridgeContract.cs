@@ -104,6 +104,8 @@ public static partial class NativeBridgeContract
         if (shape.TryGetProperty("type", out var types) && !(types.ValueKind == JsonValueKind.Array
             ? types.EnumerateArray().Any(Matches) : Matches(types)))
             throw new InvalidOperationException($"{path} has an invalid type.");
+        if (shape.TryGetProperty("enum", out var allowed) && !allowed.EnumerateArray().Any(option => JsonElement.DeepEquals(option, value)))
+            throw new InvalidOperationException($"{path} is not an allowed value.");
         if (value.ValueKind == JsonValueKind.Number && shape.TryGetProperty("type", out _))
         {
             if (!value.TryGetDouble(out var number) || !double.IsFinite(number) ||

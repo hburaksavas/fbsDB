@@ -1,3 +1,4 @@
+import {FilteredMenuItems} from './FilteredMenuItems.jsx';
 import {useFeedbackState,Feedback} from './Feedback';
 import {useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
@@ -49,7 +50,7 @@ export function ConnectionContextMenu({context,organization,favorites=[],activeP
  return createPortal(<div ref={ref} style={{fontFamily:getComputedStyle(context.trigger).fontFamily}} className="connection-context-menu theme-scope" data-theme={theme} role="menu" aria-label="Connections context menu" aria-busy={busy||undefined} onContextMenu={event=>event.preventDefault()}>
   <header><Database size={13}/><span>{profile?.name||profile?.id||folder?.name||'Connections'}</span></header>
   {panel!=='main'&&button(panel==='folders'?'Move to folder':'Group labels',ChevronLeft,()=>{setPanel('main');setError('')} )}
-  {panel==='main'&&<>{profile?<>
+  <FilteredMenuItems key={panel}>{panel==='main'&&<>{profile?<>
    {button('New SQL',FilePlus2,()=>act('newSql'),newSqlDisabled||profile.available===false)}<hr/>
    {button(current?'Reconnect current tab':'Connect',current?RefreshCw:PlugZap,()=>act(current?'reconnect':'connect'),connectionDisabled||profile.available===false)}
    {current&&button('Disconnect current tab',Unplug,()=>act('disconnect'),connectionDisabled)}
@@ -61,6 +62,6 @@ export function ConnectionContextMenu({context,organization,favorites=[],activeP
   </>:folder?<>{button('New connection here…',Plus,()=>act('newConnection'))}{button('New subfolder…',FolderPlus,()=>act('newFolder'),organizationDisabled)}<hr/>{button('Rename folder…',Pencil,()=>act('renameFolder'),organizationDisabled)}{button('Manage folder…',Settings2,()=>act('manageFolder'),organizationDisabled)}</>:<>{button('New connection…',Plus,()=>act('newConnection'))}{button('New folder…',FolderPlus,()=>act('newFolder'))}{button('New group…',Tags,()=>act('newGroup'),organizationDisabled)}<hr/>{button('Manage connections…',Settings2,()=>act('manage'))}{button('Refresh connections',RefreshCw,()=>act('refresh'))}</>}</>}
   {panel==='folders'&&<div className="connection-context-options">{[{id:null,path:'Unfiled'},...folderOptions(organization.folders)].map(f=><button type="button" role="menuitemradio" aria-checked={(assignment.folderId||null)===f.id} disabled={busy||organizationDisabled} key={f.id||'root'} onClick={()=>assign({folderId:f.id})}><span className="connection-context-check">{(assignment.folderId||null)===f.id&&<Check size={13}/>}</span><span>{f.path}</span></button>)}</div>}
   {panel==='groups'&&<div className="connection-context-options">{organization.groups.map(g=><button type="button" role="menuitemcheckbox" aria-checked={assignment.groupIds.includes(g.id)} disabled={busy||organizationDisabled} key={g.id} onClick={()=>assign({groupIds:assignment.groupIds.includes(g.id)?assignment.groupIds.filter(id=>id!==g.id):[...assignment.groupIds,g.id]})}><span className="connection-context-check">{assignment.groupIds.includes(g.id)&&<Check size={13}/>}</span><span>{g.name}</span></button>)}{!organization.groups.length&&<p>No group labels yet.</p>}{button('Manage group labels…',Settings2,()=>act('manage'))}</div>}
-  {error&&<Feedback title="Connection action failed">{error}</Feedback>}{busy&&<Feedback kind="progress" title="Connection">Saving…</Feedback>}
+  </FilteredMenuItems>{error&&<Feedback title="Connection action failed">{error}</Feedback>}{busy&&<Feedback kind="progress" title="Connection">Saving…</Feedback>}
  </div>,parent);
 }

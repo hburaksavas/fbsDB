@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { oracleLanguageCompletions, oracleSignatureHelp, oracleCallContext, oracleSymbolInfo, languageMetadataTargets } from '../src/oracleLanguageService.js';
+import { oracleLanguageCompletions, oracleSignatureHelp, oracleCallContext, oracleSymbolInfo, oracleReferenceLocations, languageMetadataTargets } from '../src/oracleLanguageService.js';
 import { OracleMetadataBroker, completionCancellation } from '../src/oracleMetadataBroker.js';
 
 const objects = [
@@ -104,4 +104,55 @@ test('cancelling one shared metadata consumer preserves the other request', asyn
   cancellation.cancel(); assert.equal(await cancelled, null); assert.equal(sent.length, 1);
   broker.handle({ type: 'completion.reply', requestId: '1', epoch: 0, result: metadata[0] });
   assert.equal((await live).name, 'ORDERS'); broker.dispose();
+});
+
+
+test('quick documentation shares signatures, attached local comments and illustrative bind calls',()=>{
+ const source='DECLARE\n -- Looks up a customer.\n -- Returns its identifier.\n FUNCTION lookup_customer(p_name VARCHAR2) RETURN NUMBER IS BEGIN RETURN 1; END;\nBEGIN lookup_customer(|); END;';
+ const result=at(source,oracleSignatureHelp);
+ assert.match(result.signatures[0].documentationText,/Looks up a customer/);
+ assert.match(result.signatures[0].documentationText,/Returns its identifier/);
+ assert.match(result.signatures[0].documentationText,/:return_value := LOOKUP_CUSTOMER\(P_NAME => :arg_1\)/);
+ const hover=at(source.replace('lookup_customer(|)','lookup_cust|omer(NULL)'),oracleSymbolInfo);
+ assert.ok(hover.contents.some(item=>item.value.includes('Looks up a customer')));
+ const metadataHelp=at('BEGIN billing.post(|); END;',oracleSignatureHelp);
+ assert.match(metadataHelp.signatures[0].documentationText,/BILLING.POST\(ORDER_ID => :arg_1, REGION => :arg_2\)/);
+ assert.match(metadataHelp.signatures[0].documentationText,/No routine documentation is available/);
+ const builtin=at('SELECT TO_NUMBER(|) FROM dual',oracleSignatureHelp);
+ assert.match(builtin.signatures[0].documentationText,/SELECT TO_NUMBER\(:arg_1/);
+ assert.ok(builtin.signatures[0].documentation);
+});
+
+
+test('reference search respects local shadowing, quotes, comments and non-code literals',()=>{
+ const source=`DECLARE
+ value NUMBER;
+BEGIN
+ value := 1;
+ DECLARE value VARCHAR2(20); BEGIN value := 'value'; END;
+ value := value+1; -- value
+END;`;
+ const outer=oracleReferenceLocations(source,source.indexOf('value := 1')+1,options);
+ assert.equal(outer.locations.length,4);
+ assert.equal(outer.locations.filter(item=>item.declaration).length,1);
+ const inner=oracleReferenceLocations(source,source.indexOf("value := 'value'")+1,options);
+ assert.equal(inner.locations.length,2);
+ assert.ok(inner.locations.every(item=>item.start>source.indexOf('DECLARE value')));
+ assert.equal(oracleReferenceLocations('SELECT '+"'value'"+' FROM dual',10,options).locations.length,0);
+});
+test('Oracle reference targets distinguish joined columns and report bounded search scope',()=>{
+ const source='SELECT o.customer_id, o.customer_id, c.id FROM app.orders o JOIN app.customers c ON c.id=o.customer_id';
+ const refs=oracleReferenceLocations(source,source.indexOf('customer_id')+1,options);
+ assert.equal(refs.locations.length,3);assert.match(refs.scope,/Current document/);
+ const bounded=oracleReferenceLocations(' '.repeat(100001),1,options);assert.equal(bounded.truncated,true);
+});
+
+test('column completion qualifies unique and colliding columns with their actual aliases',()=>{
+ const unique=at('SELECT cust| FROM app.orders o').candidates.find(c=>c.label==='CUSTOMER_ID');
+ assert.equal(unique.insertText,'O.CUSTOMER_ID');
+ const collision=at('SELECT region| FROM app.orders o JOIN app.customers c ON c.id=o.customer_id').candidates.filter(c=>c.label==='REGION_ID');
+ assert.deepEqual(new Set(collision.map(c=>c.insertText)),new Set(['O.REGION_ID','C.REGION_ID']));
+ assert.equal(at('SELECT "Order alias".cust| FROM app.orders "Order alias"').candidates.find(c=>c.label==='CUSTOMER_ID').insertText,'CUSTOMER_ID');
+ assert.equal(at('SELECT cust| FROM app.orders "Order alias"').candidates.find(c=>c.label==='CUSTOMER_ID').insertText,'"Order alias".CUSTOMER_ID');
+ assert.ok(!at("SELECT 'cust| FROM app.orders o'").candidates.length);
 });

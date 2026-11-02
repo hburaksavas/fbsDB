@@ -1,0 +1,7 @@
+.toolbar-settings{margin-top:14px;border-top:1px solid var(--line);padding-top:10px}
+.toolbar-settings h4{margin:0 0 2px;font-size:11px}
+.toolbar-settings p{margin:0 0 8px;font-size:10px;color:var(--muted)}
+.toolbar-settings-columns{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
+.toolbar-settings-group{border:1px solid var(--line);border-radius:5px;padding:6px 10px;display:grid;gap:4px}
+.toolbar-settings-group legend{font-size:10px;color:var(--muted);padding:0 4px}
+.toolbar-settings-group label{display:flex;gap:6px;align-items:center;font-size:11px}

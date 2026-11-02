@@ -1,4 +1,4 @@
-param([int]$DesktopDebugPort = 9348, [switch]$SkipBuild, [switch]$LoadTest)
+param([int]$DesktopDebugPort = 9348, [switch]$SkipBuild, [switch]$LoadTest, [switch]$ProjectRulesTest, [switch]$DragTest)
 $ErrorActionPreference = 'Stop'
 $regressionRepo = Split-Path -Parent $PSScriptRoot
 $regressionRoot = Join-Path $regressionRepo ('.artifacts\desktop-regression\' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -10,7 +10,11 @@ $regressionPortProbe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddre
 try { $regressionPortProbe.Start() } finally { $regressionPortProbe.Stop() }
 New-Item -ItemType Directory -Path $regressionRoot -Force | Out-Null
 $regressionSettings = Join-Path $regressionRoot 'settings.json'
-[System.IO.File]::WriteAllText($regressionSettings, '{}')
+if ($ProjectRulesTest) {
+    $rulesTestFiles = Join-Path $regressionRoot 'files'
+    New-Item -ItemType Directory -Path $rulesTestFiles -Force | Out-Null
+    [System.IO.File]::WriteAllText($regressionSettings, (@{lastWorkspace=$rulesTestFiles} | ConvertTo-Json))
+} else { [System.IO.File]::WriteAllText($regressionSettings, '{}') }
 $regressionEnvironment = @{
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$DesktopDebugPort"
     WEBVIEW2_USER_DATA_FOLDER = (Join-Path $regressionRoot 'webview-profile')
@@ -35,17 +39,28 @@ try {
         [Environment]::SetEnvironmentVariable($regressionKey, $regressionEnvironment[$regressionKey], 'Process')
     }
     $regressionProcess = Start-Process -FilePath (Join-Path $regressionApp 'FbsDb.exe') -WorkingDirectory $regressionApp -WindowStyle Hidden -PassThru
-    if ($LoadTest) {
+    if ($DragTest) {
+        node tests/drag-to-sql-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
+    } elseif ($ProjectRulesTest) {
+        node tests/project-rules-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
+        if ($LASTEXITCODE -ne 0) { throw "Project rules test failed. Artifacts: $regressionRoot" }
+        node tests/source-compile-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
+        if ($LASTEXITCODE -ne 0) { throw "Source comparison test failed. Artifacts: $regressionRoot" }
+        node tests/run-configurations-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
+        if ($LASTEXITCODE -ne 0) { throw "Run configuration test failed. Artifacts: $regressionRoot" }
+        node tests/script-source-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
+    } elseif ($LoadTest) {
         node tests/desktop-load-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
     } else {
         node tests/desktop-regression-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
     }
     if ($LASTEXITCODE -ne 0) { throw "Desktop test failed. Artifacts: $regressionRoot" }
-    if (-not $LoadTest) {
+    if (-not $LoadTest -and -not $ProjectRulesTest -and -not $DragTest) {
         node tests/review-improvements-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
         if ($LASTEXITCODE -ne 0) { throw "Review improvement UI tests failed. Artifacts: $regressionRoot" }
     }
-    Write-Output "Desktop test report: $(Join-Path $regressionRoot 'report.json')"
+    $regressionReportName = if ($ProjectRulesTest) { 'project-rules-report.json' } elseif ($DragTest) { 'drag-to-sql-report.json' } else { 'report.json' }
+    Write-Output "Desktop test report: $(Join-Path $regressionRoot $regressionReportName)"
 } finally {
     foreach ($regressionKey in $regressionPreviousEnvironment.Keys) {
         [Environment]::SetEnvironmentVariable($regressionKey, $regressionPreviousEnvironment[$regressionKey], 'Process')

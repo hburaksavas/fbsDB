@@ -9,6 +9,7 @@ export function createConnectionLifecycle(getPorts, {native, send}) {
     p.setConnecting(true,tabId); p.setConnectionError('',tabId);
     p.updateTabSession('connectingProfile',item.name || item.id,tabId);
     p.updateTabSession('connectingProfileId',item.id,tabId);
+    p.updateTabSession('connectingEnvironment',item.env||'UNKNOWN',tabId);
     const requestId=send('connection.connect',{profileId:item.id,...credentials,tabId});
     p.pendingConnectionsRef.current.set(requestId,{...item,user:credentials.user || item.user || item.savedUser,credentials:undefined,tabId});
   }
@@ -26,13 +27,15 @@ export function createConnectionLifecycle(getPorts, {native, send}) {
     if (p.editorIsReadonly()) return;
     if (item.available===false) { p.setManagementError('TNS source unavailable. Edit this connection or refresh sources.'); return; }
     p.setShowPicker(false);
-    if (!force && item.id.toLowerCase()===p.activeConnection.id.toLowerCase()) return;
+    if (!force && !p.connectionLost && item.id.toLowerCase()===p.activeConnection.id.toLowerCase()) return;
+    if (native && p.guardDrafts?.({ reason: 'switch', name: item.name || item.id, tabId: p.documents.activeId }, () => switchConnection(item, force))) return;
     if (native && p.transactionPending) { p.setPendingSwitch({...item,tabId:p.documents.activeId}); return; }
     if (native) { beginConnection(item); return; }
     p.setActiveConnection(item); p.setRunState(`Connected to ${item.id}`);
   }
   function disconnectActiveConnection() {
-    const p=getPorts(); p.setShowPicker(false);
+    const p=getPorts(); if(p.editorIsReadonly())return; p.setShowPicker(false);
+    if (native && p.guardDrafts?.({ reason: 'disconnect', name: 'this connection', tabId: p.documents.activeId }, () => disconnectActiveConnection())) return;
     if (p.transactionPending) p.setPendingSwitch({id:'disconnect',disconnect:true,tabId:p.documents.activeId});
     else if (native) send('connection.disconnect',{tabId:p.documents.activeId});
     else p.setActiveConnection({id:'Disconnected',title:'No active session',env:'—'});
@@ -48,6 +51,7 @@ export function createConnectionLifecycle(getPorts, {native, send}) {
   }
   function finishTransaction(action) {
     const p=getPorts();
+    if(p.editorIsReadonly()&&!p.pendingSwitch)return;
     if (native) send(`transaction.${action}`,{tabId:p.pendingSwitch?.tabId || p.documents.activeId});
     else p.setRunState(action==='commit'?'Transaction committed':'Transaction rolled back');
   }

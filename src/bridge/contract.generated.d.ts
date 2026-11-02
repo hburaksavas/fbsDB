@@ -4,6 +4,7 @@ export type SqlBindParameter = {
   "name": string;
   "type": string;
   "value"?: string | null;
+  "direction"?: string;
 };
 export type FileSnapshot = {
   "path": string | null;
@@ -27,6 +28,61 @@ export type SqlColumn = {
   "name": string;
   "type": string;
   "temporalKind"?: string | null;
+};
+export type ProjectRules = {
+  "version": number;
+  "associations": Array<{
+  "extension": string;
+  "type": string;
+}>;
+  "packagePairs": Array<{
+  "specification": string;
+  "body": string;
+}>;
+  "testPatterns": Array<string>;
+  "project"?: ProjectOptions;
+};
+export type RoutineRunParameter = {
+  "name": string;
+  "oracleType": string;
+  "bindType": string;
+  "mode": string;
+  "optional"?: boolean;
+  "useDefault"?: boolean;
+  "sensitive"?: boolean;
+};
+export type RoutineRunConfiguration = {
+  "version": number;
+  "id": string;
+  "name": string;
+  "owner": string;
+  "packageName": string;
+  "routineName": string;
+  "kind": string;
+  "returnBindType": string;
+  "parameters": Array<RoutineRunParameter>;
+  "revision"?: number;
+};
+export type ProjectOptions = {
+  "areas": {
+  "packages": string;
+  "migrations": string;
+  "scripts": string;
+  "tests": string;
+};
+  "connectionIds": Array<string>;
+  "defaultConnectionId"?: string | null;
+  "variables": Array<{
+  "name": string;
+  "type": string;
+  "required"?: boolean;
+  "description"?: string;
+}>;
+  "run": {
+  "timeoutSeconds": number;
+  "pageSize": number;
+  "continueOnError": boolean;
+};
 };
 export interface CommandPayloads {
   "analysis.begin": {
@@ -202,6 +258,15 @@ export interface CommandPayloads {
   "file.bindConnection": {
   "tabId"?: string;
 };
+  "file.history.list": {
+  "path": string;
+  "tabId"?: string;
+};
+  "file.history.read": {
+  "path": string;
+  "id": string;
+  "tabId"?: string;
+};
   "file.new": {
   "tabId"?: string;
 };
@@ -312,6 +377,13 @@ export interface CommandPayloads {
   "timeoutSeconds"?: number;
   "tabId"?: string;
 };
+  "script.sourceReviewed": {
+  "scriptRequestId": string;
+  "index": number;
+  "reviewNonce": string;
+  "reviewId": string;
+  "tabId"?: string;
+};
   "session.context": {
   "epoch": number;
   "tabId"?: string;
@@ -319,6 +391,9 @@ export interface CommandPayloads {
   "session.nls": {
   "epoch"?: number;
   "tabId"?: string;
+};
+  "source.review": {
+  "sql": string;
 };
   "sql.cancel": {
   "tabId"?: string;
@@ -337,6 +412,7 @@ export interface CommandPayloads {
   "timeoutSeconds"?: number;
   "scriptIndex"?: number;
   "tabId"?: string;
+  "sourceReviewId"?: string;
 };
   "sql.explain": {
   "sql": string;
@@ -370,12 +446,35 @@ export interface CommandPayloads {
   "transaction.rollback": {
   "tabId"?: string;
 };
+  "ui.requestAttention": {
+  "tabId"?: string;
+};
+  "ui.setTaskbarProgress": {
+  "state": string;
+  "tabId"?: string;
+};
   "ui.setTheme": {
   "theme": JsonValue;
   "tabId"?: string;
 };
   "ui.setZoom": {
   "factor"?: number;
+  "tabId"?: string;
+};
+  "workspace.binds.load": {
+  "path": string;
+  "tabId"?: string;
+};
+  "workspace.binds.save": {
+  "path": string;
+  "definitions": Array<{
+  "name": string;
+  "type"?: string;
+  "label"?: string;
+  "description"?: string;
+  "required"?: boolean;
+  "defaultValue"?: string | null;
+}>;
   "tabId"?: string;
 };
   "workspace.children": {
@@ -387,11 +486,17 @@ export interface CommandPayloads {
 };
   "workspace.create": {
   "tabId"?: string;
+  "template"?: string;
 };
   "workspace.createEntry": {
   "parent": JsonValue;
   "name": string;
   "directory": boolean;
+  "tabId"?: string;
+};
+  "workspace.createFile": {
+  "relativePath": string;
+  "content": string;
   "tabId"?: string;
 };
   "workspace.duplicateEntry": {
@@ -429,6 +534,14 @@ export interface CommandPayloads {
 };
   "workspace.pickLocation": {
   "tabId"?: string;
+};
+  "workspace.projectRules": {
+  "root": string;
+};
+  "workspace.projectRules.save": {
+  "root": string;
+  "rules": ProjectRules;
+  "revision": string;
 };
   "workspace.recycleEntries": {
   "confirmed": boolean;
@@ -473,10 +586,20 @@ export interface CommandPayloads {
   "path": string;
   "tabId"?: string;
 };
+  "workspace.runs.list": {
+  "root": string;
+};
+  "workspace.runs.save": {
+  "root": string;
+  "configuration": RoutineRunConfiguration;
+};
   "workspace.search": {
   "query"?: string | null;
   "scope"?: string | null;
   "tabId"?: string;
+};
+  "workspace.sources": {
+  "root": string;
 };
   "workspace.tools.list": {
   "root": string;
@@ -511,6 +634,35 @@ export interface CommandPayloads {
   "tabId"?: string;
 };
   "workspace.worksets": {
+  "tabId"?: string;
+};
+  "ui.openTerminal": {
+  "tool": string;
+  "directory": string;
+  "userName"?: string;
+  "identifier"?: string;
+  "tnsSource"?: string;
+};
+  "sql.evaluate": {
+  "sql": string;
+  "parameters"?: Array<JsonValue>;
+  "timeoutSeconds"?: number;
+  "rowLimit"?: number;
+};
+  "result.editIdentity": {
+  "schema": string;
+  "table": string;
+};
+  "sql.applyDml": {
+  "statements": Array<JsonValue>;
+  "timeoutSeconds"?: number;
+  "onFailure"?: string;
+};
+  "result.constraintInfo": {
+  "owner": string;
+  "name": string;
+};
+  "sql.stopApplyDml": {
   "tabId"?: string;
 };
 }
@@ -667,6 +819,7 @@ export interface ReplyMessages {
   "requestId"?: string | null;
   "tabId"?: string;
   "autoCommit"?: boolean;
+  "connected"?: boolean;
 };
   "host.ready": { type: "host.ready" } & {
   "requestId"?: string | null;
@@ -696,6 +849,8 @@ export interface ReplyMessages {
   "success"?: JsonValue;
   "message"?: JsonValue;
   "rowsWritten"?: JsonValue;
+  "bytesWritten"?: number;
+  "elapsedMs"?: number;
 };
   "result.exportProgress": { type: "result.exportProgress" } & {
   "requestId"?: string | null;
@@ -704,6 +859,8 @@ export interface ReplyMessages {
   "resultId"?: JsonValue;
   "rowsWritten"?: JsonValue;
   "message"?: JsonValue;
+  "bytesWritten"?: number;
+  "elapsedMs"?: number;
 };
   "result.primaryKey": { type: "result.primaryKey" } & {
   "requestId"?: string | null;
@@ -828,6 +985,7 @@ export interface ReplyMessages {
   "transactionPending"?: JsonValue;
   "output"?: JsonValue;
   "metadataError"?: JsonValue;
+  "sqlVersion"?: string;
 };
   "sql.explainResult": { type: "sql.explainResult" } & {
   "requestId"?: string | null;
@@ -881,6 +1039,12 @@ export interface ReplyMessages {
   "pageSize"?: JsonValue;
   "offset"?: JsonValue;
   "profileId"?: JsonValue;
+  "outParameters"?: Array<{
+  "name": string;
+  "type": string;
+  "value": JsonValue;
+}>;
+  "sqlVersion"?: string;
 };
   "sql.runtimePlan": { type: "sql.runtimePlan" } & {
   "requestId"?: string | null;
@@ -939,6 +1103,8 @@ export interface ReplyMessages {
   "autoCommit"?: boolean;
   "state"?: JsonValue;
   "pending"?: JsonValue;
+  "unconfirmed"?: boolean;
+  "message"?: string;
 };
   "ui.theme": { type: "ui.theme" } & {
   "requestId"?: string | null;
@@ -1036,6 +1202,8 @@ export interface ReplyMessages {
   "recent"?: JsonValue;
   "catalog"?: JsonValue;
   "error"?: JsonValue;
+  "projectRules"?: ProjectRules;
+  "fileConnections"?: Record<string, JsonValue>;
 };
   "workspace.tools.list": { type: "workspace.tools.list" } & {
   "requestId"?: string | null;
@@ -1074,6 +1242,142 @@ export interface ReplyMessages {
   "autoCommit"?: boolean;
   "root"?: JsonValue;
   "worksets"?: JsonValue;
+};
+  "workspace.sources": { type: "workspace.sources" } & {
+  "requestId": string | null;
+  "sources": {
+  "root": string;
+  "files": Array<{
+  "path": string;
+  "name": string;
+  "content": string;
+  "connectionProfileId"?: string | null;
+}>;
+  "skipped": Array<string>;
+  "truncated": boolean;
+};
+};
+  "workspace.projectRules": { type: "workspace.projectRules" } & {
+  "requestId": string | null;
+  "root": string;
+  "snapshot": {
+  "rules": ProjectRules;
+  "revision": string;
+};
+};
+  "source.review": { type: "source.review" } & {
+  "requestId": string | null;
+  "review": {
+  "reviewId": string;
+  "sql": string;
+  "reviewedAt": string;
+  "snapshot": {
+  "owner": string;
+  "name": string;
+  "type": string;
+  "source": string;
+  "exists": boolean;
+  "version": string;
+  "context": string;
+  "profileId"?: string | null;
+};
+};
+};
+  "source.review.error": { type: "source.review.error" } & {
+  "requestId": string | null;
+  "message": string;
+  "connected"?: boolean;
+};
+  "workspace.runs.list": { type: "workspace.runs.list" } & {
+  "requestId": string | null;
+  "root": string;
+  "catalog": {
+  "configurations": Array<RoutineRunConfiguration>;
+  "errors": Array<string>;
+};
+};
+  "workspace.runs.saved": { type: "workspace.runs.saved" } & {
+  "requestId": string | null;
+  "root": string;
+  "configuration": RoutineRunConfiguration;
+};
+  "script.sourceReviewRequired": { type: "script.sourceReviewRequired" } & {
+  "requestId": string | null;
+  "tabId"?: string;
+  "index": number;
+  "sql": string;
+  "offset": number;
+  "reviewNonce": string;
+  "transactionPending": boolean;
+};
+  "script.reviewAccepted": { type: "script.reviewAccepted" } & {
+  "requestId": string | null;
+  "tabId"?: string;
+  "accepted": boolean;
+};
+  "workspace.binds": { type: "workspace.binds" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "path": string;
+  "operation"?: string;
+  "definitions": Array<JsonValue>;
+};
+  "file.history": { type: "file.history" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "operation": string;
+  "path": string;
+  "id"?: string;
+  "entries"?: Array<JsonValue>;
+  "content"?: string | null;
+};
+  "ui.terminal": { type: "ui.terminal" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "opened": boolean;
+  "message": string;
+};
+  "sql.evaluated": { type: "sql.evaluated" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "columns"?: Array<JsonValue>;
+  "rows"?: Array<JsonValue>;
+  "elapsedMs"?: number;
+  "transactionPending"?: boolean;
+  "error"?: string;
+  "truncated"?: boolean;
+};
+  "result.editIdentity": { type: "result.editIdentity" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "schema"?: string;
+  "table"?: string;
+  "columns"?: Array<JsonValue>;
+  "error"?: string;
+};
+  "sql.dmlApplied": { type: "sql.dmlApplied" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "outcomes"?: Array<JsonValue>;
+  "transactionPending"?: boolean;
+  "autoCommit"?: boolean;
+  "error"?: string;
+  "recovery"?: string | null;
+  "stoppedByUser"?: boolean;
+};
+  "result.constraintInfo": { type: "result.constraintInfo" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "owner"?: string;
+  "name"?: string;
+  "found"?: boolean;
+  "constraintType"?: string | null;
+  "condition"?: string | null;
+  "columns"?: Array<JsonValue>;
+  "referenced"?: string | null;
+  "error"?: string;
 };
 }
 export type NativeCommandName = keyof CommandPayloads;

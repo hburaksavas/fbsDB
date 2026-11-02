@@ -1,0 +1,16 @@
+.quick-eval-dialog{max-width:min(560px,94vw)}
+.quick-eval-dialog p{margin:4px 0 0;font-size:11px;color:var(--muted)}
+.quick-eval-expression{margin:8px 18px;padding:8px;border:1px solid var(--line);border-radius:5px;background:var(--panel2);color:var(--text);font-size:11px;white-space:pre-wrap;max-height:120px;overflow:auto}
+.quick-eval-bind{display:flex;gap:8px;align-items:center;padding:2px 18px;font-size:11px}
+.quick-eval-bind input{flex:1}
+.quick-eval-warning{margin:8px 18px;padding:8px;border:1px solid var(--line);border-radius:5px}
+.quick-eval-warning label{display:flex;gap:6px;align-items:center;margin-top:6px;font-size:11px}
+.quick-eval-error{padding:0 18px;color:var(--text)}
+.quick-eval-result{display:grid;gap:2px;margin:8px 18px;padding:8px;border:1px solid var(--line);border-radius:5px}
+.quick-eval-result output{font-size:13px;font-weight:700;word-break:break-all}
+.quick-eval-result small{color:var(--muted)}
+.subquery-trial-dialog{max-width:min(760px,96vw)}
+.trial-table{margin:8px 18px;max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:5px}
+.trial-table table{border-collapse:collapse;width:100%;font-size:11px}
+.trial-table th,.trial-table td{padding:3px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.trial-table small{display:block;padding:4px 8px;color:var(--muted)}

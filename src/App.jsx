@@ -1,3 +1,8 @@
+import {nextQueryName} from './tabPathLabels';
+import {useEditorOverview} from './useEditorOverview.js';
+import {largeFilePolicy,lightweightEditorOptions,LARGE_FILE_THRESHOLD} from './largeFilePolicy.js';
+import {PackageApiDialog} from './PackageApiDialog.jsx';
+import {layoutPresets,restoreLayout} from './savedLayouts.js';
 import { useConnectionLifecycle } from './useConnectionLifecycle.js';
 import { GettingStartedDialog } from './GettingStartedDialog';
 import { QueryHistoryDialog } from './QueryHistoryDialog';
@@ -33,6 +38,21 @@ import { WorkspaceExplorer, OpenEditors } from './WorkspaceExplorer';
 import {WorkspaceWorksets} from './WorkspaceWorksets';
 import {WorkspaceOpenPopup} from './WorkspaceOpenPopup';
 import {ExternalFileNotice} from './ExternalFileNotice';
+import {describeOracleSource, relatedPackageDocument, packageDocumentGroups} from './oracleSourceIdentity.js';
+import {OracleSourceHeader} from './OracleSourceHeader';
+import {RelatedSourcesDialog} from './RelatedSourcesDialog';
+import {IdentifierCaseDialog} from './IdentifierCaseDialog';
+import {loadTemplateAliases,queryTemplateFingerprint,saveTemplateAlias} from './columnAliases';
+import {newQueryMainLabel,newQueryProfileItems,newQueryTemplates} from './newQueryOptions';
+import {dismissShortcutHint,nextShortcutHint} from './shortcutCoach';
+import {ProjectRulesDialog} from './ProjectRulesDialog';
+import {SourceCompileDialog} from './SourceCompileDialog';
+import {RunConfigurationsDialog} from './RunConfigurationsDialog';
+import {sourceRunConfigurations} from './runConfigurations';
+import {documentConnection,editedSinceExecution} from './executionContext';
+import {EnvironmentBadge,ResultSourceProvenance} from './ExecutionContextBadges';
+import {prepareSourceCompilation,sourceBaseline,sourceCompilationUnits,sourceIdentity} from './sourceCompilation';
+import {defaultProjectRules,projectOptions} from './projectRules';
 import { FileMenu } from './FileMenu';
 import { ViewMenu } from './ViewMenu';
 import { DockWorkbench } from './DockWorkbench';
@@ -48,7 +68,7 @@ import { EditorToolbarOverflow } from './EditorToolbarOverflow';
 import { ResultScope } from './ResultScope.jsx';
 import { nextColumnSort } from './resultColumnActions';
 import { themePresets, applyDocumentTheme, monacoThemeColors, monacoTokenRules, resolveTokenColors } from './themeModel';
-import { EditorNavigationHistory } from './editorNavigation';
+import { EditorNavigationHistory,sourceLineEnding,sourcePositionAt } from './editorNavigation';
 import { EditorSessionStatus } from './EditorSessionStatus';
 import { ResultToolbar } from './ResultToolbar';
 import { PivotOptionsPanel, TransposePivotInspector } from './PivotPopover';
@@ -61,8 +81,40 @@ import { buildResultDisplay, displayedColumnIndices, projectDisplayExport, resul
 import { ResultsGrid } from "./ResultsGrid";
 import { ModalBackdrop } from "./ModalBackdrop";
 import { GlobalTooltip } from "./GlobalTooltip";
+import {TreeNameOverlay} from './TreeNameOverlay.jsx';
+import {CodeCellDialog} from './CodeCellDialog.jsx';
+import {projectionRanges} from './projectionMap';
+import {surroundOptions,surroundSnippet} from './surroundWith';
+import {inListSql,insertTemplateSql,jsonTableSql} from './pasteToCode';
+import {installInsertPairProviders} from './insertPairProviders';
+import {smartEnter} from './smartEnter';
+import {installStructuralSelection} from './structuralSelection';
+import {layoutToolbar} from './editorToolbarModel';
+import {bindAtOffset,bindMenuActions} from './bindContext';
+import {docSkeletonAt} from './docSkeleton';
+import {minimapSections,minimapLabel} from './minimapSections';
+import {statusIndicators,statusIndicatorContent,toggleStatusIndicator} from './statusBarModel';
+import {previewOpenPlan,settlePreview} from './previewTabs';
+import {estimateResultBytes,evaluateBudget} from './executionBudgets';
+import {nextScratchName,promptsOnClose} from './scratchFiles';
+import {codeLensItems} from './codeLenses';
+import {createConsoleEntry,createConsoleStore} from './runConsole';
+import {relatedFileProposals} from './contextualFiles';
+import {loadBindDefinitions,saveBindDefinitions} from './bindDefinitions';
+import {createSummaryStore,summaryHover,summaryLabel} from './executionSummaries';
+import {installPostfixCompletion} from './postfixProvider';
+import {formatElapsed,playCompletionTone,postExecutionActions,taskbarProgressState} from './postExecution';
+import {extractCteSnippet} from './postfixCompletion';
+import {columnCursorDraft} from './columnMulticursor';
+import {dragSqlDraft} from './dragToSql';
+import {contextualQuickFixes} from './quickFixes';
+import {planStatementMove} from './statementMove';
+import {embeddedSqlAt} from './embeddedSql';
+import {rememberClipboard,clipboardPasteTexts} from './clipboardHistory';
+import {recordMacroStep,createEditorMacro} from './editorMacros';
+import { overridableSnippetTriggers, sqlSnippets } from './liveTemplates';
 import {detectedRegion,effectiveLanguage,effectiveRegion,translate as t} from './localeProfile';
-import { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, lazy, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 const AppearanceSettings = lazy(() => import("./AppearanceSettings.jsx").then(module => ({ default: module.AppearanceSettings })));
 const MiniToolsDialog = lazy(() => import("./MiniToolsDialog.jsx").then(module => ({ default: module.MiniToolsDialog })));
 const ExplainPlanView = lazy(() => import("./ExplainPlanView.jsx").then(module => ({ default: module.ExplainPlanView })));
@@ -72,14 +124,54 @@ const OracleObjectDialog = lazy(() => import("./OracleObjectDialog.jsx").then(mo
 const BindParameterDialog = lazy(() => import("./BindParameterDialog.jsx").then(module => ({ default: module.BindParameterDialog })));
 const SqlScriptDialog = lazy(() => import("./SqlScriptDialog.jsx").then(module => ({ default: module.SqlScriptDialog })));
 const DraftRecoveryDialog = lazy(() => import("./DraftRecoveryDialog.jsx").then(module => ({ default: module.DraftRecoveryDialog })));
+const BindLookupDialog = lazy(() => import("./BindLookupDialog.jsx").then(module => ({ default: module.BindLookupDialog })));
+const SubqueryTrialDialog = lazy(() => import("./SubqueryTrialDialog.jsx").then(module => ({ default: module.SubqueryTrialDialog })));
+const QuickEvalDialog = lazy(() => import("./QuickEvalDialog.jsx").then(module => ({ default: module.QuickEvalDialog })));
+const CompareDialog = lazy(() => import("./CompareDialog.jsx").then(module => ({ default: module.CompareDialog })));
+import { KeyTips } from "./KeyTips.jsx";
+import { ServerSourceTree } from "./ServerSourceTree.jsx";
+import { prepareEvaluation, evaluationParameters } from "./quickEval.js";
+import { cellDragType, planBindDrop } from "./resultBindDrop.js";
+import { exportProgressText } from "./exportProgress.js";
+import { loadIconPacks, resolveIconTheme, setIconTheme } from "./iconTheme.js";
+import { clearTabDrafts, countTabDrafts } from "./draftStore.js";
+import { InlineBindZone } from "./InlineBindZone.jsx";
+import { prepareSubqueryTrial, trialRowLimit } from "./subqueryTrial.js";
+import { loadBindLookups, lookupParameters, lookupRowLimit, saveBindLookup } from "./bindLookup.js";
+import { InlineBindStore, inlineBindParameters } from "./inlineBinds.js";
+import { ToolbarPrefsContext } from "./toolbarPrefs.js";
+const LocalHistoryDialog = lazy(() => import("./LocalHistoryDialog.jsx").then(module => ({ default: module.LocalHistoryDialog })));
+const RelatedFileCreateDialog = lazy(() => import("./RelatedFileCreateDialog.jsx").then(module => ({ default: module.RelatedFileCreateDialog })));
+const PortabilityDialog = lazy(() => import("./PortabilityDialog.jsx").then(module => ({ default: module.PortabilityDialog })));
+const RunConsoleDialog = lazy(() => import("./RunConsoleDialog.jsx").then(module => ({ default: module.RunConsoleDialog })));
+const SessionInspectorDialog = lazy(() => import("./SessionInspectorDialog.jsx").then(module => ({ default: module.SessionInspectorDialog })));
 const ConnectionDiagnosticsDialog = lazy(() => import("./ConnectionDiagnosticsDialog.jsx").then(module => ({ default: module.ConnectionDiagnosticsDialog })));
 const WorkspaceDevelopmentDialog = lazy(() => import("./WorkspaceDevelopmentDialog.jsx").then(module => ({ default: module.WorkspaceDevelopmentDialog })));
 const WorkspaceManager = lazy(() => import("./WorkspaceManager.jsx").then(module => ({ default: module.WorkspaceManager })));
 const ResultValueDialog = lazy(() => import("./ResultDialogs.jsx").then(module => ({ default: module.ResultValueDialog })));
 const Editor = lazy(() => import("@monaco-editor/react"));
+const LocalRenameDialog = lazy(() => import('./LocalRenameDialog.jsx').then(module=>({default:module.LocalRenameDialog})));
+const ChangeSignatureDialog = lazy(() => import('./ChangeSignatureDialog.jsx').then(module=>({default:module.ChangeSignatureDialog})));
+const ExtractProcedureDialog = lazy(() => import('./ExtractProcedureDialog.jsx').then(module=>({default:module.ExtractProcedureDialog})));
+const EmbeddedSqlDialog = lazy(() => import('./EmbeddedSqlDialog.jsx').then(module=>({default:module.EmbeddedSqlDialog})));
+const ClipboardHistoryDialog = lazy(() => import('./ClipboardHistoryDialog.jsx').then(module=>({default:module.ClipboardHistoryDialog})));
+const EditorMacrosDialog = lazy(() => import('./EditorMacrosDialog.jsx').then(module=>({default:module.EditorMacrosDialog})));
+const QuickFixDialog = lazy(() => import('./QuickFixDialog.jsx').then(module=>({default:module.QuickFixDialog})));
 import { announceUiReady, isNativeHost, sendNativeCommand, subscribeNativeMessages, setNativeTabId } from "./nativeBridge";
 import { TnsSources, useDialogFocus } from "./ConnectionManager";
 import { compilationProblemItems, offsetAtOraclePosition } from "./plsqlDiagnostics";
+import {runtimeStackProblems} from './runtimeStack';
+import {StackTraceLinks} from './StackTraceLinks';
+import {BatchCloseDialog} from './BatchCloseDialog';
+import {useSourceBookmarks} from './useSourceBookmarks';
+import {SourceBookmarksDialog} from './SourceBookmarksDialog';
+import {WorkbenchStatus} from './WorkbenchStatus';
+import {transactionStatus} from './workbenchStatusModel.js';
+import {liveResultAppearance} from './resultLiveAppearance';
+import {EditLocations,currentExecutionOffset} from './editLocations';
+import {batchClosePlan} from './batchClose';
+import {LayoutLockContext} from './LayoutLockContext';
+import {FileStructurePanel} from './FileStructurePanel';
 import { ProblemsPanel } from "./ProblemsPanel";
 import { getOracleBindNames } from "./oracleBinds";
 import { getSqlStatements } from "./sqlStatements.js";
@@ -92,7 +184,7 @@ import {
   ChevronRight, CircleHelp, Clock3, Code2, Database, Eye, FileCode2, FilePlus2, Filter, Globe2,
   Folder, FolderOpen, GitBranch, History, KeyRound, Layers3, Link2, ListFilter, LockKeyhole,
   MoreHorizontal, Package, Palette, Play, Plus, RefreshCw, Save, Search, Settings2,
-  Shapes, ShieldCheck, Star, Table2, Terminal, Timer, Trash2, Undo2, Workflow, X, Zap,
+  Redo2, Shapes, ShieldCheck, Star, Table2, Terminal, Timer, Trash2, Undo2, Workflow, X, Zap,
 } from "lucide-react";
 
 const EMPTY_SCHEMA_OBJECTS = [];
@@ -104,27 +196,12 @@ const mockConnections = [
 
 const initialSql = `-- Monthly invoice review\n\nSELECT\n    i.invoice_id,\n    i.invoice_date,\n    c.customer_name,\n    i.total_amount,\n    i.status\nFROM finance.invoices i\nINNER JOIN finance.customers c\n    ON c.customer_id = i.customer_id\nWHERE i.invoice_date >= :from_date\n  AND i.invoice_date <  :to_date\n  AND i.status = :status\nORDER BY i.invoice_date DESC;`;
 
-const sqlSnippets = [
-  { trigger: "sel", label: "SELECT query", detail: "SELECT columns with a FROM and WHERE clause", text: "SELECT ${1:column_list}\nFROM ${2:table_name}\nWHERE ${3:condition};" },
-  { trigger: "seltop", label: "SELECT · first rows", detail: "Oracle FETCH FIRST row limit", text: "SELECT *\nFROM ${1:table_name}\nFETCH FIRST ${2:100} ROWS ONLY;" },
-  { trigger: "ins", label: "INSERT row", detail: "Parameterized INSERT statement", text: "INSERT INTO ${1:table_name} (${2:column})\nVALUES (:${3:value});" },
-  { trigger: "upd", label: "UPDATE row", detail: "Parameterized UPDATE with a WHERE clause", text: "UPDATE ${1:table_name}\nSET ${2:column} = :${3:value}\nWHERE ${4:id_column} = :${5:id};" },
-  { trigger: "del", label: "DELETE row", detail: "Parameterized DELETE with a WHERE clause", text: "DELETE FROM ${1:table_name}\nWHERE ${2:id_column} = :${3:id};" },
-  { trigger: "cte", label: "Common table expression", detail: "WITH query and outer SELECT", text: "WITH ${1:query_name} AS (\n    SELECT ${2:column}\n    FROM ${3:table_name}\n)\nSELECT *\nFROM ${1:query_name};" },
-  { trigger: "with", label: "WITH query", detail: "Common table expression with an outer SELECT", text: "WITH ${1:query_name} AS (\n    SELECT ${2:column}\n    FROM ${3:table_name}\n)\nSELECT *\nFROM ${1:query_name};" },
-  { trigger: "wim", label: "WITH · multiple tables", detail: "Two table CTEs joined in an outer SELECT", text: "WITH ${1:first_cte} AS (\n    SELECT ${2:column_list}\n    FROM ${3:first_table}\n),\n${4:second_cte} AS (\n    SELECT ${5:column_list}\n    FROM ${6:second_table}\n)\nSELECT ${7:column_list}\nFROM ${1:first_cte} a\nINNER JOIN ${4:second_cte} b\n    ON ${8:a.key_column = b.key_column};" },
-  { trigger: "daterange", label: "Date range predicate", detail: "Half-open Oracle date range with bind variables", text: "${1:date_column} >= :${2:from_date}\nAND ${1:date_column} < :${3:to_date}" },
-  { trigger: "plblock", label: "PL/SQL block", detail: "Anonymous PL/SQL declaration, body and exception handler", text: "DECLARE\n    ${1:variable_name} ${2:NUMBER};\nBEGIN\n    ${3:NULL;}\nEXCEPTION\n    WHEN OTHERS THEN\n        RAISE;\nEND;\n/" },
-  { trigger: "plif", label: "PL/SQL IF", detail: "Conditional PL/SQL block", text: "IF ${1:condition} THEN\n    ${2:NULL;}\nEND IF;" },
-  { trigger: "plfor", label: "PL/SQL FOR loop", detail: "Numeric PL/SQL FOR loop", text: "FOR ${1:i} IN ${2:1} .. ${3:10} LOOP\n    ${4:NULL;}\nEND LOOP;" },
-  { trigger: "plcase", label: "CASE expression", detail: "SQL or PL/SQL searched CASE expression", text: "CASE\n    WHEN ${1:condition} THEN ${2:value}\n    ELSE ${3:fallback}\nEND" },
-];
 
 function loadCustomSqlSnippets() {
   try {
     const saved = JSON.parse(localStorage.getItem("fbsdb.customSqlSnippets") || "[]");
     if (!Array.isArray(saved)) return [];
-    const builtInTriggers = new Set(sqlSnippets.map((snippet) => snippet.trigger));
+    const builtInTriggers = new Set(sqlSnippets.map((snippet) => snippet.trigger).filter((trigger) => !overridableSnippetTriggers.has(trigger)));
     return saved.filter((snippet) => snippet && /^[a-z][a-z0-9_]{1,23}$/i.test(snippet.trigger) && !builtInTriggers.has(snippet.trigger.toLowerCase()) && typeof snippet.label === "string" && typeof snippet.text === "string" && snippet.label.trim() && snippet.text.trim())
       .slice(0, 100).map((snippet) => ({ ...snippet, trigger: snippet.trigger.toLowerCase(), detail: typeof snippet.detail === "string" ? snippet.detail : "Custom SQL snippet" }));
   } catch { return []; }
@@ -138,7 +215,7 @@ const uiFontStacks = {
   Verdana: "Verdana,'Segoe UI',sans-serif",
 };
 const defaultTokenColors = Object.fromEntries(Object.entries(themePresets).map(([key, value]) => [key, { keyword: value.keyword, string: value.string, comment: value.comment, number: value.number }]));
-function ResizeHandle({ axis, value, onChange, min, max, label, panelSelector }) {
+function ResizeHandle({ axis, value, onChange, min, max, label, panelSelector,locked }) {
   const drag = useRef(null), frame = useRef(null);
   const paint = () => {
     frame.current = null;
@@ -163,9 +240,10 @@ function ResizeHandle({ axis, value, onChange, min, max, label, panelSelector })
     if (frame.current !== null) cancelAnimationFrame(frame.current);
     if (drag.current) { drag.current.shell.style.setProperty(drag.current.property, drag.current.original); drag.current.shell.removeAttribute("data-resizing"); }
   }, []);
-  return <div className={`panel-resizer ${axis === "x" ? "resize-sidebar" : "resize-results"}`} role="separator" tabIndex={0} aria-label={label} aria-orientation={axis === "x" ? "vertical" : "horizontal"} aria-valuemin={min} aria-valuemax={max} aria-valuenow={Math.round(value)}
+  useEffect(()=>{if(locked)finish(false)},[locked]);
+  return <div className={`panel-resizer ${axis === "x" ? "resize-sidebar" : "resize-results"}`} role="separator" aria-disabled={locked||undefined} tabIndex={0} aria-label={label} aria-orientation={axis === "x" ? "vertical" : "horizontal"} aria-valuemin={min} aria-valuemax={max} aria-valuenow={Math.round(value)}
     onPointerDown={event => {
-      if (event.button !== 0) return;
+      if (locked||event.button !== 0) return;
       event.preventDefault();
       const panel = event.currentTarget.parentElement.querySelector(panelSelector), shell = event.currentTarget.closest(".desktop-shell");
       const property = axis === "x" ? "--sidebar-width" : "--results-height";
@@ -175,6 +253,7 @@ function ResizeHandle({ axis, value, onChange, min, max, label, panelSelector })
       event.currentTarget.setPointerCapture(event.pointerId);
     }} onPointerMove={update} onPointerUp={event => { update(event); finish(true); if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId); }} onPointerCancel={() => finish(false)} onLostPointerCapture={() => finish(false)}
     onKeyDown={event => {
+      if(locked)return;
       const steps = axis === "x" ? { ArrowLeft: -16, ArrowRight: 16 } : { ArrowUp: 2, ArrowDown: -2 };
       if (event.key in steps || event.key === "Home" || event.key === "End") { event.preventDefault(); onChange(event.key === "Home" ? min : event.key === "End" ? max : Math.max(min, Math.min(max, value + steps[event.key]))); }
     }} />;
@@ -219,27 +298,28 @@ function VirtualOracleObjects({ items, renderItem }) {
   </div>;
 }
 
-function OracleObjectRow({ item, activeKey, onToggle, onContext, contextKey, query = "", searchMatch = "" }) {
+function OracleObjectRow({ item, activeKey, onToggle, onContext, onDragStart, contextKey, query = "", searchMatch = "" }) {
   const key = oracleSchemaKey(item), isSelected = activeKey === key;
   return <div className="oracle-object-node" key={key}>
     <div className="oracle-object-line">
-    <button className={`oracle-object-row ${isSelected ? "active" : ""}`} data-object-key={key} data-context-selected={contextKey===key||undefined} onContextMenu={event=>onContext?.(event,item)} onKeyDown={event=>{if(event.key==='ContextMenu'||event.key==='F10'&&event.shiftKey){event.preventDefault();onContext?.(event,item)}}} title="Double-click to open object details" onDoubleClick={(event) => { event.preventDefault(); event.stopPropagation(); onToggle(item); }}>
+    <button className={`oracle-object-row ${isSelected ? "active" : ""}`} data-object-key={key} data-context-selected={contextKey===key||undefined} draggable={isOracleRelation(item)} onDragStart={event=>onDragStart?.(event,item)} onContextMenu={event=>onContext?.(event,item)} onKeyDown={event=>{if(event.key==='ContextMenu'||event.key==='F10'&&event.shiftKey){event.preventDefault();onContext?.(event,item)}}} title="Double-click to open object details; drag to editor for SELECT" onDoubleClick={(event) => { event.preventDefault(); event.stopPropagation(); onToggle(item); }}>
       <OracleObjectIcon type={item.type} size={14} /><span className="oracle-object-name">{item.name}</span>{searchMatch && <small className="oracle-search-match">{searchMatch}</small>}{item.type === "SYNONYM" && <small className="oracle-object-target">→ {item.targetOwner || "PUBLIC"}.{item.targetName}{item.dbLink ? `@${item.dbLink}` : ""}</small>}
     </button>
     </div>
+    {isOracleRelation(item)&&item.columns?.length>0&&<details className="oracle-object-columns"><summary>Columns ({item.columns.length})</summary>{item.columns.slice(0,200).map(column=><button type="button" key={column.name} draggable onDragStart={event=>onDragStart?.(event,item,column.name)} title={`Drag ${column.name} to editor for SELECT`}>{column.name}</button>)}{item.columns.length>200&&<small>First 200 columns shown</small>}</details>}
   </div>;
 }
 
-function OracleObjectCategory({ owner, type, label, items, currentSchema, query, activeKey, onToggle, onContext, contextKey, searchKinds }) {
+function OracleObjectCategory({ owner, type, label, items, currentSchema, query, activeKey, onToggle, onContext, onDragStart, contextKey, searchKinds }) {
   const [open, setOpen] = useState(false);
   useEffect(() => { if (query) setOpen(true); }, [query]);
   return <details className="oracle-category-node" open={open} onToggle={(event) => setOpen(event.currentTarget.open)}>
     <summary><ChevronRight size={12} className="schema-chevron" /><OracleObjectIcon type={type} /><span>{label}</span><span className="object-count">{items.length}</span></summary>
-    {open && (items.length ? <VirtualOracleObjects items={items} renderItem={item => <OracleObjectRow key={oracleSchemaKey(item)} item={item} activeKey={activeKey} onToggle={onToggle} onContext={onContext} contextKey={contextKey} query={query} searchMatch={searchKinds.get(oracleSchemaKey(item))}/>} /> : <div className="oracle-empty-category">No {label.toLowerCase()} visible</div>)}
+    {open && (items.length ? <VirtualOracleObjects items={items} renderItem={item => <OracleObjectRow key={oracleSchemaKey(item)} item={item} activeKey={activeKey} onToggle={onToggle} onContext={onContext} onDragStart={onDragStart} contextKey={contextKey} query={query} searchMatch={searchKinds.get(oracleSchemaKey(item))}/>} /> : <div className="oracle-empty-category">No {label.toLowerCase()} visible</div>)}
   </details>;
 }
 
-function OracleSchemaNode({ owner, categories, objectCount, currentSchema, query, activeKey, onToggle, onContext, contextKey, searchKinds }) {
+function OracleSchemaNode({ owner, categories, objectCount, currentSchema, query, activeKey, onToggle, onContext, onDragStart, contextKey, searchKinds }) {
   const [open, setOpen] = useState(false);
   useEffect(() => { if (query) setOpen(true); }, [query]);
   const kinds = oracleObjectKinds.filter(([type]) => !query || categories.has(type));
@@ -247,12 +327,12 @@ function OracleSchemaNode({ owner, categories, objectCount, currentSchema, query
     <summary><ChevronRight size={13} className="schema-chevron" /><Database size={14} className="oracle-schema-icon" /><span>{owner}</span><span className="object-count">{objectCount}</span></summary>
     {open && kinds.map(([type, label]) => {
       const items = (categories.get(type) || []).slice().sort((a, b) => a.name.localeCompare(b.name));
-      return <OracleObjectCategory key={`${owner}-${type}`} owner={owner} type={type} label={label} items={items} currentSchema={currentSchema} query={query} activeKey={activeKey} onToggle={onToggle} onContext={onContext} contextKey={contextKey} searchKinds={searchKinds}/>;
+      return <OracleObjectCategory key={`${owner}-${type}`} owner={owner} type={type} label={label} items={items} currentSchema={currentSchema} query={query} activeKey={activeKey} onToggle={onToggle} onContext={onContext} onDragStart={onDragStart} contextKey={contextKey} searchKinds={searchKinds}/>;
     })}
   </details>;
 }
 
-function OracleObjectTree({ items, activeKey, onToggle, onContext, contextKey, emptyLabel, currentSchema, query, searchKinds = new Map() }) {
+function OracleObjectTree({ items, activeKey, onToggle, onContext, onDragStart, contextKey, emptyLabel, currentSchema, query, searchKinds = new Map() }) {
   if (!items.length) return <div className="schema-tree"><div className="explorer-empty">{emptyLabel}</div></div>;
   const schemas = new Map();
   for (const item of items) {
@@ -266,7 +346,7 @@ function OracleObjectTree({ items, activeKey, onToggle, onContext, contextKey, e
   if (currentSchema && owners.includes(currentSchema)) owners.splice(owners.indexOf(currentSchema), 1), owners.unshift(currentSchema);
   return <div className="schema-tree oracle-object-tree">{owners.map((owner) => {
     const categories = schemas.get(owner), objectCount = [...categories.values()].reduce((sum, list) => sum + list.length, 0);
-    return <OracleSchemaNode key={owner} owner={owner} categories={categories} objectCount={objectCount} currentSchema={currentSchema} query={query} activeKey={activeKey} onToggle={onToggle} onContext={onContext} contextKey={contextKey} searchKinds={searchKinds}/>;
+    return <OracleSchemaNode key={owner} owner={owner} categories={categories} objectCount={objectCount} currentSchema={currentSchema} query={query} activeKey={activeKey} onToggle={onToggle} onContext={onContext} onDragStart={onDragStart} contextKey={contextKey} searchKinds={searchKinds}/>;
   })}</div>;
 }
 
@@ -316,21 +396,38 @@ function ResultRenderMeasurement({result,onMeasured}){
   return null;
 }
 
-function SqlResultsView({ result, editorSql, runState, executing, cancelling, outcome,startedAt,onCancel, filter = "", pageSize = 1000, region,language='en',onFetchMore, fetching = false, pageError = "", initialView = {}, onViewStateChange, onResultRendered,onSql, onRelated, onStreamExport, streamState, onCancelExport, onServerFilter, onClearServerFilter, onConnect, connected, onEdit, onExportColumns, onLookup, onClearFilter, onChildren, onSourceDefinition,sourceDefinition,onCloseSourceDefinition, onUpdateDraft,onGenerateSql,onMetadata,onPin,onExplain,memoryItems=[],onReleaseResult,onExportInsert }) {
+function SqlResultsView({ result, editorSql, runState, executing, cancelling, outcome,startedAt,onCancel, filter = "", pageSize = 1000, region,language='en',onFetchMore, fetching = false, pageError = "", initialView = {}, onViewStateChange, onResultRendered,onSql, onRelated, onStreamExport, streamState, onCancelExport, onServerFilter, onClearServerFilter, onConnect, connected, onEdit, onExportColumns, onLookup, onClearFilter, onChildren, onSourceDefinition,sourceDefinition,onCloseSourceDefinition, onUpdateDraft,onGenerateSql,onMetadata,onPin,onExplain,memoryItems=[],onReleaseResult,onExportInsert,liveAppearance,onAppearanceApplied,onSelectionSummary,onSmartObject,linkedColumn,onColumnSource,budget }) {
   const [page, setPage] = useState(initialView.page || 0), [requestedPage, setRequestedPage] = useState(null);
   const [sortColumn, setSortColumn] = useState(initialView.sortColumn ?? -1);
   const [sortDirection, setSortDirection] = useState(initialView.sortDirection || "asc");
   const [rowOrder, setRowOrder] = useState(initialView.rowOrder || []);
   const [options, setOptions] = useState(initialView.options || {}), [hasSelection,setHasSelection]=useState(false),[selectedColumn,setSelectedColumn]=useState(null),[layouts,setLayouts]=useState(initialView.layouts||{}), [gridCommand, setGridCommand] = useState(null), [loadingAll, setLoadingAll] = useState(false),[resetGeneration,setResetGeneration]=useState(0),[pivotPanelOpen,setPivotPanelOpen]=useState(false);
+  useEffect(()=>{if(!liveAppearance)return;setOptions(current=>liveResultAppearance(current,liveAppearance.patch));onAppearanceApplied?.(liveAppearance.sequence)},[liveAppearance?.sequence]);
   useEffect(() => { if (!pivotPanelOpen) return; const closeOnEscape = event => { if (event.key !== 'Escape' || document.querySelector('.result-hover-popover-anchor, .modal-backdrop')) return; event.preventDefault(); event.stopPropagation(); setPivotPanelOpen(false); document.querySelector('.results-toolbar button[aria-label="Pivot options"]')?.focus(); }; document.addEventListener('keydown', closeOnEscape, true); return () => document.removeEventListener('keydown', closeOnEscape, true); }, [pivotPanelOpen]);
   const openTools=(section='Overview')=>{if(section==='Commands'){window.dispatchEvent(new Event('fbsdb.result.openCommands'));return;}window.dispatchEvent(new CustomEvent('fbsdb.result.openPopover',{detail:{id:section}}));};
-  const handleSelectionChange=useCallback((hasSelectedCells,columnIndex)=>{setHasSelection(hasSelectedCells);setSelectedColumn(hasSelectedCells?columnIndex:null)},[]);
+  const selectionSummaryCallback=useRef(onSelectionSummary);selectionSummaryCallback.current=onSelectionSummary;
+  const [copySelection,setCopySelection]=useState(null);
+  const columnSourceRef=useRef(onColumnSource);columnSourceRef.current=onColumnSource;
+  const handleSelectionChange=useCallback((hasSelectedCells,columnIndex,summary)=>{setHasSelection(hasSelectedCells);columnSourceRef.current?.(hasSelectedCells?columnIndex:null,false);setCopySelection(summary);setSelectedColumn(hasSelectedCells?columnIndex:null);selectionSummaryCallback.current?.(summary)},[]);
   const command = action => { if(action.type==='cancelExport')onCancelExport?.();else if(action.type==='goTo'){ const index=action.kind==='column'?-1:visibleRows.findIndex(item=>item.index+1===Number(action.target)); if(index>=0)setPage(Math.floor(index/pageSize)); setGridCommand({...action,seq:Date.now()}); }else setGridCommand({...action,seq:Date.now()}); };
   const resetResultView=()=>{setOptions(structuredClone(result?.defaultOptions||{}));setSortColumn(-1);setSortDirection("asc");setRowOrder([]);setPage(0);setRequestedPage(null);setLayouts({});onClearFilter?.();setResetGeneration(value=>value+1)};
   const handledResetGeneration=useRef(0);
   useEffect(()=>{if(resetGeneration>handledResetGeneration.current){handledResetGeneration.current=resetGeneration;command({type:"resetView"})}},[resetGeneration]);
-  useEffect(()=>{if(loadingAll&&!fetching){if(result?.hasMore&&!pageError)onFetchMore?.();else setLoadingAll(false)}},[loadingAll,fetching,result?.rows?.length,result?.hasMore,pageError]);
+  const budgetNotified = useRef('');
+  useEffect(()=>{
+    if(!loadingAll||fetching)return;
+    if(result?.hasMore&&!pageError){
+      const verdict=budget?evaluateBudget({rows:result.rows.length,bytes:estimateResultBytes(result.rows,result.columns?.length)},budget):{exceeded:null,stop:false,message:''};
+      if(verdict.exceeded&&budgetNotified.current!==`${result.resultId}:${verdict.exceeded}`){budgetNotified.current=`${result.resultId}:${verdict.exceeded}`;notifyFeedback({kind:'warning',title:'Result budget',message:verdict.message,scope:result.executedTabId||null})}
+      if(verdict.stop){setLoadingAll(false);return}
+      onFetchMore?.();
+    }else setLoadingAll(false);
+  },[loadingAll,fetching,result?.rows?.length,result?.hasMore,pageError]);
   const [previewCell, setPreviewCell] = useState(null);
+  const aliasTemplate=useMemo(()=>queryTemplateFingerprint(result?.executedSql),[result?.executedSql]);
+  const [columnAliases,setColumnAliases]=useState(()=>loadTemplateAliases(globalThis.localStorage,aliasTemplate));
+  useEffect(()=>setColumnAliases(loadTemplateAliases(globalThis.localStorage,aliasTemplate)),[aliasTemplate]);
+  const changeColumnAlias=useCallback((key,label)=>setColumnAliases(saveTemplateAlias(globalThis.localStorage,aliasTemplate,key,label)),[aliasTemplate]);
   const previousViewKey = useRef({ resultId: result?.resultId, filter, pageSize });
   const viewCallback = useRef(onViewStateChange); viewCallback.current = onViewStateChange;
   useEffect(() => { viewCallback.current?.({ page, sortColumn, sortDirection, rowOrder, options, layouts }); }, [page, sortColumn, sortDirection, rowOrder, options, layouts]);
@@ -377,7 +474,7 @@ function SqlResultsView({ result, editorSql, runState, executing, cancelling, ou
   const pageRows = useMemo(() => visibleRows.slice(safePage * pageSize, (safePage + 1) * pageSize), [visibleRows, safePage, pageSize]);
   const firstVisible = visibleRows.length ? safePage * pageSize + 1 : 0, lastVisible = Math.min((safePage + 1) * pageSize, visibleRows.length);
   const exportView = { columns: viewColumns, rows: visibleRows.map(item => item.row), visibleColumns: displayedColumnIndices(viewColumns, columnLayout, viewOptions), settings: viewOptions.exportSettings || {} };
-  const toolbar=<ResultToolbar initialDefaults={result?.defaultOptions||{}} pivotPanelOpen={pivotPanelOpen} onTogglePivotPanel={()=>setPivotPanelOpen(open=>!open)} viewKind={viewMode} columns={viewColumns} sourceColumns={columns} loadedRows={display.rawRows} columnLayout={columnLayout} sortColumn={display.sortColumn} selectedColumn={selectedColumn} memoryItems={memoryItems} onReleaseResult={onReleaseResult} onCommand={command} onClearSort={()=>{setViewSort(-1,'asc');if(viewMode==='source')setRowOrder([])}} onOptionsChange={changeViewOptions} onLayoutChange={layout=>command({type:'layoutApply',layout})} onExport={(format,indices,overrideOptions)=>onExportColumns?.(format,indices,overrideOptions,exportView)} onExportInsert={viewMode==='source'?onExportInsert:undefined} onGenerateSql={onGenerateSql} onMetadata={onMetadata} onLookup={onLookup} onFetchMore={onFetchMore} onLoadAll={()=>setLoadingAll(true)} onStopLoad={()=>setLoadingAll(false)} loadingAll={loadingAll} onStreamExport={viewMode==='source'?onStreamExport:undefined} streamState={streamState} onServerFilter={viewMode==='source'?onServerFilter:undefined} hasData={Boolean(result?.columns?.length&&!result?.released&&!executing&&!outcome)} hasExecution={Boolean(result?.executedSql)} hasSelection={hasSelection} hasMore={result?.hasMore} busy={executing||fetching} options={viewOptions} onAction={action=>{
+  const toolbar=<ResultToolbar initialDefaults={result?.defaultOptions||{}} pivotPanelOpen={pivotPanelOpen} onTogglePivotPanel={()=>setPivotPanelOpen(open=>!open)} viewKind={viewMode} columns={viewColumns} sourceColumns={columns} loadedRows={display.rawRows} columnLayout={columnLayout} sortColumn={display.sortColumn} selectedColumn={selectedColumn} memoryItems={memoryItems} onReleaseResult={onReleaseResult} onCommand={command} onClearSort={()=>{setViewSort(-1,'asc');if(viewMode==='source')setRowOrder([])}} onOptionsChange={changeViewOptions} onLayoutChange={layout=>command({type:'layoutApply',layout})} onExport={(format,indices,overrideOptions)=>onExportColumns?.(format,indices,overrideOptions,exportView)} onExportInsert={viewMode==='source'?onExportInsert:undefined} onGenerateSql={onGenerateSql} onMetadata={onMetadata} onLookup={onLookup} onFetchMore={onFetchMore} onLoadAll={()=>setLoadingAll(true)} onStopLoad={()=>setLoadingAll(false)} loadingAll={loadingAll} onStreamExport={viewMode==='source'?onStreamExport:undefined} streamState={streamState} onServerFilter={viewMode==='source'?onServerFilter:undefined} hasData={Boolean(result?.columns?.length&&!result?.released&&!executing&&!outcome)} hasExecution={Boolean(result?.executedSql)} hasSelection={hasSelection} selectionSummary={copySelection} pageCount={pageCount} hasMore={result?.hasMore} busy={executing||fetching} options={viewOptions} onAction={action=>{
     if(action==='find')command({type:'find'});else if(action==='copy')command({type:'copyTsv'});else if(action==='inspect')command({type:'inspect'});else if(action==='details')command({type:'details'});else if(action==='execution')command({type:'execution'});else if(action==='marks')command({type:'marks'});else if(action==='pin')onPin?.();else if(action==='explain')onExplain?.();else if(action==='clear')resetResultView();
   }}/>;
   let body;
@@ -388,7 +485,7 @@ function SqlResultsView({ result, editorSql, runState, executing, cancelling, ou
   else if (!result.columns?.length) body=<ResultNotice kind="success" title="Statement completed" metric={result.rowsAffected>=0&&result.rowsAffected!=null?`${result.rowsAffected} rows affected`:undefined} detail={`${result.transactionPending?'Pending transaction · commit or rollback when ready. ':''}${result.elapsedMs??0} ms`}/>;
   else if (!rows.length&&!result.hasMore) body=<ResultNotice kind="empty" title="No rows returned" detail="The query completed successfully." metric={`0 rows · ${result.elapsedMs??0} ms`}/>;
   else if (!visibleRows.length&&(filter.trim()||viewOptions.filters?.length||viewOptions.markedOnly||viewOptions.duplicatesOnly)&&!materialized.error&&!display.error) body=<ResultNotice kind="empty" title="No rows match this view" detail={`${rows.length} loaded rows. Local filters hide all rows.`} onClear={()=>{changeViewOptions({...viewOptions,filters:[],markedOnly:false,duplicatesOnly:false});onClearFilter?.()}}/>;
-  else body=<>{(materialized.error||display.error)&&<Feedback title="Result view">{materialized.error||display.error}</Feedback>}<div className="result-presentation-layout"><ResultsPresentation language={language} pivotPanelOpen={pivotPanelOpen} onClosePivotPanel={()=>setPivotPanelOpen(false)} pivotPanel={<PivotOptionsPanel columns={columns} options={viewOptions} onChange={changeViewOptions} onClose={()=>setPivotPanelOpen(false)}/>} viewKind={viewMode} sourceRowCount={rows.length} onSourceDefinition={onSourceDefinition} sourceDefinition={sourceDefinition} onCloseSourceDefinition={onCloseSourceDefinition} executionDetails={result} onUpdateDraft={onUpdateDraft} rows={pageRows} allRows={visibleRows} onChildren={onChildren} columns={viewColumns} sortColumn={display.sortColumn} sortDirection={display.sortDirection} onSort={toggleSort} onReorder={viewMode==='source'?reorderRow:undefined} options={{...viewOptions,cursorUnavailable:result.cursorUnavailable,truncated:result.truncated}} onOptionsChange={changeViewOptions} onSelectionChange={handleSelectionChange} onLayoutChange={handleLayoutChange} onTools={openTools} command={gridCommand} onSql={onSql} onRelated={onRelated} onInspect={setPreviewCell} />{pivotPanelOpen&&viewOptions.transpose&&<TransposePivotInspector columns={columns} options={viewOptions} onChange={changeViewOptions} onClose={()=>setPivotPanelOpen(false)}/>}</div><div className="result-footer"><div><span className="success-state"><Check size={12} /> {firstVisible}–{lastVisible} {t('displayed',language)}</span><span className="foot-separator">·</span><span>{rows.length} {t(result.hasMore ? 'loaded · more available' : result.cursorUnavailable ? 'retained rows' : 'loaded rows',language)}{filter.trim() || viewOptions.filters?.length || viewOptions.markedOnly || viewOptions.duplicatesOnly ? ` · ${visibleRows.length} ${t('match',language)}` : ""}</span></div><div className="result-page-controls">{result.executedAt && <span className="result-context" title={result.executedSql}>{result.executedProfile} · {new Date(result.executedAt).toLocaleTimeString(region||undefined)} · {result.editorSnapshot !== editorSql ? (language==='tr'?'SQL çalıştırmadan sonra değişti':'SQL changed since execution') : (language==='tr'?'Son çalıştırma':'Last execution')}</span>}<span role="status">{fetching ? t("Loading page…",language) : pageError || `${t('Database',language)} ${result.elapsedMs} ms`}</span>{result.clientTiming?.totalMs!=null&&<span className="result-client-timing" title={language==='tr'?'Sorgu isteğinden son çizime kadar geçen süre':'From query request until the result finished rendering'}>{t('End-to-end',language)} {Math.round(result.clientTiming.totalMs)} ms</span>}{pageError && result.hasMore && <button className="button-secondary" onClick={onFetchMore}>{t('Retry',language)}</button>}{(pageCount > 1 || result.hasMore) && <><button className="pager-button" aria-label={t('Previous result page',language)} title={t('Previous page',language)} disabled={safePage === 0 || fetching} onClick={() => setPage(safePage - 1)}><ChevronRight size={12} className="flip" /></button><span className="result-page-number">{safePage + 1} / {pageCount}{result.hasMore ? "+" : ""}</span><button className="pager-button" aria-label={t('Next result page',language)} title={t('Next page',language)} disabled={fetching || (safePage >= pageCount - 1 && !result.hasMore)} onClick={() => { const next = safePage + 1; if (next < pageCount) setPage(next); else { setRequestedPage(next); onFetchMore?.(); } }}><ChevronRight size={12} /></button></>}</div></div></>;
+  else body=<>{(materialized.error||display.error)&&<Feedback title="Result view">{materialized.error||display.error}</Feedback>}<div className="result-presentation-layout"><ResultsPresentation language={language} pivotPanelOpen={pivotPanelOpen} onClosePivotPanel={()=>setPivotPanelOpen(false)} pivotPanel={<PivotOptionsPanel columns={columns} options={viewOptions} onChange={changeViewOptions} onClose={()=>setPivotPanelOpen(false)}/>} viewKind={viewMode} sourceRowCount={rows.length} onSourceDefinition={onSourceDefinition} sourceDefinition={sourceDefinition} onCloseSourceDefinition={onCloseSourceDefinition} executionDetails={result} onUpdateDraft={onUpdateDraft} rows={pageRows} allRows={visibleRows} pageSize={pageSize} onRowPage={setPage} onSmartObject={onSmartObject} linkedColumn={viewMode==='source'?linkedColumn:null} onColumnSource={viewMode==='source'?onColumnSource:undefined} columnAliases={columnAliases} onColumnAlias={viewMode==='source'&&aliasTemplate?changeColumnAlias:undefined} onChildren={onChildren} columns={viewColumns} sortColumn={display.sortColumn} sortDirection={display.sortDirection} onSort={toggleSort} onReorder={viewMode==='source'?reorderRow:undefined} options={{...viewOptions,cursorUnavailable:result.cursorUnavailable,truncated:result.truncated}} onOptionsChange={changeViewOptions} onSelectionChange={handleSelectionChange} onLayoutChange={handleLayoutChange} onTools={openTools} command={gridCommand} onSql={onSql} onRelated={onRelated} onInspect={setPreviewCell} />{pivotPanelOpen&&viewOptions.transpose&&<TransposePivotInspector columns={columns} options={viewOptions} onChange={changeViewOptions} onClose={()=>setPivotPanelOpen(false)}/>}</div><div className="result-footer"><div><span className="success-state"><Check size={12} /> {firstVisible}–{lastVisible} {t('displayed',language)}</span><span className="foot-separator">·</span><span>{rows.length} {t(result.hasMore ? 'loaded · more available' : result.cursorUnavailable ? 'retained rows' : 'loaded rows',language)}{filter.trim() || viewOptions.filters?.length || viewOptions.markedOnly || viewOptions.duplicatesOnly ? ` · ${visibleRows.length} ${t('match',language)}` : ""}</span></div><div className="result-page-controls">{result.executedAt && <span className="result-context" title={result.executedSql}>{result.executedProfile} · {new Date(result.executedAt).toLocaleTimeString(region||undefined)} · {result.editorSnapshot !== editorSql ? (language==='tr'?'SQL çalıştırmadan sonra değişti':'SQL changed since execution') : (language==='tr'?'Son çalıştırma':'Last execution')}</span>}<span role="status">{fetching ? t("Loading page…",language) : pageError || `${t('Database',language)} ${result.elapsedMs} ms`}</span>{result.clientTiming?.totalMs!=null&&<span className="result-client-timing" title={language==='tr'?'Sorgu isteğinden son çizime kadar geçen süre':'From query request until the result finished rendering'}>{t('End-to-end',language)} {Math.round(result.clientTiming.totalMs)} ms</span>}{pageError && result.hasMore && <button className="button-secondary" onClick={onFetchMore}>{t('Retry',language)}</button>}{(pageCount > 1 || result.hasMore) && <><button className="pager-button" aria-label={t('Previous result page',language)} title={t('Previous page',language)} disabled={safePage === 0 || fetching} onClick={() => setPage(safePage - 1)}><ChevronRight size={12} className="flip" /></button><span className="result-page-number">{safePage + 1} / {pageCount}{result.hasMore ? "+" : ""}</span><button className="pager-button" aria-label={t('Next result page',language)} title={t('Next page',language)} disabled={fetching || (safePage >= pageCount - 1 && !result.hasMore)} onClick={() => { const next = safePage + 1; if (next < pageCount) setPage(next); else { setRequestedPage(next); onFetchMore?.(); } }}><ChevronRight size={12} /></button></>}</div></div></>;
   return <>{toolbar}{fetching&&<ResultRunning compact fetching startedAt={startedAt} cancelling={cancelling} onCancel={onCancel}/ >}{pageError&&<Feedback title="Rows could not be loaded">{pageError}</Feedback>}{Boolean(result?.columns?.length)&&<ResultScope columns={viewColumns} options={viewOptions} filter={filter} sortColumn={display.sortColumn} sortDirection={display.sortDirection} serverFilter={result.serverFilter} hasMore={result.hasMore} busy={executing||fetching} onOptionsChange={changeViewOptions} onClearSearch={onClearFilter} onClearSort={()=>setViewSort(-1,'asc')} onClearServerFilter={onClearServerFilter}/>}<div className="result-view-content">{body}</div><ResultRenderMeasurement result={result} onMeasured={onResultRendered}/>{previewCell&&<Suspense fallback={<div role="status">Loading…</div>}><ResultValueDialog cell={previewCell} onClose={()=>setPreviewCell(null)}/></Suspense>}</>;
 }
 function getBindNames(sql) {
@@ -398,14 +495,14 @@ function getBindNames(sql) {
 export function App() {
   const [monaco, setMonaco] = useState(null);
   const [pendingDdl,setPendingDdl]=useState(null);
-  const [showGettingStarted,setShowGettingStarted]=useState(()=>{try{return !localStorage.getItem('fbsdb.onboardingSeen')}catch{return true}});
+  const [showGettingStarted,setShowGettingStarted]=useState(()=>{try{return !localStorage.getItem('fbsdb.onboardingSeen')||resolveSetting(loadSettings(localStorage),'ui.startupWorkspaceHub').value}catch{return true}});
   const [settings,setSettings]=useState(()=>loadSettings(localStorage)),[settingsError,setSettingsError]=useFeedbackState('',{title:'Settings',scope:null});
   const settingsRef=useRef(settings);settingsRef.current=settings;
   useEffect(()=>{try{saveSettings(localStorage,settings);setSettingsError('')}catch{setSettingsError('Settings could not be saved on this device.')}},[settings]);
   const [showOpenWorkspace,setShowOpenWorkspace]=useState(false),[showWorksets,setShowWorksets]=useState(false),[showWorkspaceManager,setShowWorkspaceManager]=useState(false),[workspaceSearchScope,setWorkspaceSearchScope]=useState(null),[workspaceReplaceScope,setWorkspaceReplaceScope]=useState(null);
   const [workspaceDevMode,setWorkspaceDevMode]=useState(null),[workspaceDev,setWorkspaceDev]=useState({});
   const workspaceDevRequestsRef=useRef(new Map());
-  const [connectionDiagnostics,setConnectionDiagnostics]=useState(null);
+  const [connectionDiagnostics,setConnectionDiagnostics]=useState(null),[showSessionInspector,setShowSessionInspector]=useState(false),[showRunConsole,setShowRunConsole]=useState(false),[showPortability,setShowPortability]=useState(false),[relatedFileCreate,setRelatedFileCreate]=useState(null),[showLocalHistory,setShowLocalHistory]=useState(false),[compareSources,setCompareSources]=useState(null),[quickEval,setQuickEval]=useState(null),[subqueryTrial,setSubqueryTrial]=useState(null),[lookupPicker,setLookupPicker]=useState(null),[draftGuard,setDraftGuard]=useState(null),[uncertainCommit,setUncertainCommit]=useState(null),[bindStoreVersion,setBindStoreVersion]=useState(0);
   const [objectAnalysis,setObjectAnalysis]=useState(null);
   const [objectMenu,setObjectMenu]=useState(null);
   const [objectTabs,setObjectTabs]=useState([]),[activeObjectTabId,setActiveObjectTabId]=useState(null),[objectTabActive,setObjectTabActive]=useState(false);
@@ -444,10 +541,31 @@ export function App() {
   useEffect(() => { const update = event => updateLayout(current => current.inspectorWidth === event.detail ? current : { ...current, inspectorWidth: event.detail }); window.addEventListener('fbsdb.inspectorWidth', update); return () => window.removeEventListener('fbsdb.inspectorWidth', update); }, []);
   useEffect(() => { window.dispatchEvent(new CustomEvent('fbsdb.inspectorWidth', { detail: layout.inspectorWidth })); }, [layout.inspectorWidth]);
 
+  const [settingsFocus,setSettingsFocus]=useState(null);
+  useEffect(()=>{
+    const state={pressed:0,last:0,clean:false};
+    const down=event=>{if(event.key==='Shift'&&!event.ctrlKey&&!event.metaKey&&!event.altKey&&!event.repeat){state.pressed=Date.now();state.clean=true}else{state.clean=false;state.last=0}};
+    const up=event=>{if(event.key!=='Shift'||!state.clean)return;const now=Date.now();state.clean=false;if(now-state.pressed>300){state.last=0;return}if(state.last&&now-state.last<450&&resolveSetting(settingsRef.current,'ui.doubleShiftSearch').value&&!document.querySelector('.modal-backdrop')){state.last=0;setPaletteMode('files')}else state.last=now};
+    window.addEventListener('keydown',down,true);window.addEventListener('keyup',up,true);return()=>{window.removeEventListener('keydown',down,true);window.removeEventListener('keyup',up,true)};
+  },[]);
+  const [filePanelView,setFilePanelView]=useState('files');
   const [paletteMode,setPaletteMode]=useState(null),[documentOutline,setDocumentOutline]=useState([]);
+  const editLocationsRef=useRef(new EditLocations());
   const navigationHistoryRef=useRef(new EditorNavigationHistory()),navigatingRef=useRef(false);
+  const [showPackageApi,setShowPackageApi]=useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [maximizedPanel,setMaximizedPanel]=useState(null);
+  const maximizedRef=useRef(null);maximizedRef.current=maximizedPanel;
+  function togglePanelMaximized(panel){setMaximizedPanel(current=>current===panel?null:panel)}
+  function applySavedLayout(entry){updateLayout(current=>restoreLayout(entry,current));setFocusMode(entry.focus===true);setMaximizedPanel(null)}
+  useEffect(()=>{const key=event=>{
+    if(document.querySelector('.modal-backdrop')||event.repeat)return;
+    if(event.key==='Escape'&&maximizedRef.current){event.preventDefault();setMaximizedPanel(null);return}
+    if(event.ctrlKey&&event.altKey&&!event.shiftKey&&['1','2','3'].includes(event.key)){event.preventDefault();const entry=layoutPresets()[Number(event.key)-1];applySavedLayout(entry)}
+  };window.addEventListener('keydown',key);return()=>window.removeEventListener('keydown',key)},[]);
+
   useEffect(() => { const open = () => setShowTnsSources(true); window.addEventListener("fbsdb.openTnsSources", open); return () => window.removeEventListener("fbsdb.openTnsSources", open); }, []);
+  const controlledEditorUpdateRef=useRef(false);
   const editorRef = useRef(null), openFileInputRef = useRef(null), lastEditorPositionRef = useRef(null), runQueryRef = useRef(null), sourceDefinitionRequestRef=useRef(new Map());
   const [dbConnections, setDbConnections] = useState(isNativeHost ? [] : mockConnections);
   const [tnsAliases, setTnsAliases] = useState(isNativeHost ? [] : mockConnections.map(p => ({ ...p, name: p.id })));
@@ -470,6 +588,7 @@ export function App() {
     } catch { return []; }
   });
   const [searchQuery, setSearchQuery] = useState(""), [historyFilter, setHistoryFilter] = useState(""), [searchMatches, setSearchMatches] = useState([]), [searching, setSearching] = useState(false), [searchTruncated, setSearchTruncated] = useState(false);
+  const [deleteReview,setDeleteReview]=useState(null);
   const [favorites, setFavorites] = useState(() => { try { return JSON.parse(localStorage.getItem("fbsdb.favorites") || (isNativeHost ? "[]" : "null")) ?? mockConnections.filter((item) => item.favorite).map((item) => item.id); } catch { return isNativeHost ? [] : mockConnections.filter((item) => item.favorite).map((item) => item.id); } });
   const [recentProfiles, setRecentProfiles] = useState(() => { try { return JSON.parse(localStorage.getItem("fbsdb.recent") || "[]"); } catch { return []; } });
   const [connectionOrg,setConnectionOrg]=useState(()=>{if(isNativeHost)return emptyConnectionOrganization();try{return connectionOrganization(mockConnections,JSON.parse(localStorage.getItem("fbsdb.connectionOrganization")||"null"))}catch{return connectionOrganization(mockConnections)}});
@@ -478,7 +597,7 @@ export function App() {
 
   function setMaxRows(value){updateTabSession("pageSizePreference",value);}
   const { documents, tabs, activeTabId, sql, fileName, filePath, fileDirty, fileConnectionProfileId } = useDocumentSessions(
-    () => [{ id: "tab-1", name: isNativeHost ? "Untitled.sql" : "monthly-invoices.sql", path: null, content: isNativeHost ? "" : initialSql, dirty: false }]);
+    () => [{ id: "tab-1", name: isNativeHost ? "Query 1" : "monthly-invoices.sql", path: null, content: isNativeHost ? "" : initialSql,savedContent:isNativeHost?"":initialSql, dirty: false }]);
   const setTabs = documents.setTabs;
   const setFileDirty = dirty => documents.patch(documents.activeId, { dirty });
   useEffect(() => { setActiveObject(''); setObjectTabActive(false); if(schemaRequestRef.current){sendNativeCommand('schema.cancel',{requestId:schemaRequestRef.current});schemaRequestRef.current=null;} }, [activeTabId]);
@@ -488,7 +607,7 @@ export function App() {
   const [batchClose,setBatchClose]=useState(null);const batchDiscardRef=useRef(new Set());
   const pendingTabCloseRef = useRef(null); pendingTabCloseRef.current = pendingTabClose;
   const tabCloseActionsRef = useRef(new Map());
-  const [pendingBindSql, setPendingBindSql] = useState(null), [copiedResults, setCopiedResults] = useState(false);
+  const bindPrefillRef = useRef({}), draftsConfirmedRef = useRef(new Set()), inlineBindStoreRef = useRef(null),  [pendingBindSql, setPendingBindSql] = useState(null), [copiedResults, setCopiedResults] = useState(false);
   const [tabSessions, setTabSessions] = useState({});
   const replyOwnerRef = useRef(null);
   const tabSession = tabSessions[activeTabId] || {};
@@ -546,6 +665,10 @@ export function App() {
   const setQueryResult = (value, owner) => updateTabResult("queryResult", value, owner);
   const setExplainResult = (value, owner) => updateTabResult("explainResult", value, owner);
   const setExplainMessage = (value, owner) => updateTabResult("explainMessage", value, owner);
+  const [resultLiveAppearance,setResultLiveAppearance]=useState(null),resultAppearanceSequence=useRef(0);
+  const currentAppearanceKey=`${activeTabId}:${view.selectedResultKey||'latest'}:${queryResult?.viewIdentity||queryResult?.resultId||queryResult?.requestId||''}`;
+  const currentResultOptions=(view.selectedResultKey?view.resultSets?.find(item=>item.key===view.selectedResultKey)?.view?.options:view.queryView?.options)||queryResult?.defaultOptions||{};
+  function previewResultAppearance(patch){if(!queryResult?.columns?.length)return;setResultLiveAppearance({key:currentAppearanceKey,sequence:++resultAppearanceSequence.current,patch})}
   const setOutputMessage = (value, owner) => updateTabResult("outputMessage", value, owner);
   const setResultTab = (value, owner) => updateTabResult("resultTab", value, owner);
   const setResultFilter = value => updateTabResult("resultFilter", value);
@@ -567,6 +690,19 @@ export function App() {
     return () => { document.removeEventListener("keydown", dismiss); document.removeEventListener("pointerdown", dismiss); };
   }, []);
   const sqlResult = resultTab === "Explain" ? explainResult : queryResult;
+  // Result columns and projection expressions link only while the editor still matches the executed snapshot.
+  const projectionMapping=useMemo(()=>resultTab==='Results'&&sqlResult?.columns?.length?projectionRanges(sqlResult,sql):null,[resultTab,sqlResult,sql]);
+  const [linkedProjectionColumn,setLinkedProjectionColumn]=useState(null),projectionDecorations=useRef(null),projectionCursorRef=useRef(null);
+  projectionCursorRef.current=position=>{const model=editorRef.current?.getModel();if(!model||!projectionMapping){setLinkedProjectionColumn(null);return}const offset=model.getOffsetAt(position),index=projectionMapping.findIndex(range=>range&&offset>=range.start&&offset<=range.end);setLinkedProjectionColumn(index<0?null:index)};
+  useEffect(()=>{if(!projectionMapping){setLinkedProjectionColumn(null);projectionDecorations.current?.clear()}},[projectionMapping]);
+  function showProjectionSource(columnIndex,reveal=false){
+    const editor=editorRef.current,model=editor?.getModel(),range=projectionMapping?.[columnIndex];
+    projectionDecorations.current?.clear();
+    if(!editor||!model||!range){if(reveal)notifyFeedback({kind:'warning',title:'Source expression',message:projectionMapping?'This column comes from * or an unmatched projection.':'The editor changed since this execution, so result columns are not linked to the SQL.',scope:documents.activeId});return}
+    const from=model.getPositionAt(range.start),to=model.getPositionAt(range.end),monacoRange=new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column);
+    projectionDecorations.current=editor.createDecorationsCollection([{range:monacoRange,options:{inlineClassName:'projection-source-highlight'}}]);
+    if(reveal){editor.setSelection(monacoRange);editor.revealRangeInCenterIfOutsideViewport(monacoRange);editor.focus()}
+  }
   const panelMessage = resultTab === "Explain" ? explainMessage : outputMessage;
   useEffect(()=>{
     const save=event=>{if(settingsRef.current.readOnly){setSettingsError('Settings belong to a newer app version.');return;}setSettings(current=>saveResultDefaults(current,event.detail||{}))};
@@ -585,6 +721,144 @@ export function App() {
     setTabSessions(current => Object.fromEntries(Object.entries(current).map(([id, session]) => [id, session.renderingRequestId === timing.requestId ? { ...session, rendering: false } : session])));
     results.measure(timing);
   }, [results]);
+  const [relatedSources, setRelatedSources] = useState(null);
+  const [identifierCase, setIdentifierCase] = useState(null);
+  const [localRename, setLocalRename] = useState(null);
+  const [changeSignature,setChangeSignature]=useState(null);
+  const [extractProcedure,setExtractProcedure]=useState(null);
+  const [embeddedSql,setEmbeddedSql]=useState(null);
+  const [clipboardHistoryOpen,setClipboardHistoryOpen]=useState(false),[clipboardEnabled,setClipboardEnabled]=useState(false),[clipboardEntries,setClipboardEntries]=useState([]);
+  const [editorMacrosOpen,setEditorMacrosOpen]=useState(false),[macroRecording,setMacroRecording]=useState(null),[editorMacros,setEditorMacros]=useState([]),macroRunRef=useRef(null);
+  useEffect(()=>{
+    if(!clipboardEnabled)return;
+    const copied=event=>{
+      if(!event.target?.closest?.('.editor-sql-surface'))return;
+      const editor=editorRef.current,model=editor?.getModel(),selections=editor?.getSelections();
+      if(!model||!selections?.length||selections.some(selection=>selection.isEmpty()))return;
+      const parts=selections.map(selection=>model.getValueInRange(selection));
+      setClipboardEntries(history=>rememberClipboard(history,parts));
+    };
+    document.addEventListener('copy',copied);return()=>document.removeEventListener('copy',copied);
+  },[clipboardEnabled]);
+  const [quickFix,setQuickFix]=useState(null),quickFixRef=useRef(null);
+  // Optional cues after long runs; nothing is played or flashed unless the user enabled it.
+  const notifyExecutionFinishedRef=useRef(null),failedUnseenRef=useRef(false),taskbarStateRef=useRef('none');
+  const anyExecuting=Object.values(tabSessions).some(session=>session?.executing);
+  useEffect(()=>{
+    if(!isNativeHost)return;
+    const apply=()=>{const state=taskbarProgressState({running:anyExecuting,failedUnseen:failedUnseenRef.current});if(state!==taskbarStateRef.current){taskbarStateRef.current=state;sendNativeCommand('ui.setTaskbarProgress',{state})}};
+    const seen=()=>{failedUnseenRef.current=false;apply()};
+    apply();window.addEventListener('focus',seen);
+    return()=>window.removeEventListener('focus',seen);
+  },[anyExecuting]);
+  const runConsoleStore=useRef(null);if(!runConsoleStore.current)runConsoleStore.current=createConsoleStore();
+  const executionSummaries=useRef(null);if(!executionSummaries.current)executionSummaries.current=createSummaryStore();
+  notifyExecutionFinishedRef.current=(owner,success,details={})=>{
+    const meta=operations.metadata.get(owner),started=meta?.requestStartedAtPerf;if(started==null)return;
+    executionSummaries.current.record(owner,meta.executedSql,{ok:success,elapsedMs:details.elapsedMs??performance.now()-started,rows:details.rows,rowsAffected:details.rowsAffected,hasMore:details.hasMore,message:details.message,profile:meta.executedProfile,executedAt:meta.executedAt});
+    runConsoleStore.current.record(owner,createConsoleEntry({sql:meta.executedSql,parameters:meta.executedParameters,output:details.output,ok:success,message:details.message,elapsedMs:details.elapsedMs??performance.now()-started,rows:details.rows,rowsAffected:details.rowsAffected,profile:meta.executedProfile,executedAt:meta.executedAt},{retainValues:resolveSetting(settings,'privacy.consoleBindValues').value}));
+    window.dispatchEvent(new Event('fbsdb.refreshRunGutter'));
+    const actions=postExecutionActions({elapsedMs:performance.now()-started,focused:document.hasFocus()&&document.visibilityState==='visible',sound:resolveSetting(settings,'notifications.completionSound').value,attention:resolveSetting(settings,'notifications.windowAttention').value,thresholdSeconds:resolveSetting(settings,'notifications.longQuerySeconds').value});
+    if(actions.sound)playCompletionTone(success);
+    if(actions.attention&&isNativeHost)sendNativeCommand('ui.requestAttention',{tabId:owner});
+    if(actions.attention||actions.sound)notifyFeedback({kind:success?'success':'error',title:success?'Query finished':'Query failed',message:`Elapsed ${formatElapsed(performance.now()-started)}`,scope:owner});
+    if(!success&&!document.hasFocus())failedUnseenRef.current=true;
+  };
+  const notifyExecutionFinished=(owner,success,details)=>notifyExecutionFinishedRef.current?.(owner,success,details);
+  const insertPairProvidersRef = useRef(null),smartEnterRef = useRef(null),structuralSelectionRef = useRef(null);
+  const postfixProviderRef = useRef(null);
+  useEffect(()=>()=>{structuralSelectionRef.current?.dispose();postfixProviderRef.current?.dispose()},[]);
+  // Status bar indicators are user-selectable; each optional one carries its own tooltip and action.
+  const [statusMenu,setStatusMenu]=useState(null),[cursorLine,setCursorLine]=useState(0),[,setStatusTick]=useState(0);
+  const enabledStatusIndicators=resolveSetting(settings,'ui.statusIndicators').value;
+  const breadcrumbRoutine=useMemo(()=>{const position=editorRef.current?.getPosition(),model=editorRef.current?.getModel();if(!position||!model)return '';const offset=model.getOffsetAt(position);return documentOutline.filter(item=>['PROCEDURE','FUNCTION'].includes(item.kind)&&item.start<=offset&&item.end>=offset).sort((a,b)=>b.depth-a.depth).map(item=>minimapLabel(item).replace(/^\w+ /,''))[0]||''},[documentOutline,cursorLine]);
+  // Evaluated while rendering the status bar, after the session values below are initialized.
+  const buildStatusContext=()=>({procedure:breadcrumbRoutine,schema:tabSession.sessionContext?.schema,oracleVersion:sessionConnected?completionSession.oracleVocabulary?.version:null,branch:workspaceDev.git?.repository?workspaceDev.git.branch:null,tabSize:codeStyle.tabSize,insertSpaces:codeStyle.insertSpaces,lineEnding:editorRef.current?.getModel()?.getEOL()==='\r\n'?'CRLF':editorRef.current?.getModel()?.getEOL()?'LF':''});
+  function statusIndicatorAction(action) {
+    if(action==='outline')setPaletteMode('outline');
+    else if(action==='objects')setPaletteMode('files');
+    else if(action==='session')setShowSessionInspector(true);
+    else if(action==='git')openWorkspaceDevelopment('git');
+    else if(action==='indent'){setSettingsFocus({query:'Tab',category:'editor'});setShowAppearance(true)}
+    else if(action==='eol'){const model=editorRef.current?.getModel();if(model&&!activeTabReadonly){model.pushEOL(model.getEOL()==='\r\n'?monaco.editor.EndOfLineSequence.LF:monaco.editor.EndOfLineSequence.CRLF);setStatusTick(tick=>tick+1)}}
+  }
+  // Code lenses: reference counts and explicit actions; every action opens the existing review/form, nothing runs by itself.
+  const lensActionRef=useRef(null),lensesOn=resolveSetting(settings,'editor.codeLenses').value;
+  lensActionRef.current=(action,line)=>{
+    const editor=editorRef.current,model=editor?.getModel();if(!editor||!model)return;
+    editor.setPosition({lineNumber:line,column:1});editor.focus();
+    if(action==='references'){const content=model.getLineContent(line),match=/(?:PACKAGE BODY|PACKAGE|PROCEDURE|FUNCTION|TRIGGER)\s+("?[\w$#.]+"?)/i.exec(content);if(match){const start=match.index+match[0].length-match[1].length;editor.setSelection(new monaco.Range(line,start+1,line,start+1+match[1].length));editor.getAction('actions.find')?.run()}}
+    else if(action==='switch')switchPackageSource();
+    else if(action==='compile')reviewSourceForCompilation();
+    else if(action==='run')openRunConfigurations();
+  };
+  useEffect(()=>{
+    if(!monaco)return;
+    const command=monaco.editor.registerCommand('fbsdb.codeLens',(_accessor,action,line)=>lensActionRef.current?.(action,line));
+    return()=>command.dispose();
+  },[monaco]);
+  useEffect(()=>{
+    const editor=editorRef.current,model=editor?.getModel();
+    if(!editor||!model||!monaco||!lensesOn||!documentOutline.length)return;
+    const provider=monaco.languages.registerCodeLensProvider('sql',{provideCodeLenses(target){
+      if(target!==editorRef.current?.getModel())return {lenses:[],dispose(){}};
+      const lenses=codeLensItems(documentOutline,target.getValue(),offset=>target.getPositionAt(offset)).flatMap(item=>item.actions.map(action=>({range:new monaco.Range(item.line,1,item.line,1),command:{id:'fbsdb.codeLens',title:action.title,arguments:[action.id,item.line]}})));
+      return {lenses,dispose(){}};
+    }});
+    return()=>provider.dispose();
+  },[documentOutline,monaco,lensesOn,activeTabId]);
+  // Routine and package boundaries are labeled in the minimap from the same outline model as breadcrumbs.
+  const minimapOn=resolveSetting(settings,'editor.minimap').value;
+  useEffect(()=>{
+    const editor=editorRef.current,model=editor?.getModel();
+    if(!editor||!model||!monaco||!minimapOn||!documentOutline.length)return;
+    const collection=editor.createDecorationsCollection(minimapSections(documentOutline,offset=>model.getPositionAt(offset)).map(({line,text})=>({range:new monaco.Range(line,1,line,1),options:{minimap:{position:monaco.editor.MinimapPosition.Inline,sectionHeaderStyle:monaco.editor.MinimapSectionHeaderStyle.Underlined,sectionHeaderText:text}}})));
+    return()=>collection.clear();
+  },[documentOutline,monaco,minimapOn,activeTabId]);
+  // Inserts a documentation comment above the routine at the cursor; Tab walks the description and parameter stops.
+  function generateDocComment() {
+    const editor=editorRef.current,model=editor?.getModel(),position=editor?.getPosition();
+    if(!model||!position||activeTabReadonly)return;
+    const result=docSkeletonAt(model.getValue(),model.getOffsetAt(position));
+    if(result.error){notifyFeedback({kind:'warning',title:'Documentation comment',message:result.error,scope:documents.activeId});return}
+    const at=model.getPositionAt(result.insertAt);
+    editor.setPosition(at);editor.focus();
+    editor.getContribution('snippetController2').insert(result.snippet.replace(/\r?\n/g,model.getEOL()),{adjustWhitespace:false,undoStopBefore:true,undoStopAfter:true});
+  }
+  // Rewrites only the statement around the selection; Tab edits the CTE name in both places at once.
+  function extractSelectionToCte() {
+    const editor=editorRef.current,model=editor?.getModel(),selection=editor?.getSelection();
+    if(!model||activeTabReadonly)return;
+    if(!selection||selection.isEmpty()){notifyFeedback({kind:'warning',title:'Extract CTE',message:'Select the subquery to extract.',scope:documents.activeId});return}
+    const text=model.getValue(),start=model.getOffsetAt(selection.getStartPosition()),end=model.getOffsetAt(selection.getEndPosition()),statement=getSqlStatements(text).find(item=>item.start<=start&&end<=item.end);
+    if(!statement){notifyFeedback({kind:'warning',title:'Extract CTE',message:'The selection must be inside one statement.',scope:documents.activeId});return}
+    const raw=text.slice(statement.start,statement.end),result=extractCteSnippet(raw,start-statement.start,end-statement.start);
+    if(result.error){notifyFeedback({kind:'warning',title:'Extract CTE',message:result.error,scope:documents.activeId});return}
+    const from=model.getPositionAt(statement.start),to=model.getPositionAt(statement.end);
+    editor.setSelection(new monacoRef.current.Selection(from.lineNumber,from.column,to.lineNumber,to.column));editor.focus();
+    editor.getContribution('snippetController2').insert(result.snippet.replace(/\n/g,model.getEOL()),{adjustWhitespace:false,undoStopBefore:true,undoStopAfter:true});
+  }
+  // Completes the construct on the cursor line as one undoable edit; it never runs SQL.
+  smartEnterRef.current=()=>{
+    const editor=editorRef.current,model=editor?.getModel(),position=editor?.getPosition();
+    if(!model||!position||editorIsReadonly())return;
+    const options=model.getOptions(),indent=options.insertSpaces?' '.repeat(options.indentSize||options.tabSize||2):'	';
+    const result=smartEnter(model.getLinesContent(),position.lineNumber-1,{indent});
+    if(!result){editor.trigger('keyboard','type',{text:model.getEOL()});return}
+    const range=new monacoRef.current.Range(position.lineNumber,1,position.lineNumber,model.getLineMaxColumn(position.lineNumber));
+    editor.pushUndoStop();editor.executeEdits('smart-enter',[{range,text:result.lines.join(model.getEOL())}]);editor.pushUndoStop();
+    editor.setPosition({lineNumber:position.lineNumber+result.cursor.line,column:result.cursor.column});editor.focus();
+  };
+  useEffect(()=>()=>insertPairProvidersRef.current?.dispose(),[]);
+  const [codeCell, setCodeCell] = useState(null),[surroundMenu,setSurroundMenu]=useState(null);
+  useEffect(()=>{const open=event=>setCodeCell(event.detail);window.addEventListener('fbsdb.result.openCode',open);return()=>window.removeEventListener('fbsdb.result.openCode',open)},[]);
+  // SQL drafts from value viewers open as unsaved editor text and are never executed automatically.
+  const sqlDraftRef=useRef(null);sqlDraftRef.current=sql=>{setObjectTabActive(false);newSqlFileNow(sql)};
+  useEffect(()=>{const open=event=>{if(typeof event.detail?.sql==='string')sqlDraftRef.current?.(event.detail.sql)};window.addEventListener('fbsdb.result.sqlDraft',open);return()=>window.removeEventListener('fbsdb.result.sqlDraft',open)},[]);
+  const [showProjectRules,setShowProjectRules]=useState(false);
+  const [sourceCompile,setSourceCompile]=useState(null);
+  const [runConfigurations,setRunConfigurations]=useState(null);
+  const sourceBaselineRequests=useRef(new Map()),sourceBaselineAttempts=useRef(new Set());
   const [workspace, setWorkspace] = useState({ root: null, name: "Open workspace", files: [], entries: [], recent: [] });
   const [completionSettings, setCompletionSettings] = useState(()=>resolveSetting(settings,'editor.completion').value);
   const learningEpochRef = useRef(0), suggestionLearningRef = useRef(null), lastSuggestionAcceptanceRef = useRef(null);
@@ -593,7 +867,7 @@ export function App() {
   const suggestionScope = () => learningScope(suggestionWorkspaceRef.current, activeConnectionRef.current?.id);
   const publishLearning = () => completionClientRef.current?.worker.postMessage({ type: 'learning', entries: completionSettingsRef.current.learning ? suggestionLearningRef.current.snapshot(suggestionScope()) : [] });
   function learnSqlUsage(source) {
-    if (!completionSettingsRef.current.learning || !completionClientRef.current) return;
+    if (source.length>=LARGE_FILE_THRESHOLD || !completionSettingsRef.current.learning || !completionClientRef.current) return;
     const scope = suggestionScope(), epoch = learningEpochRef.current;
     completionClientRef.current.request('learn', source, 0).then(result => {
       if (!completionSettingsRef.current.learning || epoch !== learningEpochRef.current) return;
@@ -610,11 +884,45 @@ export function App() {
   const formatterRef = useRef(null);
   const [plscopeReport, setPlscopeReport] = useState(null);
   if (!completionMetadataRef.current) completionMetadataRef.current = new OracleMetadataBroker(sendNativeCommand, (owner, status) => updateTabSession("completionMetadataStatus", status, owner));
+  useEffect(()=>{setRelatedSources(null);setShowProjectRules(false);setRunConfigurations(null)},[workspace.root]);
   const activeEditorTab = tabs.find(tab => tab.id === activeTabId);
-  const activeTabReadonly = !!activeEditorTab?.readOnly;
+  const [largeFileOverrides,setLargeFileOverrides]=useState({});
+  const largeFileOverridesRef=useRef(largeFileOverrides);largeFileOverridesRef.current=largeFileOverrides;
+  const largePolicy=largeFilePolicy(sql,largeFileOverrides[activeTabId]);
+  const languageTabs=useMemo(()=>tabs.filter(tab=>largeFilePolicy(tab.content,largeFileOverrides[tab.id]).source),[tabs,largeFileOverrides]);
+  useEffect(()=>{window.dispatchEvent(new Event('fbsdb.refreshRunGutter'));queueSchemaForSql(documents.text)},[activeTabId,largePolicy.source,largePolicy.completion]);
+
+  const activeTabReadonly = !!activeEditorTab?.readOnly || objectTabActive;
+  useEffect(()=>{
+    const model=editorRef.current?.getModel();if(!model||!monaco)return;
+    const ending=sourceLineEnding(documents.text);if(model.getEOL()===ending)return;
+    controlledEditorUpdateRef.current=true;
+    try{model.setEOL(ending==='\r\n'?monaco.editor.EndOfLineSequence.CRLF:monaco.editor.EndOfLineSequence.LF)}finally{controlledEditorUpdateRef.current=false}
+  },[activeTabId,monaco,sourceLineEnding(sql)]);
+  const bookmarks=useSourceBookmarks(editorRef.current,activeEditorTab,workspace.root),bookmarkCursorRef=useRef(null);
+  const [showBookmarks,setShowBookmarks]=useState(false);
+  const editorConnection = documentConnection(activeEditorTab||{},tabSessions,dbConnections);
+  const activeSource = useMemo(() => largePolicy.source?describeOracleSource(activeEditorTab || {}, workspace.projectRules):{}, [activeEditorTab,workspace.projectRules,largePolicy.source]);
+  const relatedPackage = useMemo(() => relatedPackageDocument(largePolicy.source?activeEditorTab || {}:{}, languageTabs, {root: workspace.root, sessions: tabSessions, rules:workspace.projectRules}), [activeEditorTab, languageTabs, workspace.root, tabSessions,workspace.projectRules,largePolicy.source]);
+  const packageGroups = useMemo(() => packageDocumentGroups(languageTabs, {root: workspace.root, sessions: tabSessions, rules:workspace.projectRules}), [languageTabs, workspace.root, tabSessions,workspace.projectRules]);
   const metadataOriginTabId = activeEditorTab?.metadataOriginTabId || activeTabId;
   const completionSession = tabSessions[metadataOriginTabId] || {};
   useEffect(()=>{setObjectMenu(null)},[activeTabId,metadataOriginTabId,completionSession.activeConnection?.id,completionSession.connecting,completionMetadataRef.current.session(metadataOriginTabId).epoch]);
+  useEffect(()=>{
+    const tab=documents.active,session=tabSessions[tab?.id]||{},profile=session.activeConnection?.id;
+    if(!largePolicy.source||!isNativeHost||!tab?.path||tab.readOnly||!profile||['No connection','Disconnected'].includes(profile)||session.connectionLost||session.executing||session.connecting||session.inactive||session.scriptRun?.running)return;
+    const timer=setTimeout(()=>{
+      for(const prepared of sourceCompilationUnits(tab,workspace.projectRules).slice(0,32)){
+        const identity=sourceIdentity(prepared.declaration);
+        const key=JSON.stringify([tab.id,tab.path,profile,identity,completionSession.schemaOwner]);
+        if(sourceBaselineAttempts.current.has(key))continue;
+        sourceBaselineAttempts.current.add(key);
+        const request=sendNativeCommand('source.review',{tabId:tab.id,sql:prepared.sql});
+        sourceBaselineRequests.current.set(request,{tabId:tab.id,profile,key,identity});
+      }
+    },300);
+    return()=>clearTimeout(timer);
+  },[activeTabId,filePath,sql,tabSession.activeConnection?.id,tabSession.executing,tabSession.connecting,tabSession.inactive,tabSession.connectionLost,tabSession.scriptRun?.running,workspace.projectRules,completionSession.schemaOwner,largePolicy.source]);
   const completionObjects = completionSession.schemaObjects || EMPTY_SCHEMA_OBJECTS;
   const completionSchema = completionSession.schemaOwner || "";
   const completionSettingsRef = useRef(completionSettings); completionSettingsRef.current = completionSettings;
@@ -625,6 +933,7 @@ export function App() {
   useEffect(()=>{if(isNativeHost)sendNativeCommand('ui.setTheme',{theme})},[theme]);
   const [allTokenColors,setAllTokenColors]=useState(()=>{const saved=resolveSetting(settings,'ui.tokenColors').value;return resolveTokenColors(saved)});
   const [editorThemeName, setEditorThemeName] = useState("vs-dark");
+  const overview=useEditorOverview(editorRef.current,monaco,activeEditorTab,completionClientRef.current,theme,resolveSetting(settings,'editor.overviewRuler').value);
   useEffect(()=>{setQueryHistory(current=>retainHistory(current,{limit:resolveSetting(settings,'privacy.historyLimit').value,days:resolveSetting(settings,'privacy.historyDays').value,excludedProfiles:resolveSetting(settings,'privacy.excludedProfiles').value}))},[settings.user['privacy.historyLimit'],settings.user['privacy.historyDays'],settings.user['privacy.excludedProfiles']]);
   useEffect(()=>{const timer=setInterval(()=>setQueryHistory(current=>retainHistory(current,{limit:resolveSetting(settings,'privacy.historyLimit').value,days:resolveSetting(settings,'privacy.historyDays').value,excludedProfiles:resolveSetting(settings,'privacy.excludedProfiles').value})),60000);return()=>clearInterval(timer)},[settings]);
   useEffect(()=>{const clear=()=>setQueryHistory([]);window.addEventListener('fbsdb.history.clear',clear);return()=>window.removeEventListener('fbsdb.history.clear',clear)},[]);
@@ -643,12 +952,14 @@ export function App() {
     return next;
   })},[theme,allTokenColors,codeStyle,queryTimeout,completionSettings]);
   function applySettings(next){
+    const density=resolveSetting(next,'ui.density').value;
+    if(!next.readOnly&&density!==resolveSetting(settingsRef.current,'ui.density').value){next=changeSetting(next,'results.density',density);previewResultAppearance({density})}
     setSettings(next);setTheme(resolveSetting(next,'ui.theme').value);setQueryTimeout(resolveSetting(next,'editor.queryTimeout').value);setCompletionSettings(resolveSetting(next,'editor.completion').value);
     setCodeStyle(Object.fromEntries(['fontSize','tabSize','insertSpaces'].map(field=>[field,resolveSetting(next,'editor.'+field).value])));
     const colors=resolveSetting(next,'ui.tokenColors').value;setAllTokenColors(resolveTokenColors(colors));
   }
   const tokenColors = allTokenColors[theme] || defaultTokenColors[theme], themeConfig = themePresets[theme];
-  const allSqlSnippets = useMemo(() => [...sqlSnippets, ...customSqlSnippets], [customSqlSnippets]);
+  const allSqlSnippets = useMemo(() => { const custom = new Set(customSqlSnippets.map((snippet) => snippet.trigger)); return [...sqlSnippets.filter((snippet) => !custom.has(snippet.trigger)), ...customSqlSnippets]; }, [customSqlSnippets]);
   const { visibleSchemaObjects, schemaSearchKinds } = useMemo(() => { const query = schemaQuery.trim().toLowerCase(); const kinds = new Map(); const visible = schemaObjects.filter(item => { if ((objectScope === "Favorites" && !objectFavorites.includes(oracleSchemaKey(item))) || (objectScope === "Recent" && !recentObjects.includes(oracleSchemaKey(item))) || (schemaOwnerFilter !== "All" && (item.owner || schemaOwner) !== schemaOwnerFilter)) return false; if (!query) return true; const schemaMatch = String(item.owner || schemaOwner).toLowerCase().includes(query); const objectMatch = String(item.name).toLowerCase().includes(query) || String(item.targetOwner || "").toLowerCase().includes(query) || String(item.targetName || "").toLowerCase().includes(query) || String(item.dbLink || "").toLowerCase().includes(query); const typeMatch = `${item.type} ${oracleObjectLabel(item.type)}`.toLowerCase().includes(query); const columnMatch = (item.columns || []).some(column => `${column.name} ${column.type} ${column.comment || ""}`.toLowerCase().includes(query)); const kind = objectMatch ? 'Object' : columnMatch ? 'Column' : schemaMatch ? 'Schema' : typeMatch ? 'Type' : ''; if (kind) kinds.set(oracleSchemaKey(item), kind); return Boolean(kind); }); return { visibleSchemaObjects: visible, schemaSearchKinds: kinds }; }, [schemaObjects, schemaQuery, schemaOwnerFilter, schemaOwner, objectScope, objectFavorites, recentObjects]);
   const schemaLookup = useMemo(() => makeOracleRelationLookup(schemaObjects, schemaOwner), [schemaObjects, schemaOwner]);
   const objectTab = objectTabs.find(tab => tab.id === activeObjectTabId) || null;
@@ -674,7 +985,7 @@ export function App() {
 
   function queueSchemaForSql(text) {
     if (schemaWarmupRef.current) { clearTimeout(schemaWarmupRef.current.timer); schemaWarmupRef.current.cancel(); }
-    if (!isNativeHost || !schemaReadyRef.current || (sessionsRef.current[documents.activeId]?.executing||sessionsRef.current[documents.activeId]?.scriptRun?.running)) return;
+    if (!largeFilePolicy(text,largeFileOverridesRef.current[documents.activeId]).completion || !isNativeHost || !schemaReadyRef.current || (sessionsRef.current[documents.activeId]?.executing||sessionsRef.current[documents.activeId]?.scriptRun?.running)) return;
     const owner = documents.activeId, cancellation = completionCancellation();
     const timer = setTimeout(async () => {
       const client = completionClientRef.current;
@@ -712,11 +1023,13 @@ export function App() {
     searchTimerRef.current = setTimeout(() => { searchRequestRef.current = sendNativeCommand("workspace.search", { query,scope:workspaceSearchScope,root:workspace.root }); }, 250);
     return () => clearTimeout(searchTimerRef.current);
   }, [showSearch, searchQuery, workspace.root,workspaceSearchScope]);
+  useEffect(()=>{if(!showSearch)setDeleteReview(null)},[showSearch]);
 
   useEffect(() => {
     const unsubscribe = subscribeNativeMessages((message) => {
       const owner = message?.tabId || operations.owners.get(message?.requestId) || documents.activeId;
       const operation=operations.running.get(owner);
+      if(typeof message.connected==='boolean')updateTabSession('connectionLost',!message.connected,owner);
       if((['sql.result','sql.timeout'].includes(message?.type)||message?.type==='host.error'&&operations.history.has(message.requestId))&&operation&&(operation.requestId!==message.requestId||operation.status!=='running'))return;
       replyOwnerRef.current = owner;
       try {
@@ -735,6 +1048,7 @@ export function App() {
       }
       if(message?.type==='ui.theme'){if(message.error)setSettingsError(message.error);return;}
       if(message?.type==='connection.managed'&&message.diagnostics)setConnectionDiagnostics(message.diagnostics);
+      if(message?.type==='workspace.binds'&&message.operation==='load'&&Array.isArray(message.definitions)&&message.definitions.length){try{saveBindDefinitions(localStorage,message.path,message.definitions)}catch{/* the shared form stays on disk; the dialog falls back to its local copy */}}
       if(message?.type==='schema.error')notifyFeedback({id:`schema:${owner}`,kind:'error',title:'Oracle metadata could not be loaded',message:message.message||'Metadata unavailable.',scope:owner});
       if (completionMetadataRef.current?.handle(message)) return;
       if(message?.type==='session.context'){if(!closedTabsRef.current.has(owner)&&message.epoch===completionMetadataRef.current.session(owner).epoch){updateTabSession('sessionContext',message.context||null,owner);updateTabSession('sessionContextError',message.error||'',owner)}return;}
@@ -745,6 +1059,13 @@ export function App() {
         const previous=operations.scripts.get(owner)||{steps:[]};
         const run={...previous,steps:[...(previous.steps||[])]};
         if(message.type==='script.started'){notifyFeedback({id:`script:${owner}`,kind:'progress',title:'Running SQL script',message:'Starting script…',scope:owner,actions:[{label:'Cancel script',onClick:()=>cancelQuery(owner)}]});run.started=true;run.running=true;run.requestId=message.requestId;run.steps=[];run.completed=0;run.failed=0;}
+        if(message.type==='script.sourceReviewRequired'){
+          if(!run.running||run.requestId!==message.requestId)return;
+          setTransactionPending(Boolean(message.transactionPending),owner);
+          run.awaitingSourceReview={...message,profileId:sessionsRef.current[owner]?.activeConnection?.id,generation:sessionsRef.current[owner]?.connectionGeneration??0};
+          updateTabSession('sqlStage',`Script paused for source review: statement ${message.index+1}`,owner);
+        }
+        if(message.type==='script.reviewAccepted'&&message.accepted)run.awaitingSourceReview=null;
         if(message.type==='script.step'){
           if(message.error)notifyFeedback({id:`script-error:${message.requestId}:${message.index}`,kind:'error',title:`Script statement ${message.index+1} failed`,message:message.error,scope:owner});
           run.steps[message.index]={...run.steps[message.index],...message};
@@ -755,7 +1076,7 @@ export function App() {
             setExecuting(true,owner);setCancelling(false,owner);
           }
         }
-        if(message.type==='script.completed'){notifyFeedback({id:`script:${owner}`,kind:message.failed?'error':message.cancelled?'warning':'success',title:message.cancelled?'Script cancelled':'Script completed',message:`${message.completed||0} completed · ${message.failed||0} failed`+(run.steps.filter(s=>s?.error).map(s=>'\n'+s.error).join('')),scope:owner});Object.assign(run,message,{running:false});setExecuting(false,owner);setCancelling(false,owner);setTransactionPending(Boolean(message.transactionPending),owner);}
+        if(message.type==='script.completed'){notifyFeedback({id:`script:${owner}`,kind:message.failed?'error':message.cancelled?'warning':'success',title:message.cancelled?'Script cancelled':'Script completed',message:`${message.completed||0} completed · ${message.failed||0} failed`+(run.steps.filter(s=>s?.error).map(s=>'\n'+s.error).join('')),scope:owner});Object.assign(run,message,{running:false,awaitingSourceReview:null});setSourceCompile(current=>current?.scriptRequestId===message.requestId?null:current);setExecuting(false,owner);setCancelling(false,owner);setTransactionPending(Boolean(message.transactionPending),owner);}
         operations.scripts.set(owner,run);updateTabSession('scriptRun',run,owner);return;
       }
       if(message?.type==='host.error'&&operations.scripts.get(owner)?.running){const run=operations.scripts.get(owner),index=run.index;run.steps[index]={...run.steps[index],error:message.message};if(!run.started){run.running=false;updateTabSession('scriptRun',{...run},owner)}}
@@ -768,10 +1089,20 @@ export function App() {
         if (message.type === "schema.loaded") { setSchemaObjects(message.objects || []); setSchemaOwner(message.schema || ""); setSchemaLoading(false); setSchemaError(""); updateTabSession("schemaReady", true); }
         else if (message.type === "schema.loading") { setSchemaLoading(true); updateTabSession("schemaReady", false); }
         else if (message.type === "schema.error") { setSchemaLoading(false); setSchemaError(message.message || "Oracle metadata could not be loaded."); }
-        else if ((message.type === "schema.table" || message.type === "schema.object") && message.item) setSchemaObjects(items => (items || []).map(item => oracleSchemaKey(item) === oracleSchemaKey(message.item) ? message.item : item));
+        else if ((message.type === "schema.table" || message.type === "schema.object") && message.item) setSchemaObjects(items => (items || []).map(item => oracleSchemaKey(item) === oracleSchemaKey(message.item) ? {...message.item,metadataFetchedAt:Date.now(),metadataExpiresAt:Date.now()+300000} : item));
         return;
       }
 
+      const baselineRequest=sourceBaselineRequests.current.get(message.requestId);
+      if(baselineRequest&&['source.review','source.review.error','host.error'].includes(message.type)){
+        sourceBaselineRequests.current.delete(message.requestId);
+        const tab=documents.tabs.find(tab=>tab.id===baselineRequest.tabId);
+        if(message.type==='source.review'&&tab&&sessionsRef.current[tab.id]?.activeConnection?.id===baselineRequest.profile&&sourceCompilationUnits(tab,workspace.projectRules).some(prepared=>sourceIdentity(prepared.declaration)===baselineRequest.identity)){
+          const snapshot=message.review.snapshot,baseline=sourceBaseline(snapshot);
+          documents.patch(tab.id,{sourceBaseline:baseline,sourceBaselines:{...tab.sourceBaselines,[JSON.stringify([snapshot.owner,snapshot.name,snapshot.type,snapshot.profileId,snapshot.context])]:baseline}});
+        }
+        return;
+      }
       if (message?.type === "tab.closed" || message?.type === "tab.closeFailed") {
         const action = tabCloseActionsRef.current.get(message.requestId); tabCloseActionsRef.current.delete(message.requestId);
         if (!action) return;
@@ -782,10 +1113,11 @@ export function App() {
         if (cached && !message.forceNew) { activateTab(cached.id); return; }
         rememberEditorPosition();
         const path = message.path ?? null, id = `file:${crypto.randomUUID()}`;
-        documents.open({ id, name: message.fileName ?? "query.sql", path, content: message.content ?? "", dirty: false, connectionProfileId: message.profileId ?? null, diskVersion: message.diskVersion ?? null });
+        documents.open({ id, name: message.fileName ?? "query.sql", path, content: message.content ?? "",savedContent:message.content??"", dirty: false, connectionProfileId: message.profileId ?? null, diskVersion: message.diskVersion ?? null });
+        if (path && previewPathRef.current && pathKey(previewPathRef.current) === pathKey(path)) { previewPathRef.current = null; const old = previewTabRef.current; setPreviewTabId(id); if (old && old !== id) setTimeout(() => closeTabRef.current?.(old), 0); }
         setNativeTabId(id); sendNativeCommand("file.activate", { path, tabId: id });
         const searchPosition = pendingSearchPositionRef.current;
-        if (searchPosition && path?.toLowerCase() === searchPosition.path.toLowerCase()) { pendingSearchPositionRef.current = null; requestAnimationFrame(() => { editorRef.current?.setPosition({ lineNumber: searchPosition.lineNumber, column: 1 }); editorRef.current?.revealLineInCenter(searchPosition.lineNumber); editorRef.current?.focus(); }); }
+        if (searchPosition && path?.toLowerCase() === searchPosition.path.toLowerCase()) { pendingSearchPositionRef.current = null; requestAnimationFrame(() => { editorRef.current?.setPosition({ lineNumber: searchPosition.lineNumber, column: searchPosition.column||1 }); editorRef.current?.revealLineInCenter(searchPosition.lineNumber); editorRef.current?.focus(); }); }
         if (!message.profileId || message.profileId.toLowerCase() === (tabSessions[id]?.activeConnection?.id || "").toLowerCase()) queueSchemaForSql(documents.text);
         if (message.profileId) { const profile = dbConnectionsRef.current.find((item) => item.id.toLowerCase() === message.profileId.toLowerCase()); if (profile && profile.id.toLowerCase() !== (tabSessions[id]?.activeConnection?.id || "").toLowerCase()) { setTimeout(() => beginConnection({ ...profile, tabId: id }), 0); } }
       } else if(message?.type==='file.changes'){
@@ -810,7 +1142,7 @@ export function App() {
       } else if (message?.type === "file.saveCancelled") {
         documentSavesRef.current.take(message.requestId, message.tabId);
       } else if (message?.type === "workspace.state") {
-        setWorkspace({ root: message.root ?? null, name: message.name ?? "No workspace", files: message.files ?? [], entries: message.entries ?? [], recent: message.recent ?? [], catalog:message.catalog??[],error:message.error??null });
+        setWorkspace({ root: message.root ?? null, name: message.name ?? "No workspace", files: message.files ?? [], entries: message.entries ?? [], recent: message.recent ?? [], catalog:message.catalog??[],error:message.error??null,projectRules:message.projectRules??defaultProjectRules,fileConnections:message.fileConnections??{} });
        } else if (message?.type === "workspace.error") {
         notifyFeedback({id:`workspace:${message.requestId}`,kind:'error',title:'Workspace operation failed',message:message.message||'Workspace operation failed.',scope:owner});
         if(message.requestId===searchRequestRef.current){setSearching(false);searchRequestRef.current=null;}
@@ -845,6 +1177,7 @@ export function App() {
         }
       } else if (message?.type === "connection.connected") {
         completionMetadataRef.current.reset(owner);
+        updateTabSession("connectionLost",false,owner);updateTabSession("connectionGeneration",generation=>(generation||0)+1,owner);updateTabSession("connectionEnvironment",message.profile?.env||'UNKNOWN',owner);
         updateTabSession("inactive",false,owner);
         updateTabSession("analysisReadOnly",false,owner);
         updateTabSession("oracleVocabulary", { version: message.serverVersion || 19, words: [] }, owner);
@@ -859,6 +1192,7 @@ export function App() {
         if (message.profile?.id) setRecentProfiles((current) => [message.profile.id, ...current.filter((id) => id !== message.profile.id)].slice(0, 20));
       } else if (message?.type === "connection.inactive" || message?.type === "connection.resumed") {
         updateTabSession("inactive", message.type === "connection.inactive", owner);
+        if(message.type==='connection.resumed'){updateTabSession("connectionLost",false,owner);updateTabSession("connectionGeneration",generation=>(generation||0)+1,owner);sendNativeCommand('session.context',{tabId:owner,epoch:completionMetadataRef.current.session(owner).epoch})}
         if (message.type === "connection.inactive") {
           setQueryResult(current => current ? { ...current, hasMore: false, cursorUnavailable: current.hasMore } : current);
           updateTabResult("resultSets", sets => (sets || []).map(item => ({ ...item, result: { ...item.result, hasMore: false, cursorUnavailable: item.result.hasMore } })));
@@ -881,9 +1215,9 @@ export function App() {
         const owner = pageRequestRef.current.owner, failedId = pageRequestRef.current.resultId; operations.cancellations.delete(owner);pageRequestRef.current = null; setFetchingPage(false); setCancelling(false,owner);
         results.invalidateCursor(owner, failedId); setPageError(message.message || "Page could not be loaded. Run the query again.", owner);
       } else if (message?.type === "result.exportProgress" || message?.type === "result.exportComplete") {
-        updateTabResult('streamState',{busy:message.type==='result.exportProgress',message:message.message||`${message.rowsWritten||0} rows written`},owner);
-        const exporting=message.type==='result.exportProgress';
-        notifyFeedback({id:`export:${owner}`,kind:exporting?'progress':message.cancelled?'info':message.success===false?'error':'success',title:exporting?'Exporting results':message.cancelled?'Export cancelled':message.success===false?'Export failed':'Export completed',message:message.message||`${message.rowsWritten||0} rows written`,scope:owner,actions:exporting?[{label:'Cancel export',onClick:()=>sendNativeCommand('result.cancelExport',{tabId:owner})}]:[]});
+        const exporting=message.type==='result.exportProgress',exportText=exporting?`${exportProgressText(message)} written…`:message.success&&message.bytesWritten!=null?`${message.message} (${exportProgressText(message)})`:message.message||`${message.rowsWritten||0} rows written`;
+        updateTabResult('streamState',{busy:exporting,message:exportText},owner);
+        notifyFeedback({id:`export:${owner}`,kind:exporting?'progress':message.cancelled?'info':message.success===false?'error':'success',title:exporting?'Exporting results':message.cancelled?'Export cancelled':message.success===false?'Export failed':'Export completed',message:exportText,scope:owner,actions:exporting?[{label:'Cancel export',onClick:()=>sendNativeCommand('result.cancelExport',{tabId:owner})}]:[]});
         if(message.type==='result.exportComplete'&&message.consumed) {
           results.invalidateCursor(owner, message.resultId);
         }
@@ -902,23 +1236,26 @@ export function App() {
         const owner = message.tabId || operations.owners.get(message.requestId) || operations.lastOwner || documents.activeId; operations.owners.delete(message.requestId);
         if(operation)operation.status='complete';operations.cancellations.delete(owner);updateTabSession('queryOutcome',null,owner);
         if (closedTabsRef.current.has(owner)) { if (message.resultId) sendNativeCommand("sql.closeResult", { resultId: message.resultId, tabId: owner }); setExecuting(false); setCancelling(false); setTransactionPending(Boolean(message.transactionPending)); finishHistoryEntry("Succeeded", "Statement completed in closed tab"); return; }
+        notifyExecutionFinished(owner,true,{elapsedMs:message.elapsedMs,rows:message.returnedRows,rowsAffected:message.rowsAffected,hasMore:message.hasMore,output:message.output});
         finishHistoryEntry("Succeeded", message.rowsAffected == null ? `${message.returnedRows ?? 0} rows · ${message.elapsedMs ?? 0} ms` : `${message.rowsAffected} rows affected · ${message.elapsedMs ?? 0} ms`);
         if (/^\s*(?:CREATE|ALTER|DROP|RENAME|COMMENT|GRANT|REVOKE)\b/i.test(operations.metadata.get(owner)?.executedSql || "")) { completionMetadataRef.current.reset(owner); refreshSchema(owner); }
         if(/^\s*(?:--[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*ALTER\s+SESSION\b/i.test(operations.metadata.get(owner)?.executedSql||'')){sendNativeCommand('session.nls',{tabId:owner,epoch:completionMetadataRef.current.session(owner).epoch});sendNativeCommand('session.context',{tabId:owner,epoch:completionMetadataRef.current.session(owner).epoch});}
         const executionMeta=operations.metadata.get(owner)||{},responseAt=performance.now(),renderRequestId=`${message.requestId||Date.now()}:${message.resultId||'statement'}`;
         updateTabSession("rendering",Boolean(message.columns?.length),owner);updateTabSession("renderingRequestId",renderRequestId,owner);
-        setSqlResult({ ...message, ...executionMeta,renderRequestId,clientTiming:executionMeta.requestStartedAtPerf?{startedAtPerf:executionMeta.requestStartedAtPerf,responseAtPerf:responseAt,renderMs:null,totalMs:null}:undefined,fetchMetrics:[{offset:0,rows:message.rows?.length||0,elapsedMs:message.elapsedMs,bytes:new TextEncoder().encode(JSON.stringify(message.rows||[])).length}] }, owner); const output = (message.output ?? []).join("\n"); setOutputMessage(output, owner); setTransactionPending(Boolean(message.transactionPending)); setExecuting(false); setCancelling(false); setRunState(message.rowsAffected == null ? `${message.returnedRows ?? 0} rows · ${message.elapsedMs ?? 0} ms` : `${message.rowsAffected} rows affected · ${message.elapsedMs ?? 0} ms`); setResultTab(output ? "Output" : "Results", owner);
+        setSqlResult({ ...message, ...executionMeta,renderRequestId,clientTiming:executionMeta.requestStartedAtPerf?{startedAtPerf:executionMeta.requestStartedAtPerf,responseAtPerf:responseAt,renderMs:null,totalMs:null}:undefined,fetchMetrics:[{offset:0,rows:message.rows?.length||0,elapsedMs:message.elapsedMs,bytes:new TextEncoder().encode(JSON.stringify(message.rows||[])).length}] }, owner); const output = [...(message.output ?? []),...(message.outParameters||[]).map(parameter=>`${executionMeta.parameterLabels?.[parameter.name]||parameter.name} (${parameter.type}) = ${parameter.value==null?'(NULL)':typeof parameter.value==='object'?JSON.stringify(parameter.value):parameter.value}`)].join("\n"); setOutputMessage(output, owner);updateTabResult("outputProvenance",{...message,...executionMeta},owner); setTransactionPending(Boolean(message.transactionPending)); setExecuting(false); setCancelling(false); setRunState(executionMeta.runConfiguration?`Call completed · ${message.elapsedMs??0} ms${message.transactionPending?' · pending transaction':''}`:message.rowsAffected == null ? `${message.returnedRows ?? 0} rows · ${message.elapsedMs ?? 0} ms` : `${message.rowsAffected} rows affected · ${message.elapsedMs ?? 0} ms`); setResultTab(output ? "Output" : "Results", owner);
       } else if (message?.type === "sql.compilation") {
         if(operation?.requestId===message.requestId){operation.status='complete';operations.cancellations.delete(owner);updateTabSession('queryOutcome',null,owner)}
 
         operations.owners.delete(message.requestId);
         if (closedTabsRef.current.has(owner)) return;
         const context = operations.metadata.get(owner) || {}, problems = compilationProblemItems(message.compilation, context, owner);
+        if(message.compilation?.snapshot){const snapshot=message.compilation.snapshot,current=documents.tabs.find(tab=>tab.id===owner);documents.patch(owner,{sourceBaseline:sourceBaseline(snapshot),sourceBaselines:{...current?.sourceBaselines,[JSON.stringify([snapshot.owner,snapshot.name,snapshot.type,snapshot.profileId,snapshot.context])]:sourceBaseline(snapshot)}});}
+        else if(context.sourceReviewId)documents.patch(owner,{sourceBaseline:null});
         updateTabSession("compilationProblems", problems, owner); updateTabSession("runtimeProblems", [], owner);
         setTransactionPending(!!message.transactionPending, owner); setExecuting(false, owner); setCancelling(false, owner);
         const errors = problems.filter(problem => problem.severity === "error").length;
         const summary = message.metadataError ? `Compilation completed; diagnostics unavailable: ${message.metadataError}` : errors ? `${errors} PL/SQL compilation error${errors === 1 ? "" : "s"}` : `PL/SQL compilation completed${problems.length ? ` with ${problems.length} warning(s)` : ""}`;
-        setRunState(summary, owner); setOutputMessage([...(message.output || []), summary].join("\n"), owner); setResultTab(problems.length ? "Problems" : "Output", owner);
+        setRunState(summary, owner); setOutputMessage([...(message.output || []), summary].join("\n"), owner);updateTabResult("outputProvenance",{...context,sqlVersion:message.sqlVersion,compiledSourceVersion:message.compilation?.snapshot?.version},owner); setResultTab(problems.length ? "Problems" : "Output", owner);
         notifyFeedback({id:`compilation:${message.requestId}`,kind:errors?"error":problems.length?"warning":"success",title:"PL/SQL compilation",message:summary,scope:owner,actions:problems.length?[{label:"View problems",onClick:()=>{activateTab(owner);setResultTab("Problems",owner)}}]:[]}); finishHistoryEntry(errors ? "Failed" : "Succeeded", summary);
         completionMetadataRef.current.reset(owner); refreshSchema(owner);
       } else if (message?.type === "sql.cancelled") {
@@ -931,25 +1268,31 @@ export function App() {
         operations.owners.delete(message.requestId);
         if(operation)operation.status='complete';operations.cancellations.delete(owner);updateTabSession('queryOutcome',{transactionPending:message.transactionPending,kind:'timeout',message:message.message||'Query timed out.',elapsedMs:operation?Date.now()-operation.startedAt:undefined,requestId:message.requestId},owner);setResultTab('Results',owner);
 
+        notifyExecutionFinished(owner,false,{message:'Query timed out.'});
         finishHistoryEntry("Failed", message.message || "Query timed out.");
         setTransactionPending(Boolean(message.transactionPending), owner); setExecuting(false, owner); setCancelling(false, owner); setRunState(message.message || "Query timed out.", owner);
       } else if (message?.type === "sql.explainResult") {
         const owner = message.tabId || operations.owners.get(message.requestId) || operations.lastOwner || documents.activeId; operations.owners.delete(message.requestId);
         setExplainResult(message, owner); setExplainMessage("", owner); setExecuting(false); setCancelling(false); setRunState(`Execution plan · ${message.returnedRows ?? 0} steps · ${message.elapsedMs ?? 0} ms`);
+      } else if (message?.type === "transaction.state" && message.unconfirmed) {
+        setUncertainCommit({ message: message.message || '' }); setRunState('Commit outcome not confirmed');
       } else if (message?.type === "transaction.state") {
         if(!message.pending)updateTabSession("analysisReadOnly",false,owner); setTransactionPending(Boolean(message.pending)); setRunState(`Transaction ${message.state}`);
         if (!message.pending && pendingTabCloseRef.current?.tabId === owner && pendingTabCloseRef.current.resolving) { pendingTabCloseRef.current.retry(); setPendingTabClose(null); }
         if (!message.pending && pendingSwitchRef.current?.tabId === owner) { const profile = pendingSwitchRef.current; setPendingSwitch(null); if (profile.disconnect) sendNativeCommand("connection.disconnect", { tabId: owner }); else setTimeout(() => beginConnection(profile), 0); }
+      } else if (message?.type === "sql.evaluated") { setLookupPicker(current => current && current.requestId === message.requestId ? { ...current, state: { running: false, ...(message.error ? { error: message.error } : { columns: message.columns, rows: message.rows, truncated: message.truncated }) } } : current); setSubqueryTrial(current => current && current.requestId === message.requestId ? { ...current, state: { running: false, ...(message.error ? { error: message.error } : { columns: message.columns, rows: message.rows, truncated: message.truncated, elapsedMs: message.elapsedMs, transactionPending: message.transactionPending }) } } : current); setQuickEval(current => current && current.requestId === message.requestId ? { ...current, state: { running: false, ...(message.error ? { error: message.error } : { columns: message.columns, rows: message.rows, elapsedMs: message.elapsedMs, transactionPending: message.transactionPending }) } } : current);
+      } else if (message?.type === "ui.terminal") { notifyFeedback({kind:message.opened?"success":"warning",title:"External terminal",message:message.message,scope:documents.activeId});
       } else if (message?.type === "schema.loading") { setSchemaLoading(true); setSchemaError(""); setSchemaStale((sessionsRef.current[owner]?.schemaObjects || []).length > 0); updateTabSession("schemaReady", false); schemaReadyRef.current = false;
       } else if (message?.type === "schema.loaded") {
         if (schemaRequestRef.current === message.requestId) schemaRequestRef.current = null; const objects = message.objects ?? []; schemaLookupRef.current = makeOracleRelationLookup(objects, message.schema ?? ""); setSchemaObjects(objects); setSchemaOwner(message.schema ?? ""); setSchemaLoading(false); setSchemaStale(false); setSchemaError(""); schemaReadyRef.current = true; updateTabSession("schemaReady", true); schemaRequestedRef.current.clear(); schemaLoadedRef.current.clear(); queueSchemaForSql(documents.text);
       } else if (message?.type === "schema.cancelled") {
         if (schemaRequestRef.current === message.requestId) schemaRequestRef.current = null; setSchemaLoading(false); setSchemaStale((sessionsRef.current[owner]?.schemaObjects || []).length > 0); setSchemaError('Metadata loading cancelled.');
       } else if (message?.type === "schema.table" || message?.type === "schema.object") {
-        const item = message.item; if (item?.name) { const key = oracleSchemaKey(item).toLowerCase(); schemaLoadedRef.current.add(key); schemaRequestedRef.current.delete(key); if (isOracleRelation(item)) schemaLookupRef.current.set(item.name.toLowerCase(), item); setSchemaObjects((current) => current.map((entry) => oracleSchemaKey(entry) === oracleSchemaKey(item) ? item : entry)); setObjectTabs(current => current.map(tab => tab.key === oracleSchemaKey(item) ? { ...tab, object: item } : tab)); requestAnimationFrame(() => { const position = editorRef.current?.getPosition(); const line = position && editorRef.current?.getModel()?.getLineContent(position.lineNumber); if (line) editorRef.current?.render(); }); }
+        const item = message.item?{...message.item,metadataFetchedAt:Date.now(),metadataExpiresAt:Date.now()+300000}:null; if (item?.name) { const key = oracleSchemaKey(item).toLowerCase(); schemaLoadedRef.current.add(key); schemaRequestedRef.current.delete(key); if (isOracleRelation(item)) schemaLookupRef.current.set(item.name.toLowerCase(), item); setSchemaObjects((current) => current.map((entry) => oracleSchemaKey(entry) === oracleSchemaKey(item) ? item : entry)); setObjectTabs(current => current.map(tab => tab.key === oracleSchemaKey(item) ? { ...tab, object: item } : tab)); requestAnimationFrame(() => { const position = editorRef.current?.getPosition(); const line = position && editorRef.current?.getModel()?.getLineContent(position.lineNumber); if (line) editorRef.current?.render(); }); }
       } else if (message?.type === "schema.error") { setSchemaLoading(false); setSchemaError(message.message ?? "Oracle metadata could not be loaded."); schemaReadyRef.current = true; if (message.tableName || message.name) { const failed = [...schemaObjects].find(item => item.name.toLowerCase() === (message.tableName || message.name).toLowerCase() && (!message.owner || item.owner === message.owner)); if (failed) schemaRequestedRef.current.delete(oracleSchemaKey(failed).toLowerCase()); }
       } else if (message?.type === "host.error") {
-        const failedQuery=operation?.requestId===message.requestId&&operation.status==='running';
+        const failedQuery=!!operation&&operation.requestId===message.requestId&&operation.status==='running';
+        if(failedQuery){notifyExecutionFinished(message.tabId||operations.owners.get(message.requestId)||operations.lastOwner||documents.activeId,false,{message:message.message})}
         if(failedQuery||message.explain)finishHistoryEntry("Failed", "Execution failed");
         documentSavesRef.current.take(message.requestId, message.tabId);
         if(message.requestId===filePollRef.current?.id)filePollRef.current=null;
@@ -964,9 +1307,9 @@ export function App() {
         if(failedQuery){
           operation.status='complete';operations.cancellations.delete(owner);
           updateTabSession('queryOutcome',{transactionPending:message.transactionPending,kind:'error',message:error,elapsedMs:Date.now()-operation.startedAt,requestId:message.requestId},owner);setResultTab('Results',owner);setOutputMessage(error,owner);
-          updateTabSession('runtimeProblems',[{id:`${owner}:runtime`,tabId:owner,severity:'error',source:'Oracle',message:error,fileName:documents.tabs.find(tab=>tab.id===owner)?.name||'SQL'}],owner);
+          updateTabSession('runtimeProblems',[{id:`${owner}:runtime`,tabId:owner,severity:'error',source:'Oracle',message:error,fileName:documents.tabs.find(tab=>tab.id===owner)?.name||'SQL'},...runtimeStackProblems(error,operations.metadata.get(owner),owner)],owner);
         }
-        else if ((!failedConnection && !authProfileRef.current && /ORA-\d+/i.test(error)) || message.explain) { if (message.explain) setExplainMessage(error, owner); else setOutputMessage(error, owner); setResultTab(message.explain ? "Explain" : "Output", owner); updateTabSession("runtimeProblems", [{ id: `${owner}:runtime`, tabId: owner, severity: "error", source: "Oracle", message: error, fileName: documents.tabs.find(tab => tab.id === owner)?.name || "SQL" }], owner); }
+        else if ((!failedConnection && !authProfileRef.current && /ORA-\d+/i.test(error)) || message.explain) { if (message.explain) setExplainMessage(error, owner); else setOutputMessage(error, owner); setResultTab(message.explain ? "Explain" : "Output", owner); updateTabSession("runtimeProblems", [{ id: `${owner}:runtime`, tabId: owner, severity: "error", source: "Oracle", message: error, fileName: documents.tabs.find(tab => tab.id === owner)?.name || "SQL" },...runtimeStackProblems(error,operations.metadata.get(owner),owner)], owner); }
       }
       } finally { replyOwnerRef.current = null; }
     });
@@ -996,21 +1339,37 @@ export function App() {
 
   useEffect(() => {
     const handler = (event) => {
+      if(event.altKey&&event.shiftKey&&!event.ctrlKey&&!event.metaKey&&event.key.toLowerCase()==='o'&&!document.querySelector('.modal-backdrop')&&isNativeHost&&workspace.root&&editorRef.current?.hasTextFocus()){event.preventDefault();setRelatedSources({root:workspace.root,document:documents.active});return;}
+      if(event.altKey&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&event.key.toLowerCase()==='o'&&!document.querySelector('.modal-backdrop')&&editorRef.current?.hasTextFocus()){event.preventDefault();switchPackageSource();return;}
+      if(editorRef.current?.hasTextFocus()&&!document.querySelector('.modal-backdrop')){
+        const shortcuts=resolveSetting(settingsRef.current,'editor.shortcuts').value;
+        if(matchesShortcut(event,shortcuts.bookmark)){event.preventDefault();setShowBookmarks(true);return}
+        if(matchesShortcut(event,shortcuts.nextBookmark)){event.preventDefault();navigateBookmark(1);return}
+        if(matchesShortcut(event,shortcuts.previousBookmark)){event.preventDefault();navigateBookmark(-1);return}
+      }
+      if(editorRef.current?.hasTextFocus()&&!document.querySelector('.modal-backdrop')){
+        const shortcuts=resolveSetting(settingsRef.current,'editor.shortcuts').value;
+        if(matchesShortcut(event,shortcuts.lastEdit)){event.preventDefault();navigateEdit('last');return}
+        if(matchesShortcut(event,shortcuts.previousEdit)){event.preventDefault();navigateEdit(-1);return}
+        if(matchesShortcut(event,shortcuts.nextEdit)){event.preventDefault();navigateEdit(1);return}
+        if(matchesShortcut(event,shortcuts.lastExecution)){event.preventDefault();returnToExecution();return}
+      }
       if(matchesShortcut(event,resolveSetting(settingsRef.current,'editor.shortcuts').value.outline)){event.preventDefault();if(!document.querySelector('.modal-backdrop'))setPaletteMode('outline');return;}
-      if(event.altKey&&!event.ctrlKey&&!event.metaKey&&['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();navigateHistory(event.key==='ArrowLeft'?-1:1);return;}
+      if(event.altKey&&!event.shiftKey&&!event.ctrlKey&&!event.metaKey&&['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();navigateHistory(event.key==='ArrowLeft'?-1:1);return;}
       if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='p'){event.preventDefault();event.stopPropagation();if(!document.querySelector('.modal-backdrop')||paletteMode)setPaletteMode(event.shiftKey?'commands':'files');return;}
       if ((event.ctrlKey || event.metaKey) && event.altKey && event.key.toLowerCase() === "z") { event.preventDefault(); setFocusMode(value=>!value); return; }
+      if ((event.ctrlKey || event.metaKey) && event.altKey && event.shiftKey && event.key.toLowerCase() === "m") { event.preventDefault();event.stopImmediatePropagation(); if(!document.querySelector('.modal-backdrop'))macroRunRef.current?.(); return; }
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey && event.key.toLowerCase() === "f" && !editorRef.current?.hasTextFocus()) { event.preventDefault(); setShowSearch(true); setShowHistory(false); return; }
       if (event.key === "F8" && !document.querySelector(".modal-backdrop, .feedback-notification")) { const items = problemsRef.current.filter(problem => problem.tabId === documents.activeId); if (items.length) { event.preventDefault(); problemCursorRef.current = problemCursorRef.current < 0 ? event.shiftKey ? items.length - 1 : 0 : (problemCursorRef.current + (event.shiftKey ? -1 : 1) + items.length) % items.length; navigateProblem(items[problemCursorRef.current]); } return; }
       if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "o") { event.preventDefault(); openSqlFile(); return; }
       if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "n") { event.preventDefault(); if (!document.querySelector('.modal-backdrop')) newSqlFileFromLastConnection(); return; }
       if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key === "Tab") { event.preventDefault(); if (!document.querySelector('.modal-backdrop')) cycleSqlTab(event.shiftKey ? -1 : 1); return; }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); saveSqlFile(); return; }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); if(!editorIsReadonly())saveSqlFile(); return; }
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "o") { event.preventDefault(); if (!editorIsReadonly()) setShowPicker(true); return; }
       if ((event.ctrlKey || event.metaKey) && event.code === "Space" && !event.defaultPrevented && editorRef.current?.hasTextFocus()) { manualSuggestionRef.current = true; event.preventDefault(); editorRef.current.trigger("keyboard", "editor.action.triggerSuggest", {}); }
     };
     window.addEventListener("keydown", handler,true); return () => window.removeEventListener("keydown", handler,true);
-  }, [showPicker, showAppearance, showHistory, showSearch, showSnippets, fileDirty, sql, filePath, fileName, recentProfiles]);
+  }, [showPicker, showAppearance, showHistory, showSearch, showSnippets, fileDirty, sql, filePath, fileName, recentProfiles, workspace.root,workspace.projectRules]);
 
   useEffect(() => {
     if (!autoCompletion) return;
@@ -1063,7 +1422,7 @@ export function App() {
     if (!monaco) return;
     const name = `fbsdb-${theme}-${Date.now()}`;
     monaco.editor.defineTheme(name, { base: theme === "light" ? "vs" : "vs-dark", inherit: true,
-      rules: monacoTokenRules(theme, tokenColors), colors: monacoThemeColors(theme) });
+      rules: [...monacoTokenRules(theme, tokenColors),{token:'parameter',foreground:tokenColors.keyword.replace('#',''),fontStyle:'italic'},{token:'variable',foreground:themeConfig.foreground?.replace('#','')||tokenColors.number.replace('#','')},{token:'property',foreground:tokenColors.string.replace('#','')},{token:'method',foreground:tokenColors.number.replace('#','')}], colors: monacoThemeColors(theme) });
     setEditorThemeName(name);
   }, [monaco, theme, themeConfig, tokenColors]);
 
@@ -1085,10 +1444,11 @@ export function App() {
       snapshot: () => {
         const tab = documents.tabs.find(item => item.id === documents.activeId), originTabId = tab?.metadataOriginTabId || documents.activeId;
         const originSession = sessionsRef.current[originTabId] || {}, connection = originSession.activeConnection;
-        return { busy: !!(originSession.executing || originSession.scriptRun?.running || originSession.fetchingPage), sourceObject: tab?.definitionObject, tabId: documents.activeId, originTabId, connected: isNativeHost && !!connection && !["No connection", "Disconnected"].includes(connection.id), settings: completionSettings,
+        return { semanticHighlighting:resolveSetting(settingsRef.current,'editor.semanticHighlighting').value,languageFeatures:largeFilePolicy(tab?.content,largeFileOverridesRef.current[tab?.id]), busy: !!(originSession.executing || originSession.scriptRun?.running || originSession.fetchingPage), sourceObject: tab?.definitionObject, tabId: documents.activeId, originTabId, connected: isNativeHost && !!connection && !["No connection", "Disconnected"].includes(connection.id), settings: completionSettings,
           manualSuggestion: () => { const manual = manualSuggestionRef.current; manualSuggestionRef.current = false; return manual; } };
       },
       onDefinition: openOracleDefinition,
+      onBeforeNavigate:()=>rememberLocation(),
       onReveal: target => {
         if (metadataOriginTabId !== documents.activeId) activateTab(metadataOriginTabId);
         setSidebarOpen(true); setSchemaQuery("");
@@ -1099,17 +1459,19 @@ export function App() {
       onError: setCompletionError,
       onPlscope: setPlscopeReport,
     });
-  }, [monaco, completionSettings, completionObjects, completionSchema, completionSession.oracleVocabulary, allSqlSnippets, activeTabId, metadataOriginTabId]);
+  }, [monaco, completionSettings, completionObjects, completionSchema, completionSession.oracleVocabulary, allSqlSnippets, activeTabId, metadataOriginTabId,largeFileOverrides,settings.user['editor.semanticHighlighting']]);
 
   useEffect(() => {
     if (!monaco) return;
     const owner = activeTabId;
+    if(!largePolicy.diagnostics){updateTabSession('lintProblems',[],owner);const model=editorRef.current?.getModel();if(model)monaco.editor.setModelMarkers(model,'fbsdb-lint',[]);return;}
+    let cancelled=false;
     const timer = setTimeout(async () => {
       const model = editorRef.current?.getModel(), client = completionClientRef.current;
       if (!model || !client) return;
       const text = model.getValue(), version = model.getVersionId();
       const result = await client.request("diagnostics", text, 0);
-      if (!result.diagnostics || model.isDisposed() || model.getVersionId() !== version || documents.activeId !== owner) return;
+      if (cancelled || !result.diagnostics || model.isDisposed() || model.getVersionId() !== version || documents.activeId !== owner) return;
       const problems = result.diagnostics.map((item, index) => {
         const start = model.getPositionAt(item.start), end = model.getPositionAt(item.end);
         return { ...item, id: `${owner}:lint:${index}`, tabId: owner, fileName: documents.tabs.find(tab => tab.id === owner)?.name || "SQL", line: start.lineNumber, column: start.column, offset: item.start, editorSnapshot: text, startLineNumber: start.lineNumber, startColumn: start.column, endLineNumber: end.lineNumber, endColumn: end.column };
@@ -1117,8 +1479,8 @@ export function App() {
       updateTabSession("lintProblems", problems, owner);
       monaco.editor.setModelMarkers(model, "fbsdb-lint", problems.map(problem => ({ ...problem, severity: problem.severity === "warning" ? monaco.MarkerSeverity.Warning : monaco.MarkerSeverity.Error })));
     }, 250);
-    return () => clearTimeout(timer);
-  }, [monaco, sql, activeTabId, completionSettings, completionObjects, completionSchema, completionSession.oracleVocabulary]);
+    return () => {cancelled=true;clearTimeout(timer)};
+  }, [monaco, sql, activeTabId, completionSettings, completionObjects, completionSchema, completionSession.oracleVocabulary,largePolicy.diagnostics]);
 
   useEffect(() => {
     const model = editorRef.current?.getModel(); if (!monaco || !model) return;
@@ -1127,11 +1489,18 @@ export function App() {
   }, [monaco, sql, activeTabId, tabSession.compilationProblems, tabSession.runtimeProblems]);
 
   function updateTokenColor(token, color) { setAllTokenColors((current) => ({ ...current, [theme]: { ...current[theme], [token]: color } })); }
-  function editorIsReadonly() { return !!documents.tabs.find(tab => tab.id === documents.activeId)?.readOnly; }
+  function editorIsReadonly() { return objectTabActive || !!documents.tabs.find(tab => tab.id === documents.activeId)?.readOnly; }
   async function navigateProblem(problem) {
     const tab = documents.tabs.find(tab => tab.id === problem.tabId);
     if (!tab) return;
     const text = problem.tabId === documents.activeId ? documents.text : tab.content;
+    if(problem.source==='Oracle stack'&&problem.definition){
+      const session=sessionsRef.current[problem.tabId]||{};
+      if(session.connectionLost||problem.executedProfileId&&problem.executedProfileId!==session.activeConnection?.id||problem.executedConnectionGeneration!=null&&problem.executedConnectionGeneration!==(session.connectionGeneration??0)){
+        notifyFeedback({kind:'warning',title:'Stack source',message:'The execution session changed. Return to its connection context before loading source.'});return;
+      }
+    }
+
     if (problem.offset != null && problem.editorSnapshot === text) {
       rememberLocation();
       if (problem.tabId !== documents.activeId) activateTab(problem.tabId);
@@ -1141,8 +1510,11 @@ export function App() {
     if (problem.definition) {
       let source = problem.definition;
       if (!source.text) {
+        if(problem.source==='Oracle stack')completionMetadataRef.current.invalidate(problem.tabId,{...source});
+        const epoch=completionMetadataRef.current.session(problem.tabId).epoch;
         const loaded = await completionMetadataRef.current.load(problem.tabId, { owner: source.owner, name: source.name, type: source.type.replace(/ BODY$/, ''), body: source.type.endsWith(' BODY') }, null, 'definition');
-        if (!loaded) return; source = { ...loaded, originTabId: problem.tabId };
+        if (!loaded||completionMetadataRef.current.session(problem.tabId).epoch!==epoch||closedTabsRef.current.has(problem.tabId)) return;
+        source = { ...loaded, originTabId: problem.tabId, sourceVersionNotice:problem.source==='Oracle stack'?'Current server source retrieved after failure. The execution source version is unknown; this line may have changed.':null };
       }
       const offset = offsetAtOraclePosition(source.text, problem.oracleLine, problem.oracleColumn);
       const prefix = offset == null ? null : source.text.slice(0, offset);
@@ -1160,7 +1532,36 @@ export function App() {
     if(location.tabId!==documents.activeId)activateTab(location.tabId);
     requestAnimationFrame(()=>{editorRef.current?.setPosition(location);editorRef.current?.revealPositionInCenter(location);editorRef.current?.focus();navigatingRef.current=false});
   }
-  function jumpToOffset(offset) {const editor=editorRef.current;if(!editor?.getModel())return;rememberLocation();const position=editor.getModel().getPositionAt(offset);editor.setPosition(position);editor.revealPositionInCenter(position);editor.focus();rememberLocation();}
+  function openBookmark(mark){
+    bookmarkCursorRef.current=mark.id;setObjectTabActive(false);
+    const tab=documents.tabs.find(tab=>tab.id===mark.documentId)||documents.tabs.find(tab=>mark.path&&pathKey(tab.path)===pathKey(mark.path));
+    if(tab){if(documents.activeId!==tab.id)activateTab(tab.id);requestAnimationFrame(()=>{const editor=editorRef.current,position=editor?.getModel()?.validatePosition(mark);if(position){editor.setPosition(position);editor.revealPositionInCenter(position);editor.focus()}});return;}
+    if(mark.path&&isNativeHost){pendingSearchPositionRef.current={path:mark.path,lineNumber:mark.lineNumber,column:mark.column};sendNativeCommand('file.openPath',{path:mark.path});return;}
+    setRunState('This session-only bookmark source is no longer open.');
+  }
+  function navigateBookmark(direction){
+    if(!bookmarks.items.length){setRunState('No bookmarks in this workspace.');return;}
+    const index=bookmarks.items.findIndex(mark=>mark.id===bookmarkCursorRef.current),next=index<0?(direction>0?0:bookmarks.items.length-1):(index+direction+bookmarks.items.length)%bookmarks.items.length;openBookmark(bookmarks.items[next]);
+  }
+  function navigateEdit(direction) {
+    const history=editLocationsRef.current,available=item=>documents.tabs.some(tab=>tab.id===item.tabId);
+    const item=direction==='last'?history.last(available):history.move(direction,available);
+    if(!item){setRunState('No further edit location is available.');return;}
+    setObjectTabActive(false);if(documents.activeId!==item.tabId)activateTab(item.tabId);
+    requestAnimationFrame(()=>jumpToOffset(Math.min(item.offset,editorRef.current?.getModel()?.getValueLength()||0)));
+  }
+  function returnToExecution() {
+    const owner=documents.active?.metadataOriginTabId||documents.activeId,context=operations.metadata.get(owner),original=documents.tabs.find(tab=>tab.id===owner);
+    if(!context||!original){setRunState('No execution source is recorded for this document.');return;}
+    setObjectTabActive(false);
+    const offset=currentExecutionOffset(context,original);
+    if(offset!=null){if(documents.activeId!==owner)activateTab(owner);requestAnimationFrame(()=>jumpToOffset(offset));return;}
+    const id=`execution-snapshot:${owner}`,hasPosition=Number.isInteger(context.statementOffset),content=hasPosition?context.editorSnapshot:context.executedSql;
+    if(typeof content!=='string'){setRunState('The execution source position was not recorded.');return;}
+    rememberEditorPosition();documents.open({id,name:`Execution · ${context.fileName||original.name}`,content,readOnly:true,dirty:false,metadataOriginTabId:owner,sourceVersionNotice:'Recorded execution snapshot. Current editor source differs or its position is unavailable.'});setNativeTabId(owner);
+    requestAnimationFrame(()=>jumpToOffset(hasPosition?context.statementOffset:0));
+  }
+  function jumpToOffset(offset) {const editor=editorRef.current;if(!editor?.getModel())return;rememberLocation();const position=editor.getModel().validatePosition(sourcePositionAt(documents.text,offset));editor.setPosition(position);editor.revealPositionInCenter(position);editor.focus();rememberLocation();}
   useEffect(()=>{
     const editor=editorRef.current;if(!monaco||!editor)return;
     let disposed = false;
@@ -1177,19 +1578,53 @@ export function App() {
       const trigger=editor.getDomNode(),r=trigger.getBoundingClientRect(),x=event.event?.posx||r.left+30,y=event.event?.posy||r.top+30;
       event.event?.preventDefault?.();event.event?.stopPropagation?.();
       if(object){openObjectContext({type:'contextmenu',preventDefault(){},stopPropagation(){},currentTarget:trigger,clientX:x,clientY:y},object);setEditorContext(null)}
-      else setEditorContext({tabId:documents.activeId,model,version:model.getVersionId(),selection:range,trigger,x,y,selected:!range.isEmpty(),canUndo:model.canUndo(),canRedo:model.canRedo(),readOnly:editorIsReadonly()});
+      else setEditorContext({tabId:documents.activeId,model,version:model.getVersionId(),selection:range,trigger,x,y,bind:range.isEmpty()?bindAtOffset(model.getValue(),model.getOffsetAt(position)):null,bindType:range.isEmpty()?bindTypeFor(bindAtOffset(model.getValue(),model.getOffsetAt(position)),model.getValue()):null,selected:!range.isEmpty(),canUndo:model.canUndo(),canRedo:model.canRedo(),readOnly:editorIsReadonly()});
     };const listener=editor.onContextMenu(show),keyboard=editor.onKeyDown(event=>{const e=event.browserEvent;if(e.key==='ContextMenu'||e.key==='F10'&&e.shiftKey){e.preventDefault();e.stopPropagation();const position=editor.getPosition(),p=editor.getScrolledVisiblePosition(position),r=editor.getDomNode().getBoundingClientRect();show({target:{position},event:{posx:r.left+(p?.left||20),posy:r.top+(p?.top||20)+20}})}});return()=>{disposed=true;listener.dispose();keyboard.dispose();setEditorContext(null)};
   },[monaco,activeTabId,completionObjects,completionSchema]);
+  // Saved bind types live in the file's bind form definition; unsaved documents have no file key, so types stay read-only there.
+  function bindTypeFor(bind,text) {
+    if(!bind||!filePath)return 'VARCHAR2';
+    return loadBindDefinitions(localStorage,filePath,getOracleBindNames(text)).find(item=>item.name===bind.name)?.type||'VARCHAR2';
+  }
   async function editorContextAction(action,context){
+    const configured=resolveSetting(settings,'editor.shortcuts').value,shortcuts={run:configured.run,format:configured.format,comment:configured.commentLine,find:configured.find,replace:configured.replace,undo:'Ctrl+Z',redo:'Ctrl+Y',cut:'Ctrl+X',copy:'Ctrl+C',paste:'Ctrl+V',selectAll:'Ctrl+A'};
+    if(shortcuts[action])coachShortcut(`editor:${action}`,{run:'Run SQL',format:'Format SQL',comment:'Toggle comment',selectAll:'Select all'}[action]||action[0].toUpperCase()+action.slice(1),shortcuts[action]);
     const editor=editorRef.current,valid=()=>documents.activeId===context.tabId&&editor.getModel()===context.model&&!context.model.isDisposed()&&context.model.getVersionId()===context.version;
     const check=()=>{if(!valid())throw Error('The editor changed. Open the menu again.')};check();editor.setSelection(context.selection);editor.focus();
+    if(action.startsWith('bind:')&&context.bind){
+      const bind=context.bind,from=context.model.getPositionAt(bind.start),to=context.model.getPositionAt(bind.end);
+      if(action.startsWith('bind:type:')){
+        const names=getOracleBindNames(context.model.getValue()),definitions=loadBindDefinitions(localStorage,filePath,names).map(item=>item.name===bind.name?{...item,type:action.slice(10)}:item);
+        saveBindDefinitions(localStorage,filePath,definitions);
+        notifyFeedback({kind:'success',title:'Bind type',message:`:${bind.name} is now ${action.slice(10)} in this file's bind form. SQL text is unchanged.`,scope:context.tabId});return;
+      }
+      if(action==='bind:copy'){await navigator.clipboard.writeText(`:${bind.name}`);return}
+      if(action==='bind:find'){editor.setSelection(new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column));editor.getAction('actions.find')?.run();return}
+      if(action==='bind:run'){runQuery();return}
+    }
     if(action==='run'){runQuery();return}if(action==='explain'){explainQuery();return}if(action==='format'){await formatSql();return}
+    if(action==='identifierCase'){openIdentifierCase();return}
+    if(action==='localRename'){openLocalRename();return}
+    if(action==='changeSignature'){openChangeSignature();return}
+    if(action==='extractProcedure'){openExtractProcedure();return}
+    if(action==='moveUp'||action==='moveDown'){moveStatement(action==='moveUp'?-1:1);return}
+    if(action==='embeddedSql'){openEmbeddedSql();return}
+    if(action==='clipboardHistory'){setClipboardHistoryOpen(true);return}
+    if(action==='editorMacros'){setEditorMacrosOpen(true);return}
+    if(action==='quickFix'){openQuickFix();return}
+    if(action==='deleteReview'){reviewDeleteImpact();return}
+    if(action==='surround'){openSurroundMenu(context.x,context.y,context.trigger);return}
+    if(action==='pasteAs'){openPasteAsMenu(context.x,context.y,context.trigger);return}
+    if(action==='extractCte'){extractSelectionToCte();return}
+    if(action==='docComment'){generateDocComment();return}
+    if(action==='columnCursors'){await pasteColumnCursors();return}
     if(action==='selectAll'){editor.setSelection(context.model.getFullModelRange());return}
     if(action==='copy'||action==='cut'){await navigator.clipboard.writeText(context.model.getValueInRange(context.selection));if(action==='copy')return;check()}
     if(action==='cut'||action==='paste'){if(context.readOnly)return;const text=action==='paste'?await navigator.clipboard.readText():'';check();editor.pushUndoStop();editor.executeEdits('context-menu',[{range:context.selection,text}]);editor.pushUndoStop();return}
     if(action==='undo'||action==='redo'){editor.trigger('context-menu',action,{});return}
     const command=editor.getAction({comment:'editor.action.commentLine',find:'actions.find',replace:'editor.action.startFindReplaceAction'}[action]);
     if(!command?.isSupported())throw Error('This editor action is unavailable.');await command.run();
+    if(action==='comment'&&macroRecording)setMacroRecording(steps=>steps&&recordMacroStep(steps,'comment'));
   }
   function openObjectContext(event,item) {
     event.preventDefault();event.stopPropagation();
@@ -1197,6 +1632,12 @@ export function App() {
     const profileId=sessionsRef.current[originTabId]?.activeConnection?.id;
     if(!profileId||['No connection','Disconnected'].includes(profileId))return;
     setObjectMenu({cancellation:completionCancellation(),item:{...item,owner:item.owner||schemaOwner},trigger,x:event.type==='contextmenu'?event.clientX||rect.left:rect.left,y:event.type==='contextmenu'?event.clientY||rect.bottom:rect.bottom,editorTabId:documents.activeId,originTabId,profileId,epoch:completionMetadataRef.current.session(originTabId).epoch});
+  }
+  // Result values only navigate to objects already present in the loaded schema metadata.
+  function showSmartObject({owner,name}) {
+    const item=completionObjects.find(object=>(object.owner||schemaOwner)===owner&&object.name===name&&object.type);
+    if(item)openExplorerObject(item,'Overview');
+    else notifyFeedback({kind:'warning',title:'Oracle object',message:`${owner}.${name} is not in the loaded schema metadata. Refresh the explorer or check access.`,scope:documents.activeId});
   }
   function openExplorerObject(item,view='Overview',originTabId=metadataOriginTabId) {
     setDefinitionError('');
@@ -1270,20 +1711,48 @@ export function App() {
     if(source&&broker.session(originTabId).epoch===epoch&&!closedTabsRef.current.has(originTabId)&&documents.activeId===activeTabId)openOracleDefinition({...source,originTabId});
     else if(!source)setDefinitionError(broker.session(originTabId).lastError||'Oracle definition is unavailable for this object.');
   }
+  // Coaches pointer/menu use only; hints are counted per action and can be dismissed for good.
+  function coachShortcut(id,label,shortcut) {
+    const hint=nextShortcutHint(globalThis.localStorage,{id,label,shortcut,enabled:resolveSetting(settings,'ui.shortcutCoach').value});
+    if(!hint)return;const feedbackId=`shortcut-coach:${id}`;
+    notifyFeedback({id:feedbackId,kind:'info',title:'Keyboard shortcut',message:hint.message,actions:[{label:"Don't show again",onClick:()=>{dismissShortcutHint(globalThis.localStorage,id);dismissFeedback(feedbackId)}}]});
+  }
   function choosePaletteItem(item) {
     if(item.kind==='file'){if(item.objectTab){const tab=objectTabs.find(t=>t.id===item.tabId);if(tab){setActiveObjectTabId(tab.id);setObjectTabActive(true);setActiveObject(tab.key);inspectOracleObject(tab.object,tab.originTabId,tab.view==='Related tables');}}else if(item.tabId){setObjectTabActive(false);activateTab(item.tabId);}else openWorkspaceFile(item);}
     else if(item.kind==='object')openExplorerObject(item,'Overview');
     else if(item.kind==='connection'){const profile=dbConnections.find(profile=>profile.id===item.profileId);if(profile)switchConnection(profile);}
     else if(item.kind==='history'){newSqlFileNow();requestAnimationFrame(()=>insertHistorySql(item.sql));}
-    else if(item.kind==='outline')jumpToOffset(item.start);
-    else item.run?.();
+    else if(item.kind==='outline'){setObjectTabActive(false);requestAnimationFrame(()=>jumpToOffset(item.start));}
+    else if(item.kind==='setting'){setSettingsFocus({query:item.label,category:['privacy','accessibility'].includes(item.detail)?'preferences':item.detail});setShowAppearance(true);}
+    else {item.run?.();if(item.detail)coachShortcut(`palette:${item.id}`,item.label,item.detail)}
   }
   useEffect(()=>{
-    setDocumentOutline([]);if(!monaco||!completionClientRef.current)return;
+    setDocumentOutline([]);if(!largePolicy.outline||!monaco||!completionClientRef.current)return;
     let cancelled=false;const source=sql,tabId=activeTabId;
     const timer=setTimeout(async()=>{const result=await completionClientRef.current?.request('outline',source,0);if(!cancelled&&tabId===documents.activeId&&documents.text===source)setDocumentOutline(result?.outline||[])},250);
     return()=>{cancelled=true;clearTimeout(timer)};
-  },[sql,activeTabId,monaco,completionSettings,completionObjects,completionSchema,completionSession.oracleVocabulary,allSqlSnippets]);
+  },[sql,activeTabId,monaco,completionSettings,completionObjects,completionSchema,completionSession.oracleVocabulary,allSqlSnippets,largePolicy.outline]);
+  // Dropping a result cell inserts only a bind placeholder; the cell value is kept in memory for the next bind prompt and never written to the SQL or to disk.
+  function attachBindDrop(editor) {
+    const node = editor.getDomNode();
+    if (!node || node.dataset.bindDrop) return;
+    node.dataset.bindDrop = '1';
+    node.addEventListener('dragover', event => { if ([...(event.dataTransfer?.types || [])].includes(cellDragType)) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }, true);
+    node.addEventListener('drop', event => {
+      const raw = event.dataTransfer?.getData(cellDragType);
+      if (!raw) return;
+      event.preventDefault(); event.stopPropagation();
+      const model = editor.getModel();
+      if (!model || editorIsReadonly()) { notifyFeedback({ kind: 'warning', title: 'Bind placeholder', message: 'This editor is read-only.', scope: documents.activeId }); return; }
+      const hit = editor.getTargetAtClientPoint(event.clientX, event.clientY), position = hit && [6, 7].includes(hit.type) && hit.position ? hit.position : editor.getPosition();
+      const plan = planBindDrop(raw, getOracleBindNames(model.getValue()));
+      if (!plan || !position) return;
+      editor.executeEdits('result-bind-drop', [{ range: new monacoRef.current.Range(position.lineNumber, position.column, position.lineNumber, position.column), text: plan.insertText, forceMoveMarkers: true }]);
+      if (plan.prefill) bindPrefillRef.current[plan.prefill.name] = plan.prefill;
+      notifyFeedback({ kind: 'success', title: 'Bind created', message: `${plan.insertText} (${plan.type}) was inserted. ${plan.prefill ? 'Its value is offered only in the next bind prompt and is not saved.' : 'No value was carried over.'}`, scope: documents.activeId });
+      editor.focus();
+    }, true);
+  }
   function openOracleDefinition(source, selection) {
     if (!['PACKAGE', 'PACKAGE BODY', 'PROCEDURE', 'FUNCTION', 'TRIGGER', 'TYPE', 'TYPE BODY'].includes(source.type)) {
       setObjectDefinition({ ...source, originTabId: source.originTabId || documents.activeId });
@@ -1292,7 +1761,7 @@ export function App() {
     rememberLocation();
     const originTabId = source.originTabId, id = `definition:${originTabId}:${source.owner}:${source.type}:${source.name}`;
     rememberEditorPosition();
-    const tab = { id, name: `${source.owner}.${source.name}${source.type.endsWith(" BODY") ? ".body" : ""}.sql`, path: null, content: source.text, dirty: false, readOnly: true, metadataOriginTabId: originTabId, definitionObject: { owner: source.owner, name: source.name, type: source.type } };
+    const tab = { id, name: `${source.owner}.${source.name}${source.type.endsWith(" BODY") ? ".body" : ""}.sql`, path: null, content: source.text, dirty: false, readOnly: true, metadataOriginTabId: originTabId, definitionObject: { owner: source.owner, name: source.name, type: source.type }, sourceVersionNotice:source.sourceVersionNotice };
     documents.open(tab);
     setNativeTabId(originTabId);
     requestAnimationFrame(() => { const position = { lineNumber: selection?.startLineNumber || selection?.lineNumber || 1, column: selection?.startColumn || selection?.column || 1 }; editorRef.current?.setPosition(position); editorRef.current?.revealPositionInCenter(position); editorRef.current?.focus(); rememberLocation(id,position); });
@@ -1335,7 +1804,21 @@ export function App() {
   function openSqlFileNow() { if (isNativeHost) sendNativeCommand("file.open"); else openFileInputRef.current?.click(); }
   function openSqlFile() { rememberEditorPosition(); openSqlFileNow(); }
   function openWorkspace() {setShowOpenWorkspace(true);}
-  function openWorkspaceFile(file) { const cached = documents.tabs.find((tab) => pathKey(tab.path) === pathKey(file.path)); if (cached && !file.newTab) { activateTab(cached.id); return; } rememberEditorPosition(); if (isNativeHost) sendNativeCommand("file.openPath", { path: file.path, forceNew:!!file.newTab }); else openSqlFileNow(); }
+  // Companion bind forms are shared through the workspace: load once per file so the form is ready on first use; nothing runs.
+  const bindFormRequested=useRef(new Set());
+  useEffect(()=>{if(isNativeHost&&workspace.root&&filePath&&!bindFormRequested.current.has(filePath)){bindFormRequested.current.add(filePath);sendNativeCommand('workspace.binds.load',{path:filePath})}},[filePath,workspace.root]);
+  // Single clicks in the Explorer reuse one clean preview tab; editing, double-click or an explicit open keeps the file.
+  const [previewTabId, setPreviewTabId] = useState(null), previewPathRef = useRef(null), previewTabRef = useRef(null), closeTabRef = useRef(null);
+  previewTabRef.current = previewTabId; closeTabRef.current = closeTab;
+  useEffect(() => { const settled = settlePreview(previewTabId, documents.tabs); if (settled !== previewTabId) setPreviewTabId(settled); }, [documents.tabs, previewTabId]);
+  function promotePreview(file) { const tab = documents.tabs.find(item => item.path && pathKey(item.path) === pathKey(file.path)); if (tab && tab.id === previewTabId) setPreviewTabId(null); }
+  function openWorkspaceFile(file, options = {}) {
+    const plan = previewOpenPlan({ previewId: previewTabId, tabs: documents.tabs }, file, { preview: Boolean(options.preview) && !file.newTab, enabled: resolveSetting(settings, 'ui.previewTabs').value });
+    if (plan.type === 'open' && plan.asPreview) previewPathRef.current = file.path; else previewPathRef.current = null;
+    if (plan.type === 'activate' && plan.promote) setPreviewTabId(null);
+    return openWorkspaceFileNow(file);
+  }
+  function openWorkspaceFileNow(file) { const cached = documents.tabs.find((tab) => pathKey(tab.path) === pathKey(file.path)); if (cached && !file.newTab) { activateTab(cached.id); return; } rememberEditorPosition(); if (isNativeHost) sendNativeCommand("file.openPath", { path: file.path, forceNew:!!file.newTab }); else openSqlFileNow(); }
   function activateTab(id, remember = true) { if (remember) { rememberLocation(); rememberEditorPosition(); } const tab = documents.tabs.find((item) => item.id === id); if (!tab) return; const restorePosition=editorPositionsRef.current.get(id); setNativeTabId(tab.metadataOriginTabId || id); documents.activate(id); schemaLookupRef.current = makeOracleRelationLookup(sessionsRef.current[id]?.schemaObjects || [], sessionsRef.current[id]?.schemaOwner); schemaReadyRef.current = Boolean(sessionsRef.current[id]?.schemaReady); schemaLoadedRef.current.clear(); schemaRequestedRef.current.clear(); if (isNativeHost && !tab.readOnly) sendNativeCommand("file.activate", { path: tab.path, tabId: id }); queueSchemaForSql(tab.content);
     if(isNativeHost&&tab.restoreConnectionOnActivate){
       setTabs(current=>current.map(item=>item.id===id?{...item,restoreConnectionOnActivate:false}:item));
@@ -1344,22 +1827,217 @@ export function App() {
     }
     requestAnimationFrame(() => {const position=restorePosition;if(position){editorRef.current?.setPosition(position);editorRef.current?.revealPositionInCenterIfOutsideViewport(position)}editorRef.current?.focus();rememberLocation(id)}); }
   function cycleSqlTab(direction) { const items = documents.tabs; if (items.length < 2) return; const index = items.findIndex(item => item.id === documents.activeId); activateTab(items[(index + direction + items.length) % items.length].id); }
-  function newSqlFileNow() {
+  function openIdentifierCase() {
+    const editor=editorRef.current,model=editor?.getModel(),selection=editor?.getSelection();
+    if(!model||activeTabReadonly)return;
+    if(!selection||selection.isEmpty()){notifyFeedback({kind:'warning',title:'Convert identifier case',message:'Select the identifiers to convert.',scope:documents.activeId});return}
+    setIdentifierCase({tabId:documents.activeId,model,version:model.getVersionId(),source:model.getValue(),range:{start:model.getOffsetAt(selection.getStartPosition()),end:model.getOffsetAt(selection.getEndPosition())},dictionary:workspace.root?projectOptions(workspace.projectRules).dictionary:null});
+  }
+  function openLocalRename(){
+    const editor=editorRef.current,model=editor?.getModel(),position=editor?.getPosition();
+    if(!model||!position||editorIsReadonly())return;
+    setLocalRename({tabId:documents.activeId,model,version:model.getVersionId(),source:model.getValue(),cursor:Math.min(model.getValueLength(),model.getOffsetAt(position)+1),options:{objects:schemaObjects,currentSchema:schemaOwner}});
+  }
+  function openChangeSignature(){
+    const editor=editorRef.current,model=editor?.getModel(),position=editor?.getPosition();
+    if(!model||!position||editorIsReadonly())return;
+    setChangeSignature({tabId:documents.activeId,model,version:model.getVersionId(),source:model.getValue(),cursor:Math.min(model.getValueLength(),model.getOffsetAt(position)+1)});
+  }
+  function openExtractProcedure(){
+    const editor=editorRef.current,model=editor?.getModel(),selection=editor?.getSelection();
+    if(!model||!selection||selection.isEmpty()||editorIsReadonly()){notifyFeedback({kind:'warning',title:'Extract Procedure',message:'Select complete PL/SQL assignment statements first.',scope:documents.activeId});return}
+    setExtractProcedure({tabId:documents.activeId,model,version:model.getVersionId(),source:model.getValue(),start:model.getOffsetAt(selection.getStartPosition()),end:model.getOffsetAt(selection.getEndPosition())});
+  }
+  function moveStatement(direction,record=true){
+    const editor=editorRef.current,model=editor?.getModel(),position=editor?.getPosition();if(!model||!position||editorIsReadonly())return;
+    const plan=planStatementMove(model.getValue(),model.getOffsetAt(position),direction);
+    if(plan.error){notifyFeedback({kind:'warning',title:'Move statement',message:plan.error,scope:documents.activeId});return false}
+    const from=model.getPositionAt(plan.edit.start),to=model.getPositionAt(plan.edit.end);
+    editor.pushUndoStop();editor.executeEdits('move-statement',[{range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:plan.edit.after}]);editor.pushUndoStop();editor.focus();
+    if(record&&macroRecording)setMacroRecording(steps=>steps&&recordMacroStep(steps,direction<0?'moveUp':'moveDown'));
+    return true;
+  }
+  async function runEditorMacro(macro){
+    if(!macro?.steps?.length||editorIsReadonly())throw Error('Choose an editable editor and a saved macro.');
+    const editor=editorRef.current,model=editor?.getModel(),tabId=documents.activeId;if(!model)throw Error('Open a SQL editor first.');
+    for(const step of macro.steps){
+      if(documents.activeId!==tabId||editor.getModel()!==model||model.isDisposed())throw Error('The editor changed during macro replay.');
+      if(step==='comment')await editor.getAction('editor.action.commentLine').run();
+      else if(step==='moveUp'||step==='moveDown'){if(!moveStatement(step==='moveUp'?-1:1,false))throw Error('A movement step is unavailable at the current caret.');}
+      else throw Error('This macro contains an unsupported action.');
+    }
+    editor.focus();
+  }
+  macroRunRef.current=()=>{const macro=editorMacros[0];if(macro)runEditorMacro(macro).catch(error=>notifyFeedback({kind:'warning',title:'Editor macro',message:error.message,scope:documents.activeId}));else setEditorMacrosOpen(true)};
+  function openEmbeddedSql(){
+    const editor=editorRef.current,model=editor?.getModel(),position=editor?.getPosition();if(!model||!position||editorIsReadonly())return;
+    const source=model.getValue(),context=embeddedSqlAt(source,model.getOffsetAt(position));
+    setEmbeddedSql({tabId:documents.activeId,model,version:model.getVersionId(),source,context});
+  }
+  function openQuickFix(){
+    const editor=editorRef.current,model=editor?.getModel(),position=editor?.getPosition();
+    if(!model||!position||editorIsReadonly())return;
+    const source=model.getValue(),cursor=model.getOffsetAt(position),fixes=contextualQuickFixes(source,cursor,allProblems.filter(problem=>problem.tabId===documents.activeId));
+    setQuickFix({tabId:documents.activeId,model,version:model.getVersionId(),source,fixes});
+  }
+  quickFixRef.current=openQuickFix;
+  async function reviewDeleteImpact(){
+    const editor=editorRef.current,model=editor?.getModel(),position=editor?.getPosition(),tabId=documents.activeId,version=model?.getVersionId();
+    if(!model||!position||!workspace.root||!isNativeHost){notifyFeedback({kind:'warning',title:'Delete review',message:'Open a workspace in the desktop app to inspect project references.',scope:tabId});return}
+    const source=model.getValue(),cursor=Math.min(source.length,model.getOffsetAt(position)+1),{deleteImpactSeed}=await import('./deleteImpact.js');
+    if(documents.activeId!==tabId||editor.getModel()!==model||model.getVersionId()!==version)return;
+    const impact=deleteImpactSeed(source,cursor,{objects:schemaObjects,currentSchema:schemaOwner});
+    if(impact.error){notifyFeedback({kind:'warning',title:'Delete review',message:impact.error,scope:tabId});return}
+    setDeleteReview(impact);setWorkspaceSearchScope(null);setSearchQuery(impact.name);setShowSearch(true);
+  }
+  async function pasteColumnCursors() {
+    const editor=editorRef.current,model=editor?.getModel(),selection=editor?.getSelection(),tabId=documents.activeId,version=model?.getVersionId();
+    if(!model||!selection||editorIsReadonly())return;
+    try {
+      const draft=columnCursorDraft(await navigator.clipboard.readText(),model.getEOL());
+      if(draft.error)throw Error(draft.error);
+      if(documents.activeId!==tabId||editor.getModel()!==model||model.isDisposed()||model.getVersionId()!==version)throw Error('The editor changed. Copy the columns and try again.');
+      const start=model.getOffsetAt(selection.getStartPosition());
+      editor.pushUndoStop();editor.executeEdits('column-cursors',[{range:selection,text:draft.text,forceMoveMarkers:true}]);editor.pushUndoStop();
+      editor.setSelections(draft.spans.map(span=>{const a=model.getPositionAt(start+span.start),b=model.getPositionAt(start+span.end);return new monacoRef.current.Selection(a.lineNumber,a.column,b.lineNumber,b.column)}));
+      editor.focus();
+    } catch(error) {notifyFeedback({kind:'warning',title:'Column cursors',message:error.message||'Clipboard unavailable',scope:tabId})}
+  }
+  // Wraps whole selected lines with a snippet so Tab moves through the placeholders.
+  function openSurroundMenu(x,y,trigger) {
+    const editor=editorRef.current,model=editor?.getModel(),selection=editor?.getSelection();
+    if(!model||activeTabReadonly)return;
+    if(!selection||selection.isEmpty()){notifyFeedback({kind:'warning',title:'Surround with',message:'Select the code to wrap.',scope:documents.activeId});return}
+    const lines=new monacoRef.current.Range(selection.startLineNumber,1,selection.endColumn===1&&selection.endLineNumber>selection.startLineNumber?selection.endLineNumber-1:selection.endLineNumber,Number.MAX_SAFE_INTEGER),range=model.validateRange(lines),options=surroundOptions(model.getValueInRange(range));
+    if(!options.length)return;
+    setSurroundMenu({tabId:documents.activeId,model,version:model.getVersionId(),selection:range,trigger,x,y,options});
+  }
+  const pasteAsOptions=[{id:'paste:in',label:'IN list from copied values'},{id:'paste:json',label:'JSON_TABLE draft from copied JSON'},{id:'paste:insert',label:'INSERT template from copied column names'}];
+  function openPasteAsMenu(x,y,trigger) {
+    const editor=editorRef.current,model=editor?.getModel();if(!model||activeTabReadonly)return;
+    setSurroundMenu({tabId:documents.activeId,model,version:model.getVersionId(),selection:editor.getSelection(),trigger,x,y,paste:true,options:pasteAsOptions});
+  }
+  // Converted clipboard text replaces the selection as one undoable edit; it is never executed.
+  async function applyPasteAs(action,context) {
+    const editor=editorRef.current,model=context.model;
+    const text=await navigator.clipboard.readText();
+    if(documents.activeId!==context.tabId||editor.getModel()!==model||model.isDisposed()||model.getVersionId()!==context.version)throw Error('The editor changed. Choose Paste as again.');
+    const result=action==='paste:in'?inListSql(text):action==='paste:json'?jsonTableSql(text):insertTemplateSql(text);
+    if(result.error)throw Error(result.error);
+    const sqlText=result.sql.replace(/\n/g,model.getEOL());
+    editor.setSelection(context.selection);editor.focus();editor.pushUndoStop();editor.executeEdits('paste-as',[{range:context.selection,text:sqlText,forceMoveMarkers:true}]);editor.pushUndoStop();
+  }
+  function applySurround(action,context) {
+    if(action.startsWith('paste:'))return applyPasteAs(action,context);
+    const editor=editorRef.current,model=context.model,id=action.replace(/^surround:/,'');
+    if(documents.activeId!==context.tabId||editor.getModel()!==model||model.isDisposed()||model.getVersionId()!==context.version)throw Error('The editor changed. Choose Surround with again.');
+    const modelOptions=model.getOptions(),indent=modelOptions.insertSpaces?' '.repeat(modelOptions.indentSize||modelOptions.tabSize||2):'	';
+    editor.setSelection(context.selection);editor.focus();
+    editor.getContribution('snippetController2').insert(surroundSnippet(id,model.getValueInRange(context.selection),{indent,newline:model.getEOL()}),{adjustWhitespace:false,undoStopBefore:true,undoStopAfter:true});
+  }
+  function applyIdentifierCase(plan) {
+    const editor=editorRef.current,request=identifierCase,model=request?.model;
+    if(!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version)throw Error('The editor changed after the preview. Close and convert again.');
+    editor.pushUndoStop();
+    editor.executeEdits('identifier-case',plan.edits.map(edit=>{const from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);return {range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.text}}));
+    editor.pushUndoStop();setIdentifierCase(null);editor.focus();
+  }
+  function applyLocalRename(plan){
+    const editor=editorRef.current,request=localRename,model=request?.model;
+    if(!plan?.edits?.length||!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version)throw Error('The editor changed after the preview. Close and rename again.');
+    editor.pushUndoStop();editor.executeEdits('rename-local',plan.edits.map(edit=>{const from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);return {range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.after}}));editor.pushUndoStop();setLocalRename(null);editor.focus();
+  }
+  function applyChangeSignature(plan){
+    const editor=editorRef.current,request=changeSignature,model=request?.model;
+    if(!plan?.edits?.length||!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version||model.getValue()!==request.source)throw Error('The editor changed after the preview. Reopen Change Signature.');
+    editor.pushUndoStop();editor.executeEdits('change-signature',plan.edits.map(edit=>{const from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);return {range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.after}}));editor.pushUndoStop();setChangeSignature(null);editor.focus();
+  }
+  function applyExtractProcedure(plan){
+    const editor=editorRef.current,request=extractProcedure,model=request?.model;
+    if(!plan?.edits?.length||!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version||model.getValue()!==request.source)throw Error('The editor changed after the preview. Reopen Extract Procedure.');
+    editor.pushUndoStop();editor.executeEdits('extract-procedure',plan.edits.map(edit=>{const from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);return {range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.after}}));editor.pushUndoStop();setExtractProcedure(null);editor.focus();
+  }
+  function applyEmbeddedSql(plan){
+    const editor=editorRef.current,request=embeddedSql,model=request?.model;
+    if(!plan?.edit||!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version||model.getValue()!==request.source)throw Error('The editor changed after the preview. Reopen embedded SQL.');
+    const edit=plan.edit,from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);
+    editor.pushUndoStop();editor.executeEdits('embedded-sql',[{range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.after}]);editor.pushUndoStop();setEmbeddedSql(null);editor.focus();
+  }
+  function pasteClipboardEntry(entry,distributeLines){
+    const editor=editorRef.current,model=editor?.getModel(),selections=editor?.getSelections();
+    if(!model||!selections?.length||editorIsReadonly())throw Error('Choose an editable SQL editor.');
+    const result=clipboardPasteTexts(entry,selections.length,distributeLines);if(result.error)throw Error(result.error);
+    editor.pushUndoStop();editor.executeEdits('clipboard-history',selections.map((selection,index)=>({range:selection,text:result.texts[index],forceMoveMarkers:true})));editor.pushUndoStop();setClipboardHistoryOpen(false);editor.focus();
+  }
+  function applyQuickFix(fix){
+    const editor=editorRef.current,request=quickFix,model=request?.model;
+    if(!fix?.edits?.length||!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version||model.getValue()!==request.source)throw Error('The editor changed after the preview. Reopen Quick fixes.');
+    editor.pushUndoStop();editor.executeEdits('quick-fix',fix.edits.map(edit=>{const from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);return {range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.text}}));editor.pushUndoStop();setQuickFix(null);editor.focus();
+  }
+  function switchPackageSource() {
+    const result = relatedPackageDocument(documents.active || {}, documents.tabs, {root: workspace.root, sessions: sessionsRef.current,rules:workspace.projectRules});
+    if (result.target) activateTab(result.target.id);
+    else if (isNativeHost && workspace.root && ['PACKAGE','PACKAGE BODY'].includes(describeOracleSource(documents.active || {},workspace.projectRules).declaration?.type)) setRelatedSources({root:workspace.root,document:documents.active});
+  }
+  function reviewSourceForCompilation(statement, target) {
+    const document=documents.active,session=sessionsRef.current[document?.id]||{};
+    if(!document||document.readOnly||objectTabActive||session.executing||session.fetchingPage||session.scriptRun?.running)return;
+    if(!isNativeHost||!session.activeConnection||['No connection','Disconnected'].includes(session.activeConnection.id)){setShowPicker(true);return;}
+    const prepared=prepareSourceCompilation(typeof statement==='string'?{...document,content:statement}:document,workspace.projectRules);
+    if(prepared.error){setRunState(prepared.error);return;}
+    setSourceCompile({document:{...document},prepared,statementOffset:typeof statement==='string'?target?.start??null:0,tabId:document.id,profileId:session.activeConnection.id});
+  }
+  function reviewPausedScript(owner) {
+    const run=operations.scripts.get(owner),waiting=run?.awaitingSourceReview,document=documents.tabs.find(tab=>tab.id===owner);
+    if(!waiting||!document)return;
+    if(documents.activeId!==owner)activateTab(owner);
+    const prepared={sql:waiting.sql,original:waiting.sql};
+    setSourceCompile({document:{...document,content:run.source},prepared,statementOffset:waiting.offset,tabId:owner,profileId:waiting.profileId,generation:waiting.generation,scriptRequestId:run.requestId,scriptIndex:waiting.index,reviewNonce:waiting.reviewNonce});
+  }
+  useEffect(()=>{
+    if(tabSession.scriptRun?.awaitingSourceReview)reviewPausedScript(activeTabId);
+  },[activeTabId,tabSession.scriptRun?.awaitingSourceReview?.reviewNonce]);
+  function openRunConfigurations() {
+    let source=objectTabActive?{name:'',content:''}:documents.active;if(!source)return;
+    const origin=objectTabActive&&objectTab?objectTab.originTabId:source.metadataOriginTabId||source.id;setObjectTabActive(false);
+    if(describeOracleSource(source,workspace.projectRules).declaration?.type==='PACKAGE BODY')source=relatedPackageDocument(source,documents.tabs,{root:workspace.root,sessions:sessionsRef.current,rules:workspace.projectRules}).target||source;
+    const generated=sourceRunConfigurations(source,workspace.projectRules,sessionsRef.current[origin]?.schemaOwner||'');
+    if(documents.activeId!==origin)activateTab(origin);
+    if(documents.active?.readOnly)return;
+    setRunConfigurations({root:workspace.root,tabId:origin,signatures:generated.configurations,signatureErrors:generated.errors});
+  }
+  function newSqlFileNow(content = "", extra = {}) {
     const id = `new-${crypto.randomUUID()}`;
     rememberEditorPosition();
-    documents.open({ id, name: "Untitled.sql", path: null, content: "", dirty: false, connectionProfileId: null });
+    documents.open({ id, name: nextQueryName(documents.tabs), path: null, content, dirty: Boolean(content), connectionProfileId: null, ...extra });
     setNativeTabId(id);
     if (isNativeHost) sendNativeCommand("file.new", { tabId: id });
     schemaReadyRef.current = false; schemaLookupRef.current = new Map(); schemaLoadedRef.current.clear(); schemaRequestedRef.current.clear();
     requestAnimationFrame(() => editorRef.current?.focus());
   }
-  function newSqlFileFromLastConnection() { const current = activeConnectionRef.current; const profile = dbConnectionsRef.current.find(item => item.id === (current && !['No connection', 'Disconnected'].includes(current.id) ? current.id : null)); newSqlFileNow(); if (profile) { if (isNativeHost) beginConnection({ ...profile, tabId: documents.activeId }); else { setActiveConnection(profile); setTabs(tabs => tabs.map(tab => tab.id === documents.activeId ? { ...tab, connectionProfileId: profile.id } : tab)); } } }
+  function applyProjectRunDefaults() {
+    if(editorIsReadonly()||executing||fetchingPage||tabSession.scriptRun?.running)return;
+    const defaults=projectOptions(workspace.projectRules).run;setQueryTimeout(defaults.timeoutSeconds);setMaxRows(defaults.pageSize);setRunState('Project run defaults applied; SQL has not been executed.');
+  }
+  function newProjectSqlFile() {
+    setObjectTabActive(false);newSqlFileNow();
+    const options=projectOptions(workspace.projectRules);setQueryTimeout(options.run.timeoutSeconds);updateTabSession('pageSizePreference',options.run.pageSize,documents.activeId);
+    const profile=dbConnectionsRef.current.find(item=>item.id.toLowerCase()===options.defaultConnectionId?.toLowerCase());
+    if(options.defaultConnectionId)documents.patch(documents.activeId,{connectionProfileId:options.defaultConnectionId});
+    if(profile&&profile.available!==false){beginConnection({...profile,tabId:documents.activeId})}
+    else setRunState(options.defaultConnectionId?'The project default profile is unavailable. Choose a saved connection.':'Project SQL file created; choose its connection.');
+  }
+  function newScratchFile() { setObjectTabActive(false); setActiveObject(''); newSqlFileFromLastConnection({ name: nextScratchName(documents.tabs), scratch: true }); }
+  function promoteScratch(id) { if (documents.activeId !== id) activateTab(id); setObjectTabActive(false); saveSqlFile(); }
+  function newSqlFileFromLastConnection(extra = {}) { const current = activeConnectionRef.current; const profile = dbConnectionsRef.current.find(item => item.id === (current && !['No connection', 'Disconnected'].includes(current.id) ? current.id : null)); newSqlFileNow("", extra); if (profile) { if (isNativeHost) beginConnection({ ...profile, tabId: documents.activeId }); else { setActiveConnection(profile); setTabs(tabs => tabs.map(tab => tab.id === documents.activeId ? { ...tab, connectionProfileId: profile.id } : tab)); } } }
   function closeTab(id, onClosed = null) {
     const tab = documents.tabs.find(item => item.id === id); if (!tab) return;
     const complete = () => {
       setObjectDefinition(current => current?.originTabId === id ? null : current);
-      documentSavesRef.current.forget(id);
-      batchDiscardRef.current.delete(id);closedTabsRef.current.add(id); operations.pages.delete(id); completionMetadataRef.current.forget(id); completionRecentRef.current.delete(id);
+      documentSavesRef.current.forget(id);executionSummaries.current?.forget(id);runConsoleStore.current?.clear(id);
+      for(const [request,entry] of sourceBaselineRequests.current)if(entry.tabId===id)sourceBaselineRequests.current.delete(request);
+      for(const key of sourceBaselineAttempts.current)if(JSON.parse(key)[0]===id)sourceBaselineAttempts.current.delete(key);
+      bookmarks.forgetDocument(id);editLocationsRef.current.forget(id);batchDiscardRef.current.delete(id);closedTabsRef.current.add(id); operations.pages.delete(id); completionMetadataRef.current.forget(id); completionRecentRef.current.delete(id);
       setTabSessions(current => { const next = { ...current }; delete next[id]; return next; });
       results.forget(id);
       const activeIdBeforeClose = documents.activeId;
@@ -1371,17 +2049,44 @@ export function App() {
       else newSqlFileNow();
       onClosed?.();
     };
+    const draftCount = countTabDrafts(id);
+    if (draftCount && !draftsConfirmedRef.current.has(id)) { if (id !== documents.activeId) activateTab(id); setDraftGuard({ reason: 'close', name: tab.name, tabId: id, count: draftCount, transaction: Boolean(sessionsRef.current[id]?.transactionPending), run: () => { draftsConfirmedRef.current.add(id); closeTab(id, onClosed); } }); return; }
     const retry = () => { const request = sendNativeCommand("tab.close", { tabId: id }); tabCloseActionsRef.current.set(request, { complete, retry }); };
     const close = () => isNativeHost && !tab.readOnly ? retry() : complete();
-    if (tab.dirty && !tab.readOnly && !batchDiscardRef.current.has(id)) { if (id !== documents.activeId) activateTab(id); setPendingFileAction({ run: close }); }
+    if (promptsOnClose(tab) && !batchDiscardRef.current.has(id)) { if (id !== documents.activeId) activateTab(id); setPendingFileAction({ run: close }); }
     else close();
   }
   function closeTabs(ids) {
-    const selected=[...new Set(ids)],dirty=selected.filter(id=>documents.tabs.find(tab=>tab.id===id)?.dirty);
-    const run=discard=>{setBatchClose(null);if(discard)batchDiscardRef.current=new Set(selected);const queue=[...selected];const next=()=>{const id=queue.shift();if(id)closeTab(id,()=>setTimeout(next,0));else batchDiscardRef.current.clear()};next()};
-    if(dirty.length>1)setBatchClose({count:dirty.length,run});else run(false);
+    const selected=[...new Set(ids)],dirty=selected.map(id=>documents.tabs.find(tab=>tab.id===id)).filter(promptsOnClose);
+    const run=choices=>{
+      let queue;try{queue=batchClosePlan(documents.tabs,selected,choices,dirty)}catch(error){setBatchClose(current=>({...current,error:error.message}));return;}
+      setBatchClose(null);
+      const next=()=>{
+        const item=queue.shift();if(!item){batchDiscardRef.current.clear();return;}
+        const tab=documents.tabs.find(tab=>tab.id===item.id);if(!tab){next();return;}
+        const close=()=>closeTab(item.id,()=>setTimeout(next,0));
+        if(item.action==='save'&&tab.dirty){setObjectTabActive(false);if(documents.activeId!==item.id)activateTab(item.id);saveSqlFile(close)}
+        else {if(item.action==='discard')batchDiscardRef.current.add(item.id);close()}
+      };next();
+    };
+    if(dirty.length>1)setBatchClose({items:dirty.map(tab=>({...tab})),cleanCount:selected.length-dirty.length,run});
+    else {const queue=[...selected];const next=()=>{const id=queue.shift();if(id)closeTab(id,()=>setTimeout(next,0));else batchDiscardRef.current.clear()};next()}
   }
   function newSqlFile() { newSqlFileFromLastConnection(); }
+  function newSqlFileOnProfile(profileId) {
+    setObjectTabActive(false);newSqlFileNow();
+    const profile=dbConnectionsRef.current.find(item=>item.id===profileId);
+    if(!profile)return;
+    if(isNativeHost)beginConnection({...profile,tabId:documents.activeId});
+    else{setActiveConnection(profile);setTabs(tabs=>tabs.map(tab=>tab.id===documents.activeId?{...tab,connectionProfileId:profile.id}:tab))}
+  }
+  // Starter text never runs; the current connection is reused like the main New action.
+  function newSqlFileFromTemplate(templateId) {
+    const template=newQueryTemplates.find(item=>item.id===templateId);if(!template)return;
+    const current=activeConnectionRef.current,profile=dbConnectionsRef.current.find(item=>item.id===(current&&!['No connection','Disconnected'].includes(current.id)?current.id:null));
+    setObjectTabActive(false);newSqlFileNow(template.content);
+    if(profile){if(isNativeHost)beginConnection({...profile,tabId:documents.activeId});else{setActiveConnection(profile);setTabs(tabs=>tabs.map(tab=>tab.id===documents.activeId?{...tab,connectionProfileId:profile.id}:tab))}}
+  }
   function saveSqlFile(afterSave = null) {
     learnSqlUsage(documents.text);
     if (documents.tabs.find(tab => tab.id === documents.activeId)?.readOnly) return;
@@ -1398,7 +2103,8 @@ export function App() {
 
 
 
-  const { connectInBackground, beginConnection, switchConnection, disconnectActiveConnection, submitConnectionCredentials, finishTransaction } = useConnectionLifecycle({ documents, pendingConnectionsRef, updateTabSession, setConnecting, setConnectionError, setAuthProfile, editorIsReadonly, setManagementError, setShowPicker, activeConnection, transactionPending, setPendingSwitch, setActiveConnection, setRunState, authProfile, authTestRequestRef, pendingSwitch });
+  const guardDrafts = (info, run) => { const count = countTabDrafts(info.tabId); if (!count || draftsConfirmedRef.current.has(`${info.tabId}:${info.reason}`)) return false; setDraftGuard({ ...info, count, transaction: Boolean(sessionsRef.current[info.tabId]?.transactionPending), run: () => { draftsConfirmedRef.current.add(`${info.tabId}:${info.reason}`); run(); draftsConfirmedRef.current.delete(`${info.tabId}:${info.reason}`); } }); return true; };
+  const { connectInBackground, beginConnection, switchConnection, disconnectActiveConnection, submitConnectionCredentials, finishTransaction } = useConnectionLifecycle({ guardDrafts, connectionLost:!!tabSession.connectionLost, documents, pendingConnectionsRef, updateTabSession, setConnecting, setConnectionError, setAuthProfile, editorIsReadonly, setManagementError, setShowPicker, activeConnection, transactionPending, setPendingSwitch, setActiveConnection, setRunState, authProfile, authTestRequestRef, pendingSwitch });
   function previewConnectionOrganization(payload){const next=changeConnectionOrganization(connectionOrg,payload,dbConnections);setConnectionOrg(next);setDbConnections(current=>organizedProfiles(current,next).map(p=>({...p,group:p.groups[0]||''})))}
   function connectionContextAction(action,context){
     const item=context.item,folderId=context.kind==='folder'?item.id:context.kind==='profile'?item.folderId:null;
@@ -1487,7 +2193,24 @@ export function App() {
   function requestSchemaDetails(item,originTabId=metadataOriginTabId,force=false) { const key = oracleSchemaKey(item).toLowerCase(); if(force){schemaLoadedRef.current.delete(key);schemaRequestedRef.current.delete(key)} if (!isNativeHost || schemaLoadedRef.current.has(key) || schemaRequestedRef.current.has(key)) return; schemaRequestedRef.current.add(key); sendNativeCommand("schema.objectDetails", { tabId:originTabId, owner: item.owner, name: item.name, objectType: item.type }); }
   function refreshSchema(owner = documents.activeId) { if (schemaRequestRef.current) sendNativeCommand('schema.cancel', { requestId: schemaRequestRef.current, tabId: owner }); const id = sendNativeCommand("schema.refresh", { tabId: owner }); schemaRequestRef.current = id || null; return id; }
   function insertEditorText(text) { const editor = editorRef.current; if (!editor || editorIsReadonly()) return; editor.executeEdits("schema-explorer", [{ range: editor.getSelection(), text, forceMoveMarkers: true }]); editor.focus(); setFileDirty(true); }
-  function handleEditorChange(value) { if (editorIsReadonly()) return; documents.edit(value ?? ""); queueSchemaForSql(documents.text); }
+  function startSchemaDrag(event,item,column=null){
+    if(!isOracleRelation(item)||!event.dataTransfer)return;
+    event.dataTransfer.setData('application/x-fbsdb-schema',JSON.stringify({key:oracleSchemaKey(item),column,tabId:metadataOriginTabId}));
+    event.dataTransfer.effectAllowed='copy';
+  }
+  function dropSchemaInEditor(event){
+    if(!event.dataTransfer?.types?.includes('application/x-fbsdb-schema'))return;
+    event.preventDefault();event.stopPropagation();
+    const editor=editorRef.current,model=editor?.getModel();
+    if(!model||editorIsReadonly())return;
+    let payload;try{payload=JSON.parse(event.dataTransfer.getData('application/x-fbsdb-schema'))}catch{return}
+    if(payload.tabId!==metadataOriginTabId)return;
+    const item=schemaObjects.find(object=>oracleSchemaKey(object)===payload.key),draft=dragSqlDraft(item,payload.column,model.getValue(),schemaObjects);
+    if(!draft)return;
+    const position=editor.getTargetAtClientPoint(event.clientX,event.clientY)?.position||editor.getPosition(),range=model.validateRange(editor.getSelection()?.containsPosition(position)?editor.getSelection():new monacoRef.current.Range(position.lineNumber,position.column,position.lineNumber,position.column));
+    editor.pushUndoStop();editor.executeEdits('schema-drag',[{range,text:draft.text,forceMoveMarkers:true}]);editor.pushUndoStop();editor.focus();setFileDirty(true);
+  }
+  function handleEditorChange(value) { if (controlledEditorUpdateRef.current||editorIsReadonly()) return; documents.edit(value ?? ""); queueSchemaForSql(documents.text); }
   async function formatSql() {
     if (editorIsReadonly()) return;
     const editor = editorRef.current, model = editor?.getModel(), client = completionClientRef.current;
@@ -1504,24 +2227,33 @@ export function App() {
   formatterRef.current = formatSql;
 
   function installRunGutter(editor, monacoInstance) {
-    const decorations = editor.createDecorationsCollection();
+    const decorations = editor.createDecorationsCollection(), summaryDecorations = editor.createDecorationsCollection();
     let statementsByLine = new Map();
     const refresh = () => {
       const model = editor.getModel();
       statementsByLine = new Map();
-      if (!model || editorIsReadonly()) { decorations.clear(); return; }
+      if (!model || editorIsReadonly() || model.getValueLength()>=LARGE_FILE_THRESHOLD&&!largeFileOverridesRef.current[documents.activeId]?.source) { decorations.clear(); summaryDecorations.clear(); return; }
       for (const statement of getSqlStatements(model.getValue())) {
         const position = model.getPositionAt(statement.start);
         // A gutter click targets only the first statement starting on this line.
         const current = statementsByLine.get(position.lineNumber);
         if (!current) statementsByLine.set(position.lineNumber, { ...statement, position });
       }
+      const summaryItems = [];
+      for (const statement of getSqlStatements(model.getValue())) {
+        const summary = executionSummaries.current.get(documents.activeId, statement.sql);
+        if (!summary) continue;
+        const end = model.getPositionAt(statement.end), column = model.getLineMaxColumn(end.lineNumber);
+        summaryItems.push({ range: new monacoInstance.Range(end.lineNumber, column, end.lineNumber, column), options: { showIfCollapsed: true, stickiness: monacoInstance.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges, after: { content: summaryLabel(summary), inlineClassName: summary.ok ? 'sql-exec-summary' : 'sql-exec-summary failed' }, hoverMessage: { value: summaryHover(summary) } } });
+      }
+      summaryDecorations.set(summaryItems);
       decorations.set([...statementsByLine.values()].map(({ position, sql }) => ({
         range: new monacoInstance.Range(position.lineNumber, 1, position.lineNumber, 1),
         options: { glyphMarginClassName: "sql-run-glyph", glyphMarginHoverMessage: { value: "Run SQL statement\n\n" + sql.slice(0, 160) } },
       })));
     };
     const subscriptions = [editor.onDidChangeModelContent(refresh), editor.onDidChangeModel(refresh), editor.onMouseDown((event) => {
+      if (event.target.element?.closest?.('.sql-exec-summary') || event.target.detail?.injectedText?.options?.inlineClassName?.includes('sql-exec-summary')) { setResultTab('Results'); updateLayout(current => ({ ...current, resultsCollapsed: false })); return; }
       if (event.target.type !== monacoInstance.editor.MouseTargetType.GUTTER_GLYPH_MARGIN || event.event.rightButton) return;
       const statement = statementsByLine.get(event.target.position?.lineNumber);
       if (!statement) return;
@@ -1529,7 +2261,8 @@ export function App() {
       runQueryRef.current?.(statement.sql);
     })];
     refresh();
-    editor.onDidDispose(() => { subscriptions.forEach((subscription) => subscription.dispose()); decorations.clear(); });
+    window.addEventListener('fbsdb.refreshRunGutter',refresh);
+    editor.onDidDispose(() => {window.removeEventListener('fbsdb.refreshRunGutter',refresh); subscriptions.forEach((subscription) => subscription.dispose()); decorations.clear(); summaryDecorations.clear(); });
   }
   function beginReadOnlyAnalysis() {
     if(!isNativeHost||executing||connecting||transactionPending||fetchingPage||view.streamState?.busy)return;
@@ -1549,7 +2282,7 @@ export function App() {
   function unsavedWorkspacePaths() {return documents.tabs.filter(tab=>tab.dirty&&tab.path).map(tab=>tab.path);}
   function previewWorkspaceReplace(search,replacement,caseSensitive){setWorkspaceDev(current=>({...current,preview:null,applied:null}));workspaceDevelopmentCommand('workspace.replacePreview',{search,replacement,caseSensitive,scope:workspaceReplaceScope,excluded:unsavedWorkspacePaths()});}
   function applyWorkspaceReplace(selected){if(!workspaceDev.preview)return;workspaceDevelopmentCommand('workspace.replaceApply',{previewId:workspaceDev.preview.id,selected,excluded:unsavedWorkspacePaths()});}
-  function openScriptPreview() { const tabId=documents.activeId,run=operations.scripts.get(tabId);setScriptDialog({tabId,source:run?.running?run.source:documents.text}); }
+  function openScriptPreview() { if(editorIsReadonly())return; const tabId=documents.activeId,run=operations.scripts.get(tabId),source=describeOracleSource(documents.active||{},workspace.projectRules);if(!run?.running&&!prepareSourceCompilation(documents.active||{},workspace.projectRules).error){reviewSourceForCompilation();return;}if(!run?.running&&source.expectedType&&source.warning){setRunState(source.warning+' Review the source declaration before compiling.');return;}setScriptDialog({tabId,source:run?.running?run.source:documents.text}); }
 
   const executionFlashRef=useRef(null),executionFlashTimerRef=useRef(null);
   function flashExecutionTarget(target) {
@@ -1608,10 +2341,10 @@ export function App() {
   const { runQuery, explainQuery, executeStatement, fetchMoreResults, cancelQuery, startScript } = useQueryExecution({
     documents, results, operations, native: isNativeHost, send: sendNativeCommand,
     readSession: owner => sessionsRef.current[owner] || (owner === documents.activeId ? { activeConnection: activeConnectionRef.current } : {}),
-    settings: { pageSize: pageSizes.next, scriptPageSize: maxRows, timeout: queryTimeout, workspaceRoot: workspace.root },
+    settings: { pageSize: pageSizes.next, scriptPageSize: maxRows, timeout: queryTimeout, workspaceRoot: workspace.root, activateResults: resolveSetting(settings,'notifications.activateResults').value },
     editor: { current: editorRef.current, lastPosition: lastEditorPositionRef.current, flash: flashExecutionTarget },
     session: { update: updateTabSession, status: setRunState },
-    ui: { confirmDdl: request => {setPendingDdl(request);return false}, pendingBind: pendingBindSql, bind: setPendingBindSql, showConnections: () => setShowPicker(true), scriptDialog },
+    ui: { readOnly:activeTabReadonly, inlineBinds: statement => { if (!resolveSetting(settings,'editor.inlineBinds').value) return false; inlineBindStoreRef.current ??= new InlineBindStore(); const key = `${documents.activeId}|${visibleConnection?.id||''}`; const { parameters, missing } = inlineBindParameters(getOracleBindNames(statement), name => inlineBindStoreRef.current.get(key, name)); if (missing.length) { setRunState(`Enter a value or choose NULL for :${missing[0]} beside the SQL.`); window.dispatchEvent(new CustomEvent('fbsdb.inlineBind.focus', { detail: { name: missing[0] } })); return true; } executeStatement(statement, parameters); return true; }, reviewSource: (statement,target) => {const source=describeOracleSource({...documents.active,content:statement},workspace.projectRules);if(!source.declaration||!['PACKAGE','PACKAGE BODY','PROCEDURE','FUNCTION','TRIGGER','TYPE','TYPE BODY'].includes(source.declaration.type))return false;reviewSourceForCompilation(statement,target);return true}, confirmDdl: request => {setPendingDdl(request);return false}, pendingBind: pendingBindSql, bind: setPendingBindSql, showConnections: () => setShowPicker(true), scriptDialog },
     history: {
       learn: learnSqlUsage,
       start(owner, statement, profile) {
@@ -1632,14 +2365,16 @@ export function App() {
     Source:definition?.tabId===activeTabId?<div className="result-settings-definition"><h2>{definition.name?`${definition.schema||'Current schema'}.${definition.table}.${definition.name}`:'Source definition'}</h2><dl>{Object.entries(definition).filter(([key])=>key!=='constraints'&&key!=='tabId').map(([key,value])=><div key={key}><dt>{({schema:'Schema',table:'Table',name:'Column',type:'Data type',size:'Length',precision:'Precision',scale:'Scale',nullable:'Nullable',defaultValue:'Default value',message:'Status'})[key]||key}</dt><dd>{typeof value==='boolean'?value?'Yes':'No':String(value??'—')}</dd></div>)}</dl><h3>Constraints</h3>{(definition.constraints||[]).map((constraint,i)=><div className="result-rule-row" key={i}><strong>{constraint.name}</strong><span>{({P:'Primary key',R:'Foreign key',U:'Unique',C:'Check'})[constraint.type]||constraint.type}{constraint.status?' · '+constraint.status:''}</span>{constraint.condition&&<code>{constraint.condition}</code>}</div>)}</div>:<p>Select a source column and use Source definition.</p>,
     Lookup:keyLookup?.tabId===activeTabId?(keyLookup.links?<div className="result-settings-links"><h2>Related child tables</h2>{keyLookup.links.map((link,i)=><button key={i} onClick={()=>{sendNativeCommand('result.openSql',{sql:link.sql,tabId:keyLookup.tabId});setKeyLookup(null)}}>{link.label}</button>)}</div>:<form className="result-settings-form" onSubmit={e=>{e.preventDefault();sendNativeCommand('result.lookupSql',{schema:keyLookup.schema,table:keyLookup.table,columns:keyLookup.columns,values:keyValues,tabId:keyLookup.tabId});setKeyLookup(null)}}><h2>Primary key · {keyLookup.table}</h2>{keyLookup.columns.map(column=><label key={column.name}>{column.name}<input required aria-label={`Key ${column.name}`} value={keyValues[column.name]||''} onChange={e=>setKeyValues(current=>({...current,[column.name]:e.target.value}))}/></label>)}<button type="submit">Open lookup SQL</button></form>):null
   };
-  const sessionConnected = !["No connection", "Disconnected"].includes(activeConnection.id);
-  const summarySession=tabSessions[metadataOriginTabId]||tabSession;
+  const sessionConnected = !tabSession.connectionLost && !["No connection", "Disconnected"].includes(activeConnection.id);
+  const visibleOrigin=objectTabActive&&objectTab?objectTab.originTabId:metadataOriginTabId;
+  const visibleConnection=objectTabActive&&objectTab?documentConnection({id:objectTab.originTabId},tabSessions,dbConnections):editorConnection;
+  const summarySession=tabSessions[visibleOrigin]||tabSession;
   const summaryConnectionSnapshot=summarySession.activeConnection||activeConnection;
-  const summaryConnected=!["No connection","Disconnected"].includes(summaryConnectionSnapshot.id);
+  const summaryConnected=!summarySession.connectionLost&&!["No connection","Disconnected"].includes(summaryConnectionSnapshot.id);
   const summaryConnection=dbConnections.find(profile=>profile.id===(summarySession.connecting?summarySession.connectingProfileId:summaryConnectionSnapshot.id))||summaryConnectionSnapshot;
   const dockPanels = {
-    editors: <div className="dock-content open-editors-content"><OpenEditors tabs={tabs.map(tab => tab.id === activeTabId ? { ...tab, dirty: fileDirty } : tab)} activeId={activeTabId} onActivate={activateTab} onClose={closeTab}/></div>,
-    files: <div className="dock-content file-section-content"><WorkspaceExplorer expandedPaths={layout.expandedPaths} onExpandedChange={next => updateLayout(current => ({ ...current, expandedPaths: typeof next === "function" ? next(current.expandedPaths) : next }))} workspace={workspace} activePath={filePath} onOpen={openWorkspaceFile} onOpenWorkspace={openWorkspace} onManage={()=>setShowWorkspaceManager(true)} onSearch={scope=>{setWorkspaceSearchScope(scope);setShowSearch(true)}} onReplace={scope=>openWorkspaceDevelopment('replace',scope)} onWorksets={()=>setShowWorksets(true)} gitFiles={workspaceDev.git?.files}/></div>,
+    editors: <div className="dock-content open-editors-content"><OpenEditors tabs={tabs.map(tab=>({...tab,dirty:tab.id===activeTabId?fileDirty:tab.dirty,profileName:dbConnections.find(profile=>profile.id===(tabSessions[tab.id]?.activeConnection?.id||tab.connectionProfileId))?.name,connectionProfileId:tabSessions[tab.id]?.activeConnection?.id||tab.connectionProfileId}))} activeId={activeTabId} onActivate={activateTab} onClose={closeTab}/></div>,
+    files: <div className="dock-content file-section-content"><div className="explorer-tabs" role="group" aria-label="Explorer view"><button aria-pressed={filePanelView==='files'} onClick={()=>setFilePanelView('files')}>Files</button><button aria-pressed={filePanelView==='structure'} onClick={()=>setFilePanelView('structure')}>Structure</button><button aria-pressed={filePanelView==='server'} title="Database definitions, read-only" onClick={()=>setFilePanelView('server')}>Server</button></div>{filePanelView==='server'?<ServerSourceTree objects={schemaObjects} defaultOwner={schemaOwner}connected={Boolean(visibleConnection)&&schemaObjects.length>0} onOpen={openExplorerDefinition}/>:filePanelView==='structure'?<FileStructurePanel key={activeTabId} name={fileName} items={documentOutline} onNavigate={offset=>{setObjectTabActive(false);requestAnimationFrame(()=>jumpToOffset(offset))}}/>:<WorkspaceExplorer expandedPaths={layout.expandedPaths} onExpandedChange={next => updateLayout(current => ({ ...current, expandedPaths: typeof next === "function" ? next(current.expandedPaths) : next }))} workspace={workspace} activePath={filePath} onOpen={openWorkspaceFile} onPromote={promotePreview} onOpenWorkspace={openWorkspace} onManage={()=>setShowWorkspaceManager(true)} onSearch={scope=>{setWorkspaceSearchScope(scope);setShowSearch(true)}} onReplace={scope=>openWorkspaceDevelopment('replace',scope)} onWorksets={()=>setShowWorksets(true)} onProjectRules={()=>setShowProjectRules(true)} profiles={dbConnections} gitFiles={workspaceDev.git?.files}/>}</div>,
     connections: <div className="dock-content connections-section-content" tabIndex={0} onContextMenu={e=>{if(!e.target.closest("input,select,button,summary,.connection-tree"))setConnectionMenu(connectionContext(e,"background"))}} onKeyDown={e=>{if(e.target===e.currentTarget)connectionContextKey(e,event=>setConnectionMenu(connectionContext(event,"background")))}}>
             <div className="section-heading"><div><button title="Refresh TNS aliases" onClick={() => sendNativeCommand("connection.list")}><RefreshCw size={13} /></button><button title="Manage connections" aria-label="Manage connections" onClick={()=>setProfileEditor(true)}><Settings2 size={13}/></button><button title="New connection" onClick={() => { setShowPicker(false); setProfileEditor({method:"basic"}); }}><Plus size={15} /></button></div></div>
             <div className="explorer-search"><Search size={13} /><input aria-label="Filter connections" placeholder="Search" value={explorerQuery} onChange={(event) => setExplorerQuery(event.target.value)} />{explorerQuery.length > 0 ? <button type="button" className="explorer-search-clear" title="Clear" aria-label="Clear connection filter" onMouseDown={event => event.preventDefault()} onClick={event => { setExplorerQuery(''); event.currentTarget.closest('.explorer-search').querySelector('input')?.focus(); }}><X size={12}/></button> : <Filter size={12} />}</div>
@@ -1653,7 +2388,7 @@ export function App() {
             {sessionConnected&&(schemaError||!schemaLoading&&!visibleSchemaObjects.length)&&(()=>{const state=actionableState({connected:sessionConnected,error:schemaError,hasItems:Boolean(visibleSchemaObjects.length),filtered:Boolean(schemaQuery||schemaOwnerFilter!=='All'||objectScope!=='All')});return <ActionableState {...state} onAction={()=>state.command==='connect'?setShowPicker(true):state.command==='retry'?refreshSchema(): (setSchemaQuery(''),setSchemaOwnerFilter('All'),setObjectScope('All'))}/>})()}
             {schemaStale && <Feedback kind={schemaLoading?"progress":"warning"} title="Cached metadata">Refresh failed or is still running; showing previously loaded metadata.</Feedback>}
             <div className="object-scope-switch"><button className={objectScope === "All" ? "active" : ""} onClick={() => setObjectScope("All")}>All</button><button className={objectScope === "Recent" ? "active" : ""} onClick={() => setObjectScope("Recent")}><Clock3 size={11}/> Recent</button></div>
-            {(schemaLoading||visibleSchemaObjects.length>0)&&<OracleObjectTree items={visibleSchemaObjects} activeKey={activeObject} currentSchema={schemaOwner} query={schemaQuery} searchKinds={schemaSearchKinds} onToggle={item=>openExplorerObject(item)} onContext={openObjectContext} contextKey={objectMenu?oracleSchemaKey(objectMenu.item):null} onInsert={insertEditorText} emptyLabel={schemaLoading ? "Loading Oracle objects…" : schemaObjects.length ? "No Oracle objects match this search or filter." : isNativeHost ? ["No connection", "Disconnected"].includes(activeConnection.id) ? "Connect to load Oracle objects" : "No accessible Oracle objects found for this user." : "Oracle objects appear after connecting"} />}
+            {(schemaLoading||visibleSchemaObjects.length>0)&&<OracleObjectTree items={visibleSchemaObjects} activeKey={activeObject} currentSchema={schemaOwner} query={schemaQuery} searchKinds={schemaSearchKinds} onToggle={item=>openExplorerObject(item)} onContext={openObjectContext} contextKey={objectMenu?oracleSchemaKey(objectMenu.item):null} onInsert={insertEditorText} onDragStart={startSchemaDrag} emptyLabel={schemaLoading ? "Loading Oracle objects…" : schemaObjects.length ? "No Oracle objects match this search or filter." : isNativeHost ? ["No connection", "Disconnected"].includes(activeConnection.id) ? "Connect to load Oracle objects" : "No accessible Oracle objects found for this user." : "Oracle objects appear after connecting"} />}
           </div>,
   };
   function showDockPanel(panel) {
@@ -1667,17 +2402,57 @@ export function App() {
     window.dispatchEvent(new Event('fbsdb.explorer.reset'));
     window.dispatchEvent(new Event('fbsdb.inspector.reset'));
   }
-  const bottomCollapsed = layout.resultsCollapsed || focusMode;
-  return <main className="desktop-shell" data-language={language} data-region={region} data-results-collapsed={bottomCollapsed} data-focus={focusMode} data-density={workbenchDensity} data-reduce-motion={reduceMotion} data-theme={theme} style={{ "--accent": themeConfig.accent, "--syntax-keyword":tokenColors.keyword,"--syntax-string":tokenColors.string,"--syntax-comment":tokenColors.comment,"--syntax-number":tokenColors.number, "--ui-font-family": uiFontStacks[uiFontFamily], "--sidebar-width": `${layout.widths.left}px`, "--results-height": `${resultsHeight}%` }}>
-    <GlobalTooltip />
+  const iconThemeId = resolveSetting(settings, 'ui.iconTheme').value;
+  useEffect(() => { setIconTheme(resolveIconTheme(iconThemeId, loadIconPacks(localStorage))); }, [iconThemeId]);
+  const bottomCollapsed = maximizedPanel==='results'?false:layout.resultsCollapsed || focusMode;
+  // Editor toolbar: every action is declared once; the model decides which fit inline and which go to the overflow menu.
+  const commandBarObserver=useRef(null);
+  const [commandBarWidth,setCommandBarWidth]=useState(1200);
+  const commandBarRef=useCallback(node=>{commandBarObserver.current?.disconnect();commandBarObserver.current=null;if(!node||typeof ResizeObserver==='undefined')return;const observer=new ResizeObserver(([entry])=>setCommandBarWidth(Math.round(entry.contentRect.width)));observer.observe(node);commandBarObserver.current=observer},[]);
+  const shortcutsSetting=resolveSetting(settings,'editor.shortcuts').value,busy=executing||fetchingPage;
+  const editorCommand=(command)=>{editorRef.current?.trigger('toolbar',command,{});editorRef.current?.focus()};
+  const toolbarDefs={
+    open:{label:'Open SQL file',shortcut:'Ctrl+Shift+O',title:'Open file (Ctrl+Shift+O)',aria:'Open file (Ctrl+Shift+O)',icon:<FolderOpen size={16}/>,onClick:openSqlFile},
+    save:{label:'Save SQL file',shortcut:'Ctrl+S',title:'Save SQL file (Ctrl+S)',aria:'Save SQL file',icon:<Save size={15}/>,disabled:activeTabReadonly,onClick:()=>saveSqlFile()},
+    new:{label:'New SQL file',shortcut:'Ctrl+N',title:'New SQL file (Ctrl+N)',aria:'New SQL file',icon:<Plus size={15}/>,onClick:()=>{setObjectTabActive(false);setActiveObject('');newSqlFile()}},
+    undo:{label:'Undo',shortcut:'Ctrl+Z',title:'Undo (Ctrl+Z)',aria:'Undo',icon:<Undo2 size={15}/>,disabled:activeTabReadonly,keepFocus:true,onClick:()=>editorCommand('undo')},
+    redo:{label:'Redo',shortcut:'Ctrl+Y',title:'Redo (Ctrl+Y)',aria:'Redo',icon:<Redo2 size={15}/>,disabled:activeTabReadonly,keepFocus:true,onClick:()=>editorCommand('redo')},
+    format:{label:'Format SQL',shortcut:'Ctrl+Shift+F',title:'Format SQL (Ctrl+Shift+F)',aria:'Format SQL',icon:<AlignLeft size={15}/>,className:'format-sql-button',disabled:activeTabReadonly,keepFocus:true,onClick:formatSql},
+    find:{label:'Find',shortcut:shortcutsSetting.find,title:`Find (${shortcutsSetting.find||'Ctrl+F'})`,aria:'Find in editor',icon:<Search size={15}/>,keepFocus:true,onClick:()=>editorCommand('actions.find')},
+    comment:{label:'Toggle comment',shortcut:shortcutsSetting.commentLine,title:`Toggle comment (${shortcutsSetting.commentLine||'Ctrl+/'})`,aria:'Toggle comment',icon:<Code2 size={15}/>,disabled:activeTabReadonly,keepFocus:true,onClick:()=>editorCommand('editor.action.commentLine')},
+    explain:{label:'Explain plan',title:'Explain plan for the statement at the cursor',aria:'Explain plan',icon:<Workflow size={15}/>,disabled:busy||connecting,onClick:explainQuery},
+    commit:{label:'Commit',title:'Commit',aria:'Commit',className:'transaction-button commit',icon:<Check size={13}/>,disabled:activeTabReadonly||!transactionPending||busy,onClick:()=>finishTransaction('commit')},
+    rollback:{label:'Rollback',title:'Rollback',aria:'Rollback',className:'transaction-button rollback',icon:<X size={13}/>,disabled:activeTabReadonly||!transactionPending||busy,onClick:()=>finishTransaction('rollback')},
+    autoCommit:{label:`Auto commit ${tabSession.autoCommit?'(on)':'(off)'}`,title:transactionPending?'Commit or roll back pending changes before changing auto commit':`Auto commit ${tabSession.autoCommit?'on':'off'}`,aria:'Auto commit',className:`transaction-button auto-commit${tabSession.autoCommit?' enabled':''}`,pressed:Boolean(tabSession.autoCommit),icon:<RefreshCw size={13}/>,disabled:!isNativeHost||activeTabReadonly||transactionPending||busy||connecting||tabSession.autoCommitPending,onClick:()=>{updateTabSession('autoCommitPending',true,activeTabId);updateTabSession('autoCommitRequestId',sendNativeCommand('transaction.autoCommit',{tabId:activeTabId,enabled:!tabSession.autoCommit}),activeTabId)}},
+    rows:{label:'Rows per result page'},
+  };
+  const toolbarPrefs=resolveSetting(settings,'ui.toolbars').value,toolbarLayout=layoutToolbar(commandBarWidth,undefined,toolbarPrefs.editor);
+  const renderToolbarItem=item=>{
+    if(item.kind==='rows')return <label key={item.id} className="fetch-limit-picker" title="Rows per result page"><span>Rows</span><select aria-label="Rows per result page" value={maxRows} onChange={event=>setMaxRows(Number(event.target.value))}>{[100,500,1000,5000,10000].map(limit=><option key={limit} value={limit}>{limit.toLocaleString()}</option>)}</select></label>;
+    const def=toolbarDefs[item.id];
+    return <button key={item.id} type="button" className={def.className||'icon-button'} title={def.title} aria-label={def.aria} aria-pressed={def.pressed} disabled={def.disabled} onMouseDown={def.keepFocus?event=>event.preventDefault():undefined} onClick={def.onClick}>{def.icon}</button>;
+  };
+  const runButton=<button className={`run-button${!executing && !fetchingPage && !cancelling ? " idle" : ""}`} aria-label={cancelling ? "Cancelling SQL statement" : busy ? "Cancel current SQL statement" : "Run SQL statement"} disabled={cancelling || activeTabReadonly} title={cancelling ? "Waiting for Oracle to stop this statement" : busy ? "Cancel current SQL statement" : `Run SQL statement (${shortcutsSetting.run||"unassigned"})`} onMouseDown={(event) => event.preventDefault()} onClick={() => busy ? cancelQuery() : runQuery()}>{cancelling ? <Activity size={14} className="spin" /> : <Play size={14} fill="currentColor" />} <span className="sr-only">{busy && (cancelling ? "Cancelling…" : "Cancel")}</span></button>;
+  return <ToolbarPrefsContext.Provider value={toolbarPrefs}><main className="desktop-shell" data-maximized={maximizedPanel||undefined} data-language={language} data-region={region} data-results-collapsed={bottomCollapsed} data-focus={focusMode} data-density={workbenchDensity} data-reduce-motion={reduceMotion} data-theme={theme} style={{ "--accent": themeConfig.accent, "--syntax-keyword":tokenColors.keyword,"--syntax-string":tokenColors.string,"--syntax-comment":tokenColors.comment,"--syntax-number":tokenColors.number, "--ui-font-family": uiFontStacks[uiFontFamily], "--sidebar-width": `${layout.widths.left}px`, "--results-height": `${resultsHeight}%` }}>
+    <GlobalTooltip /><TreeNameOverlay /><KeyTips enabled={resolveSetting(settings,'ui.keyTips').value}/>
     {showOpenWorkspace&&<WorkspaceOpenPopup workspace={workspace} onClose={()=>setShowOpenWorkspace(false)}/>}
     {showWorksets&&workspace.root&&<WorkspaceWorksets root={workspace.root} getSnapshot={worksetSnapshot} onOpened={openWorkset} onClose={()=>setShowWorksets(false)}/>}
     {showWorkspaceManager&&<Suspense fallback={<div role="status">Loading…</div>}><WorkspaceManager workspace={workspace} onClose={()=>setShowWorkspaceManager(false)}/></Suspense>}
     {workspaceDevMode&&<Suspense fallback={<div role="status">Loading…</div>}><WorkspaceDevelopmentDialog mode={workspaceDevMode} scope={workspaceReplaceScope} state={workspaceDev} files={workspace.files} onClose={()=>{setWorkspaceDevMode(null);workspaceDevRequestsRef.current.clear()}} onGitRefresh={refreshWorkspaceGit} onGitDiff={path=>workspaceDevelopmentCommand('workspace.gitDiff',{path})} onPreview={previewWorkspaceReplace} onApply={applyWorkspaceReplace} onInvalidate={()=>setWorkspaceDev(current=>({...current,preview:null,applied:null}))}/></Suspense> }
+    {monaco&&<InlineBindZone editor={editorRef.current} enabled={resolveSetting(settings,'editor.inlineBinds').value} store={inlineBindStoreRef.current??=new InlineBindStore()} refresh={bindStoreVersion} onPick={name=>setLookupPicker({name,state:null,requestId:null})} scopeKey={`${documents.activeId}|${visibleConnection?.id||''}`}/>}
+    {lookupPicker&&<Suspense fallback={<div role="status">Loading…</div>}><BindLookupDialog name={lookupPicker.name} initialSql={loadBindLookups(localStorage)[lookupPicker.name]||''} state={lookupPicker.state} onClose={()=>setLookupPicker(null)} onSaveSql={sql=>saveBindLookup(localStorage,lookupPicker.name,sql)} onSearch={(plan,search)=>{const requestId=sendNativeCommand('sql.evaluate',{tabId:documents.activeId,sql:plan.sql,parameters:lookupParameters(plan,search),timeoutSeconds:30,rowLimit:lookupRowLimit});setLookupPicker(current=>({...current,requestId,state:{running:true}}))}} onPick={value=>{inlineBindStoreRef.current??=new InlineBindStore();inlineBindStoreRef.current.set(`${documents.activeId}|${visibleConnection?.id||''}`,lookupPicker.name,{value});setBindStoreVersion(count=>count+1);setLookupPicker(null)}}/></Suspense>}
+    {subqueryTrial&&<Suspense fallback={<div role="status">Loading…</div>}><SubqueryTrialDialog plan={subqueryTrial.plan} state={subqueryTrial.state} onClose={()=>setSubqueryTrial(null)} onRun={values=>{const requestId=sendNativeCommand('sql.evaluate',{tabId:documents.activeId,sql:subqueryTrial.plan.sql,parameters:evaluationParameters(subqueryTrial.plan.binds,values),timeoutSeconds:30,rowLimit:trialRowLimit});setSubqueryTrial(current=>({...current,requestId,state:{running:true}}))}}/></Suspense>}
+    {quickEval&&<Suspense fallback={<div role="status">Loading…</div>}><QuickEvalDialog plan={quickEval.plan} state={quickEval.state} onClose={()=>setQuickEval(null)} onEvaluate={values=>{const requestId=sendNativeCommand('sql.evaluate',{tabId:documents.activeId,sql:quickEval.plan.sql,parameters:evaluationParameters(quickEval.plan.binds,values),timeoutSeconds:30});setQuickEval(current=>({...current,requestId,state:{running:true}}))}}/></Suspense>}
+    {compareSources&&<Suspense fallback={<div role="status">Loading…</div>}><CompareDialog initial={compareSources} editorText={editorRef.current?.getModel()?.getValue()??sql} theme={editorThemeName} onClose={()=>setCompareSources(null)}/></Suspense>}
+    {showLocalHistory&&filePath&&<Suspense fallback={<div role="status">Loading…</div>}><LocalHistoryDialog path={filePath} current={sql} theme={editorThemeName} onClose={()=>setShowLocalHistory(false)} onRestore={text=>{const editor=editorRef.current,model=editor?.getModel();if(!model||activeTabReadonly)throw Error('The editor is read-only.');editor.pushUndoStop();editor.executeEdits('local-history',[{range:model.getFullModelRange(),text}]);editor.pushUndoStop();setShowLocalHistory(false);editor.focus()}}/></Suspense>}
+    {relatedFileCreate&&<Suspense fallback={<div role="status">Loading…</div>}><RelatedFileCreateDialog {...relatedFileCreate} onClose={()=>setRelatedFileCreate(null)} onCreated={entry=>{setRelatedFileCreate(null);openWorkspaceFile({path:entry.path})}} onOpenExisting={proposal=>{const file=workspace.files.find(item=>(item.relativePath||'').replace(/\\/g,'/').toLowerCase()===proposal.path.toLowerCase());setRelatedFileCreate(null);if(file)openWorkspaceFile(file)}}/></Suspense>}
+    {showPortability&&workspace.root&&<Suspense fallback={<div role="status">Loading…</div>}><PortabilityDialog root={workspace.root} rules={workspace.projectRules} profiles={dbConnections} onOpenFile={finding=>{setShowPortability(false);openWorkspaceSearchMatch({path:finding.file,lineNumber:finding.line})}} onClose={()=>setShowPortability(false)}/></Suspense>}
+    {showRunConsole&&<Suspense fallback={<div role="status">Loading…</div>}><RunConsoleDialog entries={runConsoleStore.current.list(activeTabId)} retainValues={resolveSetting(settings,'privacy.consoleBindValues').value} onClose={()=>setShowRunConsole(false)} onClear={()=>{runConsoleStore.current.clear(activeTabId);setShowRunConsole(false)}} onLoad={entry=>{setShowRunConsole(false);setObjectTabActive(false);newSqlFileNow(entry.sql)}} onRerun={entry=>{setShowRunConsole(false);setObjectTabActive(false);runQuery(entry.sql)}}/></Suspense>}
+    {showSessionInspector&&<Suspense fallback={<div role="status">Loading…</div>}><SessionInspectorDialog tabId={metadataOriginTabId} connection={activeConnection} epoch={completionMetadataRef.current.session(metadataOriginTabId).epoch} initialContext={tabSession.sessionContext} transactionPending={transactionPending} autoCommit={Boolean(tabSession.autoCommit)} executing={executing||fetchingPage} result={queryResult} rowsLoaded={queryResult?.rows?.length||0} generation={tabSession.connectionGeneration} onClose={()=>setShowSessionInspector(false)}/></Suspense>}
     {connectionDiagnostics&&<Suspense fallback={<div role="status">Loading…</div>}><ConnectionDiagnosticsDialog report={connectionDiagnostics} onClose={()=>setConnectionDiagnostics(null)}/></Suspense>}
-    {scriptDialog&&<Suspense fallback={<div role="status">Loading…</div>}><SqlScriptDialog key={scriptDialog.tabId} source={scriptDialog.source} run={tabSessions[scriptDialog.tabId]?.scriptRun} timeout={queryTimeout} autoCommit={Boolean(tabSessions[scriptDialog.tabId]?.autoCommit)} onTimeout={setQueryTimeout} onClose={()=>setScriptDialog(null)} onCancel={()=>sendNativeCommand('sql.cancel',{tabId:scriptDialog.tabId})} onStart={startScript} disabled={!isNativeHost||!tabSessions[scriptDialog.tabId]?.activeConnection||['No connection','Disconnected'].includes(tabSessions[scriptDialog.tabId]?.activeConnection?.id)||tabSessions[scriptDialog.tabId]?.connecting||tabSessions[scriptDialog.tabId]?.executing||tabSessions[scriptDialog.tabId]?.fetchingPage}/></Suspense> }
+    {scriptDialog&&!sourceCompile?.scriptRequestId&&<Suspense fallback={<div role="status">Loading…</div>}><SqlScriptDialog projectVariables={projectOptions(workspace.projectRules).variables} defaultContinueOnError={projectOptions(workspace.projectRules).run.continueOnError} key={scriptDialog.tabId} source={scriptDialog.source} run={tabSessions[scriptDialog.tabId]?.scriptRun} timeout={queryTimeout} autoCommit={Boolean(tabSessions[scriptDialog.tabId]?.autoCommit)} onTimeout={setQueryTimeout} onClose={()=>setScriptDialog(null)} onCancel={()=>sendNativeCommand('sql.cancel',{tabId:scriptDialog.tabId})} onReviewSource={()=>reviewPausedScript(scriptDialog.tabId)} onStart={startScript} disabled={!isNativeHost||!tabSessions[scriptDialog.tabId]?.activeConnection||['No connection','Disconnected'].includes(tabSessions[scriptDialog.tabId]?.activeConnection?.id)||tabSessions[scriptDialog.tabId]?.connecting||tabSessions[scriptDialog.tabId]?.executing||tabSessions[scriptDialog.tabId]?.fetchingPage}/></Suspense> }
     {recovery&&<Suspense fallback={<div role="status">Loading…</div>}><DraftRecoveryDialog snapshot={recovery} onDiscard={()=>{try{localStorage.removeItem('fbsdb.sqlDrafts')}catch{}setRecovery(null)}} onRestore={restoreDrafts}/></Suspense>}
-    {paletteMode&&<IdeCommandPalette mode={paletteMode} onClose={()=>setPaletteMode(null)} onChoose={choosePaletteItem}
+    {paletteMode&&<IdeCommandPalette settings={Object.entries(settingDefinitions).filter(([id])=>!['ui.layout','ui.density','ui.scale'].includes(id)).map(([id,definition])=>({id,label:definition.label,detail:definition.category}))} mode={paletteMode} onClose={()=>setPaletteMode(null)} onChoose={choosePaletteItem}
       history={queryHistory} files={[...objectTabs.map(tab=>({id:tab.id,tabId:tab.id,name:`${tab.object.owner}.${tab.object.name}`,objectTab:true,connectionProfileId:tabSessions[tab.originTabId]?.activeConnection?.id})),...tabs.map(tab=>({...tab,tabId:tab.id,profileName:dbConnections.find(p=>p.id===tab.connectionProfileId)?.name})),...workspace.files.filter(file=>!tabs.some(tab=>tab.path?.toLowerCase()===file.path.toLowerCase()))]}
       objects={completionObjects.map(item=>({...item,disabled:!isNativeHost||executing||connecting||fetchingPage}))}
       connections={dbConnections.map(item=>({...item,disabled:activeTabReadonly||connecting||executing}))} outline={documentOutline}
@@ -1691,30 +2466,99 @@ export function App() {
         {id:'save',label:'Save SQL file',detail:'Ctrl+S',disabled:activeTabReadonly,run:saveSqlFile},
         {id:'format',label:'Format SQL / PL/SQL',disabled:activeTabReadonly||!sql.trim(),run:()=>formatterRef.current?.()},
         {id:'connect',label:'Switch connection',detail:'Ctrl+O',disabled:activeTabReadonly||connecting||executing,run:()=>setShowPicker(true)},
-        {id:'commit',label:'Commit transaction',disabled:!transactionPending||executing,run:()=>finishTransaction('commit')},
-        {id:'rollback',label:'Rollback transaction',disabled:!transactionPending||executing,run:()=>finishTransaction('rollback')},
+        {id:'commit',label:'Commit transaction',disabled:activeTabReadonly||!transactionPending||executing,run:()=>finishTransaction('commit')},
+        {id:'rollback',label:'Rollback transaction',disabled:activeTabReadonly||!transactionPending||executing,run:()=>finishTransaction('rollback')},
         {id:'settings',label:'Open settings',run:()=>setShowAppearance(true)},
+        {id:'relatedPackage',label:'Switch package specification / body',detail:'Alt+O',disabled:!relatedPackage.target&&(!isNativeHost||!workspace.root||!['PACKAGE','PACKAGE BODY'].includes(activeSource.declaration?.type)),run:switchPackageSource},
+        {id:'bookmarks',label:'Source bookmarks / add named position',detail:resolveSetting(settings,'editor.shortcuts').value.bookmark,run:()=>setShowBookmarks(true)},
+        {id:'nextBookmark',label:'Next source bookmark',detail:resolveSetting(settings,'editor.shortcuts').value.nextBookmark,run:()=>navigateBookmark(1)},
+        {id:'previousBookmark',label:'Previous source bookmark',detail:resolveSetting(settings,'editor.shortcuts').value.previousBookmark,run:()=>navigateBookmark(-1)},
+        {id:'focusRoutine',label:'Focus current PL/SQL routine',run:()=>{const editor=editorRef.current,model=editor?.getModel(),offset=model&&editor?.getPosition()?model.getOffsetAt(editor.getPosition()):0;const current=documentOutline.filter(item=>['PROCEDURE','FUNCTION'].includes(item.kind)&&item.start<=offset&&item.end>=offset).sort((a,b)=>b.depth-a.depth)[0];if(!current){setRunState('Place the caret inside a procedure or function to focus its code.');return;}editor?.trigger('toolbar','editor.foldAllExcept',{});editor?.focus()}},
+        {id:'identifierCase',label:'Convert identifier case (snake_case, camelCase, UPPER_CASE)',disabled:activeTabReadonly,run:openIdentifierCase},
+        {id:'localRename',label:'Rename local variable or parameter',disabled:activeTabReadonly,run:openLocalRename},
+        {id:'changeSignature',label:'Change local procedure signature',disabled:activeTabReadonly,run:openChangeSignature},
+        {id:'extractProcedure',label:'Extract selected PL/SQL assignments into procedure',disabled:activeTabReadonly,run:openExtractProcedure},
+        {id:'moveUp',label:'Move SQL item or PL/SQL statement up',disabled:activeTabReadonly,run:()=>moveStatement(-1)},
+        {id:'moveDown',label:'Move SQL item or PL/SQL statement down',disabled:activeTabReadonly,run:()=>moveStatement(1)},
+        {id:'embeddedSql',label:'Edit static SQL inside EXECUTE IMMEDIATE',disabled:activeTabReadonly,run:openEmbeddedSql},
+        {id:'clipboardHistory',label:'Clipboard history (session only)',disabled:activeTabReadonly,run:()=>setClipboardHistoryOpen(true)},
+        {id:'editorMacros',label:'Record or replay editor macros',disabled:activeTabReadonly,run:()=>setEditorMacrosOpen(true)},
+        {id:'quickFix',label:'Quick fixes for compiler diagnostic',detail:'Alt+Enter',disabled:activeTabReadonly,run:openQuickFix},
+        {id:'deleteReview',label:'Review references before deleting local procedure or parameter',disabled:!isNativeHost||!workspace.root,run:reviewDeleteImpact},
+        {id:'pasteAs',label:'Paste as IN list, JSON_TABLE draft or INSERT template',disabled:activeTabReadonly,run:()=>{const editor=editorRef.current,position=editor?.getPosition(),point=position&&editor.getScrolledVisiblePosition(position),rect=editor?.getDomNode()?.getBoundingClientRect();openPasteAsMenu((rect?.left||0)+(point?.left||0),(rect?.top||0)+(point?.top||0)+(point?.height||0),editor?.getDomNode())}},
+        {id:'expandSelection',label:'Expand selection to enclosing SQL structure',detail:'Shift+Alt+Right',run:()=>{editorRef.current?.focus();editorRef.current?.trigger('palette','editor.action.smartSelect.expand',{})}},
+        {id:'shrinkSelection',label:'Shrink selection',detail:'Shift+Alt+Left',run:()=>{editorRef.current?.focus();editorRef.current?.trigger('palette','editor.action.smartSelect.shrink',{})}},
+        {id:'quickEval',label:'Evaluate the selected SQL expression…',detail:'Runs only on confirmation',disabled:!isNativeHost||!visibleConnection||visibleConnection.id==='Disconnected',run:()=>{const editor=editorRef.current,model=editor?.getModel(),selection=editor?.getSelection();const text=model&&selection&&!selection.isEmpty()?model.getValueInRange(selection):'';const plan=prepareEvaluation(text);if(plan.error){notifyFeedback({kind:'warning',title:'Evaluate expression',message:plan.error,scope:documents.activeId});return}setQuickEval({plan,state:null,requestId:null})}},
+        {id:'subqueryTrial',label:'Try the selected subquery…',detail:'Runs only on confirmation',disabled:!isNativeHost||!visibleConnection||visibleConnection.id==='Disconnected',run:()=>{const editor=editorRef.current,model=editor?.getModel(),selection=editor?.getSelection();const text=model&&selection&&!selection.isEmpty()?model.getValueInRange(selection):'';const plan=prepareSubqueryTrial(text);if(plan.error){notifyFeedback({kind:'warning',title:'Try subquery',message:plan.error,scope:documents.activeId});return}setSubqueryTrial({plan,state:null,requestId:null})}},
+        {id:'compareClipboard',label:'Compare the editor (or selection) with the clipboard',run:async()=>{const editor=editorRef.current,model=editor?.getModel(),selection=editor?.getSelection();const text=model&&selection&&!selection.isEmpty()?model.getValueInRange(selection):model?.getValue()??sql;let clip='';try{clip=await navigator.clipboard.readText()}catch{notifyFeedback({kind:'warning',title:'Compare',message:'The clipboard could not be read.',scope:documents.activeId});return}setCompareSources({left:{label:selection&&!selection.isEmpty()?'Selection':'Current editor',text},right:{label:'Clipboard',text:clip}})}},
+        {id:'compareFiles',label:'Compare two files: drop them into the comparison window',run:()=>setCompareSources({left:null,right:null})},
+        {id:'localHistory',label:'Local history: compare and restore earlier saved versions of this file',disabled:!isNativeHost||!filePath,run:()=>setShowLocalHistory(true)},
+        {id:'relatedFile',label:'Create related file: test draft, migration draft or example call for this package',disabled:!isNativeHost||!workspace.root||activeTabReadonly,run:()=>{const result=relatedFileProposals(documents.active||{name:'',content:''},workspace.projectRules,workspace.files.map(file=>file.relativePath||''));setRelatedFileCreate(result)}},
+        {id:'portability',label:'Workspace portability check: absolute paths, TNS and local tool dependencies',disabled:!isNativeHost||!workspace.root,run:()=>setShowPortability(true)},
+        {id:'runConsole',label:'Run console: recent executions, output and errors of this tab',run:()=>setShowRunConsole(true)},
+        {id:'newScratch',label:'New scratch file (experiment, not added to the project)',run:newScratchFile},
+        {id:'sessionInspector',label:'Session inspector: schema, NLS, transaction and cursor of this tab',run:()=>setShowSessionInspector(true)},
+        {id:'docComment',label:'Generate documentation comment for the routine at the cursor',disabled:activeTabReadonly,run:generateDocComment},
+        {id:'extractCte',label:'Extract selected subquery into a CTE',disabled:activeTabReadonly,run:extractSelectionToCte},
+        {id:'columnCursors',label:'Paste column names as multiple cursors',disabled:activeTabReadonly,run:pasteColumnCursors},
+        {id:'smartEnter',label:'Complete statement (Smart Enter)',detail:resolveSetting(settings,'editor.shortcuts').value.smartEnter,disabled:activeTabReadonly,run:()=>smartEnterRef.current?.()},
+        {id:'surround',label:'Surround selection with block, IF, loop or timing',disabled:activeTabReadonly,run:()=>{const editor=editorRef.current,position=editor?.getPosition(),point=position&&editor.getScrolledVisiblePosition(position),rect=editor?.getDomNode()?.getBoundingClientRect();openSurroundMenu((rect?.left||0)+(point?.left||0),(rect?.top||0)+(point?.top||0)+(point?.height||0),editor?.getDomNode())}},
+        {id:'unfoldSource',label:'Show all source regions',run:()=>{editorRef.current?.trigger('toolbar','editor.unfoldAll',{});editorRef.current?.focus()}},
+        ...[['sqlcl','Open SQLcl in the project directory'],['sqlplus','Open SQL*Plus in the project directory'],['shell','Open a terminal in the project directory']].map(([tool,label])=>({id:`terminal:${tool}`,label,detail:'Separate session',disabled:!isNativeHost||!workspace.root,run:()=>sendNativeCommand('ui.openTerminal',{tool,directory:workspace.root,userName:visibleConnection?.user||visibleConnection?.username||undefined,identifier:visibleConnection?.id||undefined,tnsSource:visibleConnection?.source||undefined})})),
+        {id:'foldRegions',label:'Fold named code regions',run:()=>{editorRef.current?.trigger('toolbar','editor.foldAllMarkerRegions',{});editorRef.current?.focus()}},
+        {id:'lastEdit',label:'Return to last edit',detail:resolveSetting(settings,'editor.shortcuts').value.lastEdit,run:()=>navigateEdit('last')},
+        {id:'previousEdit',label:'Previous edit location',detail:resolveSetting(settings,'editor.shortcuts').value.previousEdit,run:()=>navigateEdit(-1)},
+        {id:'nextEdit',label:'Next edit location',detail:resolveSetting(settings,'editor.shortcuts').value.nextEdit,run:()=>navigateEdit(1)},
+        {id:'lastExecution',label:'Return to latest executed SQL',detail:resolveSetting(settings,'editor.shortcuts').value.lastExecution,run:returnToExecution},
+        {id:'layoutLock',label:layout.locked?'Unlock panel layout':'Lock panel layout',run:()=>updateLayout(current=>({...current,locked:!current.locked}))},
+        {id:'structure',label:'Show file structure panel',run:()=>{setFilePanelView('structure');showDockPanel('files')}},
         {id:'outline',label:'Show file outline',run:()=>setPaletteMode('outline')},
         {id:'density',label:'Toggle compact / comfortable workbench density',run:()=>setWorkbenchDensity(value=>value==='compact'?'comfortable':'compact')},
         {id:'focus',label:'Toggle editor focus mode',detail:'Ctrl+Alt+Z',run:()=>setFocusMode(value=>!value)},
         {id:'problems',label:'Show Problems',run:()=>setResultTab('Problems')},
+        {id:'runConfigurations',label:'Open procedure/function run configurations',disabled:!isNativeHost,run:openRunConfigurations},
+        {id:'compileSource',label:'Compare and compile Oracle source',disabled:activeTabReadonly||!activeSource.declaration||!!activeSource.warning||executing||fetchingPage,run:reviewSourceForCompilation},
+        ...projectOptions(workspace.projectRules).connectionIds.map(id=>{const profile=dbConnections.find(item=>item.id.toLowerCase()===id.toLowerCase());return {id:'project-connect:'+id,label:'Connect project: '+(profile?.name||id),detail:profile?'Project saved profile':'Profile unavailable',disabled:!profile||activeTabReadonly||connecting||executing||fetchingPage,run:()=>profile&&switchConnection(profile)}}),
+        {id:'newProjectSql',label:'New project SQL file',disabled:!workspace.root,run:newProjectSqlFile},
+        {id:'projectDefaults',label:'Use project run defaults',disabled:!workspace.root||activeTabReadonly||executing||fetchingPage,run:applyProjectRunDefaults},
+        {id:'projectRules',label:'Configure project rules',disabled:!isNativeHost||!workspace.root,run:()=>setShowProjectRules(true)},
+        {id:'relatedFiles',label:'Find related package sources and tests',detail:'Alt+Shift+O',disabled:!isNativeHost||!workspace.root||activeTabReadonly||!activeEditorTab?.path,run:()=>setRelatedSources({root:workspace.root,document:documents.active})},
         {id:'worksets',label:'Manage workspace worksets',disabled:!isNativeHost||!workspace.root,run:()=>setShowWorksets(true)},
         {id:'git',label:'Inspect workspace SQL Git changes',disabled:!isNativeHost||!workspace.root,run:()=>openWorkspaceDevelopment('git')},
         {id:'replace',label:'Preview replace in workspace SQL files',disabled:!isNativeHost||!workspace.root,run:()=>openWorkspaceDevelopment('replace')},
         {id:'search',label:'Search workspace',detail:'Ctrl+Shift+F',run:()=>setShowSearch(true)},
       ]}/>}
-    <input ref={openFileInputRef} type="file" accept=".sql,text/plain" hidden onChange={async (event) => { const file = event.target.files?.[0]; if (file) { const content = await file.text(); rememberEditorPosition(); const id = `file:${crypto.randomUUID()}`; documents.open({ id, name: file.name, path: null, content, dirty: false, connectionProfileId: null }); setNativeTabId(id); } event.target.value = ""; }} />
-    <FileMenu connectionControl={<ConnectionControl key={metadataOriginTabId} context={summarySession.sessionContext} contextError={summarySession.sessionContextError} executing={summarySession.executing} fetching={summarySession.fetchingPage} rendering={summarySession.rendering} cancelling={summarySession.cancelling} stage={summarySession.sqlStage} startedAt={summarySession.operationStartedAt} transactionPending={summarySession.transactionPending} readOnlyAnalysis={summarySession.analysisReadOnly} exporting={Boolean(tabResults[metadataOriginTabId]?.streamState?.busy)} inactive={Boolean(summarySession.inactive)} profile={summaryConnection} connected={summaryConnected} connecting={summarySession.connecting} connectingProfile={summarySession.connectingProfile} disabled={activeTabReadonly} open={showPicker} onOpen={() => setShowPicker(true)}/>} onManageWorkspaces={()=>setShowWorkspaceManager(true)} workspace={workspace} onNew={newSqlFile} onOpen={openSqlFile} onSave={() => saveSqlFile()} onOpenWorkspace={openWorkspace} language={language}>
-      <RunMenu actions={[{label:'Run statement',shortcut:resolveSetting(settings,'editor.shortcuts').value.run,disabled:executing||fetchingPage,run:runQuery},{label:'Preview / run script',run:openScriptPreview},{id:'navigation',separator:true},{label:'File outline',shortcut:resolveSetting(settings,'editor.shortcuts').value.outline,run:()=>setPaletteMode('outline')},{label:'Navigate back',shortcut:'Alt+Left',run:()=>navigateHistory(-1)},{label:'Navigate forward',shortcut:'Alt+Right',run:()=>navigateHistory(1)}]}/>
-      <ViewMenu settings={settings} layout={layout} language={language} onSetting={(id, value) => applySettings(changeSetting(settings, id, value))} onLayout={updateLayout} onPanel={showDockPanel} focusMode={focusMode} onFocusMode={setFocusMode} onResults={name => { setFocusMode(false); updateLayout(current => ({ ...current, resultsCollapsed: false })); setResultTab(name); }} onReset={resetPanelLayout} onSettings={() => setShowAppearance(true)} onCloseDetails={() => { setObjectDefinition(null); window.dispatchEvent(new Event('fbsdb.closeDetails')); }}/>
+    {runConfigurations&&<RunConfigurationsDialog {...runConfigurations} profileId={tabSessions[runConfigurations.tabId]?.activeConnection?.id} autoCommit={!!tabSessions[runConfigurations.tabId]?.autoCommit} connected={isNativeHost&&!tabSessions[runConfigurations.tabId]?.connectionLost&&!!tabSessions[runConfigurations.tabId]?.activeConnection&&!['No connection','Disconnected'].includes(tabSessions[runConfigurations.tabId]?.activeConnection?.id)} busy={!!tabSessions[runConfigurations.tabId]?.executing||!!tabSessions[runConfigurations.tabId]?.fetchingPage||!!tabSessions[runConfigurations.tabId]?.connecting} status={tabSessions[runConfigurations.tabId]?.runState||'Ready'} output={tabResults[runConfigurations.tabId]?.outputMessage||''} onClose={()=>setRunConfigurations(null)} onRun={(sql,parameters,configuration)=>{if(documents.activeId!==runConfigurations.tabId){setRunState('Return to the call configuration tab before running.');return;}const labels=Object.fromEntries(configuration.parameters.map((parameter,index)=>['arg_'+index,parameter.name]));labels.run_result='Return value';const sensitive=new Set(configuration.parameters.flatMap((parameter,index)=>parameter.sensitive?['arg_'+index]:[]));executeStatement(sql,parameters,false,{executedParameters:parameters.filter(parameter=>!sensitive.has(parameter.name)),parameterLabels:labels,runConfiguration:{id:configuration.id,name:configuration.name,revision:configuration.revision}})}}/>}
+    {sourceCompile&&<SourceCompileDialog {...sourceCompile} theme={editorThemeName} valid={activeTabId===sourceCompile.tabId&&sql===sourceCompile.document.content&&tabSession.activeConnection?.id===sourceCompile.profileId&&(!sourceCompile.scriptRequestId||(tabSession.connectionGeneration??0)===sourceCompile.generation)} transactionPending={!!tabSession.transactionPending} onClose={()=>{if(sourceCompile.scriptRequestId)sendNativeCommand('sql.cancel',{tabId:sourceCompile.tabId});setSourceCompile(null)}} confirmLabel={sourceCompile.scriptRequestId?'Compile this script source':'Compile reviewed source'} reviewContext={sourceCompile.scriptRequestId?`Script paused before statement ${sourceCompile.scriptIndex+1}. Earlier statements remain completed; Cancel stops the remaining script.`:null} onBaseline={snapshot=>{const current=documents.tabs.find(tab=>tab.id===sourceCompile.tabId);if(current?.content===sourceCompile.document.content)documents.patch(current.id,{sourceBaseline:sourceBaseline(snapshot),sourceBaselines:{...current.sourceBaselines,[JSON.stringify([snapshot.owner,snapshot.name,snapshot.type,snapshot.profileId,snapshot.context])]:sourceBaseline(snapshot)}})}} onCompile={review=>{if(documents.activeId!==sourceCompile.tabId||documents.text!==sourceCompile.document.content||sessionsRef.current[sourceCompile.tabId]?.activeConnection?.id!==sourceCompile.profileId)return;const request=sourceCompile;
+      if(request.scriptRequestId){const session=sessionsRef.current[request.tabId]||{};if((session.connectionGeneration??0)!==request.generation)return;sendNativeCommand('script.sourceReviewed',{tabId:request.tabId,scriptRequestId:request.scriptRequestId,index:request.scriptIndex,reviewNonce:request.reviewNonce,reviewId:review.reviewId});setSourceCompile(null);return;}
+      setSourceCompile(null);executeStatement(request.prepared.sql,[],false,{ddlConfirmed:true,sourceReviewId:review.reviewId,submittedSql:request.prepared.sql,executedSql:request.prepared.original,statementOffset:request.statementOffset})}}/>}
+    {showProjectRules&&workspace.root&&<ProjectRulesDialog profiles={dbConnections} root={workspace.root} onClose={()=>setShowProjectRules(false)} onSaved={rules=>{setWorkspace(current=>({...current,projectRules:rules}));setShowProjectRules(false)}}/>}
+    {statusMenu&&<EditorContextMenu context={statusMenu} onClose={()=>setStatusMenu(null)} onAction={id=>{settings&&applySettings(changeSetting(settings,'ui.statusIndicators',toggleStatusIndicator(enabledStatusIndicators,id)))}} actions={statusIndicators.filter(item=>!item.fixed).map(item=>({id:item.id,label:`${enabledStatusIndicators.includes(item.id)?'✓ ':'    '}${item.label}`}))}/>}
+    {surroundMenu&&<EditorContextMenu context={surroundMenu} onClose={()=>setSurroundMenu(null)} onAction={applySurround} actions={surroundMenu.options.map(option=>({id:surroundMenu.paste?option.id:`surround:${option.id}`,label:option.label}))}/>}
+    {codeCell&&<CodeCellDialog cell={codeCell} theme={editorThemeName} onClose={()=>setCodeCell(null)} onOpenSql={text=>{setCodeCell(null);setObjectTabActive(false);newSqlFileNow(text)}}/>}
+    {identifierCase&&<IdentifierCaseDialog request={identifierCase} onApply={applyIdentifierCase} onClose={()=>{setIdentifierCase(null);editorRef.current?.focus()}}/>}
+    {localRename&&<Suspense fallback={null}><LocalRenameDialog request={localRename} onApply={applyLocalRename} onClose={()=>{setLocalRename(null);editorRef.current?.focus()}}/></Suspense>}
+    {changeSignature&&<Suspense fallback={null}><ChangeSignatureDialog request={changeSignature} onApply={applyChangeSignature} onClose={()=>{setChangeSignature(null);editorRef.current?.focus()}}/></Suspense>}
+    {extractProcedure&&<Suspense fallback={null}><ExtractProcedureDialog request={extractProcedure} onApply={applyExtractProcedure} onClose={()=>{setExtractProcedure(null);editorRef.current?.focus()}}/></Suspense>}
+    {embeddedSql&&<Suspense fallback={null}><EmbeddedSqlDialog request={embeddedSql} onApply={applyEmbeddedSql} onClose={()=>{setEmbeddedSql(null);editorRef.current?.focus()}}/></Suspense>}
+    {clipboardHistoryOpen&&<Suspense fallback={null}><ClipboardHistoryDialog enabled={clipboardEnabled} onEnabled={enabled=>{setClipboardEnabled(enabled);if(!enabled)setClipboardEntries([])}} entries={clipboardEntries} onClear={()=>setClipboardEntries([])} onPaste={pasteClipboardEntry} onClose={()=>{setClipboardHistoryOpen(false);editorRef.current?.focus()}}/></Suspense>}
+    {editorMacrosOpen&&<Suspense fallback={null}><EditorMacrosDialog recording={macroRecording} macros={editorMacros} onStart={()=>{setMacroRecording([]);setEditorMacrosOpen(false);editorRef.current?.focus()}} onSave={name=>{const result=createEditorMacro(name,macroRecording);if(result.error)throw Error(result.error);setEditorMacros(items=>[result.macro,...items].slice(0,9));setMacroRecording(null)}} onCancel={()=>setMacroRecording(null)} onRun={macro=>{setEditorMacrosOpen(false);return runEditorMacro(macro)}} onDelete={id=>setEditorMacros(items=>items.filter(item=>item.id!==id))} onClose={()=>{setEditorMacrosOpen(false);editorRef.current?.focus()}}/></Suspense>}
+    {quickFix&&<Suspense fallback={null}><QuickFixDialog request={quickFix} onApply={applyQuickFix} onClose={()=>{setQuickFix(null);editorRef.current?.focus()}}/></Suspense>}
+    {relatedSources&&<RelatedSourcesDialog rules={workspace.projectRules} root={relatedSources.root} document={relatedSources.document} documents={tabs} onClose={()=>setRelatedSources(null)} onOpen={file=>{if(pathKey(workspace.root)!==pathKey(relatedSources.root))return;setRelatedSources(null);openWorkspaceFile(file)}}/>}
+    <input ref={openFileInputRef} type="file" accept={(workspace.projectRules||defaultProjectRules).associations.map(item=>item.extension).join(',')+',text/plain'} hidden onChange={async (event) => { const file = event.target.files?.[0]; if (file) { const content = await file.text(); rememberEditorPosition(); const id = `file:${crypto.randomUUID()}`; documents.open({ id, name: file.name, path: null, content,savedContent:content, dirty: false, connectionProfileId: null }); setNativeTabId(id); } event.target.value = ""; }} />
+    <FileMenu connectionControl={<ConnectionControl key={metadataOriginTabId} context={summarySession.sessionContext} contextError={summarySession.sessionContextError} executing={summarySession.executing} fetching={summarySession.fetchingPage} rendering={summarySession.rendering} cancelling={summarySession.cancelling} stage={summarySession.sqlStage} startedAt={summarySession.operationStartedAt} transactionPending={summarySession.transactionPending} readOnlyAnalysis={summarySession.analysisReadOnly} exporting={Boolean(tabResults[metadataOriginTabId]?.streamState?.busy)} inactive={Boolean(summarySession.inactive)&&!summarySession.connectionLost} profile={summaryConnection} connected={summaryConnected} connecting={summarySession.connecting} connectingProfile={summarySession.connectingProfile} disabled={activeTabReadonly} open={showPicker} onOpen={() => setShowPicker(true)}/>} onManageWorkspaces={()=>setShowWorkspaceManager(true)} workspace={workspace} onNew={newSqlFile} onOpen={openSqlFile} onSave={() => {if(!activeTabReadonly)saveSqlFile()}} onOpenWorkspace={openWorkspace} language={language}>
+      <RunMenu actions={[{label:'Run statement',shortcut:resolveSetting(settings,'editor.shortcuts').value.run,disabled:activeTabReadonly||executing||fetchingPage,run:runQuery},{label:'Preview / run script',disabled:activeTabReadonly,run:openScriptPreview},{id:'navigation',separator:true},{label:'File outline',shortcut:resolveSetting(settings,'editor.shortcuts').value.outline,run:()=>setPaletteMode('outline')},{label:'Navigate back',shortcut:'Alt+Left',run:()=>navigateHistory(-1)},{label:'Navigate forward',shortcut:'Alt+Right',run:()=>navigateHistory(1)}]}/>
+      <ViewMenu onApplyLayout={applySavedLayout} resultOptions={currentResultOptions} canPreviewResult={!!queryResult?.columns?.length} onResultAppearance={previewResultAppearance} settings={settings} layout={layout} language={language} onSetting={(id, value) => applySettings(changeSetting(settings, id, value))} onLayout={updateLayout} onPanel={showDockPanel} focusMode={focusMode} onFocusMode={setFocusMode} onResults={name => { setFocusMode(false); updateLayout(current => ({ ...current, resultsCollapsed: false })); setResultTab(name); }} onReset={resetPanelLayout} onSettings={() => setShowAppearance(true)} onCloseDetails={() => { setObjectDefinition(null); window.dispatchEvent(new Event('fbsdb.closeDetails')); }}/>
     </FileMenu>
     <div className="workbench"><aside className="activity-rail"><button className={`rail-button explorer-rail-toggle${sidebarOpen && !focusMode ? " selected" : ""}`} title={sidebarOpen && !focusMode ? "Hide explorer" : "Show explorer"} aria-label={sidebarOpen && !focusMode ? "Hide explorer" : "Show explorer"} aria-pressed={sidebarOpen && !focusMode} onClick={() => {if(focusMode){setFocusMode(false);setSidebarOpen(true)}else setSidebarOpen(open=>!open)}}><Database size={18} /></button><button className="rail-button" title="Search workbench (Ctrl+P)" aria-label="Search workbench" onClick={() => setPaletteMode("files")}><Search size={18} /></button><button className="rail-button" title="History" aria-label="History" onClick={() => { setShowHistory(true); setShowSearch(false); }}><History size={18} /></button><button className="rail-button" title="SQL snippets" aria-label="SQL snippets" onClick={() => { setSnippetFilter(""); setShowSnippets(true); }}><Braces size={18} /></button><button className="rail-button" title="SQL mini tools" aria-label="SQL mini tools" onClick={() => setShowMiniTools(true)}><Workflow size={18}/></button><div className="rail-spacer" /><button className={`rail-button${focusMode?" selected":""}`} title="Editor focus mode (Ctrl+Alt+Z)" aria-label="Editor focus mode" aria-pressed={focusMode} onClick={()=>setFocusMode(value=>!value)}><Code2 size={18}/></button><button className="rail-button" title="Settings" aria-label="Settings" onClick={() => setShowAppearance(true)}><Settings2 size={18} /></button></aside>
-      <DockWorkbench layout={layout} onChange={updateLayout} panels={dockPanels} hidden={focusMode}>
-      <div className="editor-results-stack"><section className="editor-workspace" data-inspector={Boolean(objectInspectorView)}><div className="commandbar"><div className="command-left"><button className="icon-button" title="Open file (Ctrl+Shift+O)" aria-label="Open file (Ctrl+Shift+O)" onClick={openSqlFile}><FolderOpen size={16} /></button><button className="icon-button" title="Undo (Ctrl+Z)" aria-label="Undo" onMouseDown={(event) => event.preventDefault()} onClick={() => { editorRef.current?.trigger("toolbar", "undo", {}); editorRef.current?.focus(); }}><Undo2 size={15} /></button><button className="icon-button format-sql-button" title="Format SQL (Ctrl+Shift+F)" aria-label="Format SQL" onMouseDown={(event) => event.preventDefault()} onClick={formatSql}><AlignLeft size={15} /></button><span className="toolbar-separator" /><label className="fetch-limit-picker" title="Rows per result page"><span>Rows</span><select aria-label="Rows per result page" value={maxRows} onChange={(event) => setMaxRows(Number(event.target.value))}>{[100, 500, 1000, 5000, 10000].map((limit) => <option key={limit} value={limit}>{limit.toLocaleString()}</option>)}</select></label><button className={`run-button${!executing && !fetchingPage && !cancelling ? " idle" : ""}`} aria-label={cancelling ? "Cancelling SQL statement" : (executing || fetchingPage) ? "Cancel current SQL statement" : "Run SQL statement"} disabled={cancelling || activeTabReadonly} title={cancelling ? "Waiting for Oracle to stop this statement" : (executing || fetchingPage) ? "Cancel current SQL statement" : `Run SQL statement (${resolveSetting(settings,"editor.shortcuts").value.run||"unassigned"})`} onMouseDown={(event) => event.preventDefault()} onClick={() => (executing || fetchingPage) ? cancelQuery() : runQuery()}>{cancelling ? <Activity size={14} className="spin" /> : <Play size={14} fill="currentColor" />} <span className="sr-only">{(executing || fetchingPage) && (cancelling ? "Cancelling…" : "Cancel")}</span></button><span className="toolbar-separator" /><button className="transaction-button commit" title="Commit" aria-label="Commit" onClick={() => finishTransaction("commit")} disabled={!transactionPending||executing||fetchingPage}><Check size={13} /></button><button className="transaction-button rollback" title="Rollback" aria-label="Rollback" onClick={() => finishTransaction("rollback")} disabled={!transactionPending||executing||fetchingPage}><X size={13} /></button><button type="button" className={`transaction-button auto-commit${tabSession.autoCommit?' enabled':''}`} aria-label="Auto commit" aria-pressed={Boolean(tabSession.autoCommit)} title={transactionPending?'Commit or roll back pending changes before changing auto commit':`Auto commit ${tabSession.autoCommit?'on':'off'}`} disabled={!isNativeHost||activeTabReadonly||transactionPending||executing||fetchingPage||connecting||tabSession.autoCommitPending} onClick={()=>{updateTabSession('autoCommitPending',true,activeTabId);updateTabSession('autoCommitRequestId',sendNativeCommand('transaction.autoCommit',{tabId:activeTabId,enabled:!tabSession.autoCommit}),activeTabId)}}><RefreshCw size={13}/></button></div><EditorToolbarOverflow theme={theme} onOpen={openSqlFile} onUndo={()=>{editorRef.current?.trigger("toolbar","undo",{});editorRef.current?.focus()}} onFormat={formatSql} pageSize={maxRows} onPageSize={setMaxRows} readOnly={activeTabReadonly}/></div><EditorTabs tabs={[...tabs.map(tab=>({...tab,queryFailed:['error','timeout'].includes(tabSessions[tab.id]?.queryOutcome?.kind),profileName:dbConnections.find(p=>p.id===(tabSessions[tab.id]?.activeConnection?.id||tab.connectionProfileId))?.name,connectionProfileId:tabSessions[tab.id]?.activeConnection?.id||tab.connectionProfileId})), ...objectTabs.map(tab => ({ id: tab.id, name: `${tab.object.owner}.${tab.object.name}`, kind: 'object', connectionProfileId:tabSessions[tab.originTabId]?.activeConnection?.id }))]} activeId={objectTabActive ? objectTabId : activeTabId} onActivate={id => { const selected = objectTabs.find(tab => tab.id === id); if (selected) { setActiveObjectTabId(id); setObjectTabActive(true); setActiveObject(selected.key); inspectOracleObject(selected.object,selected.originTabId,selected.view==='Related tables'); } else { setObjectTabActive(false); setActiveObject(''); activateTab(id); } }} onClose={id => { if (objectTabs.some(tab => tab.id === id)) { setObjectTabs(current => current.filter(tab => tab.id !== id)); if (activeObjectTabId === id) { setObjectTabActive(false); setActiveObjectTabId(null); objectAnalysisRequestRef.current?.cancel(); setObjectAnalysis(null); } } else closeTab(id); }} onCloseMany={ids => { const objectIds = new Set(objectTabs.map(tab => tab.id)); if (ids.includes(activeObjectTabId)) { setObjectTabActive(false); setActiveObjectTabId(null); objectAnalysisRequestRef.current?.cancel(); setObjectAnalysis(null); } setObjectTabs(current => current.filter(tab => !ids.includes(tab.id))); closeTabs(ids.filter(id => !objectIds.has(id))); }} onNew={() => { setObjectTabActive(false); setActiveObject(''); newSqlFile(); }}>{!objectInspectorView && filePath && <button className={fileConnectionProfileId === activeConnection.id ? "icon-button file-connection-button bound" : "icon-button file-connection-button"} title="Bind current connection to this file" aria-label="Bind current connection to this file" disabled={!isNativeHost || !workspace.root || ["No connection", "Disconnected"].includes(activeConnection.id)} onClick={bindCurrentConnectionToFile}><Database size={14} /></button>}</EditorTabs><div className="breadcrumb"><span>{workspace.name}</span>{filePath && <><ChevronRight size={12} /><span>{filePath.split(/[\\/]/).slice(-2, -1)[0]}</span></>}<ChevronRight size={12} /><b>{fileName}{fileDirty ? " *" : ""}</b><EditorSymbolBreadcrumb editor={editorRef.current} tabId={activeTabId} outline={documentOutline}/>{filePath && <span className="file-connection-chip" title="Saved connection for this file"><Database size={11} />{(dbConnections.find(item => item.id === fileConnectionProfileId)?.name || fileConnectionProfileId) ?? "No profile bound"}</span>}</div><ExternalFileNotice key={activeTabId} change={tabs.find(tab=>tab.id===activeTabId)?.externalChange} dirty={fileDirty} onReload={()=>resolveExternalFile(true)} onKeep={()=>resolveExternalFile(false)} onRetry={pollOpenFiles}/><div className="editor-container"><div className="editor-sql-surface" hidden={Boolean(objectInspectorView)}><Suspense fallback={<div className="editor-loading">Loading SQL editor…</div>}><Editor height="100%" defaultLanguage="sql" value={sql} onChange={handleEditorChange} theme={editorThemeName} onMount={(editor, monacoInstance) => { setMonaco(monacoInstance);
-    editor.onDidChangeModelContent(event => { const accepted = lastSuggestionAcceptanceRef.current; if (event.isUndoing && accepted && accepted.tabId === documents.activeId && event.versionId === accepted.version + 1 && Date.now()-accepted.at < 10000 && completionSettingsRef.current.learning) { suggestionLearningRef.current.record(accepted.scope, accepted.context, accepted.key, -1); lastSuggestionAcceptanceRef.current = null; publishLearning(); } }); completionTabKeyRef.current = editor.createContextKey("fbsdb.acceptCompletionOnTab", completionSettings.acceptTab); completionAcceptanceRef.current = editor.addCommand(0, (_accessor, key, context) => { if (completionSettingsRef.current.learning) { const scope = suggestionScope(); suggestionLearningRef.current.record(scope, context || 'statement', key); lastSuggestionAcceptanceRef.current = { scope, context: context || 'statement', key, tabId: documents.activeId, version: editor.getModel().getVersionId(), at: Date.now() }; publishLearning(); } const tabId = documents.activeId; completionRecentRef.current.set(tabId, [key, ...(completionRecentRef.current.get(tabId) || []).filter(item => item !== key)].slice(0, 100)); completionClientRef.current?.remember(key); }); editor.addCommand(monacoInstance.KeyCode.Tab, () => { editor.trigger("keyboard", "hideSuggestWidget", {}); editor.trigger("keyboard", "editor.action.inlineSuggest.hide", {}); editor.trigger("keyboard", "tab", {}); }, "(suggestWidgetVisible || inlineSuggestionVisible) && editorTextFocus && !fbsdb.acceptCompletionOnTab"); editor.addAction({ id: "fbsdb.runStatement", label: "Run SQL statement", run: () => runQueryRef.current?.() }); editor.addAction({ id: "fbsdb.deleteLine", label: "Delete line", precondition: "editorTextFocus && !editorReadonly", run: () => editor.trigger("keyboard", "editor.action.deleteLines", {}) }); editor.addAction({ id: "fbsdb.formatSql", label: "Format SQL", run: () => formatterRef.current?.() }); installRunGutter(editor, monacoInstance); editorRef.current = editor; lastEditorPositionRef.current = editor.getPosition(); editor.onDidChangeCursorPosition(({ position }) => { lastEditorPositionRef.current = position;editorPositionsRef.current.set(documents.activeId,position); }); editor.focus(); recordStartupMilestone("editor-ready"); announceUiReady(); }} options={{ fontFamily: `"${resolveSetting(settings,"editor.fontFamily").value}", Consolas, monospace`, fontSize: codeStyle.fontSize, readOnly: activeTabReadonly, lineHeight: Math.max(codeStyle.fontSize + 2, resolveSetting(settings,"editor.lineHeight").value), minimap: { enabled: resolveSetting(settings,"editor.minimap").value }, padding: { top: 18, bottom: 18 }, lineNumbers: resolveSetting(settings,"editor.lineNumbers").value ? "on" : "off", renderLineHighlight: resolveSetting(settings,"editor.lineHighlight").value ? "line" : "none", renderWhitespace: resolveSetting(settings,"editor.whitespace").value ? "all" : "none", scrollBeyondLastLine: false, smoothScrolling: !reduceMotion, automaticLayout: true, contextmenu:false, wordWrap: resolveSetting(settings,"editor.wordWrap").value ? "on" : "off", glyphMargin: true, folding: resolveSetting(settings,"editor.folding").value, guides: { indentation: resolveSetting(settings,"editor.indentGuides").value, highlightActiveIndentation: resolveSetting(settings,"editor.indentGuides").value }, suggest: { showWords: false, showSnippets: completionSettings.snippets, preview: false }, inlineSuggest: { enabled: completionSettings.inline, mode: "prefix", showToolbar: "never", minShowDelay: completionSettings.delay, suppressSuggestions: false }, quickSuggestions: false, suggestOnTriggerCharacters: autoCompletion, acceptSuggestionOnEnter: completionSettings.acceptEnter ? "on" : "off", tabCompletion: completionSettings.acceptTab ? "on" : "off", parameterHints: { enabled: completionSettings.signatureHelp }, tabSize: codeStyle.tabSize, insertSpaces: codeStyle.insertSpaces, cursorBlinking: reduceMotion?"solid":resolveSetting(settings,"editor.cursorBlinking").value, cursorStyle: resolveSetting(settings,"editor.cursorStyle").value, cursorSmoothCaretAnimation: reduceMotion?"off":"on", bracketPairColorization: { enabled: resolveSetting(settings,"editor.bracketColors").value }, overviewRulerLanes: 0, fixedOverflowWidgets: true, find: { addExtraSpaceOnTop: false } }} /></Suspense></div>{objectInspectorView}{!objectInspectorView && objectDefinition && objectDefinition.originTabId === metadataOriginTabId && <Suspense fallback={<div role="status">Loading…</div>}><OracleDefinitionView hidden={focusMode} source={objectDefinition} onClose={() => setObjectDefinition(null)}/></Suspense>}</div><div className="editor-status"><EditorSessionStatus executionTarget={tabSession.executionTarget} inactive={Boolean(tabSession.inactive)} editor={editorRef.current} tabId={activeTabId} connection={activeConnection} connected={sessionConnected} connecting={connecting} executing={executing} cancelling={cancelling} fetching={fetchingPage} startedAt={tabSession.operationStartedAt} stage={tabSession.sqlStage} readOnlyAnalysis={tabSession.analysisReadOnly} transactionPending={transactionPending} exporting={Boolean(view.streamState?.busy)} /><span>SQL</span><span>Spaces: {codeStyle.tabSize}</span><span>UTF-8</span><span className="status-sql"><Code2 size={12} /> Oracle SQL</span><button type="button" className="status-intellisense saved-state editor-save-button" title={activeTabReadonly ? "Read only" : "Save SQL file (Ctrl+S)"} aria-label={activeTabReadonly ? "Read only" : "Save SQL file (Ctrl+S)"} disabled={activeTabReadonly} onClick={() => saveSqlFile()}>{activeTabReadonly ? <><LockKeyhole size={12} /> Read only</> : fileDirty ? <><Save size={12} /> Unsaved</> : <><Save size={12} /> Saved</>}</button></div></section>
-      <ResizeHandle axis="y" value={resultsHeight} onChange={value=>{setFocusMode(false);setResultsHeight(value)}} min={15} max={70} label="Resize results" panelSelector=".result-panel" />
+      <LayoutLockContext.Provider value={!!layout.locked}><DockWorkbench layout={layout} onChange={updateLayout} panels={dockPanels} hidden={focusMode||!!maximizedPanel}>
+      <div className="editor-results-stack"><section className="editor-workspace" data-env={visibleConnection.environment} data-inspector={Boolean(objectInspectorView)}><div className="commandbar" ref={commandBarRef} onDoubleClick={event=>{if(!event.target.closest('button,input,select,label'))togglePanelMaximized('editor')}}><div className="command-left">{runButton}{toolbarLayout.inline.map((item,index,list)=><Fragment key={item.id}>{(index===0||list[index-1].group!==item.group)&&<span className="toolbar-separator" />}{renderToolbarItem(item)}</Fragment>)}</div><div className="command-end"><EditorToolbarOverflow theme={theme} items={toolbarLayout.overflow.map(item=>({...toolbarDefs[item.id],id:item.id,kind:item.kind}))} pageSize={maxRows} onPageSize={setMaxRows}/><button className="icon-button panel-maximize" aria-label={maximizedPanel==='editor'?'Restore editor panel':'Maximize editor panel'} aria-pressed={maximizedPanel==='editor'} title="Temporarily maximize editor (Escape restores)" onClick={()=>togglePanelMaximized('editor')}>{maximizedPanel==='editor'?'↙':'↗'}</button></div></div><EditorTabs onPromoteScratch={promoteScratch} onPromote={id=>setPreviewTabId(current=>current===id?null:current)} packageGroups={packageGroups} tabs={[...tabs.map(tab=>({...tab,preview:tab.id===previewTabId,isScratch:Boolean(tab.scratch&&!tab.path),connection:documentConnection(tab,tabSessions,dbConnections),sourceEdited:editedSinceExecution(tab,operations.metadata.get(tab.id)),queryFailed:['error','timeout'].includes(tabSessions[tab.id]?.queryOutcome?.kind),latestStatus:tabSessions[tab.id]?.cancelling?'Cancelling':tabSessions[tab.id]?.executing?'Executing':tabSessions[tab.id]?.runState||'No execution yet',profileName:dbConnections.find(p=>p.id===(tabSessions[tab.id]?.activeConnection?.id||tab.connectionProfileId))?.name,connectionProfileId:tabSessions[tab.id]?.activeConnection?.id||tab.connectionProfileId})), ...objectTabs.map(tab => ({ id: tab.id, name: `${tab.object.owner}.${tab.object.name}`, kind: 'object', connection:documentConnection({id:tab.originTabId},tabSessions,dbConnections), connectionProfileId:tabSessions[tab.originTabId]?.activeConnection?.id }))]} activeId={objectTabActive ? objectTabId : activeTabId} onActivate={id => { const selected = objectTabs.find(tab => tab.id === id); if (selected) { setActiveObjectTabId(id); setObjectTabActive(true); setActiveObject(selected.key); inspectOracleObject(selected.object,selected.originTabId,selected.view==='Related tables'); } else { setObjectTabActive(false); setActiveObject(''); activateTab(id); } }} onClose={id => { if (objectTabs.some(tab => tab.id === id)) { setObjectTabs(current => current.filter(tab => tab.id !== id)); if (activeObjectTabId === id) { setObjectTabActive(false); setActiveObjectTabId(null); objectAnalysisRequestRef.current?.cancel(); setObjectAnalysis(null); } } else closeTab(id); }} onCloseMany={ids => { const objectIds = new Set(objectTabs.map(tab => tab.id)); if (ids.includes(activeObjectTabId)) { setObjectTabActive(false); setActiveObjectTabId(null); objectAnalysisRequestRef.current?.cancel(); setObjectAnalysis(null); } setObjectTabs(current => current.filter(tab => !ids.includes(tab.id))); closeTabs(ids.filter(id => !objectIds.has(id))); }} onNew={() => { setObjectTabActive(false); setActiveObject(''); newSqlFile(); }} newOptions={{label:newQueryMainLabel(dbConnections,activeConnection?.id),profiles:newQueryProfileItems(dbConnections,activeConnection?.id),templates:newQueryTemplates,onProfile:id=>{setActiveObject('');newSqlFileOnProfile(id)},onTemplate:id=>{setActiveObject('');newSqlFileFromTemplate(id)}}}>{!objectInspectorView && filePath && <button className={fileConnectionProfileId === activeConnection.id ? "icon-button file-connection-button bound" : "icon-button file-connection-button"} title="Bind current connection to this file" aria-label="Bind current connection to this file" disabled={!isNativeHost || !workspace.root || ["No connection", "Disconnected"].includes(activeConnection.id)} onClick={bindCurrentConnectionToFile}><Database size={14} /></button>}</EditorTabs><div className="breadcrumb"><EnvironmentBadge environment={visibleConnection.environment} profileName={visibleConnection.profileName}/><span>{workspace.name}</span>{filePath && <><ChevronRight size={12} /><span>{filePath.split(/[\\/]/).slice(-2, -1)[0]}</span></>}<ChevronRight size={12} /><b>{objectTabActive&&inspectorObject?`${inspectorObject.owner}.${inspectorObject.name}`:fileName}{!objectTabActive&&fileDirty ? " *" : ""}</b>{!objectInspectorView&&<EditorSymbolBreadcrumb source={activeSource.declaration} schema={completionSchema} onNavigate={jumpToOffset} editor={editorRef.current} tabId={activeTabId} outline={documentOutline}/>}{filePath && <span className="file-connection-chip" title="Saved connection for this file"><Database size={11} />{(dbConnections.find(item => item.id === fileConnectionProfileId)?.name || fileConnectionProfileId) ?? "No profile bound"}</span>}</div>{!objectInspectorView&&<OracleSourceHeader onApi={()=>setShowPackageApi(true)} onCall={isNativeHost?openRunConfigurations:undefined} onCompile={!activeTabReadonly&&isNativeHost?reviewSourceForCompilation:undefined} compileDisabled={executing||fetchingPage||connecting||!!tabSession.scriptRun?.running} source={activeSource} related={relatedPackage} document={activeEditorTab} onSwitch={switchPackageSource} onFind={isNativeHost&&workspace.root&&!activeTabReadonly&&!activeSource.warning?()=>setRelatedSources({root:workspace.root,document:documents.active}):undefined}/>}{!objectInspectorView&&activeEditorTab?.sourceVersionNotice&&<div className="result-source-provenance" role="status">{activeEditorTab.sourceVersionNotice}</div>}{largePolicy.large&&<div className="large-file-notice" role="status"><b>Large file mode</b><span>{sql.length.toLocaleString()} characters · lightweight rendering. Enable only the analysis needed for this document:</span>{[['completion','Completion & navigation'],['diagnostics','Diagnostics'],['outline','Outline & folding'],['source','Source identity & comparison']].map(([feature,label])=><label key={feature}><input type="checkbox" aria-label={`Large file ${label}`} checked={largePolicy[feature]} onChange={event=>{const enabled=event.target.checked;setLargeFileOverrides(current=>({...current,[activeTabId]:{...current[activeTabId],[feature]:enabled}}))}}/>{label}</label>)}</div>}<ExternalFileNotice key={activeTabId} change={tabs.find(tab=>tab.id===activeTabId)?.externalChange} dirty={fileDirty} onReload={()=>resolveExternalFile(true)} onKeep={()=>resolveExternalFile(false)} onRetry={pollOpenFiles}/><div className="editor-container"><div className="editor-sql-surface" hidden={Boolean(objectInspectorView)} onDragOverCapture={event=>{if(event.dataTransfer?.types?.includes('application/x-fbsdb-schema')){event.preventDefault();event.dataTransfer.dropEffect='copy'}}} onDropCapture={dropSchemaInEditor}><Suspense fallback={<div className="editor-loading">Loading SQL editor…</div>}><Editor height="100%" defaultLanguage="sql" value={sql} onChange={handleEditorChange} theme={editorThemeName} onMount={(editor, monacoInstance) => { setMonaco(monacoInstance);attachBindDrop(editor);
+    let trackedEditTab=documents.activeId;
+    editor.onDidChangeModelContent(event=>{const id=documents.activeId;if(controlledEditorUpdateRef.current||event.isEolChange){trackedEditTab=id;return;}if(trackedEditTab!==id){trackedEditTab=id;return;}if(event.isFlush){if(trackedEditTab===id)editLocationsRef.current.forget(id);trackedEditTab=id;return;}trackedEditTab=id;if(!documents.active?.readOnly)editLocationsRef.current.record(id,event.changes,editor.getModel()?.getValueLength()||0)});
+    editor.onDidChangeModelContent(event => { const accepted = lastSuggestionAcceptanceRef.current; if (event.isUndoing && accepted && accepted.tabId === documents.activeId && event.versionId === accepted.version + 1 && Date.now()-accepted.at < 10000 && completionSettingsRef.current.learning) { suggestionLearningRef.current.record(accepted.scope, accepted.context, accepted.key, -1); lastSuggestionAcceptanceRef.current = null; publishLearning(); } }); completionTabKeyRef.current = editor.createContextKey("fbsdb.acceptCompletionOnTab", completionSettings.acceptTab); completionAcceptanceRef.current = editor.addCommand(0, (_accessor, key, context) => { if (completionSettingsRef.current.learning) { const scope = suggestionScope(); suggestionLearningRef.current.record(scope, context || 'statement', key); lastSuggestionAcceptanceRef.current = { scope, context: context || 'statement', key, tabId: documents.activeId, version: editor.getModel().getVersionId(), at: Date.now() }; publishLearning(); } const tabId = documents.activeId; completionRecentRef.current.set(tabId, [key, ...(completionRecentRef.current.get(tabId) || []).filter(item => item !== key)].slice(0, 100)); completionClientRef.current?.remember(key); }); editor.addCommand(monacoInstance.KeyCode.Tab, () => { editor.trigger("keyboard", "hideSuggestWidget", {}); editor.trigger("keyboard", "editor.action.inlineSuggest.hide", {}); editor.trigger("keyboard", "tab", {}); }, "(suggestWidgetVisible || inlineSuggestionVisible) && editorTextFocus && !fbsdb.acceptCompletionOnTab"); editor.addAction({ id: "fbsdb.runStatement", label: "Run SQL statement", run: () => runQueryRef.current?.() }); editor.addAction({ id: "fbsdb.deleteLine", label: "Delete line", precondition: "editorTextFocus && !editorReadonly", run: () => editor.trigger("keyboard", "editor.action.deleteLines", {}) }); editor.addAction({ id: "fbsdb.formatSql", label: "Format SQL", run: () => formatterRef.current?.() }); editor.addAction({ id: 'fbsdb.smartEnter', label: 'Complete statement (Smart Enter)', precondition: 'editorTextFocus && !editorReadonly', run: () => smartEnterRef.current?.() }); editor.addAction({ id: 'fbsdb.quickFix', label: 'Quick fixes', keybindings: [monacoInstance.KeyMod.Alt | monacoInstance.KeyCode.Enter], precondition: 'editorTextFocus && !editorReadonly', run: () => quickFixRef.current?.() }); editor.addAction({ id: 'fbsdb.replayMacro', label: 'Replay latest editor macro', keybindings: [monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyMod.Alt | monacoInstance.KeyMod.Shift | monacoInstance.KeyCode.KeyM], precondition: 'editorTextFocus && !editorReadonly', run: () => macroRunRef.current?.() }); installRunGutter(editor, monacoInstance); insertPairProvidersRef.current?.dispose(); insertPairProvidersRef.current = installInsertPairProviders(monacoInstance); structuralSelectionRef.current?.dispose(); structuralSelectionRef.current = installStructuralSelection(monacoInstance); postfixProviderRef.current?.dispose(); postfixProviderRef.current = installPostfixCompletion(monacoInstance); editorRef.current = editor; lastEditorPositionRef.current = editor.getPosition(); editor.onDidChangeCursorPosition(({ position }) => { lastEditorPositionRef.current = position;editorPositionsRef.current.set(documents.activeId,position);projectionCursorRef.current?.(position);setCursorLine(position.lineNumber); }); editor.focus(); recordStartupMilestone("editor-ready"); announceUiReady(); }} options={{ fontFamily: `"${resolveSetting(settings,"editor.fontFamily").value}", Consolas, monospace`, fontSize: codeStyle.fontSize, readOnly: activeTabReadonly, lineHeight: Math.max(codeStyle.fontSize + 2, resolveSetting(settings,"editor.lineHeight").value), minimap: { enabled: resolveSetting(settings,"editor.minimap").value, showRegionSectionHeaders: true, showMarkSectionHeaders: true }, padding: { top: 18, bottom: 18 }, lineNumbers: resolveSetting(settings,"editor.lineNumbers").value ? "on" : "off", renderLineHighlight: resolveSetting(settings,"editor.lineHighlight").value ? "line" : "none", renderWhitespace: resolveSetting(settings,"editor.whitespace").value ? "all" : "none", scrollBeyondLastLine: false, smoothScrolling: !reduceMotion, automaticLayout: true, contextmenu:false, wordWrap: resolveSetting(settings,"editor.wordWrap").value ? "on" : "off", glyphMargin: true, folding: resolveSetting(settings,"editor.folding").value, guides: { indentation: resolveSetting(settings,"editor.indentGuides").value, highlightActiveIndentation: resolveSetting(settings,"editor.indentGuides").value }, suggest: { showWords: false, showSnippets: completionSettings.snippets, preview: false }, inlineSuggest: { enabled: completionSettings.inline, mode: "prefix", showToolbar: "never", minShowDelay: completionSettings.delay, suppressSuggestions: false }, 'semanticHighlighting.enabled':resolveSetting(settings,'editor.semanticHighlighting').value&&!largePolicy.large,quickSuggestions: false, suggestOnTriggerCharacters: autoCompletion, acceptSuggestionOnEnter: completionSettings.acceptEnter ? "on" : "off", tabCompletion: completionSettings.acceptTab ? "on" : "off", parameterHints: { enabled: completionSettings.signatureHelp }, tabSize: codeStyle.tabSize, insertSpaces: codeStyle.insertSpaces, cursorBlinking: reduceMotion?"solid":resolveSetting(settings,"editor.cursorBlinking").value, cursorStyle: resolveSetting(settings,"editor.cursorStyle").value, cursorSmoothCaretAnimation: reduceMotion?"off":"on", bracketPairColorization: { enabled: resolveSetting(settings,"editor.bracketColors").value }, stickyScroll:{enabled:resolveSetting(settings,'editor.stickyHeaders').value,maxLineCount:4,defaultModel:'outlineModel'},codeLens: resolveSetting(settings,'editor.codeLenses').value&&!largePolicy.large, overviewRulerLanes: resolveSetting(settings,'editor.overviewRuler').value?3:0,overviewRulerBorder:false, fixedOverflowWidgets: true,...lightweightEditorOptions(largePolicy), find: { addExtraSpaceOnTop: false } }} /></Suspense></div>{objectInspectorView}{!objectInspectorView && objectDefinition && objectDefinition.originTabId === metadataOriginTabId && <Suspense fallback={<div role="status">Loading…</div>}><OracleDefinitionView hidden={focusMode} source={objectDefinition} onClose={() => setObjectDefinition(null)}/></Suspense>}</div><div className="editor-status" onContextMenu={event=>{if(event.target.closest('input,select,textarea'))return;event.preventDefault();setStatusMenu({tabId:activeTabId,x:event.clientX,y:event.clientY,trigger:event.currentTarget,model:null,version:0,selection:null})}}><EditorSessionStatus sourceEdited={editedSinceExecution(activeEditorTab||{},operations.metadata.get(activeTabId))} executionTarget={tabSession.executionTarget} inactive={Boolean(tabSession.inactive)} editor={editorRef.current} tabId={activeTabId} connection={activeConnection} connected={sessionConnected} connecting={connecting} executing={executing} cancelling={cancelling} fetching={fetchingPage} startedAt={tabSession.operationStartedAt} stage={tabSession.sqlStage} readOnlyAnalysis={tabSession.analysisReadOnly} transactionPending={transactionPending} exporting={Boolean(view.streamState?.busy)} /><span>SQL</span><button type="button" className="status-overview" aria-label="Next local change" disabled={!overview.ranges.length} onClick={overview.next} title="Overview ruler: diagnostics, find matches, and local changes (left lane). Click the ruler to scroll to a location.">{overview.label}</button>{enabledStatusIndicators.map(id=>{const item=statusIndicatorContent(id,buildStatusContext());if(!item)return null;const inner=<>{item.icon==='code'&&<Code2 size={12} />}{item.text}</>;return item.action?<button type="button" key={id} className="status-indicator" data-indicator={id} title={item.title} onClick={()=>statusIndicatorAction(item.action)}>{inner}</button>:<span key={id} className="status-indicator" data-indicator={id} title={item.title}>{inner}</span>})}<button type="button" className="status-intellisense saved-state editor-save-button" title={activeTabReadonly ? "Read only" : "Save SQL file (Ctrl+S)"} aria-label={activeTabReadonly ? "Read only" : "Save SQL file (Ctrl+S)"} disabled={activeTabReadonly} onClick={() => saveSqlFile()}>{activeTabReadonly ? <><LockKeyhole size={12} /> Read only</> : fileDirty ? <><Save size={12} /> Unsaved</> : <><Save size={12} /> Saved</>}</button></div></section>
+      <ResizeHandle locked={layout.locked} axis="y" value={resultsHeight} onChange={value=>{setFocusMode(false);setResultsHeight(value)}} min={15} max={70} label="Resize results" panelSelector=".result-panel" />
       <section className="result-panel" data-collapsed={bottomCollapsed}>
-        <div className="result-header"><div className="result-tabs">
+        <div className="result-header" onDoubleClick={event=>{if(!event.target.closest('button,input,select'))togglePanelMaximized('results')}}><button className="icon-button panel-maximize" aria-label={maximizedPanel==='results'?'Restore results panel':'Maximize results panel'} aria-pressed={maximizedPanel==='results'} title="Temporarily maximize results (Escape restores)" onClick={()=>togglePanelMaximized('results')}>{maximizedPanel==='results'?'↙':'↗'}</button><div className="result-tabs">
           <button className={resultTab === "Results" ? "active" : ""} onClick={() => { updateLayout(current => ({ ...current, resultsCollapsed: false })); setFocusMode(false); setResultTab("Results"); }}><Table2 size={14} /> Results{queryResult && <span className="result-tab-count">{queryResult.returnedRows ?? queryResult.rowsAffected ?? ""}</span>}</button>
           <button className={resultTab === "Output" ? "active" : ""} onClick={() => { updateLayout(current => ({ ...current, resultsCollapsed: false })); setFocusMode(false); setResultTab("Output"); }}><Terminal size={14} /> Output</button>
           <button className={resultTab === "Problems" ? "active" : ""} onClick={() => { updateLayout(current => ({ ...current, resultsCollapsed: false })); setFocusMode(false); setResultTab("Problems"); }} title="SQL and PL/SQL problems (F8 / Shift+F8)"><CircleHelp size={14} /> Problems{activeProblems.length > 0 && <span className="result-tab-count">{activeProblems.length}</span>}</button>
@@ -1728,9 +2572,13 @@ export function App() {
             <button aria-label="Close result set" onClick={() => { if (item.result.resultId && item.result.resultId !== view.queryResult?.resultId && !(view.resultSets || []).some(other => other.key !== item.key && other.result.resultId === item.result.resultId)) sendNativeCommand("sql.closeResult", { resultId: item.result.resultId }); updateTabResult("resultSets", sets => sets.filter(value => value.key !== item.key)); if (view.selectedResultKey === item.key) updateTabResult("selectedResultKey", null); }}>×</button>
           </div>)}
         </div>}
+        {['Results','Output'].includes(resultTab)&&<StackTraceLinks items={tabSession.runtimeProblems} onNavigate={navigateProblem}/>}
+        {['Results','Output'].includes(resultTab)&&<ResultSourceProvenance result={resultTab==='Output'?view.outputProvenance:queryResult} document={activeEditorTab||{}} connection={editorConnection} context={tabSession.sessionContext}/>}
         {resultTab === "Problems" ? <ProblemsPanel onReturnToEditor={()=>editorRef.current?.focus()} items={allProblems} activeTabId={activeTabId} onNavigate={navigateProblem} /> : resultTab === "Explain" ? <Suspense fallback={<div role="status">Loading…</div>}><ExplainPlanView result={explainResult} loading={executing && executionKind === "explain"} error={explainMessage} mode={view.planPresentation || "diagram"} onModeChange={mode => updateTabResult("planPresentation", mode, activeTabId)} /></Suspense> : resultTab === "Results"
           ? <SqlResultsView
-              onExportInsert={exportResultsInsertSql}
+              liveAppearance={resultTab==='Results'&&resultLiveAppearance?.key===currentAppearanceKey?resultLiveAppearance:null} onAppearanceApplied={sequence=>setResultLiveAppearance(current=>current?.sequence===sequence?null:current)}
+              budget={{maxRows:resolveSetting(settings,'results.budgetRows').value,maxMemoryMb:resolveSetting(settings,'results.budgetMemoryMb').value,action:resolveSetting(settings,'results.budgetAction').value}}
+              onSelectionSummary={summary=>updateTabResult('selectionSummary',summary,activeTabId)} onExportInsert={exportResultsInsertSql} onSmartObject={showSmartObject} linkedColumn={linkedProjectionColumn} onColumnSource={showProjectionSource}
               sourceDefinition={definition?.tabId === activeTabId ? definition : null}
               onCloseSourceDefinition={() => { const owner = documents.activeId, requestId = sourceDefinitionRequestRef.current.get(owner); if (requestId) operations.owners.delete(requestId); sourceDefinitionRequestRef.current.delete(owner); setDefinition(null); }}
               memoryItems={[{ key: "latest", label: view.latestResultName || "Latest", result: view.queryResult }, ...(view.resultSets || []).filter(item => item.pinned)].filter(item => item.result).map(item => ({ ...item, memoryKB: Math.round(estimateResultMemory(item.result) / 1024) }))}
@@ -1755,9 +2603,9 @@ export function App() {
           : /ORA-\d+/i.test(panelMessage||'') ? <ActionableState className="output-empty" title={/ORA-0*1031\b/i.test(panelMessage)?'Oracle access denied':/ORA-0*942\b/i.test(panelMessage)?'Oracle object missing or inaccessible':'Oracle execution error'} detail={panelMessage} action={/ORA-0*1031\b/i.test(panelMessage)?'Choose another profile':'Return to SQL'} onAction={()=>/ORA-0*1031\b/i.test(panelMessage)?setShowPicker(true):editorRef.current?.focus()}/>: <div className="output-empty"><div className="output-icon"><BookOpen size={18}/></div><b>{panelMessage?'DBMS_OUTPUT':'No output messages'}</b><span>{panelMessage||'DBMS_OUTPUT and execution notices appear here.'}</span></div>}
       </section>
     </div>
-      </DockWorkbench>
+      </DockWorkbench></LayoutLockContext.Provider>
     </div>
-    <footer className="app-status"><div><Folder size={12}/><span title={workspace.root||'Open a workspace'}>{workspace.name}</span></div><div><button type="button" onClick={()=>setShowGettingStarted(true)}>Getting started</button><span>Ctrl+P · Search workbench</span><span className="status-divider"/><span>Ctrl+Enter · Run SQL</span></div><div><LockKeyhole size={12}/><span>Manual commit</span></div></footer>
+    <footer className="app-status"><div className="footer-workspace"><Folder size={12}/><span title={workspace.root||'Open a workspace'}>{workspace.name}</span></div><div className="footer-context"><button type="button" aria-label="Getting started" onClick={()=>setShowGettingStarted(true)}><CircleHelp size={11}/><span>Getting started</span></button><WorkbenchStatus session={{...summarySession,exporting:!!tabResults[visibleOrigin]?.streamState?.busy}} connection={visibleConnection} selection={visibleOrigin===activeTabId&&resultTab==='Results'?view.selectionSummary:null} error={visibleOrigin===activeTabId?view.pageError:''}/></div><div className="footer-transaction" title={`${visibleConnection.profileName} · ${transactionStatus(summarySession)}`}><LockKeyhole size={12}/><span>{transactionStatus(summarySession)}</span></div></footer>
     {showPicker && <ConnectionPicker items={dbConnections.map(item => ({ ...item, recent: recentProfiles.includes(item.id) }))} current={activeConnection} onClose={() => setShowPicker(false)} onConnect={switchConnection} favorites={favorites} setFavorites={setFavorites} groups={connectionGroupNames} onManage={()=>{setShowPicker(false);setProfileEditor(true)}} managementError={managementError}
       onNew={() => { setShowPicker(false); setProfileEditor({}); }}
       onEdit={(profile) => { setShowPicker(false); setProfileEditor(profile); }}
@@ -1772,11 +2620,11 @@ export function App() {
       return executeStatement(statement, parameters, true);
     }} onCancelRun={cancelQuery} onFetchMore={fetchMoreResults} onClose={() => setShowMiniTools(false)}/></Suspense>}
     {showSnippets && <ModalBackdrop onClose={() => setShowSnippets(false)} onMouseDown={(event) => event.target === event.currentTarget && setShowSnippets(false)}><section className="appearance-modal snippet-browser-modal" role="dialog" aria-modal="true" aria-labelledby="snippet-browser-title"><header className="appearance-header"><div><div className="eyebrow">SQL TOOLKIT</div><h2 id="snippet-browser-title">SQL snippets</h2><p>Search, preview, and insert SQL templates, or create your own.</p></div><div className="snippet-header-actions"><button className="button-secondary" onClick={() => { setSnippetFormOpen(true); setSnippetError(""); }}><Plus size={13} /> New custom</button><button className="icon-button" onClick={() => setShowSnippets(false)} aria-label="Close SQL snippets"><X size={17} /></button></div></header><label className="workspace-search-input snippet-search-input"><Search size={15} /><input autoFocus value={snippetFilter} onChange={(event) => setSnippetFilter(event.target.value)} placeholder="Search snippets or triggers…" aria-label="Search SQL snippets" /></label><div className="snippet-browser-body"><div className="snippet-list" role="listbox" aria-label="Available SQL snippets">{filteredSnippets.length ? filteredSnippets.map((snippet) => <button key={snippet.trigger} className={`snippet-option ${selectedSnippet?.trigger === snippet.trigger ? "selected" : ""}`} role="option" aria-selected={selectedSnippet?.trigger === snippet.trigger} onClick={() => { setSelectedSnippetTrigger(snippet.trigger); setSnippetFormOpen(false); }}><span className="snippet-trigger">{snippet.trigger}</span><span className="snippet-option-copy"><b>{snippet.label}</b><small>{snippet.detail}</small></span><ChevronRight size={14} /></button>) : <div className="query-history-empty"><Search size={20} /><b>No matching snippets</b><span>Try a SQL keyword or trigger such as `cte`.</span></div>}</div>{snippetFormOpen ? <div className="snippet-preview snippet-form-panel"><div className="snippet-preview-heading"><div><span className="appearance-section-title">CUSTOM TEMPLATE</span><b>Create a SQL snippet</b></div><Braces size={15} /></div><label>Trigger<input autoFocus maxLength={24} value={snippetDraft.trigger} onChange={(event) => { setSnippetDraft((draft) => ({ ...draft, trigger: event.target.value })); setSnippetError(""); }} placeholder="e.g. myquery" /></label><label>Name<input maxLength={48} value={snippetDraft.label} onChange={(event) => setSnippetDraft((draft) => ({ ...draft, label: event.target.value }))} placeholder="e.g. Active invoices" /></label><label>Description<input maxLength={100} value={snippetDraft.detail} onChange={(event) => setSnippetDraft((draft) => ({ ...draft, detail: event.target.value }))} placeholder="Shown in IntelliSense" /></label><label>SQL template<textarea spellCheck="false" value={snippetDraft.text} onChange={(event) => setSnippetDraft((draft) => ({ ...draft, text: event.target.value }))} placeholder="Use ${1:placeholder} for editable Tab stops" /></label>{snippetError && <Feedback title="Snippet could not be saved">{snippetError}</Feedback>}</div> : selectedSnippet && <div className="snippet-preview"><div className="snippet-preview-heading"><div><span className="appearance-section-title">{customSqlSnippets.some((snippet) => snippet.trigger === selectedSnippet.trigger) ? "CUSTOM SNIPPET" : "BUILT-IN PREVIEW"}</span><b>{selectedSnippet.label}</b></div><div className="snippet-preview-tools">{customSqlSnippets.some((snippet) => snippet.trigger === selectedSnippet.trigger) && <button className="snippet-delete-button" aria-label={"Delete " + selectedSnippet.label} title="Delete custom snippet" onClick={() => deleteCustomSqlSnippet(selectedSnippet.trigger)}><Trash2 size={13} /></button>}<code>{selectedSnippet.trigger}</code></div></div><p>{selectedSnippet.detail}</p><pre>{selectedSnippet.text.replace(/\$\{\d+:([^}]+)\}/g, "$1")}</pre><div className="snippet-placeholder-note"><Zap size={13} /> Tab moves between editable placeholders.</div></div>}</div><footer className="appearance-footer"><span>{sqlSnippets.length} built-in · {customSqlSnippets.length} custom · Ctrl+Space opens trigger suggestions</span>{snippetFormOpen ? <div className="snippet-footer-actions"><button className="button-secondary" onClick={() => { setSnippetFormOpen(false); setSnippetError(""); }}>Cancel</button><button className="button-primary" onClick={saveCustomSqlSnippet}><Check size={13} /> Save snippet</button></div> : <button className="button-primary" disabled={!selectedSnippet} onClick={() => insertSqlSnippet(selectedSnippet)}><Braces size={14} /> Insert snippet</button>}</footer></section></ModalBackdrop>}
-    {showSearch && <ModalBackdrop onClose={() => setShowSearch(false)} onMouseDown={(event) => { if (event.target === event.currentTarget) setShowSearch(false); }}><section className="appearance-modal workspace-search-modal" role="dialog" aria-modal="true" aria-labelledby="workspace-search-title"><header className="appearance-header"><div><div className="eyebrow">WORKSPACE SEARCH</div><h2 id="workspace-search-title">Find in SQL files</h2><p>{workspaceSearchScope?`Search SQL files in ${workspaceSearchScope}`:'Case-insensitive search across SQL files in the open workspace.'}</p></div><button className="icon-button" aria-label="Close workspace search" onClick={() => setShowSearch(false)}><X size={17} /></button></header><label className="workspace-search-input"><Search size={15} /><input autoFocus value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search text in .sql files…" aria-label="Search SQL workspace" /></label><div className="workspace-search-summary">{!isNativeHost ? "Open the desktop app to search workspace files." : !workspace.root ? "Open a workspace to search its SQL files." : searchQuery.trim().length < 2 ? "Enter at least 2 characters to search." : searching ? "Searching workspace…" : `${searchMatches.length} match${searchMatches.length === 1 ? "" : "es"}${searchTruncated ? " · search limits reached; some files may be omitted" : ""}`}</div><div className="workspace-search-results">{searchMatches.map((match, index) => <button className="workspace-search-result" key={`${match.path}:${match.lineNumber}:${index}`} onClick={() => openWorkspaceSearchMatch(match)}><span><b>{match.relativePath}</b><small>Line {match.lineNumber}</small></span><code>{match.lineText}</code></button>)}{isNativeHost && workspace.root && searchQuery.trim().length >= 2 && !searching && !searchMatches.length && <div className="query-history-empty"><Search size={20} /><b>{searchTruncated ? "No matches in scanned files" : "No matches found"}</b><span>{searchTruncated ? "Some files were skipped because the workspace is large." : "Try a different term or shorter fragment."}</span><button className="button-secondary" onClick={()=>setSearchQuery("")}>Clear search</button></div>}{!isNativeHost && <div className="query-history-empty"><Search size={20} /><b>Workspace search is available in the desktop app</b><span>It searches SQL files in the open workspace.</span></div>}</div><footer className="appearance-footer"><span>{searchMatches.length ? "Select a match to open its file at that line." : "Search runs locally against workspace SQL files."}</span><button className="button-secondary" onClick={() => { setShowSearch(false); setSearchQuery(""); setSearchMatches([]); }}>Close</button></footer></section></ModalBackdrop>}
-    {showGettingStarted && <GettingStartedDialog onClose={()=>{persistLocal(localStorage,'fbsdb.onboardingSeen','true');setShowGettingStarted(false)}}/>}
+    {showSearch && <ModalBackdrop onClose={() => setShowSearch(false)} onMouseDown={(event) => { if (event.target === event.currentTarget) setShowSearch(false); }}><section className="appearance-modal workspace-search-modal" role="dialog" aria-modal="true" aria-labelledby="workspace-search-title"><header className="appearance-header"><div><div className="eyebrow">WORKSPACE SEARCH</div><h2 id="workspace-search-title">{deleteReview?'Review references before delete':'Find in SQL files'}</h2><p>{workspaceSearchScope?`Search SQL files in ${workspaceSearchScope}`:'Case-insensitive search across SQL files in the open workspace.'}</p></div><button className="icon-button" aria-label="Close workspace search" onClick={() => setShowSearch(false)}><X size={17} /></button></header>{deleteReview&&<div className="workspace-delete-review" role="status"><b>{deleteReview.kind} {deleteReview.name}</b><span>{deleteReview.localReferences} resolved current-document reference{deleteReview.localReferences===1?'':'s'}{deleteReview.localComplete?'':` · local analysis incomplete: ${deleteReview.localReason||'limit reached'}`}. Workspace results are bounded text candidates, not verified semantic references. Dynamic SQL, server-side callers and unsaved changes in other editors are unresolved. This review does not delete code or prove deletion is safe.</span></div>}<label className="workspace-search-input"><Search size={15} /><input autoFocus value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Search text in .sql files…" aria-label="Search SQL workspace" /></label><div className="workspace-search-summary">{!isNativeHost ? "Open the desktop app to search workspace files." : !workspace.root ? "Open a workspace to search its SQL files." : searchQuery.trim().length < 2 ? "Enter at least 2 characters to search." : searching ? "Searching workspace…" : `${searchMatches.length} match${searchMatches.length === 1 ? "" : "es"}${searchTruncated ? " · search limits reached; some files may be omitted" : ""}`}</div><div className="workspace-search-results">{searchMatches.map((match, index) => <button className="workspace-search-result" key={`${match.path}:${match.lineNumber}:${index}`} onClick={() => openWorkspaceSearchMatch(match)}><span><b>{match.relativePath}</b><small>Line {match.lineNumber}</small></span><code>{match.lineText}</code></button>)}{isNativeHost && workspace.root && searchQuery.trim().length >= 2 && !searching && !searchMatches.length && <div className="query-history-empty"><Search size={20} /><b>{searchTruncated ? "No matches in scanned files" : "No matches found"}</b><span>{searchTruncated ? "Some files were skipped because the workspace is large." : "Try a different term or shorter fragment."}</span><button className="button-secondary" onClick={()=>setSearchQuery("")}>Clear search</button></div>}{!isNativeHost && <div className="query-history-empty"><Search size={20} /><b>Workspace search is available in the desktop app</b><span>It searches SQL files in the open workspace.</span></div>}</div><footer className="appearance-footer"><span>{searchMatches.length ? "Select a match to open its file at that line." : "Search runs locally against workspace SQL files."}</span><button className="button-secondary" onClick={() => { setShowSearch(false); setSearchQuery(""); setSearchMatches([]); }}>Close</button></footer></section></ModalBackdrop>}
+    {showGettingStarted && <GettingStartedDialog workspace={workspace} startup={resolveSetting(settings,'ui.startupWorkspaceHub').value} onStartup={value=>applySettings(changeSetting(settings,'ui.startupWorkspaceHub',value))} onClose={()=>{persistLocal(localStorage,'fbsdb.onboardingSeen','true');setShowGettingStarted(false)}}/>}
     {showHistory && <QueryHistoryDialog historyLimit={historyLimit} historyFilter={historyFilter} setHistoryFilter={setHistoryFilter} queryHistory={queryHistory} filteredQueryHistory={filteredQueryHistory} setQueryHistory={setQueryHistory} insertHistorySql={insertHistorySql} setShowHistory={setShowHistory}/>}
     {showTnsSources && <TnsSources aliases={tnsAliases} onClose={() => setShowTnsSources(false)} />}
-    {editorContext&&<EditorContextMenu context={editorContext} onClose={()=>setEditorContext(null)} onAction={editorContextAction} actions={[{id:'run',label:editorContext.selected?'Run selection':'Run statement',disabled:executing||fetchingPage||activeTabReadonly},{id:'explain',label:'Explain plan',disabled:executing||fetchingPage},{id:'format',label:editorContext.selected?'Format selection':'Format SQL',disabled:editorContext.readOnly},{id:'edit',separator:true},{id:'undo',label:'Undo',disabled:editorContext.readOnly||!editorContext.canUndo},{id:'redo',label:'Redo',disabled:editorContext.readOnly||!editorContext.canRedo},{id:'cut',label:'Cut',disabled:editorContext.readOnly||!editorContext.selected},{id:'copy',label:'Copy',disabled:!editorContext.selected},{id:'paste',label:'Paste',disabled:editorContext.readOnly},{id:'selectAll',label:'Select all'},{id:'comment',label:'Toggle comment',disabled:editorContext.readOnly},{id:'find',label:'Find'},{id:'replace',label:'Replace',disabled:editorContext.readOnly}]}/>}
+    {editorContext&&<EditorContextMenu context={editorContext} onClose={()=>setEditorContext(null)} onAction={editorContextAction} actions={[...bindMenuActions(editorContext.bind,editorContext.bindType,{readOnly:editorContext.readOnly||!filePath}),{id:'run',label:editorContext.selected?'Run selection':'Run statement',disabled:executing||fetchingPage||activeTabReadonly},{id:'explain',label:'Explain plan',disabled:executing||fetchingPage},{id:'format',label:editorContext.selected?'Format selection':'Format SQL',disabled:editorContext.readOnly},{id:'edit',separator:true},{id:'undo',label:'Undo',disabled:editorContext.readOnly||!editorContext.canUndo},{id:'redo',label:'Redo',disabled:editorContext.readOnly||!editorContext.canRedo},{id:'cut',label:'Cut',disabled:editorContext.readOnly||!editorContext.selected},{id:'copy',label:'Copy',disabled:!editorContext.selected},{id:'paste',label:'Paste',disabled:editorContext.readOnly},{id:'selectAll',label:'Select all'},{id:'comment',label:'Toggle comment',disabled:editorContext.readOnly},{id:'identifierCase',label:'Convert identifier case…',disabled:editorContext.readOnly||!editorContext.selected},{id:'localRename',label:'Rename local variable or parameter…',disabled:editorContext.readOnly},{id:'changeSignature',label:'Change local procedure signature…',disabled:editorContext.readOnly},{id:'extractProcedure',label:'Extract selected PL/SQL assignments…',disabled:editorContext.readOnly||!editorContext.selected},{id:'moveUp',label:'Move SQL item or PL/SQL statement up',disabled:editorContext.readOnly},{id:'moveDown',label:'Move SQL item or PL/SQL statement down',disabled:editorContext.readOnly},{id:'embeddedSql',label:'Edit SQL inside EXECUTE IMMEDIATE…',disabled:editorContext.readOnly},{id:'clipboardHistory',label:'Clipboard history…',disabled:editorContext.readOnly},{id:'editorMacros',label:'Record or replay editor macros…',disabled:editorContext.readOnly},{id:'quickFix',label:'Quick fixes…',disabled:editorContext.readOnly},{id:'deleteReview',label:'Review references before delete…',disabled:!isNativeHost||!workspace.root},{id:'surround',label:'Surround with…',disabled:editorContext.readOnly||!editorContext.selected},{id:'extractCte',label:'Extract query into CTE',disabled:editorContext.readOnly||!editorContext.selected},{id:'docComment',label:'Generate documentation comment',disabled:editorContext.readOnly},{id:'columnCursors',label:'Paste column names as cursors',disabled:editorContext.readOnly},{id:'pasteAs',label:'Paste as…',disabled:editorContext.readOnly},{id:'find',label:'Find'},{id:'replace',label:'Replace',disabled:editorContext.readOnly}]}/>}
     {objectMenu&&<OracleObjectMenu context={objectMenu} favorite={objectFavorites.includes(oracleSchemaKey(objectMenu.item))} onAction={objectContextAction} onClose={()=>setObjectMenu(null)}/>}
     {connectionMenu&&<ConnectionContextMenu context={connectionMenu} organization={connectionOrg} favorites={favorites} activeProfileId={activeConnection.id} usedProfileIds={Object.values(tabSessions).map(session=>session.activeConnection?.id).filter(Boolean)} connectionDisabled={activeTabReadonly||connecting||executing||cancelling} onClose={()=>setConnectionMenu(null)} onAction={connectionContextAction} onPreviewOrganization={previewConnectionOrganization}/>}
     {profileEditor && <ConnectionLibrary onNewSql={profile=>{setProfileEditor(null);newSqlFileNow();if(isNativeHost)beginConnection({...profile,tabId:documents.activeId})}} favorites={favorites} onToggleFavorite={id=>setFavorites(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])} activeProfileId={activeConnection.id} onDisconnect={()=>{setProfileEditor(null);disconnectActiveConnection()}} connectionDisabled={activeTabReadonly||connecting||executing||cancelling} managementError={managementError} profiles={dbConnections} aliases={tnsAliases} organization={connectionOrg} initialContext={profileEditor.libraryContext} initialAction={profileEditor.libraryAction} initialProfile={profileEditor===true||profileEditor.libraryContext?null:profileEditor} usedProfileIds={Object.values(tabSessions).map(s=>s.activeConnection?.id).filter(Boolean)} onClose={()=>setProfileEditor(null)} onConnect={(profile,force=false)=>{setProfileEditor(null);switchConnection(profile,force)}}
@@ -1791,12 +2639,16 @@ export function App() {
     {resolveSetting(settings,'ui.connectionNotifications').value&&Object.entries(tabSessions).filter(([,session])=>session.connecting&&session.connectingProfile).map(([tabId,session])=><Feedback key={tabId} scope={tabId} kind="progress" title="Connecting">{`Connecting to ${session.connectingProfile}…`}</Feedback>)}
     {plscopeReport && <ModalBackdrop onClose={() => setPlscopeReport(null)}><section className="appearance-modal plscope-dialog" role="dialog" aria-modal="true" aria-label="PL/Scope references"><header className="appearance-header"><div><h2>PL/Scope references</h2><p>{plscopeReport.target.owner}.{plscopeReport.target.name} · {plscopeReport.settings || 'Collection settings unavailable'}</p></div><button className="icon-button" aria-label="Close PL/Scope references" onClick={() => setPlscopeReport(null)}><X size={17} /></button></header><div className="plscope-reference-list">{plscopeReport.references.length ? plscopeReport.references.map((reference, index) => <button key={index} onClick={async () => { const source = await completionMetadataRef.current.load(plscopeReport.originTabId, { owner: reference.owner, name: reference.objectName, type: reference.objectType.replace(/ BODY$/, ''), body: reference.objectType.endsWith(' BODY') }, null, 'definition'); if (!source) return; setPlscopeReport(null); openOracleDefinition({ ...source, originTabId: plscopeReport.originTabId }, { lineNumber: reference.line, column: reference.column }); }}><b>{reference.owner}.{reference.objectName}</b><span>{reference.name} · {reference.usage}</span><code>{reference.line}:{reference.column}</code></button>) : <div className="output-empty"><b>No collected references</b><span>No PL/Scope identifiers are available for this object. Collection and compilation settings are managed explicitly.</span></div>}</div><footer className="appearance-footer"><span>{plscopeReport.references.length} reference(s){plscopeReport.truncated ? ' · first 2,000 shown' : ''}</span><button className="button-secondary" onClick={() => setPlscopeReport(null)}>Close</button></footer></section></ModalBackdrop>}
     {authProfile && <ConnectionAuthDialog key={`${authProfile.tabId}:${authProfile.id}`} profile={authProfile} connecting={tabSessions[authProfile.tabId]?.connecting || false} error={tabSessions[authProfile.tabId]?.connectionError || ""} onClose={() => setAuthProfile(null)} onConnect={submitConnectionCredentials} />}
-    {pendingBindSql && <Suspense fallback={<div role="status">Loading…</div>}><BindParameterDialog file={filePath} sql={pendingBindSql} onCancel={() => setPendingBindSql(null)} onExecute={(values) => executeStatement(pendingBindSql, values)} /></Suspense>}
+    {pendingBindSql && <Suspense fallback={<div role="status">Loading…</div>}><BindParameterDialog prefill={bindPrefillRef.current} onPrefillUsed={() => { bindPrefillRef.current = {}; }} onSaveDefinitions={definitions=>{if(isNativeHost&&workspace.root&&filePath)sendNativeCommand('workspace.binds.save',{path:filePath,definitions:definitions.map(item=>({name:item.name,type:item.type,label:item.label||'',description:item.description||'',required:Boolean(item.required),defaultValue:item.defaultValue||null}))})}} projectVariables={projectOptions(workspace.projectRules).variables} file={filePath} sql={pendingBindSql} onCancel={() => setPendingBindSql(null)} onExecute={(values) => executeStatement(pendingBindSql, values)} /></Suspense>}
+    {uncertainCommit && <ModalBackdrop onClose={() => setUncertainCommit(null)}><section className="appearance-modal transaction-guard" role="alertdialog" aria-modal="true" aria-label="Commit not confirmed"><header className="appearance-header"><div><div className="eyebrow">COMMIT NOT CONFIRMED</div><h2>The connection failed while committing</h2><p>Oracle may or may not have saved your changes; this window cannot tell. Nothing was retried and nothing is assumed.</p><p>Reconnect, then re-run the query that shows the affected rows and compare them with what you intended before applying anything again.</p>{uncertainCommit.message && <p><small>{uncertainCommit.message}</small></p>}</div></header><footer className="appearance-footer"><button className="button-secondary" onClick={() => setUncertainCommit(null)}>Close</button><button className="button-primary" onClick={() => { setUncertainCommit(null); setShowPicker(true); }}>Reconnect…</button></footer></section></ModalBackdrop>}
+    {draftGuard && <ModalBackdrop onClose={() => setDraftGuard(null)}><section className="appearance-modal transaction-guard" role="alertdialog" aria-modal="true" aria-label="Unapplied grid edits"><header className="appearance-header"><div><div className="eyebrow">UNAPPLIED GRID EDITS</div><h2>{draftGuard.reason === 'close' ? `Close ${draftGuard.name}?` : draftGuard.reason === 'disconnect' ? 'Disconnect?' : `Switch to ${draftGuard.name}?`}</h2><p>{draftGuard.count} local edit{draftGuard.count === 1 ? '' : 's'} have not been sent to Oracle. They exist only in this window and cannot be moved to another connection.</p>{draftGuard.transaction && <p>This session also has uncommitted work. That is separate: this choice neither commits nor rolls it back, and you decide about it next.</p>}</div></header><footer className="appearance-footer"><button className="button-primary" onClick={() => setDraftGuard(null)}>Keep editing</button><button className="transaction-button rollback" onClick={() => { const guard = draftGuard; clearTabDrafts(guard.tabId); window.dispatchEvent(new CustomEvent('fbsdb.draftsCleared', { detail: { tabId: guard.tabId } })); setDraftGuard(null); guard.run(); }}>Discard the edits and continue</button></footer></section></ModalBackdrop>}
     {pendingSwitch && <ModalBackdrop onClose={() => { setPendingSwitch(null); setRunState("Connection switch cancelled."); }}><section className="appearance-modal transaction-guard"><header className="appearance-header"><div><div className="eyebrow">UNCOMMITTED CHANGES</div><h2>{pendingSwitch.disconnect ? "Disconnecting" : "Switching connection"}</h2><p>Commit or roll back the pending transaction before {pendingSwitch.disconnect ? "disconnecting" : `connecting to ${pendingSwitch.name || pendingSwitch.id}`}.</p></div></header><footer className="appearance-footer"><button className="button-secondary" onClick={() => { setPendingSwitch(null); setRunState("Connection switch cancelled."); }}>Cancel</button><div><button className="transaction-button rollback" onClick={() => finishTransaction("rollback")}><X size={13} /> Rollback & {pendingSwitch.disconnect ? "disconnect" : "switch"}</button><button className="button-primary" onClick={() => finishTransaction("commit")}><Check size={13} /> Commit & {pendingSwitch.disconnect ? "disconnect" : "switch"}</button></div></footer></section></ModalBackdrop>}
     {pendingDdl && <FeedbackDialog kind="warning" title="Run DDL statement?" onClose={()=>setPendingDdl(null)} actions={<><button onClick={()=>setPendingDdl(null)}>Cancel</button><button className="danger" onClick={()=>{const request=pendingDdl;setPendingDdl(null);if(documents.activeId!==request.owner||sessionsRef.current[request.owner]?.activeConnection?.id!==request.profileId){setRunState('The execution tab or connection changed. Review the statement and run it again.',request.owner);return;}executeStatement(request.statement,request.parameters,request.miniTool,{ddlConfirmed:true});}}>Run DDL</button></>}><p>Oracle DDL commits automatically and cannot be undone with Rollback. Pending changes must be committed or rolled back first.</p><p>Profile: {pendingDdl.profileId}</p><pre>{pendingDdl.statement}</pre></FeedbackDialog>}
-    {batchClose&&<FeedbackDialog kind="warning" title={`Close ${batchClose.count} unsaved editors?`} onClose={()=>setBatchClose(null)} actions={<><button onClick={()=>setBatchClose(null)}>Cancel</button><button onClick={()=>batchClose.run(false)}>Review individually</button><button className="danger" onClick={()=>batchClose.run(true)}>Discard All</button></>}>Discard unsaved editor changes in these tabs? Pending database transactions still require Commit or Rollback.</FeedbackDialog>}
+    {showPackageApi&&<PackageApiDialog document={activeEditorTab} rules={workspace.projectRules} onNavigate={offset=>{setShowPackageApi(false);jumpToOffset(offset)}} onClose={()=>setShowPackageApi(false)}/>}
+    {showBookmarks&&<SourceBookmarksDialog items={bookmarks.items} error={bookmarks.error} canAdd={!bookmarks.full&&!objectTabActive&&!!activeEditorTab&&!!editorRef.current?.getModel()} position={editorRef.current?.getPosition()} file={fileName} onAdd={bookmarks.add} onOpen={openBookmark} onRemove={bookmarks.remove} onClose={()=>setShowBookmarks(false)}/>}
+    {batchClose&&<BatchCloseDialog items={batchClose.items} cleanCount={batchClose.cleanCount} error={batchClose.error} onClose={()=>setBatchClose(null)} onApply={batchClose.run}/>}
     {pendingTabClose && <ModalBackdrop onClose={() => {batchDiscardRef.current.clear();setPendingTabClose(null)}}><section className="appearance-modal transaction-guard" role="dialog" aria-modal="true" aria-label="Close SQL session"><header className="appearance-header"><div><div className="eyebrow">SQL TAB SESSION</div><h2>{pendingTabClose.pending ? "Uncommitted changes" : "Could not close tab"}</h2><p>{pendingTabClose.message || "Resolve this tab’s transaction before closing it."}</p></div></header><footer className="appearance-footer"><button className="button-secondary" onClick={() => {batchDiscardRef.current.clear();setPendingTabClose(null)}}>Cancel</button><div>{pendingTabClose.pending ? ["rollback", "commit"].map(action => <button key={action} disabled={pendingTabClose.resolving} className={action === "commit" ? "button-primary" : "transaction-button rollback"} onClick={() => { const pending = { ...pendingTabClose, resolving: true }; pendingTabCloseRef.current = pending; setPendingTabClose(pending); sendNativeCommand(`transaction.${action}`, { tabId: pending.tabId }); }}>{action === "commit" ? "Commit" : "Rollback"} & close</button>) : <button className="button-primary" onClick={pendingTabClose.retry}>Retry</button>}</div></footer></section></ModalBackdrop>}
     {pendingFileAction && <ModalBackdrop onClose={() => {batchDiscardRef.current.clear();setPendingFileAction(null)}}><section className="appearance-modal transaction-guard"><header className="appearance-header"><div><div className="eyebrow">UNSAVED SQL</div><h2>Save changes to {fileName}?</h2><p>Your edits will be lost if you continue without saving.</p></div></header><footer className="appearance-footer"><button className="button-secondary" onClick={() => {batchDiscardRef.current.clear();setPendingFileAction(null)}}>Cancel</button><div><button className="transaction-button rollback" onClick={() => { const run = pendingFileAction.run; setPendingFileAction(null); run(); }}>Discard changes</button><button className="button-primary" onClick={() => saveSqlFile(() => { setPendingFileAction(null); pendingFileAction.run(); })}><Check size={13} /> Save</button></div></footer></section></ModalBackdrop>}
-    {showAppearance && <Suspense fallback={<div role="status">Loading…</div>}><AppearanceSettings aliases={tnsAliases} profiles={dbConnections} originTabId={metadataOriginTabId} activeProfileId={completionSession.activeConnection?.id} metadataEpoch={completionMetadataRef.current.session(metadataOriginTabId).epoch} settings={settings} onSettingsChange={applySettings} settingsError={settingsError} workspaceRoot={workspace.root} theme={theme} onThemeChange={setTheme} tokenColors={tokenColors} onTokenColorChange={updateTokenColor} completionSettings={completionSettings} onCompletionSettingsChange={setCompletionSettings} completionError={completionError} queryTimeout={queryTimeout} onQueryTimeoutChange={setQueryTimeout} oracleVocabulary={completionSession.oracleVocabulary} completionMetadataStatus={completionSession.completionMetadataStatus || (completionSession.activeConnection && !["No connection", "Disconnected"].includes(completionSession.activeConnection.id) ? "Oracle metadata is loaded on demand." : "Offline Oracle vocabulary; connect to load object metadata.")} codeStyle={codeStyle} onCodeStyleChange={setCodeStyle} systemLocale={systemLocale} onClose={() => setShowAppearance(false)} /></Suspense>}
-  </main>;
+    {showAppearance && <Suspense fallback={<div role="status">Loading…</div>}><AppearanceSettings initialSearch={settingsFocus?.query||''} initialCategory={settingsFocus?.category||'general'} aliases={tnsAliases} profiles={dbConnections} originTabId={metadataOriginTabId} activeProfileId={completionSession.activeConnection?.id} metadataEpoch={completionMetadataRef.current.session(metadataOriginTabId).epoch} settings={settings} onSettingsChange={applySettings} settingsError={settingsError} workspaceRoot={workspace.root} theme={theme} onThemeChange={setTheme} tokenColors={tokenColors} onTokenColorChange={updateTokenColor} completionSettings={completionSettings} onCompletionSettingsChange={setCompletionSettings} completionError={completionError} queryTimeout={queryTimeout} onQueryTimeoutChange={setQueryTimeout} oracleVocabulary={completionSession.oracleVocabulary} completionMetadataStatus={completionSession.completionMetadataStatus || (completionSession.activeConnection && !["No connection", "Disconnected"].includes(completionSession.activeConnection.id) ? "Oracle metadata is loaded on demand." : "Offline Oracle vocabulary; connect to load object metadata.")} codeStyle={codeStyle} onCodeStyleChange={setCodeStyle} systemLocale={systemLocale} onClose={() => {setShowAppearance(false);setSettingsFocus(null)}} /></Suspense>}
+  </main></ToolbarPrefsContext.Provider>;
 }

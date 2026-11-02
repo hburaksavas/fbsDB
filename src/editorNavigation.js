@@ -20,6 +20,12 @@ export function sqlOutline(source) {
       }
     }
     const walk=(node,depth)=>{
+      if(node.kind==='declaration') {
+        const declaration=lexOracle(statement.sql.slice(node.start,node.end)).filter(token=>token.kind!=='comment');
+        const kind=declaration[0]?.quoted?null:declaration[0]?.value.toUpperCase();
+        if(['CURSOR','TYPE','SUBTYPE'].includes(kind)&&declaration[1]?.kind==='identifier')
+          items.push({name:declaration[1].value,kind,start:statement.start+node.start,end:statement.start+node.end,depth});
+      }
       if(node.kind==='routine'||node.kind==='block') {
         const header=source.slice(statement.start+node.start,statement.start+(node.headerEnd||node.begin||node.start+90)).split(/\r?\n/)[0].trim();
         items.push({name:header||node.routineKind||'BEGIN / END',kind:node.routineKind||'Block',start:statement.start+node.start,end:statement.start+node.end,depth});
@@ -27,7 +33,14 @@ export function sqlOutline(source) {
       }
       for(const child of [...(node.declarations||[]),...(node.children||[])])walk(child,depth);
     };
-    if(tokens.some(token=>['DECLARE','BEGIN','PROCEDURE','FUNCTION','PACKAGE','TRIGGER'].includes(token.value.toUpperCase())))walk(parsePlsql(statement.sql),1);
+    if(tokens.some(token=>['DECLARE','BEGIN','PROCEDURE','FUNCTION','PACKAGE','TRIGGER','TYPE'].includes(token.value.toUpperCase())))walk(parsePlsql(statement.sql),1);
+  }
+  const regions=[];
+  for(const token of lexOracle(source)){
+    if(token.kind!=='comment'||!token.value.startsWith('--')||source.slice(source.lastIndexOf('\n',token.start-1)+1,token.start).trim())continue;
+    const open=/^--\s*#region(?:\s+(.+))?\s*$/i.exec(token.value),close=/^--\s*#endregion\s*$/i.test(token.value);
+    if(open)regions.push({name:open[1]?.trim()||'Region',start:token.start,depth:regions.length});
+    else if(close&&regions.length){const region=regions.pop();items.push({...region,kind:'Region',end:token.end})}
   }
   return items.filter(item=>Number.isFinite(item.start)&&Number.isFinite(item.end)).sort((a,b)=>a.start-b.start||a.depth-b.depth);
 }
@@ -46,4 +59,11 @@ export class EditorNavigationHistory {
     while(index>=0&&index<this.items.length){if(available(this.items[index])){this.index=index;return this.items[index]}index+=direction;}
     return null;
   }
+}
+
+
+export function sourceLineEnding(source){return /\r\n|\n/.exec(source)?.[0]||'\n'}
+export function sourcePositionAt(source,offset){
+ const prefix=source.slice(0,Math.max(0,Math.min(source.length,offset))),lines=prefix.split(/\r\n|\r|\n/);
+ return {lineNumber:lines.length,column:lines.at(-1).length+1};
 }

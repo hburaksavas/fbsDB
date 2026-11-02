@@ -43,3 +43,12 @@ export function miniToolFromResult(result) {
   return normalizeMiniTool({ version: 1, name: 'New mini tool', sql: result.executedSql,
     columns: result.columns.map(c => ({ name: c.name, visible: true })), fields: [] });
 }
+
+// Rename in place: 1-100 characters, unique among the workspace tools ignoring case. The tool id never changes.
+export function validateToolName(tools, name, exceptId = null) {
+  const text = String(name || '').trim();
+  if (!text) return { error: 'Enter a tool name.' };
+  if (text.length > 100) return { error: 'Use at most 100 characters.' };
+  if (tools.some(tool => tool.id !== exceptId && String(tool.name).trim().toLowerCase() === text.toLowerCase())) return { error: 'Another tool already has this name.' };
+  return { name: text };
+}

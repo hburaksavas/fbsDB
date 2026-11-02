@@ -14,6 +14,9 @@ var a = registry.Get("live-a").Oracle;
 var b = registry.Get("live-b").Oracle;
 string? table = null;
 bool created = false;
+string? sourceProcedure = null;
+string? sourcePackage = null;
+string? sourcePackageName = null;
 Exception? failure = null;
 void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
 async Task Check(string name, Func<Task> action)
@@ -58,11 +61,99 @@ try
         user = Convert.ToString(first.Rows[0][0])!;
         Require(!Equals(first.Rows[0][1], second.Rows[0][1]), "Both tabs share the same physical Oracle session.");
     });
+    await Check("typed OUT and IN OUT binds preserve NUMBER precision and Oracle date/timestamp components", async () => {
+        const string precise = "123456789012345678901234567890.12345678";
+        var result = await a.ExecuteAsync($"BEGIN :n := {precise}; :inout_n := :inout_n + 0; :label := :label || '-output'; :d := TO_DATE('2026-11-01 12:13:14','YYYY-MM-DD HH24:MI:SS'); :t := TIMESTAMP '2026-11-01 12:13:14.123456789'; :empty := NULL; END;", [
+            new("n", "NUMBER", null, "OUT"), new("inout_n", "NUMBER", precise, "IN OUT"), new("label", "VARCHAR2", "input", "IN OUT"), new("d", "DATE", null, "OUT"), new("t", "TIMESTAMP", null, "OUT"), new("empty", "VARCHAR2", null, "OUT")]);
+        var output = result.OutParameters.ToDictionary(parameter => parameter.Name, parameter => parameter.Value);
+        Require(Convert.ToString(output["n"]) == precise && Convert.ToString(output["inout_n"]) == precise && Convert.ToString(output["label"]) == "input-output" && output["empty"] is null, "Output bind values were rounded, lost or mistyped.");
+        var wire = JsonSerializer.SerializeToElement(new { type = "sql.result", columns = result.Columns, rows = result.Rows, outParameters = result.OutParameters }, NativeBridgeContract.JsonOptions);
+        NativeBridgeContract.ValidateReply(wire);
+        Require(output["d"] is OracleTemporalCell { Value: "2026-11-01T12:13:14" } && output["t"] is OracleTemporalCell { Value: "2026-11-01T12:13:14.123456789" }, "Output temporal values lost wall-clock components or nanoseconds.");
+        Require(!a.HasPendingTransaction, "A computation-only call left a pending transaction.");
+    });
     string Identifier(string value) => "\"" + value.Replace("\"", "\"\"") + "\"";
     var name = "FBSQA_" + Guid.NewGuid().ToString("N")[..12].ToUpperInvariant();
     table = Identifier(user) + "." + Identifier(name);
     await Check("create an isolated temporary fixture without touching user tables", async () => {
         await a.ExecuteAsync($"CREATE GLOBAL TEMPORARY TABLE {table} (N NUMBER) ON COMMIT DELETE ROWS"); created = true;
+    });
+    var sourceProcedureName = "FBSQA_SRC_" + Guid.NewGuid().ToString("N")[..12].ToUpperInvariant();
+    sourceProcedure = Identifier(user) + "." + Identifier(sourceProcedureName);
+    var sourceSql = $"CREATE OR REPLACE PROCEDURE {sourceProcedure} AS BEGIN NULL; END;";
+    await Check("source review creates an isolated procedure only after explicit version-checked execution", async () => {
+        var review = await a.ReviewSourceAsync(sourceSql);
+        Require(!review.Snapshot.Exists, "A unique test procedure already exists.");
+        await a.ExecuteAsync(sourceSql, sourceReviewId: review.ReviewId);
+        var compilation = await a.LoadCompilationDiagnosticsAsync(sourceSql);
+        Require(compilation is not null && compilation.Errors.All(error => error.Attribute != "ERROR") && compilation.Snapshot?.Exists == true, "Reviewed source compilation or version readback failed.");
+        await Reject<InvalidOperationException>(() => a.ExecuteAsync(sourceSql, sourceReviewId: review.ReviewId));
+    });
+    await Check("source review rejects changed editor SQL and external database source updates", async () => {
+        var review = await a.ReviewSourceAsync(sourceSql);
+        await Reject<InvalidOperationException>(() => a.ExecuteAsync(sourceSql.Replace("NULL;", "NULL; NULL;"), sourceReviewId: review.ReviewId));
+        review = await a.ReviewSourceAsync(sourceSql);
+        var external = sourceSql.Replace("NULL;", "NULL; NULL;");
+        await b.ExecuteAsync(external);
+        await Reject<OracleSourceChangedException>(() => a.ExecuteAsync(sourceSql, sourceReviewId: review.ReviewId));
+        var current = await a.ReviewSourceAsync(sourceSql);
+        Require(current.Snapshot.Source.Contains("NULL; NULL;"), "A rejected compile overwrote the external source.");
+    });
+    await Check("source compilation never commits pending unrelated session DML", async () => {
+        var review = await a.ReviewSourceAsync(sourceSql);
+        await a.ExecuteAsync($"INSERT INTO {table} VALUES (101)");
+        await Reject<InvalidOperationException>(() => a.ExecuteAsync(sourceSql, sourceReviewId: review.ReviewId));
+        Require(a.HasPendingTransaction && await Count(a) == 1, "Rejected compilation disturbed pending DML.");
+        await a.RollbackAsync();
+        await a.ExecuteAsync(sourceSql, sourceReviewId: review.ReviewId);
+        var invalid = sourceSql.Replace("NULL;", "fbsqa_missing_call;");
+        review = await a.ReviewSourceAsync(invalid);
+        await a.ExecuteAsync(invalid, sourceReviewId: review.ReviewId);
+        var diagnostics = await a.LoadCompilationDiagnosticsAsync(invalid);
+        Require(diagnostics?.Errors.Any(error => error.Attribute == "ERROR") == true && diagnostics.Source.Contains("fbsqa_missing_call"), "Compilation errors were not associated with the submitted source.");
+    });
+    sourcePackageName = "FBSQA_PKG_" + Guid.NewGuid().ToString("N")[..12].ToUpperInvariant();
+    sourcePackage = Identifier(user) + "." + Identifier(sourcePackageName);
+    await Check("package specification and body compile as independently versioned sources", async () => {
+        var specification = $"CREATE OR REPLACE PACKAGE {sourcePackage} AS PROCEDURE run(p NUMBER); PROCEDURE echo_value(p_value IN NUMBER,p_result OUT NUMBER,p_label IN OUT VARCHAR2); FUNCTION twice(p_value NUMBER) RETURN NUMBER; FUNCTION twice(p_value VARCHAR2) RETURN VARCHAR2; END;";
+        var body = $"CREATE OR REPLACE PACKAGE BODY {sourcePackage} AS PROCEDURE run(p NUMBER) IS BEGIN NULL; END; PROCEDURE echo_value(p_value IN NUMBER,p_result OUT NUMBER,p_label IN OUT VARCHAR2) IS BEGIN p_result:=p_value*2;p_label:=p_label||'-output';END; FUNCTION twice(p_value NUMBER) RETURN NUMBER IS BEGIN RETURN p_value*2;END; FUNCTION twice(p_value VARCHAR2) RETURN VARCHAR2 IS BEGIN RETURN p_value||p_value;END; END;";
+        var review = await a.ReviewSourceAsync(specification);
+        await a.ExecuteAsync(specification, sourceReviewId: review.ReviewId);
+        var specReport = await a.LoadCompilationDiagnosticsAsync(specification);
+        review = await b.ReviewSourceAsync(body);
+        Require(!review.Snapshot.Exists && review.Snapshot.Type == "PACKAGE BODY", "Body identity was confused with the specification.");
+        await b.ExecuteAsync(body, sourceReviewId: review.ReviewId);
+        var bodyReport = await b.LoadCompilationDiagnosticsAsync(body);
+        Require(specReport?.Snapshot is not null && bodyReport?.Snapshot is not null && specReport.Snapshot.Version != bodyReport.Snapshot.Version && bodyReport.Errors.All(error => error.Attribute != "ERROR"), "Package part revisions or body diagnostics were not independent.");
+    });
+    await Check("structured procedure/function calls repeat with typed overloads and independent OUT values", async () => {
+        var configuration = new RoutineRunConfiguration(1, "", "Echo", user, sourcePackageName!, "ECHO_VALUE", "PROCEDURE", "", [new("P_VALUE", "NUMBER", "NUMBER", "IN"),new("P_RESULT", "NUMBER", "NUMBER", "OUT"),new("P_LABEL", "VARCHAR2", "VARCHAR2", "IN OUT")]);
+        foreach (var value in new[] { "41.25", "2" })
+        {
+            var result = await a.ExecuteAsync(RunConfigurationService.BuildSql(configuration), [new("arg_0","NUMBER",value),new("arg_1","NUMBER",null,"OUT"),new("arg_2","VARCHAR2","call","IN OUT")]);
+            var output = result.OutParameters.ToDictionary(parameter => parameter.Name, parameter => parameter.Value);
+            Require(decimal.Parse(Convert.ToString(output["arg_1"])!,System.Globalization.CultureInfo.InvariantCulture) == decimal.Parse(value,System.Globalization.CultureInfo.InvariantCulture)*2 && Convert.ToString(output["arg_2"]) == "call-output", "A repeated call reused or lost its parameter values.");
+        }
+        foreach (var type in new[] { "NUMBER", "VARCHAR2" })
+        {
+            var function = new RoutineRunConfiguration(1,"","Twice",user,sourcePackageName!,"TWICE","FUNCTION",type,[new("P_VALUE",type,type,"IN")]);
+            var result = await a.ExecuteAsync(RunConfigurationService.BuildSql(function),[new("arg_0",type,"3"),new("run_result",type,null,"OUT")]);
+            Require(Convert.ToString(result.OutParameters.Single().Value) == (type=="NUMBER"?"6":"33"), "Call binding selected the wrong overload or return type.");
+        }
+    });
+    await Check("runtime stack source resolves package body and standalone routine without executing source", async () => {
+        var body = await a.LoadCompletionDefinitionAsync(user, sourcePackageName!, "PLSQL FRAME", false, CancellationToken.None);
+        Require(body.Type == "PACKAGE BODY" && body.Text.Contains("echo_value"), "Runtime stack navigation did not resolve the package body.");
+        var failureSql = $"CREATE OR REPLACE PROCEDURE {sourceProcedure} AS BEGIN raise_application_error(-20001,'FBSQA stack fixture'); END;";
+        var review = await a.ReviewSourceAsync(failureSql);
+        await a.ExecuteAsync(failureSql, sourceReviewId: review.ReviewId);
+        try { await a.ExecuteAsync($"BEGIN {sourceProcedure}; END;"); throw new Exception("Expected fixture runtime failure."); }
+        catch (Oracle.ManagedDataAccess.Client.OracleException error) { Require(error.Message.Contains("ORA-06512") && error.Message.Contains(sourceProcedureName), "Runtime failure lost its named source frame."); }
+        var pendingBeforeLookup = a.HasPendingTransaction;
+        var routine = await a.LoadCompletionDefinitionAsync(user, sourceProcedureName, "PLSQL FRAME", false, CancellationToken.None);
+        Require(routine.Type == "PROCEDURE" && routine.Text.Contains("FBSQA stack fixture"), "Runtime stack source lookup failed.");
+        Require(a.HasPendingTransaction == pendingBeforeLookup, "Source lookup disturbed the runtime transaction state.");
+        await a.RollbackAsync();
     });
     await Check("live schema, table and column metadata preserve identity and transaction state", async () => {
         var schema = await a.LoadSchemaAsync();
@@ -171,9 +262,19 @@ finally
         try { await a.ExecuteAsync($"DROP TABLE {table}"); checks.Add(new { name = "temporary table removed", status = "passed" }); Console.WriteLine("PASS temporary table removed"); }
         catch (Exception error) { failure ??= error; checks.Add(new { name = "temporary table removed", status = "failed", error = error.Message }); }
     }
+    if (sourceProcedure is not null && a.IsConnected)
+    {
+        try { await a.ExecuteAsync($"DROP PROCEDURE {sourceProcedure}"); checks.Add(new { name = "temporary source procedure removed", status = "passed" }); }
+        catch (Exception error) { failure ??= error; checks.Add(new { name = "temporary source procedure removed", status = "failed", error = error.Message }); }
+    }
+    if (sourcePackage is not null && a.IsConnected)
+    {
+        try { await a.ExecuteAsync($"DROP PACKAGE {sourcePackage}"); checks.Add(new { name = "temporary source package removed", status = "passed" }); }
+        catch (Exception error) { failure ??= error; checks.Add(new { name = "temporary source package removed", status = "failed", error = error.Message }); }
+    }
     await File.WriteAllTextAsync(reportPath, JsonSerializer.Serialize(new {
         startedAt, completedAt = DateTimeOffset.UtcNow, profileId, status = failure is null ? "passed" : "failed",
-        scope = "Live Oracle services; temporary-table DML only; queued metadata cancellation; no user-table updates or saved-credential changes.",
+        scope = "Live Oracle services; temporary-table DML and uniquely named temporary procedure/package sources only; queued metadata cancellation; no user-table updates or saved-credential changes.",
         checks, error = failure?.Message
     }, new JsonSerializerOptions { WriteIndented = true }));
     Console.WriteLine("Report: " + reportPath);

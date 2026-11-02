@@ -75,3 +75,13 @@ test('earlier docking settings retain separately stored folder expansions and in
   settings=changeSetting(settings,'ui.layout',defaultDockLayout());saveSettings(storage,settings);
   assert.deepEqual(resolveSetting(loadSettings(storage),'ui.layout').value.expandedPaths,{});
 });
+
+
+test('layout locking persists and blocks panel movement without losing the stored arrangement',()=>{
+ const unlocked=moveDockPanel(defaultDockLayout(),'objects','right'),locked={...unlocked,locked:true};
+ assert.deepEqual(moveDockPanel(locked,'files','right',locked.groups.at(-1).id,'merge'),normalizeDockLayout(locked));
+ const entries=new Map(),storage={getItem:key=>entries.get(key)??null,setItem:(key,value)=>entries.set(key,value),removeItem:key=>entries.delete(key)};
+ saveSettings(storage,changeSetting(loadSettings(storage),'ui.layout',locked));
+ assert.equal(resolveSetting(loadSettings(storage),'ui.layout').value.locked,true);
+ assert.equal(moveDockPanel({...locked,locked:false},'objects','left').groups.find(group=>group.panels.includes('objects')).side,'left');
+});

@@ -16,6 +16,9 @@ export const bridgeContract = {
             "string",
             "null"
           ]
+        },
+        "direction": {
+          "type": "string"
         }
       },
       "required": [
@@ -121,6 +124,235 @@ export const bridgeContract = {
       "required": [
         "name",
         "type"
+      ]
+    },
+    "ProjectRules": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "associations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "extension": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "extension",
+              "type"
+            ]
+          }
+        },
+        "packagePairs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "specification": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "specification",
+              "body"
+            ]
+          }
+        },
+        "testPatterns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "project": {
+          "$ref": "ProjectOptions"
+        }
+      },
+      "required": [
+        "version",
+        "associations",
+        "packagePairs",
+        "testPatterns"
+      ]
+    },
+    "RoutineRunParameter": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "oracleType": {
+          "type": "string"
+        },
+        "bindType": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "useDefault": {
+          "type": "boolean"
+        },
+        "sensitive": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "name",
+        "oracleType",
+        "bindType",
+        "mode"
+      ]
+    },
+    "RoutineRunConfiguration": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "type": "integer"
+        },
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "packageName": {
+          "type": "string"
+        },
+        "routineName": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "returnBindType": {
+          "type": "string"
+        },
+        "parameters": {
+          "type": "array",
+          "items": {
+            "$ref": "RoutineRunParameter"
+          }
+        },
+        "revision": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "version",
+        "id",
+        "name",
+        "owner",
+        "packageName",
+        "routineName",
+        "kind",
+        "returnBindType",
+        "parameters"
+      ]
+    },
+    "ProjectOptions": {
+      "type": "object",
+      "properties": {
+        "areas": {
+          "type": "object",
+          "properties": {
+            "packages": {
+              "type": "string"
+            },
+            "migrations": {
+              "type": "string"
+            },
+            "scripts": {
+              "type": "string"
+            },
+            "tests": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "packages",
+            "migrations",
+            "scripts",
+            "tests"
+          ]
+        },
+        "connectionIds": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "defaultConnectionId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "variables": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "required": {
+                "type": "boolean"
+              },
+              "description": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "type"
+            ]
+          }
+        },
+        "run": {
+          "type": "object",
+          "properties": {
+            "timeoutSeconds": {
+              "type": "integer"
+            },
+            "pageSize": {
+              "type": "integer"
+            },
+            "continueOnError": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "timeoutSeconds",
+            "pageSize",
+            "continueOnError"
+          ]
+        }
+      },
+      "required": [
+        "areas",
+        "connectionIds",
+        "variables",
+        "run"
       ]
     }
   },
@@ -984,6 +1216,46 @@ export const bridgeContract = {
         "required": []
       }
     },
+    "file.history.list": {
+      "handler": "file",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    },
+    "file.history.read": {
+      "handler": "file",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "id"
+        ]
+      }
+    },
     "file.new": {
       "handler": "file",
       "resumeSession": false,
@@ -1477,6 +1749,38 @@ export const bridgeContract = {
         ]
       }
     },
+    "script.sourceReviewed": {
+      "handler": "oracle",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "scriptRequestId": {
+            "type": "string"
+          },
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1999
+          },
+          "reviewNonce": {
+            "type": "string"
+          },
+          "reviewId": {
+            "type": "string"
+          },
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "scriptRequestId",
+          "index",
+          "reviewNonce",
+          "reviewId"
+        ]
+      }
+    },
     "session.context": {
       "handler": "oracle",
       "resumeSession": false,
@@ -1513,6 +1817,21 @@ export const bridgeContract = {
           }
         },
         "required": []
+      }
+    },
+    "source.review": {
+      "handler": "oracle",
+      "resumeSession": true,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "sql": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "sql"
+        ]
       }
     },
     "sql.cancel": {
@@ -1586,6 +1905,9 @@ export const bridgeContract = {
             "maximum": 2147483647
           },
           "tabId": {
+            "type": "string"
+          },
+          "sourceReviewId": {
             "type": "string"
           }
         },
@@ -1736,6 +2058,42 @@ export const bridgeContract = {
         "required": []
       }
     },
+    "ui.requestAttention": {
+      "handler": "ui",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": []
+      }
+    },
+    "ui.setTaskbarProgress": {
+      "handler": "ui",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "none",
+              "indeterminate",
+              "error"
+            ]
+          },
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      }
+    },
     "ui.setTheme": {
       "handler": "ui",
       "resumeSession": false,
@@ -1766,6 +2124,75 @@ export const bridgeContract = {
           }
         },
         "required": []
+      }
+    },
+    "workspace.binds.load": {
+      "handler": "workspace",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ]
+      }
+    },
+    "workspace.binds.save": {
+      "handler": "workspace",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "definitions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "required": {
+                  "type": "boolean"
+                },
+                "defaultValue": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "name"
+              ]
+            }
+          },
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "definitions"
+        ]
       }
     },
     "workspace.children": {
@@ -1807,6 +2234,14 @@ export const bridgeContract = {
         "properties": {
           "tabId": {
             "type": "string"
+          },
+          "template": {
+            "type": "string",
+            "enum": [
+              "blank",
+              "oracle-package",
+              "migrations"
+            ]
           }
         },
         "required": []
@@ -1833,6 +2268,28 @@ export const bridgeContract = {
           "parent",
           "name",
           "directory"
+        ]
+      }
+    },
+    "workspace.createFile": {
+      "handler": "workspace",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "relativePath": {
+            "type": "string"
+          },
+          "content": {
+            "type": "string"
+          },
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "relativePath",
+          "content"
         ]
       }
     },
@@ -1989,6 +2446,44 @@ export const bridgeContract = {
           }
         },
         "required": []
+      }
+    },
+    "workspace.projectRules": {
+      "handler": "workspace",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "root": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "root"
+        ]
+      }
+    },
+    "workspace.projectRules.save": {
+      "handler": "workspace",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "root": {
+            "type": "string"
+          },
+          "rules": {
+            "$ref": "ProjectRules"
+          },
+          "revision": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "root",
+          "rules",
+          "revision"
+        ]
       }
     },
     "workspace.recycleEntries": {
@@ -2177,6 +2672,40 @@ export const bridgeContract = {
         ]
       }
     },
+    "workspace.runs.list": {
+      "handler": "workspace",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "root": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "root"
+        ]
+      }
+    },
+    "workspace.runs.save": {
+      "handler": "workspace",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "root": {
+            "type": "string"
+          },
+          "configuration": {
+            "$ref": "RoutineRunConfiguration"
+          }
+        },
+        "required": [
+          "root",
+          "configuration"
+        ]
+      }
+    },
     "workspace.search": {
       "handler": "workspace",
       "resumeSession": false,
@@ -2200,6 +2729,21 @@ export const bridgeContract = {
           }
         },
         "required": []
+      }
+    },
+    "workspace.sources": {
+      "handler": "workspace",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "root": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "root"
+        ]
       }
     },
     "workspace.tools.list": {
@@ -2344,6 +2888,139 @@ export const bridgeContract = {
     },
     "workspace.worksets": {
       "handler": "workspace",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": []
+      }
+    },
+    "ui.openTerminal": {
+      "handler": "ui",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tool": {
+            "type": "string",
+            "enum": [
+              "sqlcl",
+              "sqlplus",
+              "shell"
+            ]
+          },
+          "directory": {
+            "type": "string"
+          },
+          "userName": {
+            "type": "string"
+          },
+          "identifier": {
+            "type": "string"
+          },
+          "tnsSource": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "tool",
+          "directory"
+        ]
+      }
+    },
+    "sql.evaluate": {
+      "handler": "oracle",
+      "resumeSession": true,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "sql": {
+            "type": "string"
+          },
+          "parameters": {
+            "type": "array"
+          },
+          "timeoutSeconds": {
+            "type": "integer"
+          },
+          "rowLimit": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "sql"
+        ]
+      }
+    },
+    "result.editIdentity": {
+      "handler": "oracle",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "schema": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema",
+          "table"
+        ]
+      }
+    },
+    "sql.applyDml": {
+      "handler": "oracle",
+      "resumeSession": true,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "statements": {
+            "type": "array"
+          },
+          "timeoutSeconds": {
+            "type": "integer"
+          },
+          "onFailure": {
+            "type": "string",
+            "enum": [
+              "rollback",
+              "keep"
+            ]
+          }
+        },
+        "required": [
+          "statements"
+        ]
+      }
+    },
+    "result.constraintInfo": {
+      "handler": "oracle",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "owner": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "owner",
+          "name"
+        ]
+      }
+    },
+    "sql.stopApplyDml": {
+      "handler": "oracle",
       "resumeSession": false,
       "payload": {
         "type": "object",
@@ -2843,6 +3520,9 @@ export const bridgeContract = {
         },
         "autoCommit": {
           "type": "boolean"
+        },
+        "connected": {
+          "type": "boolean"
         }
       },
       "required": [
@@ -2926,7 +3606,13 @@ export const bridgeContract = {
         "cancelled": {},
         "success": {},
         "message": {},
-        "rowsWritten": {}
+        "rowsWritten": {},
+        "bytesWritten": {
+          "type": "integer"
+        },
+        "elapsedMs": {
+          "type": "integer"
+        }
       },
       "required": []
     },
@@ -2947,7 +3633,13 @@ export const bridgeContract = {
         },
         "resultId": {},
         "rowsWritten": {},
-        "message": {}
+        "message": {},
+        "bytesWritten": {
+          "type": "integer"
+        },
+        "elapsedMs": {
+          "type": "integer"
+        }
       },
       "required": []
     },
@@ -3283,7 +3975,10 @@ export const bridgeContract = {
         "elapsedMs": {},
         "transactionPending": {},
         "output": {},
-        "metadataError": {}
+        "metadataError": {},
+        "sqlVersion": {
+          "type": "string"
+        }
       },
       "required": []
     },
@@ -3463,7 +4158,30 @@ export const bridgeContract = {
         },
         "pageSize": {},
         "offset": {},
-        "profileId": {}
+        "profileId": {},
+        "outParameters": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string"
+              },
+              "value": {}
+            },
+            "required": [
+              "name",
+              "type",
+              "value"
+            ]
+          }
+        },
+        "sqlVersion": {
+          "type": "string"
+        }
       },
       "required": [
         "columns",
@@ -3644,7 +4362,13 @@ export const bridgeContract = {
           "type": "boolean"
         },
         "state": {},
-        "pending": {}
+        "pending": {},
+        "unconfirmed": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        }
       },
       "required": []
     },
@@ -3901,7 +4625,13 @@ export const bridgeContract = {
         "entries": {},
         "recent": {},
         "catalog": {},
-        "error": {}
+        "error": {},
+        "projectRules": {
+          "$ref": "ProjectRules"
+        },
+        "fileConnections": {
+          "type": "object"
+        }
       },
       "required": []
     },
@@ -4034,6 +4764,560 @@ export const bridgeContract = {
         },
         "root": {},
         "worksets": {}
+      },
+      "required": []
+    },
+    "workspace.sources": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sources": {
+          "type": "object",
+          "properties": {
+            "root": {
+              "type": "string"
+            },
+            "files": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  },
+                  "connectionProfileId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "path",
+                  "name",
+                  "content"
+                ]
+              }
+            },
+            "skipped": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "truncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "root",
+            "files",
+            "skipped",
+            "truncated"
+          ]
+        }
+      },
+      "required": [
+        "requestId",
+        "sources"
+      ]
+    },
+    "workspace.projectRules": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "root": {
+          "type": "string"
+        },
+        "snapshot": {
+          "type": "object",
+          "properties": {
+            "rules": {
+              "$ref": "ProjectRules"
+            },
+            "revision": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "rules",
+            "revision"
+          ]
+        }
+      },
+      "required": [
+        "requestId",
+        "root",
+        "snapshot"
+      ]
+    },
+    "source.review": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "review": {
+          "type": "object",
+          "properties": {
+            "reviewId": {
+              "type": "string"
+            },
+            "sql": {
+              "type": "string"
+            },
+            "reviewedAt": {
+              "type": "string"
+            },
+            "snapshot": {
+              "type": "object",
+              "properties": {
+                "owner": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "exists": {
+                  "type": "boolean"
+                },
+                "version": {
+                  "type": "string"
+                },
+                "context": {
+                  "type": "string"
+                },
+                "profileId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "owner",
+                "name",
+                "type",
+                "source",
+                "exists",
+                "version",
+                "context"
+              ]
+            }
+          },
+          "required": [
+            "reviewId",
+            "snapshot",
+            "sql",
+            "reviewedAt"
+          ]
+        }
+      },
+      "required": [
+        "requestId",
+        "review"
+      ]
+    },
+    "source.review.error": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "message": {
+          "type": "string"
+        },
+        "connected": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "requestId",
+        "message"
+      ]
+    },
+    "workspace.runs.list": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "root": {
+          "type": "string"
+        },
+        "catalog": {
+          "type": "object",
+          "properties": {
+            "configurations": {
+              "type": "array",
+              "items": {
+                "$ref": "RoutineRunConfiguration"
+              }
+            },
+            "errors": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "configurations",
+            "errors"
+          ]
+        }
+      },
+      "required": [
+        "requestId",
+        "root",
+        "catalog"
+      ]
+    },
+    "workspace.runs.saved": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "root": {
+          "type": "string"
+        },
+        "configuration": {
+          "$ref": "RoutineRunConfiguration"
+        }
+      },
+      "required": [
+        "requestId",
+        "root",
+        "configuration"
+      ]
+    },
+    "script.sourceReviewRequired": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "index": {
+          "type": "integer"
+        },
+        "sql": {
+          "type": "string"
+        },
+        "offset": {
+          "type": "integer"
+        },
+        "reviewNonce": {
+          "type": "string"
+        },
+        "transactionPending": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "requestId",
+        "index",
+        "sql",
+        "offset",
+        "reviewNonce",
+        "transactionPending"
+      ]
+    },
+    "script.reviewAccepted": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "accepted": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "requestId",
+        "accepted"
+      ]
+    },
+    "workspace.binds": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "definitions": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "path",
+        "definitions"
+      ]
+    },
+    "file.history": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "operation": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "entries": {
+          "type": "array"
+        },
+        "content": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "operation",
+        "path"
+      ]
+    },
+    "ui.terminal": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "opened": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "opened",
+        "message"
+      ]
+    },
+    "sql.evaluated": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array"
+        },
+        "rows": {
+          "type": "array"
+        },
+        "elapsedMs": {
+          "type": "integer"
+        },
+        "transactionPending": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string"
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "result.editIdentity": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "table": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array"
+        },
+        "error": {
+          "type": "string"
+        }
+      },
+      "required": []
+    },
+    "sql.dmlApplied": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "outcomes": {
+          "type": "array"
+        },
+        "transactionPending": {
+          "type": "boolean"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string"
+        },
+        "recovery": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "stoppedByUser": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "result.constraintInfo": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "found": {
+          "type": "boolean"
+        },
+        "constraintType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "condition": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "columns": {
+          "type": "array"
+        },
+        "referenced": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "error": {
+          "type": "string"
+        }
       },
       "required": []
     }

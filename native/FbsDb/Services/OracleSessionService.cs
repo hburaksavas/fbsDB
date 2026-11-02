@@ -123,7 +123,7 @@ public sealed partial class OracleSessionService : IDisposable
         await test.OpenAsync();
     }
 
-    public async Task<SqlExecutionResult> ExecuteAsync(string sql, IReadOnlyList<SqlBindParameter>? parameters = null, int rowLimit = 1000, CancellationToken cancellationToken = default, int timeoutSeconds = 0, IProgress<string>? progress = null)
+    public async Task<SqlExecutionResult> ExecuteAsync(string sql, IReadOnlyList<SqlBindParameter>? parameters = null, int rowLimit = 1000, CancellationToken cancellationToken = default, int timeoutSeconds = 0, IProgress<string>? progress = null, string? sourceReviewId = null)
     {
         await _gate.WaitAsync(cancellationToken);
         var timer = Stopwatch.StartNew();
@@ -157,6 +157,7 @@ public sealed partial class OracleSessionService : IDisposable
             if (_analysisReadOnly && FirstKeyword(statement) is not ("SELECT" or "WITH")) throw new InvalidOperationException("Read-only analysis permits SELECT queries only. End analysis before executing this statement.");
             if (IsDdl(statement) && _transaction is not null)
                 throw new InvalidOperationException("Commit or roll back pending changes before running DDL. DDL commits automatically and cannot be rolled back.");
+            if (sourceReviewId is not null) await ValidateSourceReviewUnderGateAsync(sql, sourceReviewId, operationToken);
             var beginsTransaction = OracleSqlUnit.RequiresManualTransaction(statement) && _transaction is null;
             command = _connection.CreateCommand();
             command.BindByName = true;
@@ -172,7 +173,17 @@ public sealed partial class OracleSessionService : IDisposable
                 if (!parsed && string.Equals(parameter.Type, "NUMBER", StringComparison.OrdinalIgnoreCase)) { dbType = OracleDbType.Decimal; parsed = true; }
                 if (!parsed) throw new InvalidOperationException($"Unsupported bind type '{parameter.Type}'.");
                 var oracleParameter = command.Parameters.Add(parameter.Name.TrimStart(':'), dbType);
-                oracleParameter.Value = ParseParameterValue(dbType, parameter.Value);
+                oracleParameter.Direction = parameter.Direction switch
+                {
+                    "IN" => System.Data.ParameterDirection.Input,
+                    "OUT" => System.Data.ParameterDirection.Output,
+                    "IN OUT" => System.Data.ParameterDirection.InputOutput,
+                    _ => throw new InvalidOperationException("Unsupported bind direction.")
+                };
+                if (oracleParameter.Direction != System.Data.ParameterDirection.Input && dbType is not (OracleDbType.Decimal or OracleDbType.Varchar2 or OracleDbType.NVarchar2 or OracleDbType.Date or OracleDbType.TimeStamp))
+                    throw new InvalidOperationException("Output binds currently support NUMBER, VARCHAR2, NVARCHAR2, DATE and TIMESTAMP.");
+                if (oracleParameter.Direction != System.Data.ParameterDirection.Input && dbType is OracleDbType.Varchar2 or OracleDbType.NVarchar2) oracleParameter.Size = 32767;
+                oracleParameter.Value = oracleParameter.Direction == System.Data.ParameterDirection.Output ? DBNull.Value : ParseParameterValue(dbType, parameter.Value);
             }
             if (beginsTransaction) _transaction = _connection.BeginTransaction();
             if (_transaction is not null) command.Transaction = _transaction;
@@ -218,7 +229,9 @@ public sealed partial class OracleSessionService : IDisposable
             }
             timer.Stop();
             if (command.SqlId is { Length: > 0 } sqlId) _executedSqlIds.Add(sqlId);
-            return new SqlExecutionResult([], [], affected, timer.ElapsedMilliseconds, 0, false, transactionPending, outputLines) { SqlId = command.SqlId };
+            var outParameters = command.Parameters.Cast<OracleParameter>().Where(parameter => parameter.Direction != System.Data.ParameterDirection.Input)
+                .Select(parameter => new SqlOutputParameter(parameter.ParameterName, parameter.OracleDbType switch { OracleDbType.Decimal => "NUMBER", OracleDbType.Varchar2 => "VARCHAR2", OracleDbType.NVarchar2 => "NVARCHAR2", OracleDbType.Date => "DATE", OracleDbType.TimeStamp => "TIMESTAMP", _ => parameter.OracleDbType.ToString() }, OutputParameterValue(parameter.Value))).ToArray();
+            return new SqlExecutionResult([], [], affected, timer.ElapsedMilliseconds, 0, false, transactionPending, outputLines) { SqlId = command.SqlId, OutParameters = outParameters };
         }
         catch (Exception ex) when (Volatile.Read(ref timeoutElapsed) == 1 && !cancellationToken.IsCancellationRequested)
         {
@@ -279,6 +292,7 @@ public sealed partial class OracleSessionService : IDisposable
     public static string BuildPrimaryKeySql(string schema,string table,IReadOnlyList<LookupColumn> columns,IReadOnlyDictionary<string,string> values) => MetadataOperations.BuildPrimaryKeySql(schema, table, columns, values);
 
     public Task<PrimaryKeyInfo> GetPrimaryKeyAsync(string schema,string table) => _metadata.GetPrimaryKeyAsync(schema, table);
+    public Task<ConstraintInfo?> GetConstraintInfoAsync(string owner,string name) => _metadata.GetConstraintInfoAsync(owner, name);
 
     public Task<IReadOnlyList<RelatedRecordLink>> ChildRecordsSqlAsync(string owner,string table,IReadOnlyDictionary<string,object?> values) => _metadata.ChildRecordsSqlAsync(owner, table, values);
 
@@ -512,6 +526,16 @@ public sealed partial class OracleSessionService : IDisposable
             _ => value,
         };
     }
+
+    private static object? OutputParameterValue(object? value) => value switch
+    {
+        null or DBNull => null,
+        Oracle.ManagedDataAccess.Types.OracleDecimal number => number.IsNull ? null : number.ToString().Replace(CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator, "."),
+        Oracle.ManagedDataAccess.Types.OracleString text => text.IsNull ? null : text.Value,
+        Oracle.ManagedDataAccess.Types.OracleDate date => date.IsNull ? null : OracleTemporalCell.From(date),
+        Oracle.ManagedDataAccess.Types.OracleTimeStamp stamp => stamp.IsNull ? null : OracleTemporalCell.From(stamp),
+        _ => ToWireValue(value)
+    };
 
     private static object? ToProviderValue(object value)
     {

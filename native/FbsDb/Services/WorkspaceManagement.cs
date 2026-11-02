@@ -18,6 +18,7 @@ public sealed partial class WorkspaceService
 
     private async Task SaveCatalogAsync(List<WorkspaceRegistration> next, string? root)
     {
+        var rules = SamePath(root, _root) ? ProjectRules : await ReadRulesAtRootAsync(root);
         var gate = NativeSettingsStore.Gate(_appSettingsPath); await gate.WaitAsync();
         try
         {
@@ -26,7 +27,7 @@ public sealed partial class WorkspaceService
             settings["recentWorkspaces"] = JsonSerializer.SerializeToNode(next.OrderByDescending(w => w.LastOpened).Select(w => w.Path).Take(10));
             settings["lastWorkspace"] = root;
             await NativeSettingsStore.WriteAsync(_appSettingsPath, settings);
-            _catalog = next; _root = root; RefreshRecent();
+            _catalog = next; _root = root; ProjectRules = rules; RefreshRecent();
         }
         finally { gate.Release(); }
     }
@@ -65,7 +66,7 @@ public sealed partial class WorkspaceService
     public async Task<WorkspaceEntry> DuplicateEntryAsync(string source, string name)
     {
         source = SafePath(source); ValidateName(name);
-        if (!source.EndsWith(".sql", StringComparison.OrdinalIgnoreCase) || !name.EndsWith(".sql", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Choose a SQL file and a .sql destination name.");
+        if (!IsWorkspaceSourceFile(source) || !IsWorkspaceSourceFile(name)) throw new InvalidOperationException("Choose an Oracle source file and a supported destination extension.");
         var target = SafePath(Path.Combine(Path.GetDirectoryName(source)!, name));
         await using (var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, true))
         await using (var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, true))

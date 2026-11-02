@@ -61,3 +61,10 @@ test('metadata empty states distinguish disconnected, denied, failed and empty s
   assert.equal(editorSessionState({connected:true,rendering:true}).text,'Rendering results');
   assert.equal(editorSessionState({connected:true,rendering:true,cancelling:true}).text,'Cancelling');
 });
+
+
+test('Search Everywhere includes bounded current symbols, settings IDs and commands in ordinary Ctrl P mode',()=>{
+ const results=workbenchSearch({query:'invoice',outline:[{name:'invoice_total',kind:'FUNCTION',start:20,depth:2}],settings:[{id:'invoice.format',label:'Invoice formatting',detail:'results'}],commands:[{id:'invoice-run',label:'Run invoice',disabled:true}],objects:Array.from({length:2000},(_,index)=>({owner:'APP',name:'INVOICE_'+index,type:'TABLE'}))});
+ assert.ok(results.some(item=>item.category==='Symbols'&&item.start===20));assert.ok(results.some(item=>item.category==='Settings'&&item.settingId==='invoice.format'));assert.ok(results.some(item=>item.category==='Commands'&&item.disabled));
+ assert.equal(workbenchSearch({query:'editor.lineHeight',settings:[{id:'editor.lineHeight',label:'Line height',detail:'editor'}]})[0].kind,'setting');
+});

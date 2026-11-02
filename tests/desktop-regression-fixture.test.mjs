@@ -3,11 +3,11 @@ import assert from 'node:assert/strict';
 import vm from 'node:vm';
 import { desktopRegressionFixture } from './desktopRegressionFixture.mjs';
 
-function fixture() {
+function fixture(workspace = false) {
   const forwarded = [], listeners = new Set(), window = { addEventListener() {} };
   const chrome = { webview: { postMessage: value => forwarded.push(JSON.parse(value)),
     addEventListener: (_, listener) => listeners.add(listener), removeEventListener: (_, listener) => listeners.delete(listener) } };
-  vm.runInNewContext(desktopRegressionFixture('D:\\qa\\files'), { window, chrome });
+  vm.runInNewContext(desktopRegressionFixture('D:\\qa\\files',workspace), { window, chrome });
   const send = (command, payload) => chrome.webview.postMessage(JSON.stringify({ type: 'command', id: 'r', tabId: 'a', command, payload }));
   return { state: window.__desktopRegression, send, forwarded, listeners, chrome };
 }
@@ -37,4 +37,14 @@ test('desktop fixture blocks Oracle commands and delays genuine replies without 
   f.state.releaseSaves(); assert.equal(received[0], reply);
   f.chrome.webview.removeEventListener('message', listener);
   assert.equal(f.state.pendingReplies.length, 0);
+});
+
+test('workspace fixture permits only isolated project rules and keeps Oracle commands blocked', () => {
+  const f=fixture(true);
+  f.send('workspace.projectRules',{root:f.state.root});
+  assert.equal(f.forwarded.length,1);
+  assert.throws(()=>f.send('workspace.sources',{root:'C:/outside'}),/escaped/);
+  f.send('sql.execute',{sql:'SELECT 1'});
+  assert.equal(f.forwarded.length,1);
+  assert.equal(f.state.blocked.length,1);
 });

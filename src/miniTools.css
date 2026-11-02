@@ -17,3 +17,7 @@
 .mini-tool-table td,.mini-tool-table th{padding:7px 10px;text-align:left;white-space:pre;border-bottom:1px solid var(--line)}
 .mini-tool-error{color:var(--danger)}
 @media(max-width:720px){.mini-tools-body{grid-template-columns:1fr}.mini-tools-body>aside{border-right:0;border-bottom:1px solid var(--line)}}
+
+.mini-tool-rename{display:flex;flex-direction:column;gap:2px}
+.mini-tool-rename input{width:100%;box-sizing:border-box}
+.mini-tool-rename small{color:var(--text);font-size:10px}

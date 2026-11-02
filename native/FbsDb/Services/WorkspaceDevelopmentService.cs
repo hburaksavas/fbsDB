@@ -15,7 +15,7 @@ public sealed class WorkspaceDevelopmentService(WorkspaceService workspace)
     {
         var root = Path.TrimEndingDirectorySeparator(workspace.Root ?? throw new InvalidOperationException("Open a workspace first."));
         var full = Path.GetFullPath(path);
-        if (!workspace.IsUnderRoot(full) || !full.EndsWith(".sql", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("Only SQL files inside the workspace are supported.");
+        if (!workspace.IsUnderRoot(full) || !workspace.IsWorkspaceSourceFile(full)) throw new InvalidOperationException("Only SQL files inside the workspace are supported.");
         for (var cursor = full; !string.Equals(cursor, root, StringComparison.OrdinalIgnoreCase); cursor = Path.GetDirectoryName(cursor)!)
             if ((File.Exists(cursor) || Directory.Exists(cursor)) && File.GetAttributes(cursor).HasFlag(FileAttributes.ReparsePoint)) throw new InvalidOperationException("Linked files and directories are excluded.");
         return full;
@@ -57,7 +57,7 @@ public sealed class WorkspaceDevelopmentService(WorkspaceService workspace)
             if (entry.Length < 4 || entry[2] != ' ') continue;
             var code = entry[..2]; var relative = entry[3..];
             if (code.Contains('R') || code.Contains('C')) index++;
-            if (!relative.EndsWith(".sql", StringComparison.OrdinalIgnoreCase)) continue;
+            if (!workspace.IsWorkspaceSourceFile(relative)) continue;
             var path = Path.GetFullPath(Path.Combine(repository.Output.Trim(), relative));
             if (!workspace.IsUnderRoot(path)) continue;
             files.Add(new(path, Path.GetRelativePath(root,path).Replace('\\','/'), code.Trim()));

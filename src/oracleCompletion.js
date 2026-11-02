@@ -100,7 +100,7 @@ export function getOracleCompletions(source, cursor, { settings: supplied = {}, 
       const list = allColumns.get(column.name) || []; list.push({ column, ref, object }); allColumns.set(column.name, list);
     }
     for (const [name, rows] of allColumns) for (const row of rows) {
-      const ambiguous = rows.length > 1, qualifier = ambiguous ? sqlIdentifier(row.ref.aliasKey || row.ref.nameKey) + '.' : '';
+      const qualify = rows.length > 1 || !!row.ref.alias, qualifier = qualify ? sqlIdentifier(row.ref.aliasKey || row.ref.nameKey) + '.' : '';
       add(name, 'field', 3, `${row.ref.alias || row.ref.name} · ${row.column.type || 'column'}`, { identity: `${row.ref.alias || row.ref.name}.${name}`, insertText: qualifier + sqlIdentifier(name), column: row.column, ...projectionState(row.ref.aliasKey || row.ref.nameKey, row.column) });
     }
     for (const local of [...context.locals].reverse()) add(local.name, 'variable', 0, `PL/SQL · ${local.type}`, { insertText: local.quoted ? sqlIdentifier(local.name) : local.name });

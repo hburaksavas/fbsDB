@@ -66,3 +66,20 @@ createRoot(document.getElementById("root")).render(
     <ApplicationErrorBoundary><MeasuredApp /><FeedbackHost /></ApplicationErrorBoundary>
   </React.StrictMode>,
 );
+
+import './oracleSourceHeader.css';
+import './runConsole.css';
+import './portability.css';
+import './relatedFiles.css';
+import './localHistory.css';
+import './compare.css';
+import './keyTips.css';
+import './toolbarSettings.css';
+import './serverSources.css';
+import './quickEval.css';
+import './inlineBinds.css';
+import './coordinateMap.css';
+import './iconTheme.css';
+import './gridEdit.css';
+
+import "./executionContext.css";

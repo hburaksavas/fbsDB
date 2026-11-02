@@ -19,6 +19,7 @@ public sealed record SqlExecutionResult(IReadOnlyList<SqlColumn> Columns, IReadO
     public bool HasMore { get; init; }
     public int PageSize { get; init; } = 1000;
     public int Offset { get; init; }
+    public IReadOnlyList<SqlOutputParameter> OutParameters { get; init; } = [];
 }
 public sealed record SchemaColumn(string Name, string Type, bool Nullable, bool Indexed)
 {
@@ -41,11 +42,13 @@ public sealed record SchemaObject(string Name, string Type, IReadOnlyList<Schema
     public IReadOnlyList<SchemaProperty> Details { get; init; } = [];
 }
 public sealed record SchemaSnapshot(string Owner, IReadOnlyList<SchemaObject> Objects);
-public sealed record SqlBindParameter(string Name, string Type, string? Value);
+public sealed record SqlBindParameter(string Name, string Type, string? Value, string Direction = "IN");
+public sealed record SqlOutputParameter(string Name, string Type, [property: System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.Never)] object? Value);
 
 public sealed record LookupColumn(string Name,string Type);
 public sealed record PrimaryKeyInfo(string Schema,string Table,IReadOnlyList<LookupColumn> Columns);
 public sealed record RelatedRecordLink(string Label,string Sql);
 
+public sealed record ConstraintInfo(string Owner,string Name,string Type,string? Condition,string? ReferencedConstraint,IReadOnlyList<string> Columns);
 public sealed record ColumnConstraint(string Name,string Type,string? Condition,string Status);
 public sealed record ColumnDefinition(string Schema,string Table,string Name,string Type,int? Size,int? Precision,int? Scale,bool Nullable,string? DefaultValue,IReadOnlyList<ColumnConstraint> Constraints);

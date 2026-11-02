@@ -5,8 +5,8 @@ import {effectiveLanguage,translate as t} from './localeProfile';
 
 const categories=[['general','Appearance'],['editor','Style'],['completion','Completion'],['formatter','Formatter'],['shortcuts','Shortcuts'],['nls','Oracle session / NLS'],['results','Results Table View'],['export','Export'],['preferences','General'],['notifications','Notifications']];
 const categoryMatches=(definition,id)=>definition.category===id||id==='preferences'&&['accessibility','privacy'].includes(definition.category);
-export function SettingsFrame({children,settings,onChange,workspace,systemLocale,onImport}) {
-  const [category,setCategory]=useState('general'),[query,setQuery]=useState(''),[changedOnly,setChangedOnly]=useState(false),[fileError,setFileError]=useFeedbackState('',{title:'Settings import failed',scope:null});const importInput=useRef(null);
+export function SettingsFrame({children,settings,onChange,workspace,systemLocale,onImport,initialSearch="",initialCategory="general"}) {
+  const [category,setCategory]=useState(initialCategory),[query,setQuery]=useState(initialSearch),[changedOnly,setChangedOnly]=useState(false),[fileError,setFileError]=useFeedbackState('',{title:'Settings import failed',scope:null});const importInput=useRef(null);
   const language=effectiveLanguage();
   const sections=Children.toArray(children).filter(child=>isValidElement(child));
   const entries=sections.flatMap(child=>{

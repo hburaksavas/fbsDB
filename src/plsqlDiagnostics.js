@@ -4,7 +4,7 @@ const word = (token, value) => token?.kind === 'identifier' && !token.quoted && 
 const semantic = token => token.kind === 'identifier' && !token.quoted ? token.value.toUpperCase() : token.value;
 
 export function compilationHeader(source) {
-  const tokens = lexOracle(source).filter(token => token.kind !== 'comment');
+  const tokens = lexOracle(source).filter(token => token.kind !== 'comment' && !(token.value === '/' && source.slice(source.lastIndexOf('\n', token.start - 1) + 1, source.indexOf('\n', token.end) < 0 ? source.length : source.indexOf('\n', token.end)).trim() === '/'));
   let at = tokens.findIndex(token => ['PROCEDURE', 'FUNCTION', 'PACKAGE', 'TRIGGER', 'TYPE'].some(value => word(token, value)));
   if (at < 0 || ![0, 1, 2, 3, 4, 5].includes(at)) return null;
   const start = at, type = tokens[at++].value.toUpperCase();

@@ -5,6 +5,25 @@ namespace FbsDb.Services;
 
 public sealed partial class WorkspaceService
 {
+    public static IReadOnlyList<string> SourceExtensions { get; } = Array.AsReadOnly(new[] { ".sql", ".pks", ".pkb", ".prc", ".fnc", ".trg" });
+    public static bool IsSourceFile(string path) => SourceExtensions.Contains(Path.GetExtension(path), StringComparer.OrdinalIgnoreCase);
+
+    // Extensions choose creation templates only; they do not establish database object identity.
+    public static string SourceTemplate(string name, string? sourceType = null)
+    {
+        var identifier = Path.GetFileNameWithoutExtension(name);
+        if (!System.Text.RegularExpressions.Regex.IsMatch(identifier, @"^[A-Za-z][A-Za-z0-9_$#]*$"))
+            identifier = "\"" + identifier.Replace("\"", "\"\"") + "\"";
+        return (sourceType ?? DefaultProjectRules.Associations.FirstOrDefault(item => item.Extension.Equals(Path.GetExtension(name), StringComparison.OrdinalIgnoreCase))?.Type) switch
+        {
+            "PACKAGE" => $"CREATE OR REPLACE PACKAGE {identifier} AS\n  -- Public declarations\nEND {identifier};\n/\n",
+            "PACKAGE BODY" => $"CREATE OR REPLACE PACKAGE BODY {identifier} AS\n  -- Implement the package specification here\nEND {identifier};\n/\n",
+            "PROCEDURE" => $"CREATE OR REPLACE PROCEDURE {identifier} AS\nBEGIN\n  NULL;\nEND {identifier};\n/\n",
+            "FUNCTION" => $"CREATE OR REPLACE FUNCTION {identifier}\n  RETURN NUMBER\nAS\nBEGIN\n  RETURN NULL;\nEND {identifier};\n/\n",
+            "TRIGGER" => $"-- Replace table_name and review timing/event before compiling.\nCREATE OR REPLACE TRIGGER {identifier}\n  BEFORE INSERT ON table_name\n  FOR EACH ROW\nBEGIN\n  NULL;\nEND {identifier};\n/\n",
+            _ => ""
+        };
+    }
     private readonly string _appSettingsPath;
     private string? _root;
     private string[] _recent = [];
@@ -29,6 +48,7 @@ public sealed partial class WorkspaceService
             _catalog.Add(new(Guid.NewGuid().ToString("N"), _root, Path.GetFileName(_root), "", false, null));
         if (_root is not null && !Directory.Exists(_root)) _root = null;
         RefreshRecent();
+        await LoadProjectRulesAsync();
     }
 
     public async Task SetRootAsync(string root)
@@ -50,7 +70,7 @@ public sealed partial class WorkspaceService
         var folder = SafePath(path ?? _root, allowRoot: true);
         return Directory.EnumerateFileSystemEntries(folder).Select(item => new FileInfo(item))
             .Where(item => !item.Name.StartsWith('.') && item.Name is not ("bin" or "obj" or "node_modules") && !item.Attributes.HasFlag(FileAttributes.ReparsePoint))
-            .Where(item => item.Attributes.HasFlag(FileAttributes.Directory) || item.Extension.Equals(".sql", StringComparison.OrdinalIgnoreCase))
+            .Where(item => item.Attributes.HasFlag(FileAttributes.Directory) || IsWorkspaceSourceFile(item.Name))
             .Select(item => new WorkspaceEntry(item.FullName, Path.GetRelativePath(_root, item.FullName).Replace('\\', '/'), item.Name, item.Attributes.HasFlag(FileAttributes.Directory)))
             .OrderByDescending(item => item.IsDirectory).ThenBy(item => item.Name, StringComparer.OrdinalIgnoreCase).ToArray();
     }
@@ -58,12 +78,36 @@ public sealed partial class WorkspaceService
     public async Task<WorkspaceEntry> CreateEntryAsync(string parent, string name, bool directory)
     {
         ValidateName(name);
-        if (!directory && !name.EndsWith(".sql", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("SQL files must use the .sql extension.");
+        if (!directory && !IsWorkspaceSourceFile(name)) throw new InvalidOperationException("Use an extension associated in Project rules.");
         var path = SafePath(Path.Combine(SafePath(parent, allowRoot: true), name));
         if (File.Exists(path) || Directory.Exists(path)) throw new IOException("An item with this name already exists.");
         if (directory) Directory.CreateDirectory(path);
-        else { await using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, true); }
+        else
+        {
+            await using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, true);
+            await using var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false));
+            await writer.WriteAsync(SourceTemplate(name, ProjectRules.Associations.First(item => item.Extension.Equals(Path.GetExtension(name), StringComparison.OrdinalIgnoreCase)).Type));
+        }
         return new(path, Path.GetRelativePath(_root!, path).Replace('\\', '/'), name, directory);
+    }
+
+    // Creates a new workspace-relative source file with the given text. Missing folders are created; an existing file is never replaced.
+    public async Task<WorkspaceEntry> CreateFileWithContentAsync(string relativePath, string content)
+    {
+        var normalized = (relativePath ?? string.Empty).Replace('\\', '/').Trim();
+        if (string.IsNullOrWhiteSpace(normalized) || Path.IsPathRooted(normalized) || normalized.StartsWith('/') || normalized.Split('/').Any(part => part is "" or "." or ".."))
+            throw new InvalidOperationException("Use a path relative to the workspace.");
+        if ((content?.Length ?? 0) > 200_000) throw new InvalidOperationException("Generated content is too large.");
+        var name = Path.GetFileName(normalized);
+        ValidateName(name);
+        if (!IsWorkspaceSourceFile(name)) throw new InvalidOperationException("Use an extension associated in Project rules.");
+        var path = SafePath(Path.Combine(_root!, normalized.Replace('/', Path.DirectorySeparatorChar)));
+        if (File.Exists(path) || Directory.Exists(path)) throw new IOException("An item with this name already exists.");
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        await using var stream = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None, 4096, true);
+        await using var writer = new StreamWriter(stream, new System.Text.UTF8Encoding(false));
+        await writer.WriteAsync(content ?? string.Empty);
+        return new(path, Path.GetRelativePath(_root!, path).Replace('\\', '/'), name, false);
     }
 
     public async Task MoveEntryAsync(string path, string destination)
@@ -74,7 +118,7 @@ public sealed partial class WorkspaceService
         if (File.Exists(target) || Directory.Exists(target)) throw new IOException("An item with this name already exists.");
         if (!Directory.Exists(Path.GetDirectoryName(target))) throw new DirectoryNotFoundException("The destination folder no longer exists.");
         var directory = Directory.Exists(source);
-        if (!directory && !target.EndsWith(".sql", StringComparison.OrdinalIgnoreCase)) throw new InvalidOperationException("SQL files must use the .sql extension.");
+        if (!directory && !IsWorkspaceSourceFile(target)) throw new InvalidOperationException("Use a supported Oracle source extension.");
         var configPath = WorkspaceSettingsPath; var gate = NativeSettingsStore.Gate(configPath); await gate.WaitAsync();
         try
         {
@@ -118,8 +162,9 @@ public sealed partial class WorkspaceService
         var result = new List<WorkspaceSqlFile>();
         try
         {
-            foreach (var file in Directory.EnumerateFiles(_root, "*.sql", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint }))
+            foreach (var file in Directory.EnumerateFiles(_root, "*", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint }))
             {
+                if (!IsWorkspaceSourceFile(file)) continue;
                 var relative = Path.GetRelativePath(_root, file);
                 if (relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Any(part => part.StartsWith('.') || part is "bin" or "obj" or "node_modules")) continue;
                 result.Add(new WorkspaceSqlFile(file, relative.Replace(Path.DirectorySeparatorChar, '/'), Path.GetFileName(file)));
@@ -155,18 +200,66 @@ public sealed partial class WorkspaceService
                     matches.Add(new WorkspaceSearchMatch(file.Path, file.RelativePath, lineNumber, line.Trim()));
                 }
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { truncated = true; }
             if (truncated) break;
         }
         return new WorkspaceSearchResult(matches, truncated);
     }
 
+    public async Task<WorkspaceSources> ReadSourceFilesAsync(string expectedRoot)
+    {
+        void CheckRoot() { if (!SamePath(_root, expectedRoot)) throw new InvalidOperationException("The workspace changed. Search again."); }
+        CheckRoot();
+        var files = ListSqlFiles();
+        var connections = await GetFileConnectionsAsync();
+        var sources = new List<WorkspaceSourceFile>();
+        var skipped = new List<string>();
+        var truncated = files.Count > 300;
+        long bytes = 0;
+        foreach (var file in files.Take(300))
+        {
+            CheckRoot();
+            try
+            {
+                var path = SafePath(file.Path);
+                if (new FileInfo(path).Length > 1024 * 1024) { skipped.Add(file.RelativePath + ": exceeds the 1 MB discovery limit."); continue; }
+                var snapshot = await WorkspaceFileService.ReadAsync(path);
+                if (snapshot.Error is not null || snapshot.Missing) { skipped.Add(file.RelativePath + ": " + (snapshot.Error ?? "file missing")); continue; }
+                var contentBytes = System.Text.Encoding.UTF8.GetByteCount(snapshot.Content!);
+                if (contentBytes > 1024 * 1024) { skipped.Add(file.RelativePath + ": exceeds the 1 MB discovery content limit."); continue; }
+                bytes += contentBytes;
+                if (bytes > 8 * 1024 * 1024) { truncated = true; break; }
+                sources.Add(new(path, file.Name, snapshot.Content!, connections.GetValueOrDefault(path)));
+            }
+            catch (Exception error) when (error is IOException or UnauthorizedAccessException or InvalidOperationException) { skipped.Add(file.RelativePath + ": " + error.Message); }
+        }
+        CheckRoot();
+        return new(expectedRoot, sources, skipped, truncated);
+    }
+
     public async Task<string?> GetFileConnectionAsync(string path)
     {
+        var connections = await GetFileConnectionsAsync();
+        return connections.GetValueOrDefault(Path.GetFullPath(path));
+    }
+
+    public async Task<Dictionary<string, string>> GetFileConnectionsAsync()
+    {
+        var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        if (_root is null) return result;
         var settings = await ReadWorkspaceSettingsAsync();
-        var key = Path.GetFullPath(path);
-        return settings.TryGetProperty("fileConnections", out var files) && files.ValueKind == JsonValueKind.Object
-            && files.TryGetProperty(key, out var profile) ? profile.GetString() : null;
+        if (!settings.TryGetProperty("fileConnections", out var files) || files.ValueKind != JsonValueKind.Object) return result;
+        foreach (var item in files.EnumerateObject())
+        {
+            try
+            {
+                if (!Path.IsPathRooted(item.Name) || !IsUnderRoot(item.Name) || item.Value.ValueKind != JsonValueKind.String) continue;
+                var profile = item.Value.GetString();
+                if (profile is not null && profile.Length <= 250 && !profile.Any(char.IsControl)) result[Path.GetFullPath(item.Name)] = profile;
+            }
+            catch (Exception error) when (error is ArgumentException or NotSupportedException or PathTooLongException) { }
+        }
+        return result;
     }
 
     public async Task SetFileConnectionAsync(string path, string profileId)
@@ -205,3 +298,5 @@ public sealed record WorkspaceSqlFile(string Path, string RelativePath, string N
 public sealed record WorkspaceEntry(string Path, string RelativePath, string Name, bool IsDirectory);
 public sealed record WorkspaceSearchMatch(string Path, string RelativePath, int LineNumber, string LineText);
 public sealed record WorkspaceSearchResult(IReadOnlyList<WorkspaceSearchMatch> Matches, bool Truncated);
+public sealed record WorkspaceSourceFile(string Path, string Name, string Content, string? ConnectionProfileId);
+public sealed record WorkspaceSources(string Root, IReadOnlyList<WorkspaceSourceFile> Files, IReadOnlyList<string> Skipped, bool Truncated);
