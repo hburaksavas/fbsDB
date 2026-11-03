@@ -20,3 +20,5 @@ export function confirmSummary({ statements, target = null, excludedCount = 0 })
     note: excludedCount > 0 ? `${plural(excludedCount, 'pending change')} stay${excludedCount === 1 ? 's' : ''} a draft.` : ''
   };
 }
+
+export const applyRunningDetail = count => `Sending ${plural(count, 'statement')} in this tab's session. Nothing is committed.`;

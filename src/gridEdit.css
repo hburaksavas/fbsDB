@@ -126,3 +126,8 @@ tr[data-row-error] td.rownum::after{content:'✖';margin-left:2px}
 .grid-edit-reversible[data-tone=permanent]{color:var(--muted)}
 .grid-edit-reversible[data-tone=open]{color:var(--accent-text)}
 .grid-edit-reversible[data-tone=unknown]{color:var(--danger)}
+
+.operation-progress{display:flex;align-items:center;gap:8px;padding:4px 0}
+.operation-progress-text{display:flex;flex-direction:column;flex:1;min-width:0}
+.operation-progress-text small{color:var(--muted);font-size:10px}
+.operation-progress-time{color:var(--muted);font-variant-numeric:tabular-nums}

@@ -1518,6 +1518,9 @@ try {
   assert.deepEqual(sent.payload.statements[0].binds.map(item => item.value), ['Ada L', '1', 'Ada']); assert.equal(sent.payload.statements[0].expectRows, 1);
   assert.equal(sent.payload.onFailure, 'rollback', 'The recommended policy rolls the whole batch back');
   await cdp.until(`[...document.querySelectorAll('.pending-drawer button')].some(b=>b.textContent==='Stop after the current statement')`, 'Stop offered while applying');
+  const progress = await cdp.evaluate(`(()=>{const e=document.querySelector('.pending-drawer .operation-progress');return e&&{text:e.textContent,time:e.querySelector('time')?.textContent,busy:e.getAttribute('aria-busy')}})()`);
+  assert.ok(progress && /Applying changes…/.test(progress.text) && /Nothing is committed/.test(progress.text), 'The running line names the work: ' + JSON.stringify(progress));
+  assert.match(progress.time, /^\d+s$|^\d+m \d\d s?$|^\d+m \d{2}s$/, 'Elapsed time is shown');
   const stops = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.stopApplyDml').length`);
   await cdp.evaluate(`[...document.querySelectorAll('.pending-drawer button')].find(b=>b.textContent==='Stop after the current statement').click()`);
   await cdp.until(`__uxFixture.commands.filter(m=>m.command==='sql.stopApplyDml').length>${stops}`, 'Stop sent');
