@@ -66,6 +66,7 @@ import { activeGridActions } from './gridActionBridge';
 import { actionableState } from './workbenchUx';
 import { ActionableState } from './ActionableState';
 import { ExecutionTargetContext } from './executionTarget';
+import { commitButtonTitle, rollbackButtonTitle } from './reversibility';
 import { idleGuidance, noRowsGuidance } from './emptyGuidance';
 import { EditorToolbarOverflow } from './EditorToolbarOverflow';
 import { ResultScope } from './ResultScope.jsx';
@@ -2426,8 +2427,8 @@ export function App() {
     find:{label:'Find',shortcut:shortcutsSetting.find,title:`Find (${shortcutsSetting.find||'Ctrl+F'})`,aria:'Find in editor',icon:<Search size={15}/>,keepFocus:true,onClick:()=>editorCommand('actions.find')},
     comment:{label:'Toggle comment',shortcut:shortcutsSetting.commentLine,title:`Toggle comment (${shortcutsSetting.commentLine||'Ctrl+/'})`,aria:'Toggle comment',icon:<Code2 size={15}/>,disabled:activeTabReadonly,keepFocus:true,onClick:()=>editorCommand('editor.action.commentLine')},
     explain:{label:'Explain plan',title:'Explain plan for the statement at the cursor',aria:'Explain plan',icon:<Workflow size={15}/>,disabled:busy||connecting,onClick:explainQuery},
-    commit:{label:'Commit',title:'Commit',aria:'Commit',className:'transaction-button commit',icon:<Check size={13}/>,disabled:activeTabReadonly||!transactionPending||busy,onClick:()=>finishTransaction('commit')},
-    rollback:{label:'Rollback',title:'Rollback',aria:'Rollback',className:'transaction-button rollback',icon:<X size={13}/>,disabled:activeTabReadonly||!transactionPending||busy,onClick:()=>finishTransaction('rollback')},
+    commit:{label:'Commit',title:commitButtonTitle,aria:'Commit',className:'transaction-button commit',icon:<Check size={13}/>,disabled:activeTabReadonly||!transactionPending||busy,onClick:()=>finishTransaction('commit')},
+    rollback:{label:'Rollback',title:rollbackButtonTitle,aria:'Rollback',className:'transaction-button rollback',icon:<X size={13}/>,disabled:activeTabReadonly||!transactionPending||busy,onClick:()=>finishTransaction('rollback')},
     autoCommit:{label:`Auto commit ${tabSession.autoCommit?'(on)':'(off)'}`,title:transactionPending?'Commit or roll back pending changes before changing auto commit':`Auto commit ${tabSession.autoCommit?'on':'off'}`,aria:'Auto commit',className:`transaction-button auto-commit${tabSession.autoCommit?' enabled':''}`,pressed:Boolean(tabSession.autoCommit),icon:<RefreshCw size={13}/>,disabled:!isNativeHost||activeTabReadonly||transactionPending||busy||connecting||tabSession.autoCommitPending,onClick:()=>{updateTabSession('autoCommitPending',true,activeTabId);updateTabSession('autoCommitRequestId',sendNativeCommand('transaction.autoCommit',{tabId:activeTabId,enabled:!tabSession.autoCommit}),activeTabId)}},
     rows:{label:'Rows per result page'},
   };

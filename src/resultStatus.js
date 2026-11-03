@@ -20,6 +20,6 @@ export function queryFailureDetails(outcome){
 
 /** @param {{transactionPending?: boolean}} outcome */
 export function transactionRecoveryHint(outcome) {
- const state=outcome.transactionPending===true?'Uncommitted changes remain in this session. Review them and choose Commit or Rollback.':outcome.transactionPending===false?'No pending transaction was reported by the database session.':'Transaction outcome is unconfirmed. Reconnect and verify database state.';
+ const state=outcome.transactionPending===true?'Not committed: changes remain in this session and can still be rolled back. Review them and choose Commit or Rollback.':outcome.transactionPending===false?'No pending transaction was reported by the database session.':'Transaction outcome is unconfirmed. Reconnect and verify database state.';
  return `${state} Before retrying a data change, verify whether it already took effect; cancellation or timeout does not undo earlier committed changes.`;
 }

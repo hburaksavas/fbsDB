@@ -13,7 +13,7 @@ export function documentConnection(document,sessions={},profiles=[]) {
   const text={connecting:'Connecting',connected:'Connected',disconnected:'Disconnected',inactive:'Inactive'}[state];
   const pending=!!session.transactionPending&&!session.analysisReadOnly;
   const short=state==='connecting'?'Conn':state==='inactive'?'Idle':state==='connected'?(pending?'TX':'On'):(pending?'Off TX':'Off');
-  return {profileId:validProfile(id)?id:null,profileName:saved?.name||(validProfile(active?.id)?active?.name:null)||id||'No profile',environment,state,pending,short,text:text+(pending?' · transaction pending':''),generation:session.connectionGeneration??0};
+  return {profileId:validProfile(id)?id:null,profileName:saved?.name||(validProfile(active?.id)?active?.name:null)||id||'No profile',environment,state,pending,short,text:text+(pending?' · not committed':''),generation:session.connectionGeneration??0};
 }
 
 export function editedSinceExecution(document,execution) {

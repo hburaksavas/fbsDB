@@ -1528,8 +1528,11 @@ try {
   assert.equal(await cdp.evaluate(`document.querySelector('[data-cell="0:1"]').dataset.draft`), 'applied', 'Applied cell is marked as applied');
   await cdp.until(`document.querySelector('.grid-edit-tx')?.textContent.includes('1 grid change applied, not committed')`, 'Tracked applied count');
   assert.match(await cdp.evaluate(`document.querySelector('.grid-edit-tx').textContent`), /Other work in this session is not counted/);
+  assert.equal(await cdp.evaluate(`document.querySelector('.grid-edit-reversible')?.textContent`), 'Not committed · can still be rolled back', 'Applied work says it can still be undone');
+  assert.match(await cdp.evaluate(`(()=>{const b=document.querySelector('[aria-label="Commit"]');return b?.dataset.appTooltip||b?.title||''})()`), /permanent/, 'Commit tooltip names its effect (a title is not replaced by the aria-label)');
   await cdp.evaluate(`__uxFixture.emit({type:'transaction.state',state:'committed',pending:false})`);
   await cdp.until(`document.querySelector('.grid-edit-tx')?.textContent.includes('1 grid change committed')`, 'Commit is reflected');
+  assert.equal(await cdp.evaluate(`document.querySelector('.grid-edit-reversible')?.textContent`), 'Committed · permanent', 'Committed work says it is permanent');
   await cdp.until(`[...document.querySelectorAll('.grid-edit-tx button')].some(b=>b.textContent==='Verify against the database')`, 'Verification offered after Commit');
   const reads = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.evaluate').length`);
   await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-tx button')].find(b=>b.textContent==='Verify against the database').click()`);

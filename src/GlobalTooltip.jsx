@@ -13,12 +13,16 @@ function tooltipText(element) {
     || "";
 }
 
+// Removing a title (below) is itself an attribute change; without this the observer would re-run and fall back to the aria-label,
+// replacing a descriptive title with a short label.
+const ownTitleRemovals = new WeakSet();
+
 function prepareTooltip(element) {
   if (!(element instanceof Element) || !eligible(element)) return;
   const text = tooltipText(element);
   if (!text) return;
   element.dataset.appTooltip = text;
-  if (element.hasAttribute("title")) element.removeAttribute("title");
+  if (element.hasAttribute("title")) { ownTitleRemovals.add(element); element.removeAttribute("title"); }
 }
 
 export function GlobalTooltip() {
@@ -86,7 +90,10 @@ export function GlobalTooltip() {
     prepareTree(document.body);
     const observer = new MutationObserver(records => {
       for (const record of records) {
-        if (record.type === "attributes") prepareTooltip(record.target);
+        if (record.type === "attributes") {
+          if (record.attributeName === "title" && !record.target.hasAttribute("title") && ownTitleRemovals.delete(record.target)) continue;
+          prepareTooltip(record.target);
+        }
         else record.addedNodes.forEach(node => prepareTree(node));
       }
     });

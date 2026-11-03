@@ -121,3 +121,8 @@ tr[data-row-error] td.rownum::after{content:'✖';margin-left:2px}
 .pending-target[data-env=PROD]{font-weight:700;color:var(--danger)}
 .pending-target[data-unknown]{font-style:italic}
 .pending-prod-warning{margin:4px 0;padding:4px 8px;border-left:3px solid var(--danger);font-weight:700}
+
+.grid-edit-reversible{font-weight:700}
+.grid-edit-reversible[data-tone=permanent]{color:var(--muted)}
+.grid-edit-reversible[data-tone=open]{color:var(--accent-text)}
+.grid-edit-reversible[data-tone=unknown]{color:var(--danger)}
