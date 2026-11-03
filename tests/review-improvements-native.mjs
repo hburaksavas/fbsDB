@@ -33,6 +33,13 @@ try {
  })();`;
  installed=await cdp.call('Page.addScriptToEvaluateOnNewDocument',{source});await cdp.call('Page.reload');
  await cdp.until(`window.__uxFixture && ${editor} && document.querySelector('.app-status')?.textContent.includes('UX fixture')`,'Fixture ready',60000);
+ await check('empty result area: the idle state says what to do next and offers the matching action',async()=>{
+  await cdp.until(`document.querySelector('.result-idle')`, 'Idle result area');
+  const idle = await cdp.evaluate(`(()=>{const e=document.querySelector('.result-idle');return {text:e.textContent,buttons:[...e.querySelectorAll('button')].map(b=>b.textContent)}})()`);
+  assert.match(idle.text, /^No results yet.*(Connect to a database first|Press .+ to run|Write a statement)/, 'The idle text explains the next step: ' + JSON.stringify(idle));
+  assert.equal(idle.buttons.length, 1, 'One matching action is offered');
+  assert.ok(['Choose a connection', 'Run statement', 'Go to the editor'].includes(idle.buttons[0]), 'The action matches the situation: ' + idle.buttons[0]);
+ });
  await check('history UI reflects configured count and removes expired/excluded SQL',async()=>{
   await cdp.click('[aria-label="History"]');await cdp.until(`document.getElementById('query-history-title')`);
   const text=await cdp.evaluate(`document.querySelector('.query-history-modal').textContent`);
@@ -1495,7 +1502,7 @@ try {
   await pick(1, 1); await gridKey('F2'); await cdp.until(`document.querySelector('.cell-editor')`); await type('Bobby');
   await cdp.evaluate(`document.querySelector('.cell-editor').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))`);
   await cdp.until(`document.querySelector('.grid-edit-pending')?.textContent.includes('Pending: 2')`, 'Two row updates staged');
-  await barClick('Pending'); await cdp.until(`[...document.querySelectorAll('.pending-drawer button')].some(b=>b.textContent.startsWith('Apply to Oracle'))`, 'Apply offered');
+  await barClick('Pending'); await cdp.until(`[...document.querySelectorAll('.pending-drawer button')].some(b=>b.textContent.startsWith('Apply to Oracle')&&!b.disabled)`, 'Apply offered and enabled');
   const before = await applies();
   await drawerClick('Apply to Oracle'); await cdp.until(`document.querySelector('[aria-label="Confirm applying changes"]')`, 'Confirmation');
   assert.match(await cdp.evaluate(`document.querySelector('[aria-label="Confirm applying changes"]').textContent`), /all<\/b>|all pending work/);

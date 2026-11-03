@@ -15,7 +15,7 @@ Grid düzenleme sırasında araç çubuğuna ve panellere çok sayıda eylem ekl
 | UX-01 ✅ | **Düzenleme araç çubuğunu kademelendir:** her zaman görünen çekirdek (Düzenle, Uygula, Geri al) ve "Daha fazla" menüsüne alınan gelişmiş araçlar (Toplu düzenle, Yapıştır, Açıklamalar, Mantıksal sütunlar). Kullanım sıklığına göre kullanıcı sabitleyebilsin. | Y | M |
 | UX-02 ✅ | **Bağlama duyarlı ipucu şeridi:** düzenleme modunda seçime göre tek satırlık öneri ("Satırı kopyalamak için…", "Birden çok hücre seçili: Toplu düzenle"). Kapatılabilir ve bir kez gösterilir. | O | S |
 | UX-03 ✅ | **Komut paletinde grid eylemleri:** tüm grid düzenleme eylemleri `IdeCommandPalette` içinde aranabilir olsun; araç çubuğunda yer olmayan eylemler buradan bulunur. | Y | S |
-| UX-04 | **Boş durum yönlendirmeleri:** sonuç yok, düzenlenemeyen sonuç, bekleyen değişiklik yok gibi durumlarda bir sonraki adımı söyleyen kısa metin (düzenlenemiyorsa neden ve ne yapılabileceği). `ActionableState` bileşeni genişletilebilir. | O | S |
+| UX-04 ✅ | **Boş durum yönlendirmeleri:** sonuç yok, düzenlenemeyen sonuç, bekleyen değişiklik yok gibi durumlarda bir sonraki adımı söyleyen kısa metin (düzenlenemiyorsa neden ve ne yapılabileceği). `ActionableState` bileşeni genişletilebilir. | O | S |
 
 ## B. Güven ve geri bildirim (veri değiştiren akışlar)
 
@@ -60,6 +60,7 @@ Grid düzenleme sırasında araç çubuğuna ve panellere çok sayıda eylem ekl
 - **UX-02 tamamlandı:** düzenleme çubuğunun altında seçime ve hazırlanan değişikliklere göre tek satırlık ipucu (seçim yok / tek hücre / çok hücre → Bulk edit / bekleyen değişiklik). "Got it" ipucunu kalıcı kapatır, "Turn off tips" hepsini kapatır. Birim test (`tests/edit-hints.test.mjs`) ve masaüstü testi (124 kontrol) geçti.
 - **UX-03 tamamlandı:** Ctrl+P komut paletinde ekrandaki sonucun grid düzenleme eylemleri "Grid: …" öneki ile aranabilir (düzenle, yeni satır, NULL, sil, geri al, toplu düzenle, yapıştır, kayıt görünümü, kontroller…). Devre dışı eylemler nedeniyle birlikte listelenir. Birim test (`tests/grid-action-bridge.test.mjs`) ve masaüstü testi (124 kontrol) geçti.
 - **Ek düzenleme (UX-01/03 sonrası):** "Edit rows" anahtarı sonuç araç çubuğuna (kalem simgesi) ve Descriptions simgesi araç çubuğuna taşındı; ayrı düzenleme satırı yalnızca düzenleme açıkken görünür (`docs/ui-decisions.md`). Masaüstü testi 124 kontrol geçti; Apply onayı adımı bir ara iki çalıştırmada zaman aşımına uğradı, üçüncüde geçti (olası zamanlama yarışı, nedeni araştırılmadı).
+- **UX-04 tamamlandı:** sonuç alanı boşken duruma göre yönlendirme ve tek eylem düğmesi (bağlı değil → "Choose a connection", SQL var → "Run statement", SQL yok → "Go to the editor"; çalıştır kısayolu ayarlardan okunur). "No rows returned" artık WHERE koşullarını/şemayı denetlemeyi söyler ve "Return to SQL" sunar. Boş bekleyen değişiklik listesi F2 / New row / silme işaretlemeyi anlatır. Birim test (`tests/empty-guidance.test.mjs`) ve masaüstü testi (125 kontrol) geçti. Apply onay adımındaki zaman aşımı, düğmenin etkinleşmesini bekleyerek giderildi.
 
 ## Önerilen sıra
 

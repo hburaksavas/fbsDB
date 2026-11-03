@@ -38,7 +38,7 @@ try{
  for(let i=0;i<3;i++){
   await click('[aria-label="Settings"]');await textClick('[aria-label="Settings categories"] button','Appearance');await click(`.theme-choice:nth-child(${i+1})`);await key('Escape');
   const idle=await evaluate(`(()=>{const e=document.querySelector('.result-idle'),mark=e.querySelector('.result-idle-mark'),r=e.getBoundingClientRect(),p=e.parentElement.getBoundingClientRect();return {text:e.textContent,width:r.width,height:r.height,center:Math.abs((r.left+r.width/2)-(p.left+p.width/2)),icon:getComputedStyle(mark).color,surface:getComputedStyle(mark).backgroundColor,buttons:e.querySelectorAll('button').length}})()`);
-  assert.equal(idle.text,'No results yet');assert.ok(idle.height<65);assert.ok(idle.center<2);assert.equal(idle.buttons,0);assert.notEqual(idle.icon,idle.surface);
+  assert.match(idle.text,/^No results yet.*(Connect to a database|Press .+ to run|Write a statement)/);assert.ok(idle.height<65);assert.ok(idle.center<2);assert.equal(idle.buttons,1,'One next-step button is offered');assert.notEqual(idle.icon,idle.surface);
  }
  console.log('PASS compact centered idle state in all three themes');
  await emit({type:'connection.connected',tabId:'tab-1',profile:{id:'UX_DEV'},serverVersion:'23'});

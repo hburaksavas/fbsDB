@@ -3,10 +3,11 @@ import {useEffect,useState} from 'react';
 import {AlertCircle,CheckCircle2,Rows3,Table2,Timer,Square,Code2,Copy,LoaderCircle,CircleSlash} from 'lucide-react';
 import {LONG_QUERY_MS,elapsedQueryTime,formatQueryDuration,queryFailureDetails,transactionRecoveryHint} from './resultStatus.js';
 
-export function ResultIdle(){
+export function ResultIdle({guidance,onAction}){
   return <section className="result-idle" data-kind="idle" role="status">
     <span className="result-idle-mark" aria-hidden="true"><Table2 size={19} strokeWidth={1.4}/></span>
-    <span>No results yet</span>
+    <span className="result-idle-text"><span>{guidance?.title||'No results yet'}</span>{guidance?.detail&&<small>{guidance.detail}</small>}</span>
+    {guidance?.action&&<button type="button" className="button-secondary" onClick={()=>onAction?.(guidance.action)}>{guidance.label}</button>}
   </section>;
 }
 

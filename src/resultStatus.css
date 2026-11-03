@@ -33,3 +33,7 @@
 @keyframes result-query-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){.result-running-spinner{animation:none}}
 .desktop-shell[data-reduce-motion=true] .result-running-spinner{animation:none}
+
+.result-idle-text{display:flex;flex-direction:column;gap:2px}
+.result-idle-text small{color:var(--muted);font-size:11px;font-weight:400}
+.result-idle .button-secondary{padding:2px 10px}
