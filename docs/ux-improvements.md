@@ -21,7 +21,7 @@ Grid düzenleme sırasında araç çubuğuna ve panellere çok sayıda eylem ekl
 
 | # | Öneri | Etki | Efor |
 | --- | --- | --- | --- |
-| UX-05 | **Uygula öncesi tek ekranlık özet:** kaç INSERT/UPDATE/DELETE, hangi tablo, hangi bağlantı/ortam (PROD ise belirgin uyarı), toplam etkilenecek satır. Onay düğmesi etkiyi söylesin ("12 satırı güncelle"), "Tamam" değil. | Y | M |
+| UX-05 ✅ | **Uygula öncesi tek ekranlık özet:** kaç INSERT/UPDATE/DELETE, hangi tablo, hangi bağlantı/ortam (PROD ise belirgin uyarı), toplam etkilenecek satır. Onay düğmesi etkiyi söylesin ("12 satırı güncelle"), "Tamam" değil. | Y | M |
 | UX-06 | **Geri alınabilirlik göstergesi:** her uygulama sonucunda "Geri alınabilir (commit edilmedi)" ya da "Kalıcı" durumu aynı yerde ve aynı dille görünsün; sekme işlem göstergesiyle tutarlı olsun. | Y | S |
 | UX-07 | **Hata iletilerinde eylem:** Oracle hataları (ORA-…) yalnızca metin değil, "Bu satıra git", "Taslağı düzelt", "Hatayı kopyala" düğmeleriyle sunulsun. `oracleErrorMap` zaten var; yüzeye çıkarılır. | Y | M |
 | UX-08 | **Uzun işlemlerde iptal ve ilerleme:** Apply, dışa aktarma ve LOB okuma için aynı ilerleme/iptal deseni (ilerleme çubuğu, geçen süre, İptal). Şu an her biri kendi biçiminde. | O | M |
@@ -61,6 +61,7 @@ Grid düzenleme sırasında araç çubuğuna ve panellere çok sayıda eylem ekl
 - **UX-03 tamamlandı:** Ctrl+P komut paletinde ekrandaki sonucun grid düzenleme eylemleri "Grid: …" öneki ile aranabilir (düzenle, yeni satır, NULL, sil, geri al, toplu düzenle, yapıştır, kayıt görünümü, kontroller…). Devre dışı eylemler nedeniyle birlikte listelenir. Birim test (`tests/grid-action-bridge.test.mjs`) ve masaüstü testi (124 kontrol) geçti.
 - **Ek düzenleme (UX-01/03 sonrası):** "Edit rows" anahtarı sonuç araç çubuğuna (kalem simgesi) ve Descriptions simgesi araç çubuğuna taşındı; ayrı düzenleme satırı yalnızca düzenleme açıkken görünür (`docs/ui-decisions.md`). Masaüstü testi 124 kontrol geçti; Apply onayı adımı bir ara iki çalıştırmada zaman aşımına uğradı, üçüncüde geçti (olası zamanlama yarışı, nedeni araştırılmadı).
 - **UX-04 tamamlandı:** sonuç alanı boşken duruma göre yönlendirme ve tek eylem düğmesi (bağlı değil → "Choose a connection", SQL var → "Run statement", SQL yok → "Go to the editor"; çalıştır kısayolu ayarlardan okunur). "No rows returned" artık WHERE koşullarını/şemayı denetlemeyi söyler ve "Return to SQL" sunar. Boş bekleyen değişiklik listesi F2 / New row / silme işaretlemeyi anlatır. Birim test (`tests/empty-guidance.test.mjs`) ve masaüstü testi (125 kontrol) geçti. Apply onay adımındaki zaman aşımı, düğmenin etkinleşmesini bekleyerek giderildi.
+- **UX-05 tamamlandı:** Apply onayı artık tek satırda etkiyi ("4 statements · about 4 rows affected (2 updates, 1 insert, 1 delete)"), hedefi (bağlantı adı · ortam) ve PROD ise kalın bir uyarıyı gösterir; düğme etkisini söyler ("Apply 4 changes"). PROD için ek onay kutusu koymadım (sürtünme artırır); istenirse eklenebilir. Birim test (`tests/apply-confirm.test.mjs`) ve masaüstü testi (125 kontrol) geçti. PROD uyarısı masaüstü testinde değil yalnızca birim testte doğrulandı (fixture bağlantısı PROD değil).
 
 ## Önerilen sıra
 

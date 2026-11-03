@@ -1505,6 +1505,9 @@ try {
   await barClick('Pending'); await cdp.until(`[...document.querySelectorAll('.pending-drawer button')].some(b=>b.textContent.startsWith('Apply to Oracle')&&!b.disabled)`, 'Apply offered and enabled');
   const before = await applies();
   await drawerClick('Apply to Oracle'); await cdp.until(`document.querySelector('[aria-label="Confirm applying changes"]')`, 'Confirmation');
+  const confirm = await cdp.evaluate(`(()=>{const c=document.querySelector('[aria-label="Confirm applying changes"]');return {head:c.querySelector('.pending-confirm-head').textContent,primary:c.querySelector('button.button-primary').textContent}})()`);
+  assert.match(confirm.head, /2 statements · about 2 rows affected \(2 updates\).*Target: /, 'The confirmation states the effect and the target: ' + confirm.head);
+  assert.equal(confirm.primary, 'Apply 2 changes', 'The button names the effect');
   assert.match(await cdp.evaluate(`document.querySelector('[aria-label="Confirm applying changes"]').textContent`), /all<\/b>|all pending work/);
   assert.equal(await applies(), before, 'Nothing is sent before confirmation');
   await drawerClick('Cancel'); assert.equal(await applies(), before);
@@ -1888,7 +1891,7 @@ try {
   await cdp.until(`document.querySelector('[aria-label="Impact summary"]')`, 'Impact summary');
   assert.equal(await cdp.evaluate(`document.querySelector('[aria-label="Impact summary"]').textContent`), '"APP"."REVIEW": 1 update, 1 delete');
   const sends = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.applyDml').length`);
-  await cdp.evaluate(`[...document.querySelectorAll('.pending-drawer button')].find(b=>b.textContent==='Apply').click()`);
+  await cdp.evaluate(`[...document.querySelectorAll('.pending-drawer .pending-confirm button.button-primary')].find(b=>b.textContent.startsWith('Apply ')).click()`);
   await cdp.until(`__uxFixture.commands.filter(m=>m.command==='sql.applyDml').length>${sends}`, 'Selected batch sent');
   const sent = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.applyDml').at(-1)`);
   assert.deepEqual(sent.payload.statements.map(item => item.kind), ['delete', 'update']); assert.deepEqual(sent.payload.statements[1].binds.map(item => item.value), ['B2', '2', 'b']);
@@ -2124,7 +2127,7 @@ try {
   await cdp.until(`[...document.querySelectorAll('.pending-drawer button')].some(b=>b.textContent.startsWith('Apply to Oracle'))`);
   const sends = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.applyDml').length`);
   await cdp.evaluate(`[...document.querySelectorAll('.pending-drawer button')].find(b=>b.textContent.startsWith('Apply to Oracle')).click()`);
-  await cdp.evaluate(`[...document.querySelectorAll('.pending-drawer button')].find(b=>b.textContent==='Apply').click()`);
+  await cdp.evaluate(`[...document.querySelectorAll('.pending-drawer .pending-confirm button.button-primary')].find(b=>b.textContent.startsWith('Apply ')).click()`);
   await cdp.until(`__uxFixture.commands.filter(m=>m.command==='sql.applyDml').length>${sends}`, 'Batch sent');
   const sent = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.applyDml').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'sql.dmlApplied',requestId:${JSON.stringify(sent.id)},tabId:'tab-1',outcomes:[{index:0,status:'applied',rowsAffected:1}],transactionPending:true,autoCommit:false,recovery:null})`);
