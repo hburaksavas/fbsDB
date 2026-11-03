@@ -3,7 +3,7 @@ import {toolbarItems} from './editorToolbarModel.js';
 
 // Result actions in toolbar order; "view" and "commands" stay reachable because every other action is opened from them.
 export const resultToolItems = [
-  ['view', 'Table view options'], ['pivot', 'Pivot options'], ['filter', 'Filters'], ['sort', 'Sorting'],
+  ['view', 'Table view options'], ['edit', 'Edit rows of this result'], ['descriptions', 'Show descriptions beside key values'], ['pivot', 'Pivot options'], ['filter', 'Filters'], ['sort', 'Sorting'],
   ['find', 'Find in results'], ['navigation', 'Navigate to row or column'], ['copy', 'Copy selection formats'], ['marks', 'Marks'], ['highlights', 'Highlights'],
   ['load', 'Load result rows'], ['export', 'Export results'], ['sql', 'SQL generation'], ['pin', 'Pin result'], ['memory', 'Result memory'], ['explain', 'Generate execution plan'], ['commands', 'Result commands'], ['clear', 'Reset result view'],
 ].map(([id, label]) => ({ id, label, fixed: id === 'view' || id === 'commands' }));

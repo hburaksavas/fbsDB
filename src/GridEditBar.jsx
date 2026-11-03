@@ -84,6 +84,8 @@ export function GridEditBar({editability,loading,editMode,onToggle,summary,canUn
     ]:[])
   ];
   useEffect(()=>registerGridActions({element:rootRef.current,get:()=>paletteActions.current()}),[]);
+  // Outside edit mode the bar takes no room; the Edit rows switch lives in the result toolbar. It stays mounted for the palette and stays open for applied-changes status.
+  if(!editMode&&!txText&&!verification)return <div ref={rootRef} className="grid-edit-anchor" aria-hidden="true"/>;
   return <div ref={rootRef} className="grid-edit-bar" role="toolbar" aria-label="Edit result rows">
     <button type="button" className="grid-edit-toggle" aria-pressed={editMode} title={editMode?'Leave edit mode (pending edits stay until discarded)':'Edit rows of this result (explicit edit mode)'} onClick={onToggle}><Pencil size={13}/>{editMode?'Editing':'Edit rows'}</button>
     {editMode&&<>

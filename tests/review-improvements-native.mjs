@@ -10,6 +10,7 @@ const editor=`window.monaco?.editor.getEditors().find(e=>document.contains(e.get
 let installed,failure;
 // Edit tools live on the bar when pinned and otherwise in the "More" menu; this finds the action in either place.
 async function clickBar(cdp,label){
+  if(label==='Descriptions…'){await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Show descriptions beside key values"]').click()`);return}
   const find=`(()=>{const bar=document.querySelector('.grid-edit-bar');return [...bar.querySelectorAll('button,[role=menuitem],[role=menuitemcheckbox]')].find(b=>b.textContent===${JSON.stringify(label)}||b.getAttribute('aria-label')===${JSON.stringify(label)})})()`;
   if(!await cdp.evaluate(`!!${find}`)){
     if(!await cdp.evaluate(`document.querySelector('.grid-edit-more-button')?.getAttribute('aria-expanded')==='true'`))await cdp.evaluate(`document.querySelector('.grid-edit-more-button').click()`);
@@ -1435,10 +1436,10 @@ try {
   const type = text => cdp.evaluate(`(()=>{const input=document.querySelector('.cell-editor');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(text)});input.dispatchEvent(new Event('input',{bubbles:true}))})()`);
   const executes = () => cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length`);
   const bar = label => cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>(b.getAttribute('aria-label')||b.textContent).startsWith(${JSON.stringify(label)}))`).then(() => label);
-  const barClick = label => cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>(b.getAttribute('aria-label')||b.textContent).startsWith(${JSON.stringify(label)})).click()`);
+  const barClick = label => cdp.evaluate(label === 'Edit rows' ? `document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()` : `[...document.querySelectorAll('.grid-edit-bar button')].find(b=>(b.getAttribute('aria-label')||b.textContent).startsWith(${JSON.stringify(label)})).click()`);
   // 1. A table without a primary key is explained, never guessed.
   await run('SELECT id, name FROM orders', 'ORDERS', [['1', 'Ada'], ['2', 'Bob']]);
-  await cdp.until(`document.querySelector('.grid-edit-bar')`, 'Edit bar offered for a result with a source table');
+  await cdp.until(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]:not(:disabled)')`, 'Edit switch offered for a result with a source table');
   await barClick('Edit rows'); await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='ORDERS')`, 'Identity requested');
   const first = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(first.id)},tabId:'tab-1',schema:'APP',table:'ORDERS',columns:[]})`);
@@ -1448,7 +1449,7 @@ try {
   // 2. A keyed table can be edited.
   await run('SELECT id, name FROM customers', 'CUSTOMERS', [['1', 'Ada'], ['2', 'Bob']]);
   const before = await executes();
-  await cdp.until(`document.querySelector('.grid-edit-toggle')?.getAttribute('aria-pressed')==='false'`, 'New result starts read-only');
+  await cdp.until(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]')?.getAttribute('aria-pressed')==='false'`, 'New result starts read-only');
   await barClick('Edit rows'); await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='CUSTOMERS')`);
   const second = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(second.id)},tabId:'tab-1',schema:'APP',table:'CUSTOMERS',columns:['ID']})`);
@@ -1482,12 +1483,12 @@ try {
   const pick = (r, c) => cdp.evaluate(`document.querySelector('[data-cell="${r}:${c}"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));document.querySelector('.grid-wrap').focus()`);
   const gridKey = key => cdp.evaluate(`document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:${JSON.stringify(key)},bubbles:true,cancelable:true}))`);
   const type = text => cdp.evaluate(`(()=>{const input=document.querySelector('.cell-editor');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(text)});input.dispatchEvent(new Event('input',{bubbles:true}))})()`);
-  const barClick = label => cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>(b.getAttribute('aria-label')||b.textContent).startsWith(${JSON.stringify(label)})).click()`);
+  const barClick = label => cdp.evaluate(label === 'Edit rows' ? `document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()` : `[...document.querySelectorAll('.grid-edit-bar button')].find(b=>(b.getAttribute('aria-label')||b.textContent).startsWith(${JSON.stringify(label)})).click()`);
   const drawerClick = label => cdp.evaluate(`[...document.querySelectorAll('.pending-drawer button')].find(b=>b.textContent.startsWith(${JSON.stringify(label)})).click()`);
   const applies = () => cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.applyDml').length`);
   // The previous check left a keyed CUSTOMERS result open; edit again from a clean state.
-  await cdp.until(`document.querySelector('.grid-edit-toggle')`, 'Edit bar');
-  if (await cdp.evaluate(`document.querySelector('.grid-edit-toggle').getAttribute('aria-pressed')==='false'`)) await barClick('Edit rows');
+  await cdp.until(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]')`, 'Edit switch');
+  if (await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').getAttribute('aria-pressed')==='false'`)) await barClick('Edit rows');
   await cdp.until(`[...document.querySelectorAll('.grid-edit-bar button')].some(b=>b.textContent==='New row'&&!b.disabled)`, 'Editing available');
   await pick(0, 1); await gridKey('F2'); await cdp.until(`document.querySelector('.cell-editor')`); await type('Ada L');
   await cdp.evaluate(`document.querySelector('.cell-editor').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))`);
@@ -1570,9 +1571,9 @@ try {
   await drawerClick('Dismiss'); await barClick('Editing');
  });
  await check('new rows: a sectioned form sends only filled columns, keeps NULL explicit and previews the INSERT', async () => {
-  const barClick = label => cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>(b.getAttribute('aria-label')||b.textContent).startsWith(${JSON.stringify(label)})).click()`);
+  const barClick = label => cdp.evaluate(label === 'Edit rows' ? `document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()` : `[...document.querySelectorAll('.grid-edit-bar button')].find(b=>(b.getAttribute('aria-label')||b.textContent).startsWith(${JSON.stringify(label)})).click()`);
   const setInput = (label, value) => cdp.evaluate(`(()=>{const input=document.querySelector('[aria-label="${label}"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(value)});input.dispatchEvent(new Event('input',{bubbles:true}))})()`);
-  if (await cdp.evaluate(`document.querySelector('.grid-edit-toggle').getAttribute('aria-pressed')==='false'`)) await barClick('Edit rows');
+  if (await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').getAttribute('aria-pressed')==='false'`)) await barClick('Edit rows');
   await cdp.until(`[...document.querySelectorAll('.grid-edit-bar button')].some(b=>b.textContent==='New row'&&!b.disabled)`, 'New row available');
   await barClick('New row'); await cdp.until(`document.querySelector('[data-new-row="1"]')`, 'New row form');
   assert.match(await cdp.evaluate(`document.querySelector('[data-new-row="1"]').textContent`), /\(database default\)|Ready/);
@@ -1600,7 +1601,7 @@ try {
   await cdp.until(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length>${before}`, 'Query sent');
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:[{name:'ID',type:'NUMBER',sourceSchema:'APP',sourceTable:'MEMOS',sourceColumn:'ID'},{name:'NOTE',type:'VARCHAR2',sourceSchema:'APP',sourceTable:'MEMOS',sourceColumn:'NOTE'}],rows:[['1',${JSON.stringify(long)}]],rowsAffected:null,elapsedMs:2,returnedRows:1,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
   await cdp.until(`document.querySelector('[data-cell="0:1"]')?.textContent.includes('First line')`, 'Memo result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
   await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='MEMOS')`);
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'MEMOS',columns:['ID']})`);
@@ -1625,7 +1626,7 @@ try {
   await cdp.until(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length>${before}`, 'Query sent');
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:[{name:'ID',type:'NUMBER',sourceSchema:'APP',sourceTable:'TINY',sourceColumn:'ID'},{name:'CODE',type:'VARCHAR2',size:5,sourceSchema:'APP',sourceTable:'TINY',sourceColumn:'CODE'}],rows:[['1','ab'],['2','cd']],rowsAffected:null,elapsedMs:2,returnedRows:2,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
   await cdp.until(`document.querySelector('[data-cell="1:1"]')?.textContent.includes('cd')`, 'Tiny result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
   await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='TINY')`);
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'TINY',columns:['ID']})`);
@@ -1663,7 +1664,7 @@ try {
   const column = (name, type) => ({ name, type, sourceSchema: 'APP', sourceTable: 'WIDE', sourceColumn: name });
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('ID', 'NUMBER'), column('CODE', 'VARCHAR2'), column('EXTRA', 'VARCHAR2')])},rows:[['1','a','x'],['2','b','y'],['3','c','z']],rowsAffected:null,elapsedMs:2,returnedRows:3,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
   await cdp.until(`document.querySelector('[data-cell="2:2"]')?.textContent.includes('z')`, 'Wide result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
   await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='WIDE')`);
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'WIDE',columns:['ID']})`);
@@ -1702,7 +1703,7 @@ try {
   const column = (name, type) => ({ name, type, sourceSchema: 'APP', sourceTable: 'DOCS', sourceColumn: name });
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('ID', 'NUMBER'), column('NAME', 'VARCHAR2'), column('DOC', 'CLOB'), { name: 'TOTAL', type: 'NUMBER' }])},rows:[['1','a','long','5']],rowsAffected:null,elapsedMs:2,returnedRows:1,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
   await cdp.until(`document.querySelector('[data-cell="0:3"]')`, 'Docs result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
   await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='DOCS')`);
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'DOCS',columns:['ID']})`);
@@ -1726,7 +1727,7 @@ try {
   const column = name => ({ name, type: 'VARCHAR2', sourceSchema: 'APP', sourceTable: 'EVENTS_LOG', sourceColumn: name });
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('REF'), column('KIND'), column('NOTE')])},rows:[['r1','x','n1'],['r2','x','n2']],rowsAffected:null,elapsedMs:2,returnedRows:2,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
   await cdp.until(`document.querySelector('[data-cell="1:2"]')?.textContent.includes('n2')`, 'Log result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
   await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='EVENTS_LOG')`);
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'EVENTS_LOG',columns:[]})`);
@@ -1766,7 +1767,7 @@ try {
   };
   await emitRows([['1', 'ab'], ['2', 'cd']]);
   await cdp.until(`document.querySelector('[data-cell="1:1"]')?.textContent.includes('cd')`, 'First result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
   await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='REFRESHED')`);
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'REFRESHED',columns:['ID']})`);
@@ -1796,7 +1797,7 @@ try {
   const column = name => ({ name, type: name === 'ID' ? 'NUMBER' : 'VARCHAR2', sourceSchema: 'APP', sourceTable: 'CLOSING', sourceColumn: name });
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('ID'), column('CODE')])},rows:[['1','a']],rowsAffected:null,elapsedMs:2,returnedRows:1,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
   await cdp.until(`document.querySelector('[data-cell="0:1"]')?.textContent.includes('a')`, 'Closing result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
   await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='CLOSING')`);
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'CLOSING',columns:['ID']})`);
@@ -1840,7 +1841,7 @@ try {
   const column = name => ({ name, type: name === 'ID' ? 'NUMBER' : 'VARCHAR2', sourceSchema: 'APP', sourceTable: 'REVIEW', sourceColumn: name });
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('ID'), column('CODE')])},rows:[['1','a'],['2','b'],['3','c']],rowsAffected:null,elapsedMs:2,returnedRows:3,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
   await cdp.until(`document.querySelector('[data-cell="2:1"]')?.textContent.includes('c')`, 'Review result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
   await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='REVIEW')`);
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'REVIEW',columns:['ID']})`);
@@ -1913,7 +1914,7 @@ try {
   const column = name => ({ name, type: name === 'ID' ? 'NUMBER' : 'VARCHAR2', sourceSchema: 'APP', sourceTable: 'FILLS', sourceColumn: name });
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('ID'), column('CODE')])},rows:[['1','x'],['2','y']],rowsAffected:null,elapsedMs:2,returnedRows:2,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
   await cdp.until(`document.querySelector('[data-cell="1:1"]')?.textContent.includes('y')`, 'Fills result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
   await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='FILLS')`);
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'FILLS',columns:['ID']})`);
@@ -1949,7 +1950,9 @@ try {
   const column = (name, type) => ({ name, type, sourceSchema: 'APP', sourceTable: 'PRICES', sourceColumn: name });
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('ID', 'NUMBER'), column('PRICE', 'NUMBER')])},rows:[['1','100'],['2','19.99'],['3',null]],rowsAffected:null,elapsedMs:2,returnedRows:3,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
   await cdp.until(`document.querySelector('[data-cell="1:1"]')?.textContent.includes('19,99')`, 'Prices result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  assert.equal(await cdp.evaluate(`document.querySelector('.grid-edit-bar')`), null, 'No extra row above the grid while not editing');
+  assert.equal(await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').getAttribute('aria-pressed')`), 'false', 'The switch lives in the result toolbar');
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
   await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='PRICES')`);
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'PRICES',columns:['ID']})`);
@@ -2031,7 +2034,7 @@ try {
   const column = (name, type) => ({ name, type, sourceSchema: 'APP', sourceTable: 'PASTES', sourceColumn: name });
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('ID', 'NUMBER'), column('CODE', 'VARCHAR2'), column('NOTE', 'VARCHAR2')])},rows:[['1','a','x'],['2','b','y'],['3','c','z']],rowsAffected:null,elapsedMs:2,returnedRows:3,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
   await cdp.until(`document.querySelector('[data-cell="2:2"]')?.textContent.includes('z')`, 'Paste result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
   await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='PASTES')`);
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'PASTES',columns:['ID']})`);
@@ -2067,7 +2070,7 @@ try {
   const column = (name, type) => ({ name, type, sourceSchema: 'APP', sourceTable: 'FLAGS', sourceColumn: name });
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('ID', 'NUMBER'), column('ACTIVE', 'VARCHAR2')])},rows:[['1','Y'],['2',null],['3','maybe']],rowsAffected:null,elapsedMs:2,returnedRows:3,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
   await cdp.until(`document.querySelector('[data-cell="0:1"]')?.textContent.includes('Y')`, 'Flags result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
   await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='FLAGS')`);
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'FLAGS',columns:['ID']})`);
@@ -2101,7 +2104,7 @@ try {
   const column = name => ({ name, type: name === 'ID' ? 'NUMBER' : 'VARCHAR2', sourceSchema: 'APP', sourceTable: 'BATCHES', sourceColumn: name });
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('ID'), column('CODE')])},rows:[['1','a']],rowsAffected:null,elapsedMs:2,returnedRows:1,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
   await cdp.until(`document.querySelector('[data-cell="0:1"]')?.textContent.includes('a')`, 'Batches result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
   await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='BATCHES')`);
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'BATCHES',columns:['ID']})`);
@@ -2208,7 +2211,7 @@ try {
   const column = (name, type) => ({ name, type, sourceSchema: 'APP', sourceTable: 'RECORDS', sourceColumn: name });
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('ID', 'NUMBER'), column('CODE', 'VARCHAR2'), column('DOC', 'CLOB')])},rows:[['1','a','d1'],['2','b','d2'],['3','c','d3']],rowsAffected:null,elapsedMs:2,returnedRows:3,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
   await cdp.until(`document.querySelector('[data-cell="2:1"]')?.textContent.includes('c')`, 'Records result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
   await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='RECORDS')`);
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'RECORDS',columns:['ID']})`);
@@ -2240,7 +2243,7 @@ try {
   const column = (name, type) => ({ name, type, sourceSchema: 'APP', sourceTable: 'TICKETS', sourceColumn: name });
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('ID', 'NUMBER'), column('STATUS', 'VARCHAR2'), column('API_TOKEN', 'VARCHAR2')])},rows:[['1','OLD','tok']],rowsAffected:null,elapsedMs:2,returnedRows:1,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
   await cdp.until(`document.querySelector('[data-cell="0:1"]')?.textContent.includes('OLD')`, 'Tickets result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
   await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='TICKETS')`);
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'TICKETS',columns:['ID']})`);
@@ -2274,7 +2277,7 @@ try {
   const column = (name, type, extra = {}) => ({ name, type, sourceSchema: 'APP', sourceTable: 'TABS_ENTRY', sourceColumn: name, ...extra });
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('ID', 'NUMBER', { identityAlways: true }), column('NAME', 'VARCHAR2', { nullable: false }), column('NOTE', 'VARCHAR2', { nullable: true })])},rows:[['1','a','n']],rowsAffected:null,elapsedMs:2,returnedRows:1,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
   await cdp.until(`document.querySelector('[data-cell="0:2"]')?.textContent.includes('n')`, 'Entry result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
   await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='TABS_ENTRY')`);
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'TABS_ENTRY',columns:['ID']})`);

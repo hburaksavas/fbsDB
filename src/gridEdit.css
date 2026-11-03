@@ -114,3 +114,5 @@ tr[data-row-error] td.rownum::after{content:'✖';margin-left:2px}
 
 .grid-edit-hint{flex-basis:100%;display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0;color:var(--muted);font-size:10px}
 .grid-edit-hint button{font-size:10px;padding:0 6px}
+
+.grid-edit-anchor{display:block;height:0;overflow:hidden}

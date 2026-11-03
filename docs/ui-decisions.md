@@ -13,3 +13,12 @@ User-approved product decision. Preserve these choices in later changes.
 - Remove the entire `Latest status` row. Do not replace it with a last-execution summary, row count, duration or error summary. The explicit query-failure flag may remain.
 
 Scope: title/preview presentation. Normal file opening continues to activate an existing tab; explicit opening in a new tab keeps its existing behavior.
+
+## 2026-11-04 — Grid edit controls
+
+User-approved product decision. Preserve these choices in later changes.
+
+- The switch that turns row editing on lives in the result toolbar (pencil icon, `aria-pressed`), next to the other view controls. Descriptions has a toolbar icon as well.
+- The separate edit row above the grid appears only while editing is on (or while an applied-changes status or verification is shown). Outside edit mode no extra row takes space.
+- Inside the edit row, core actions stay visible (Set NULL, New row, Delete row, Undo/Redo, invalid-cell counter, Pending); the rest sit in a "More" menu and can be pinned to the row. A switched-on filter stays visible on the row.
+- Every grid edit action is also available in the command palette with a "Grid: " prefix.

@@ -59,6 +59,7 @@ Grid düzenleme sırasında araç çubuğuna ve panellere çok sayıda eylem ekl
 - **UX-01 tamamlandı:** çekirdek eylemler çubukta, gelişmiş araçlar "More" menüsünde (ok tuşları, Escape ile odağı geri verme, çubuğa sabitleme; açık bir süzgeç menüde gizlenmez). Birim test (`tests/grid-bar-layout.test.mjs`) ve WebView2 masaüstü testi geçti (124 kontrol).
 - **UX-02 tamamlandı:** düzenleme çubuğunun altında seçime ve hazırlanan değişikliklere göre tek satırlık ipucu (seçim yok / tek hücre / çok hücre → Bulk edit / bekleyen değişiklik). "Got it" ipucunu kalıcı kapatır, "Turn off tips" hepsini kapatır. Birim test (`tests/edit-hints.test.mjs`) ve masaüstü testi (124 kontrol) geçti.
 - **UX-03 tamamlandı:** Ctrl+P komut paletinde ekrandaki sonucun grid düzenleme eylemleri "Grid: …" öneki ile aranabilir (düzenle, yeni satır, NULL, sil, geri al, toplu düzenle, yapıştır, kayıt görünümü, kontroller…). Devre dışı eylemler nedeniyle birlikte listelenir. Birim test (`tests/grid-action-bridge.test.mjs`) ve masaüstü testi (124 kontrol) geçti.
+- **Ek düzenleme (UX-01/03 sonrası):** "Edit rows" anahtarı sonuç araç çubuğuna (kalem simgesi) ve Descriptions simgesi araç çubuğuna taşındı; ayrı düzenleme satırı yalnızca düzenleme açıkken görünür (`docs/ui-decisions.md`). Masaüstü testi 124 kontrol geçti; Apply onayı adımı bir ara iki çalıştırmada zaman aşımına uğradı, üçüncüde geçti (olası zamanlama yarışı, nedeni araştırılmadı).
 
 ## Önerilen sıra
 
