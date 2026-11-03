@@ -665,6 +665,9 @@ export interface CommandPayloads {
   "sql.stopApplyDml": {
   "tabId"?: string;
 };
+  "sql.rollbackGridBatch": {
+  "tabId"?: string;
+};
 }
 export interface ReplyMessages {
   "analysis.state": { type: "analysis.state" } & {
@@ -1378,6 +1381,13 @@ export interface ReplyMessages {
   "columns"?: Array<JsonValue>;
   "referenced"?: string | null;
   "error"?: string;
+};
+  "sql.gridBatchRolledBack": { type: "sql.gridBatchRolledBack" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "ok"?: boolean;
+  "error"?: string;
+  "transactionPending"?: boolean;
 };
 }
 export type NativeCommandName = keyof CommandPayloads;

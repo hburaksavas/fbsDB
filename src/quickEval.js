@@ -11,10 +11,12 @@ const forbidden = new Set(['SELECT', 'WITH', 'INSERT', 'UPDATE', 'DELETE', 'MERG
 const wordOf = token => token?.kind === 'identifier' && !token.quoted ? token.value.toUpperCase() : '';
 
 // Calls to anything not known to be pure (user, package or quoted names), each listed once.
+const syntaxWords = new Set(['EXISTS', 'IN', 'NOT', 'AND', 'OR', 'ALL', 'ANY', 'SOME', 'SELECT', 'FROM', 'WHERE', 'ON', 'USING', 'JOIN', 'UNION', 'INTERSECT', 'MINUS', 'OVER', 'VALUES', 'AS', 'BETWEEN', 'LIKE', 'CASE', 'WHEN', 'THEN', 'ELSE', 'HAVING', 'BY', 'PARTITION', 'KEEP', 'WITHIN', 'GROUP', 'FILTER', 'FETCH']);
+
 export function impureCalls(tokens) {
   const calls = [];
   for (let at = 0; at < tokens.length - 1; at++) {
-    if (tokens[at + 1].value !== '(' || tokens[at].kind !== 'identifier') continue;
+    if (tokens[at + 1].value !== '(' || tokens[at].kind !== 'identifier' || (!tokens[at].quoted && syntaxWords.has(wordOf(tokens[at])) && tokens[at - 1]?.value !== '.')) continue;
     let name = tokens[at].quoted ? `"${tokens[at].value}"` : tokens[at].value;
     let start = at;
     while (start >= 2 && tokens[start - 1].value === '.' && tokens[start - 2].kind === 'identifier') { start -= 2; name = `${tokens[start].value}.${name}`; }

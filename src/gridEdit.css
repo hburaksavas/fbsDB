@@ -78,3 +78,8 @@ tr[data-row-error] td.rownum::after{content:'✖';margin-left:2px}
 
 .boolean-cell{display:inline-flex;gap:4px;align-items:center}
 .cell-suggest-note{font-size:9px;color:var(--muted)}
+
+.commit-check-list,.commit-check-results{list-style:none;margin:2px 0;padding:0;flex-basis:100%}
+.commit-check-results li[data-status=attention]{font-weight:700}
+.commit-check-new{flex-basis:100%;display:grid;gap:4px;border:1px solid var(--line);border-radius:5px;padding:4px 8px}
+.grid-edit-label{width:200px;font-size:10px}

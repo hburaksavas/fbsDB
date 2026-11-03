@@ -30,6 +30,12 @@ Bu sıralama ilk uçtan uca akışı tanımlar; sonraki fazların tümünü bekl
 
 ### Uygulama ilerlemesi — 2026-11-01
 
+- **FI-085 · Tamamlandı (Oracle regex atölyesi):** Komut paleti "Oracle regex workbench…" (seçili metni desen olarak alır) REGEXP_SUBSTR / REPLACE / INSTR / COUNT / LIKE çağrılarını örnek metin üzerinde yerelde, veritabanı olmadan çalıştırır: konum, oluşum, alt ifade (grup), geri başvurulu (` `) yerine koyma, `i` / `c` / `n` / `m` eşleşme parametreleri, POSIX sınıfları (`[[:digit:]]` vb.) ve `\A` / `\Z` desteklenir; sonuç, eşleşme sayısı ve konumları gösterilir. Oracle'da bulunmayan yapılar (ileri/geri bakış, ``, adlandırılmış grup, satır içi bayrak, `x` parametresi) yaklaşık sonuç verilmeden gerekçeyle reddedilir. "Insert the call" desenin tırnaklanmış (`'` → `''`) hâliyle hazır REGEXP_* çağrısını imlece ekler. Birim (678) ve WebView2 testi geçti.
+
+- **FI-118 / FI-086 · Tamamlandı (renk ve tarih biçimi):** (1) Dize değişmezlerinin ve yorumların içinde yazılmış `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()` ve `rgba()` renkleri Monaco'nun renk sağlayıcısıyla küçük bir renk kutusu ve seçici alır; seçici renk değerini kullanılan yazımla geri yazar. Koddaki `#` veya benzer görünen metinler (`#ggg`, 5 haneli hex, 300'lü rgb) renk sayılmaz. (2) Komut paleti "Date format designer…": TO_CHAR biçim modelini örnek bir tarih üzerinde yerelde önizler (YYYY/YY/MM/MON/MONTH/DD/DDD/DAY/DY/D/HH/HH12/HH24/MI/SS/FF1-9/AM/PM/Q/FM ve tırnaklı metin; MONTH/DAY Oracle gibi 9 karaktere doldurulur, FM kaldırır), tarih dili İngilizce ya da Türkçe seçilir (NLS_DATE_LANGUAGE'in oturum ayarı olduğu söylenir), yazılan metni TO_DATE yönünde aynı modelle okur ve gerçek olmayan tarihi, desteklenmeyen öğeyi (ör. WW) veya yalnızca yazdırılabilen öğeyi (DAY) gerekçeyle reddeder; biçimi imleç konumuna tırnaklı değişmez olarak ekleyebilir. Birim (673) ve WebView2 testi geçti.
+
+- **FI-202 / FI-206 / FI-173 · Tamamlandı (işlem araçları):** (1) Bekleyen işe "Label this work" ile yerel bir etiket verilir; işlem satırında (“Fix codes”: 1 grid change applied…) ve Commit makbuzunda görünür, Commit/Rollback kapsamını değiştirmez ve işi diğer DML'den ayırmaz (bunu söyler). (2) "Checks…": kullanıcının yazdığı tek SELECT'ler (bind yok, ad zorunlu, saf olmayan çağrı için açık onay) yalnızca "Run"a basılınca, oturumun açık işleminde çalışır; beklentiye göre (satır dönmemeli / en az bir satır / yalnızca göster) sonuç ve ilk satır gösterilir, kısıtların yerini tutmaz. (3) Apply önceden savepoint alır; işlem açıkken "Undo last Apply…" Oracle'ı o noktaya döndürür (onayda "o noktadan sonra oturumda yapılan her şey, grid dışı iş dahil geri alınır; satırlar tek tek geri alınamaz" yazar), değişiklikler yeniden taslak olur; Commit/Rollback savepoint'i geçersiz kılar. Birim (665) ve WebView2 testi geçti.
+
 - **FI-217 / FI-218 / FI-211 / FI-216 · Tamamlandı (giriş kolaylıkları):** (1) Sayı sütunlarında yazılan değer kullanıcının yerel ayarına göre okunur (tr: "1.234,5" → 1234.5, "19,99" → 19.99; veritabanı biçimi ve İngilizce biçim de kabul); okunuş "Read … as …" ile gösterilir, belirsiz/bozuk girdi ("1,2,3", üçlü olmayan binlik grupları) tahmin edilmeden hata olarak işaretlenir. (2) "Checkbox columns…" ile düzenlenebilir metin/sayı sütunları Y/N, 1/0, T/F, TRUE/FALSE eşlemesiyle onay kutusu olur; NULL üçüncü (belirsiz) durumdur ve tıklayınca açık olur, eşleme dışı değer metin olarak görünür kalır, yalnızca eşlenen değerler yazılır; seçim `fbsdb.booleanColumns`'ta saklanır. (3) Metin hücresi düzenlenirken yüklü satırlardaki farklı değerler (sık olandan başlayarak, en çok 30) öneri olur; kapsam "N of M distinct values in the K loaded rows. Any other text can still be typed." diye söylenir, serbest giriş korunur. (4) Toplu düzenleme "Change only the date" / "Change only the time" işlemleriyle zaman damgasının yalnızca tarih ya da saat kısmını (kesir ve diğer kısım korunarak) değiştirir; geçersiz tarih/saat ve tarih olmayan değerler atlananlar arasında nedeniyle listelenir. Birim (662) ve WebView2 testi geçti.
 
 - **FI-167 / FI-183 / FI-198 / FI-166 / FI-204 · Tamamlandı (toplu giriş):** (1) "Bulk edit…" seçili hücreleri tek seferde değiştirir: değere ayarla, NULL yap, metinde bul-değiştir (düz metin, büyük/küçük harf seçenekli), sayı ekle, çarp, yüzde artır. Önce önizleme gösterilir ("N hücre değişir, M atlandı", eski → yeni, atlananların nedeni: NULL, sayı değil, kilitli sütun); hiçbir şey hazırlanmaz, "Stage" tek bir Geri Al adımıdır. (2) "Paste…" / Ctrl+V panodaki tablo (sekmeyle ayrılmış, tırnaklı hücreler ve Windows satır sonları destekli) verisini önizler: ilk satır başlık olarak atlanabilir; etkin hücreden itibaren konum sırasıyla doldurur ya da tek anahtar sütunu varsa ilk yapıştırılan sütunu anahtar sayıp satırları anahtarla eşler (yüklü olmayan anahtar atlananlar arasında). Boş hücre NULL olur, grid dışına taşan sütun/satırlar bildirilir. Birim (652) ve WebView2 testi geçti.
@@ -539,13 +545,13 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 
 - [ ] **FI-079 · R4** — Dynamic SQL preview: show statically resolvable portions of concatenated SQL strings in a separate panel and mark unresolved fragments without execution.
 
-- [ ] **FI-085 · R4** — Oracle regex workbench: test expressions against sample text, inspect matches/groups and insert the expression into SQL. Use Oracle-backed explicit evaluation or clearly label any local approximation and its limitations.
+- [x] **FI-085 · R4** — Oracle regex workbench: test expressions against sample text, inspect matches/groups and insert the expression into SQL. Use Oracle-backed explicit evaluation or clearly label any local approximation and its limitations.
 
-- [ ] **FI-086 · R4** — Date format designer: preview supported TO_CHAR/TO_DATE format models with sample dates and selectable format elements, exposing relevant NLS context and distinguishing Oracle evaluation from local approximation.
+- [x] **FI-086 · R4** — Date format designer: preview supported TO_CHAR/TO_DATE format models with sample dates and selectable format elements, exposing relevant NLS context and distinguishing Oracle evaluation from local approximation.
 
 - [ ] **FI-113 · R4** — Explain expression at caret: explain a selected CASE expression, analytic function or window frame using a small illustrative dataset. Highlight the rows involved and resulting values, including partitioning, ordering, ties and ROWS/RANGE distinctions where applicable. Label example data clearly; do not execute user SQL implicitly or claim unsupported semantics are exact.
 
-- [ ] **FI-118 · R4** — Inline color previews: decorate supported HEX/RGB values with color swatches and offer an explicit color picker edit without misclassifying arbitrary IDs.
+- [x] **FI-118 · R4** — Inline color previews: decorate supported HEX/RGB values with color swatches and offer an explicit color picker edit without misclassifying arbitrary IDs.
 
 ### D. Çalıştırma, bind parametreleri ve bağlantı bağlamı
 
@@ -927,7 +933,7 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 
 #### R4 — Proje ölçeği ve ileri üretkenlik
 
-- [ ] **FI-173 · R4** — Grid savepoint: optionally create a savepoint before applying an edit batch and offer rollback to that boundary, explicitly showing that all subsequent session work is affected. Track invalidation by transaction boundaries and never promise independent row rollback through savepoints.
+- [x] **FI-173 · R4** — Grid savepoint: optionally create a savepoint before applying an edit batch and offer rollback to that boundary, explicitly showing that all subsequent session work is affected. Track invalidation by transaction boundaries and never promise independent row rollback through savepoints.
 
 - [ ] **FI-175 · R4** — Related-record checks: display known foreign-key relationships and offer explicit checks for blocking/cascade effects; report scope and acknowledge that concurrent changes may invalidate a preflight result.
 
@@ -937,9 +943,9 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 
 - [x] **FI-195 · R4** — Post-commit verification: reread changed records and compare against expected values, separating verification failures from commit outcomes and noting that later concurrent updates may explain differences.
 
-- [ ] **FI-202 · R4** — Named transaction context: attach a local descriptive label to pending work and show it with Commit/Rollback summaries; the label does not change Oracle transaction scope or isolate that work from other session DML.
+- [x] **FI-202 · R4** — Named transaction context: attach a local descriptive label to pending work and show it with Commit/Rollback summaries; the label does not change Oracle transaction scope or isolate that work from other session DML.
 
-- [ ] **FI-206 · R4** — Pre-commit check queries: explicitly run user-defined SELECT checks in the same transaction and display outcomes during commit review. Do not treat arbitrary SELECT functions as side-effect free or replace database constraints.
+- [x] **FI-206 · R4** — Pre-commit check queries: explicitly run user-defined SELECT checks in the same transaction and display outcomes during commit review. Do not treat arbitrary SELECT functions as side-effect free or replace database constraints.
 
 - [ ] **FI-225 · R4** — Lock wait preference: configure supported wait behavior for grid mutations and expose per-row timeout/wait outcomes. Validate Oracle/provider support rather than promise a generic exact lock timeout.
 

@@ -60,12 +60,13 @@ export function compareVerification({ identity, entries, selected, rows }) {
 const typeCounts = entries => entries.reduce((all, entry) => ({ ...all, [entry.kind]: (all[entry.kind] || 0) + 1 }), {});
 
 // A copyable record of what the grid committed: when, where, which table and which keys. It says nothing about what other work the session committed.
-export function commitReceipt({ entries, table, columns, identity, committedAt = new Date(), tab = '' }) {
+export function commitReceipt({ entries, table, columns, identity, committedAt = new Date(), tab = '', label = '' }) {
   const counts = typeCounts(entries);
   const keyNames = identity.map(col => columns[col].name).join(', ');
   const lines = [
     'fbsDB commit receipt',
     `Committed at: ${committedAt.toISOString()}${tab ? ` · tab ${tab}` : ''}`,
+    ...(label.trim() ? [`Label: ${label.trim()} (a local note; it does not change what Commit affected)`] : []),
     `Table: ${table}`,
     `Grid changes: ${[counts.update && `${counts.update} update${counts.update === 1 ? '' : 's'}`, counts.delete && `${counts.delete} delete${counts.delete === 1 ? '' : 's'}`, counts.insert && `${counts.insert} insert${counts.insert === 1 ? '' : 's'}`].filter(Boolean).join(', ')}`,
     `Rows (${keyNames}):`,

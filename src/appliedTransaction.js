@@ -17,9 +17,9 @@ export function elapsedText(since, now = Date.now()) {
   return minutes < 60 ? `${minutes} min` : `${Math.floor(minutes / 60)} h ${minutes % 60} min`;
 }
 
-export function transactionText(tx, now = Date.now()) {
+export function transactionText(tx, now = Date.now(), label = '') {
   if (!tx) return '';
-  const changes = `${tx.count} grid change${tx.count === 1 ? '' : 's'}`;
+  const changes = `${label.trim() ? `“${label.trim()}”: ` : ''}${tx.count} grid change${tx.count === 1 ? '' : 's'}`;
   if (tx.state === 'committed') return `${changes} committed.`;
   if (tx.state === 'unconfirmed') return `${changes} were being committed when the connection failed. Whether Oracle saved them is not confirmed: check the stored data before repeating anything.`;
   if (tx.state === 'rolledBack') return `${changes} rolled back; the grid shows the stored values again.`;

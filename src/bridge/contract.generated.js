@@ -3031,6 +3031,19 @@ export const bridgeContract = {
         },
         "required": []
       }
+    },
+    "sql.rollbackGridBatch": {
+      "handler": "oracle",
+      "resumeSession": true,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": []
+      }
     }
   },
   "replies": {
@@ -5317,6 +5330,30 @@ export const bridgeContract = {
         },
         "error": {
           "type": "string"
+        }
+      },
+      "required": []
+    },
+    "sql.gridBatchRolledBack": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "ok": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string"
+        },
+        "transactionPending": {
+          "type": "boolean"
         }
       },
       "required": []

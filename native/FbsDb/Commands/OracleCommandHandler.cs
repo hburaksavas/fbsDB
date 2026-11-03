@@ -186,6 +186,15 @@ public sealed partial class MainPage
                 case "sql.execute":
                     await ExecuteSqlAsync(sender, id, payload);
                     break;
+                case "sql.rollbackGridBatch":
+                    // Returns the session to the start of the last grid Apply. Everything the session did after that point is undone too.
+                    try
+                    {
+                        await Task.Run(() => _oracle.ExecuteAsync("ROLLBACK TO SAVEPOINT fbsdb_grid_batch", null, 1, default, timeoutSeconds: 30));
+                        Send(sender, new { type = "sql.gridBatchRolledBack", requestId = id, tabId, ok = true, transactionPending = _oracle.HasPendingTransaction });
+                    }
+                    catch (Exception ex) { Send(sender, new { type = "sql.gridBatchRolledBack", requestId = id, tabId, ok = false, error = ex.Message, transactionPending = _oracle.HasPendingTransaction }); }
+                    break;
                 case "sql.stopApplyDml":
                     // Only stops sending new statements; the one already running finishes and is reported.
                     if (_gridApplies.TryGetValue(tabId, out var applying)) { try { applying.Cancel(); } catch (ObjectDisposedException) { } }
