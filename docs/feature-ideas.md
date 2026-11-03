@@ -348,61 +348,38 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 #### R1 — IDE çekirdeği
 
 - [x] **FI-001 · R1** — Project system: packages, migrations, scripts and tests organized with project-specific connections, variables and run settings.
-
   - [x] Workspace içinde sürümlü proje kuralları, uzantı eşlemeleri ve paket/test yol kalıplarını sakla; eşzamanlı kural değişikliğinde eski kaydı reddet.
-
   - [x] Proje bağlantıları, değişkenleri ve çalıştırma ayarları ile proje alanlarını bütünleştir.
 
 - [x] **FI-003 · R1** — Package development: switch between specification and body, compile, and navigate from compilation diagnostics to the relevant source line.
 
 - [x] **FI-009 · R1** — Database/source synchronization: detect when the database definition has changed during local editing and show differences between local and server versions before publishing changes.
-
   - [x] Bağlı yerel tek nesneli kaynakta metadata başlangıç sürümünü yakala ve sonraki sunucu değişimini göster.
-
   - [x] Monaco diff görünümünde güncel sunucu kaynağı ile gönderilecek kodu karşılaştır; açık onay olmadan derleme gönderme.
-
   - [x] Sunucu sürümü, fiziksel bağlantı veya yerel metin değişirse incelemeyi geçersiz kıl; belirteci tek kullanımlı ve süreli tut.
-
   - [x] Normal Run ve tek nesneli Run script eylemlerini aynı derleme incelemesine yönlendir.
-
   - [x] Çok nesneli genel SQL scriptlerinde her nesne için ayrı kaynak eşzamanlama incelemesini tamamla.
 
 - [x] **FI-075 · R1** — Related files: navigate between package specification, body and associated test files using project naming conventions and a dedicated shortcut.
-
   - [x] Açık yerel spec/body dosyaları arasında kaynak kimliğiyle geçiş (buton, komut, Alt+O).
-
   - [x] Şema/bağlantı/workspace farkında veya çoklu eşleşmede otomatik hedef seçme.
-
   - [x] Açılmamış spec/body kaynaklarını sınırlı workspace taramasıyla bul; hedefi kullanıcıya seçtir.
-
   - [x] Keşifte disk içeriği yerine açık dosyanın kaydedilmemiş metnini esas al.
-
   - [x] Kalıcı proje yol kalıplarını ve ilişkili test dosyalarını keşfe bağla (Alt+Shift+O).
-
   - [x] Test dosyasından kaynak pakete ters yönlü ilişki çözümleme ekle.
 
 - [x] **FI-114 · R1** — Oracle-specific file types: associate .pks, .pkb, .prc, .fnc and .trg files with package specifications, package bodies, procedures, functions and triggers respectively. Offer type-specific creation templates and explicit compilation actions. Treat extensions as conventions, validate actual source declarations and allow configurable associations where conventions differ.
-
   - [x] Oracle uzantılarını workspace, arama, Git/replace ve workset akışlarına dahil et.
-
   - [x] Açma/kaydetme ve kopyalama/taşıma/yeniden adlandırmada uzantıları koru.
-
   - [x] Yeni dosyalara türe göre şablon oluştur; oluştururken SQL çalıştırma.
-
   - [x] Kaynak bildirimindeki türü tanı; uzantıyla uyuşmazlığı editörde göster.
-
   - [x] Yapılandırılabilir uzantı/tür eşlemelerini şablon, dosya seçici, arama, Git/replace ve workset akışlarına bağla.
-
   - [x] Compare and compile eylemi, sunucu farkı incelemesi ve kaynak sürümü kontrolüyle derleme ekle.
 
 - [x] **FI-115 · R1** — Group related package files in one editor tab: expose package specification and body as subviews of a single logical tab, with a shortcut to switch between them. Preserve independent file identity, dirty/save state and cursor position; determine pairing from object identity and configurable project conventions rather than filename similarity alone.
-
   - [x] Tekil spec/body eşleşmesini sekme şeridinde tek mantıksal sekmede grupla.
-
   - [x] Specification/Body alt görünümlerini sun; dosyaların bağımsız kayıt, dirty, oturum ve imleç durumlarını koru.
-
   - [x] Grup kapanışını iki belgenin mevcut kapanış incelemesine yönlendir; Open editors içinde tekil dosya kapanışını koru.
-
   - [x] Yapılandırılabilir proje yol kurallarını kaynak/bağlantı/şema kimliğini koruyarak eşlemeye dahil et.
 
 #### R2 — Günlük kullanım ve sonuç inceleme
@@ -450,9 +427,7 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 - [x] **FI-025 · R2** — Semantic highlighting: distinguish parameters, local variables, columns and package members using symbol scope where available.
 
 - [x] **FI-041 · R2** — Inline documentation preview: render procedure comments in the editor and generate documentation skeletons from parameter definitions.
-
   - [x] İmleçteki PROCEDURE/FUNCTION için parametre ve dönüş tiplerinden belge iskeleti üret.
-
   - [x] Yordam yorumlarını editörde (hover/önizleme) işlenmiş biçimde göster.
 
 - [ ] **FI-044 · R2** — Peek Definition: inspect and edit a definition in an inline editor without leaving the current source location.
@@ -518,11 +493,8 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 - [x] **FI-083 · R2** — Paired INSERT editing: match INSERT target columns with VALUES expressions, highlight corresponding entries and support contextual placeholder completion.
 
 - [x] **FI-094 · R2** — Identifier case conversion: transform selected identifiers into snake_case, camelCase, UPPER_CASE or project naming styles while treating string literals separately. Respect quoted-identifier semantics and preview semantic renames.
-
   - [x] Seçimdeki identifier'ları snake_case/camelCase/PascalCase/UPPER_CASE'e çevir; string, yorum, bind ve anahtar sözcükleri koru.
-
   - [x] Tırnaklı identifier'ları varsayılan olarak atla; Oracle kimliğini değiştiren dönüşümleri önizlemede semantik yeniden adlandırma olarak işaretle.
-
   - [x] Proje adlandırma stillerini (FI-080 proje sözlüğü) dönüşüm seçeneklerine bağla.
 
 #### R4 — Proje ölçeği ve ileri üretkenlik
@@ -532,9 +504,7 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 - [x] **FI-008 · R4** — Quick fixes (Alt+Enter): propose contextual edits such as declaring an unknown local variable, generating a missing procedure skeleton, or fixing a supported compilation diagnostic. Preview edits before applying them.
 
 - [ ] **FI-015 · R4** — Safe delete: find project references before removing a procedure or parameter, and show affected code. Report analysis scope and unresolved dynamic references rather than claiming complete coverage.
-
   - [x] Geçerli belgede çözülen başvuruları ve sınırlı çalışma alanı metin adaylarını silme öncesi incelemede göster; belirsiz kapsamı açıkla.
-
   - [ ] Proje çapı semantik doğrulama ve gerçek silme akışına inceleme kapısı ekle; atlanan/okunamayan dosyaları ayrı raporla.
 
 - [x] **FI-016 · R4** — Change Signature: preview coordinated updates to supported call sites when adding, reordering or renaming procedure parameters.
@@ -606,9 +576,7 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 - [x] **FI-116 · R2** — Inline bind inputs: enter query bind values in interactive fields beside the relevant source lines instead of a separate dialog. Render fields as editor UI without modifying source text; synchronize repeated named binds, preserve Oracle type and NULL distinctions, and scope values to the intended execution context. Do not persist sensitive values by default.
 
 - [x] **FI-117 · R2** — Bind value pickers: provide calendar controls for dates, explicit choices for boolean-like values and searchable record pickers for configured related identifiers. Respect Oracle types; record searches require explicit queries.
-
   - [x] DATE/TIMESTAMP için takvim (datetime-local) ve boolean benzeri adlar için Y/N/1/0 seçimi.
-
   - [x] Yapılandırılmış ilişkili tanımlayıcılar için aranabilir kayıt seçici (açık sorguyla).
 
 - [x] **FI-119 · R2** — Per-statement execution summaries: show the latest duration, row count and result link beside each executed SQL block, with execution provenance.
@@ -668,9 +636,7 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 - [x] **FI-067 · R2** — Icon themes: customize schema-object, file and folder icons through selectable or imported icon packs.
 
 - [x] **FI-068 · R2** — Vim mode and IDE keymaps: support Vim-style editing or preset shortcut mappings inspired by familiar Visual Studio and JetBrains workflows.
-
   - [x] Hazır kısayol eşlemeleri (Visual Studio ve JetBrains tarzı).
-
   - [ ] Vim tarzı modlu düzenleme (ayrı paket/uygulama gerektirir; hazır eşlemeler maddenin "veya" koşulunu karşılar).
 
 - [x] **FI-070 · R2** — Drag-and-drop comparison: compare two dropped SQL files or compare clipboard text with the active document.
@@ -692,11 +658,8 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 - [x] **FI-132 · R2** — Tab groups: organize editor tabs into named, colored, collapsible groups such as packages, validation queries and temporary work.
 
 - [ ] **FI-133 · R2** — Inline renaming: rename a tab group, connection display name or saved mini tool directly in its current list/header without opening a separate dialog. Support F2 or an explicit rename action, Enter to save and Escape to cancel; validate input and show save failures in place. Preserve stable identities and do not treat a connection label edit as a credential/configuration change.
-
   - [x] Sekme grubu yerinde yeniden adlandırma (F2/çift tıklama, Enter kaydeder, Escape iptal eder, doğrulama hatası yerinde).
-
   - [ ] Bağlantı görünen adı yerinde yeniden adlandırma (kimlik bilgisi/yapılandırma değişikliği sayılmadan).
-
   - [x] Kayıtlı mini araç yerinde yeniden adlandırma. (F2/çift tıklama, Enter kaydeder, Escape iptal eder; boş/100+ karakter/yinelenen ad ve kaydetme hatası listede yerinde gösterilir, araç kimliği değişmez.)
 
 - [x] **FI-137 · R2** — Search within menus: type in long context menus to filter available actions without losing keyboard navigation.
@@ -706,9 +669,7 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 - [x] **FI-139 · R2** — Disambiguated tab paths: show only the directory suffix needed to distinguish files sharing the same basename, with the full path available on demand.
 
 - [x] **FI-141 · R2** — Multi-select tabs: select editor tabs with Ctrl/Shift and move, group or close them together, preserving dirty-document prompts and session ownership.
-
   - [x] Ctrl ile seç/çıkar, Shift ile aralık seç, Escape ile temizle; seçili sekmeleri birlikte kapat (kirli belge incelemesi korunur).
-
   - [x] Seçili sekmeleri birlikte taşı ve grupla (sekme sürükleme/FI-132 sekme grupları ile birlikte).
 
 - [x] **FI-142 · R2** — Keyboard access labels: reveal letter labels on actionable controls with Alt and activate them by keyboard, coordinating with existing editor shortcuts.
@@ -738,19 +699,14 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 - [x] **FI-061 · R2** — SQL/result navigation: link result columns to their producing projection expressions and highlight the corresponding source or result column.
 
 - [x] **FI-095 · R2** — Specialized result viewers: display JSON as an expandable tree, coordinates on a map and XML in a structured view. Select viewers using column metadata and supported content detection, with a manual override. Extend existing value inspection rather than duplicate it; define coordinate conventions explicitly and avoid sending result values to external services without user authorization.
-
   - [x] JSON için genişletilebilir, klavyeyle gezilebilir ağaç; XML için mevcut yapı görünümü.
-
   - [x] Görüntüleyiciyi sütun metadata'sı ve içerik tespitiyle seç; elle değiştirilebilir.
-
   - [x] Koordinatları açık kuralla (lat/lon sırası, SRID) harita üzerinde göster; değerleri kullanıcı izni olmadan dış servise gönderme.
 
 - [x] **FI-096 · R2** — In-cell search: search large JSON, XML and CLOB values and navigate from matches to their locations in the active viewer.
 
 - [x] **FI-097 · R2** — JSON/XML path to SQL: generate editable JSON_VALUE, JSON_QUERY or XMLTABLE drafts for selected fields, accounting for escaping, namespaces and types.
-
   - [x] JSON ağacındaki seçili düğümden tipine göre JSON_VALUE (RETURNING NUMBER/VARCHAR2) veya JSON_QUERY taslağı; Oracle yol sözdizimi ve literal kaçışı.
-
   - [x] XML yapı görünümündeki öğeden namespace bildirimleriyle XMLTABLE taslağı.
 
 - [x] **FI-098 · R2** — Smart links: recognize URLs, file paths, email addresses and Oracle object references in result values and offer explicit open/navigation actions.
@@ -796,15 +752,11 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 #### R3 — Güvenilir grid düzenleme
 
 - [x] **FI-155 · R3** — Change layer: mark edited cells with original-value previews and distinguish newly inserted and deletion-marked rows with non-color indicators.
-
   - [x] Düzenlenen hücre işareti (sol çubuk + ✎/∅ simgesi), özgün değer ipucu ve silinmeye işaretli satırın üstü çizili/− göstergesi (renge bağlı değil).
-
   - [x] Yeni eklenen satırların gösterimi.
 
 - [ ] **FI-156 · R3** — Typed cell editors: provide date pickers, expanded text editors and configured related-record selectors; make setting NULL an explicit action.
-
   - [x] Düz DATE/TIMESTAMP için takvim denetimi; uzun/çok satırlı metin için çok satırlı düzenleyici (Ctrl+Enter ile hazırlar); NULL açık eylem.
-
   - [ ] Yapılandırılmış ilişkili kayıt seçici.
 
 - [x] **FI-157 · R3** — Pending changes drawer: summarize updates/inserts/deletes and navigate from each pending change to its row or cell.
@@ -812,15 +764,11 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 - [x] **FI-159 · R3** — Draft undo by cell or row: discard selected unapplied edits without losing other draft changes. Do not imply applied DML can be undone independently without a defined transactional mechanism.
 
 - [ ] **FI-163 · R3** — Editability explanations: explain computed columns, ambiguous source tables, missing reliable row identity or insufficient privileges when editing is unavailable. Do not assume arbitrary SELECT results can be safely updated.
-
   - [x] Hesaplanmış/sanal sütun, birden çok kaynak tablo, kaynak tablo yok, birincil anahtar yok/eksik ve LOB-ikili sütun nedenleri gerekçesiyle gösterilir.
-
   - [ ] Yetersiz yetki nedeni (uygulama adımında).
 
 - [x] **FI-165 · R3** — Default versus NULL: distinguish explicit values, explicit NULL and omitted columns using database defaults when constructing inserts.
-
   - [x] Bilinçli NULL (Set NULL), boş metin ve dokunulmamış hücre taslakta ayrı durumlardır; INSERT'te atlanan sütunlar veritabanı varsayılanını kullanır (model).
-
   - [x] Yeni satır giriş arayüzü.
 
 - [x] **FI-168 · R3** — DML preview: inspect generated INSERT/UPDATE/DELETE statements and binds per row before applying; do not persist or unnecessarily expose sensitive values.
@@ -834,9 +782,7 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 - [x] **FI-184 · R3** — Pin identifying columns: keep reliable row-key columns visible while editing so users can identify the record being changed.
 
 - [ ] **FI-185 · R3** — Keep edited rows visible: temporarily retain locally edited rows that no longer satisfy the current filter and label that state explicitly.
-
   - [x] Süzgeç ve sıralama saklanan değerlere uygulandığı için düzenlenen satır taslak değerle süzgeçten düşmez.
-
   - [ ] Taslak değeri süzgece uymayan satırın açıkça etiketlenmesi.
 
 - [x] **FI-188 · R3** — Explicit edit mode: start results read-only and reveal cell editing and mutation controls through an explicit Edit data action.
@@ -848,9 +794,7 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 - [x] **FI-191 · R3** — Remove no-op edits: clear draft markers and unnecessary UPDATEs when a cell is restored to its original typed value.
 
 - [ ] **FI-194 · R3** — Editable-column metadata: explain why generated, identity or unauthorized columns are locked, based on actual Oracle capabilities and privileges.
-
   - [x] Sanal/hesaplanmış, GENERATED ALWAYS, LOB-ikili ve ifade sütunları başlıkta 🔒 ve nedeni içeren ipucuyla işaretlenir.
-
   - [ ] Gerçek Oracle yetkilerine (INSERT/UPDATE ayrıcalıkları) dayalı kilit nedenleri.
 
 - [x] **FI-200 · R3** — Required-field counter: show missing required inputs on new row drafts and navigate to each, accounting for database defaults and generated values.
@@ -858,9 +802,7 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 - [x] **FI-201 · R3** — Stable ordering while editing: defer local resorting so an edited row does not jump away, with an explicit action to reapply sort order.
 
 - [x] **FI-203 · R3** — Keyboard cell completion: Enter stages a cell edit locally, Escape cancels the active edit and a separate explicit action applies drafts to Oracle.
-
   - [x] Enter hücre düzenlemesini yerelde hazırlar, Escape iptal eder, Tab hazırlayıp bir sonraki hücreye geçer.
-
   - [x] Taslakları Oracle'a uygulayan ayrı, açık eylem (Apply).
 
 - [x] **FI-208 · R3** — Text length meter: show character and byte counts against column limits using actual Oracle character-set and BYTE/CHAR semantics where available.
@@ -876,9 +818,7 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 - [x] **FI-220 · R3** — Show source-column identity: display the resolved schema.table.column while editing an aliased projection; reject ambiguous update targets.
 
 - [x] **FI-221 · R3** — Track changed primary keys: retain original row identity when editing key values and show old/new keys while enforcing concurrency checks.
-
   - [x] Anahtar sütun düzenlense bile WHERE koşulu okunan özgün anahtar değerini kullanır; çekmecede eski → yeni değer görünür.
-
   - [x] Eşzamanlılık denetimi (uygulama adımında).
 
 - [x] **FI-222 · R3** — Distinguish delete/reinsert: retain DELETE and INSERT drafts as separate operations even when keys match; do not silently convert them to UPDATE.
@@ -894,9 +834,7 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 - [x] **FI-158 · R3** — Two-stage application: keep local grid drafts separate from database-applied, uncommitted DML. Apply sends edits to the session transaction; Commit/Rollback resolves that transaction, with clear state transitions and failure behavior.
 
 - [x] **FI-160 · R3** — Conflict resolution: compare originally read, locally edited and current database values when another session changes a row. Use reliable identity and concurrency checks and require explicit resolution before overwriting.
-
   - [x] Başka oturumun değiştirdiği veya sildiği satır tespit edilir: UPDATE, okunan özgün değerleri de şart koşar ve eşleşme yoksa "başka bir oturum değiştirmiş/silmiş" gerekçesiyle durur (üzerine yazılmaz).
-
   - [x] Çakışma çekmecesi: okunan değer → güncel değer gösterilir, "Keep my edit" (taslak güncel değerin üzerine yeniden temellenir) veya "Use the database value" açıkça seçilmeden Apply kapalıdır.
 
 - [x] **FI-162 · R3** — Commit scope summary: show that Commit affects all pending work in the physical session, including DML executed outside the grid.
@@ -908,17 +846,13 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 - [x] **FI-172 · R3** — Select drafts to apply: choose draft rows with checkboxes and apply only selected changes; distinguish this from session-wide Commit semantics.
 
 - [ ] **FI-177 · R3** — Retry corrected failures: preserve confirmed applied outcomes, let users correct failed drafts and avoid resending successful DML. Unknown outcomes require reconciliation before retry; define batch atomicity explicitly.
-
   - [x] Uygulanan değişiklikler korunur ve yeniden gönderilmez; başarısız/uyuşmayan/geri alınan/atlanan taslaklar düzeltilip yeniden denenebilir.
-
   - [ ] Belirsiz sonuç (bağlantı kopması) için mutabakat.
 
 - [x] **FI-178 · R3** — Uncertain commit outcome: if the connection fails during Commit, report an unconfirmed outcome and provide reconciliation guidance rather than an automatic retry or an unsupported success/failure assertion.
 
 - [x] **FI-187 · R3** — Per-row application progress: show queued, applying, applied and failed outcomes while distinguishing applied-uncommitted from committed states.
-
   - [x] Her satır için uygulandı / başarısız / durduruldu / çalışmadı / geri alındı sonucu (uygulandı-işlenmemiş durumu açık).
-
   - [x] Commit/Rollback sonrası "işlendi"/"geri alındı" durumu (uygulanıyor göstergesi "Applying…" ile).
 
 - [x] **FI-192 · R3** — Affected-row mismatch handling: report zero or multiple affected rows for an intended single-row mutation, stop normal progression and use a defined transactional recovery mechanism rather than leave unintended work pending.
