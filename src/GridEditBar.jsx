@@ -5,6 +5,7 @@ import {lengthMeter} from './cellValidation';
 import {useState} from 'react';
 import {layoutActions,loadPinned,savePinned,togglePinned} from './gridBarLayout';
 import {chooseHint,dismissHint,loadHintPrefs,saveHintPrefs} from './editHints';
+import {registerGridActions} from './gridActionBridge';
 
 // The "More" menu keeps the rarely needed edit tools off the bar. Arrow keys move through it, Escape closes it and returns focus to its button.
 function MoreMenu({items,pinned,onPin}) {
@@ -65,7 +66,25 @@ export function GridEditBar({editability,loading,editMode,onToggle,summary,canUn
   };
   const {inline,menu}=layoutActions({editMode,pinned,active:[changesOnly&&'changesOnly',deletionsOnly&&'deletionsOnly'].filter(Boolean),hidden:templates.length?[]:['template']});
   const entry=id=>({id,pinnable:id!=='tabAdds'&&id!=='template',...actions[id]});
-  return <div className="grid-edit-bar" role="toolbar" aria-label="Edit result rows">
+  // The command palette offers the same actions; it reads this list when it opens.
+  const rootRef=useRef(null),paletteActions=useRef(null);
+  const needs=!editable?'This result cannot be edited':'Select a cell or row first';
+  paletteActions.current=()=>[
+    {id:'toggleEdit',label:editMode?'Leave edit mode (pending edits stay)':'Edit rows of this result',run:onToggle},
+    {id:'descriptions',label:'Show descriptions beside key values…',run:onDescriptions},
+    ...(editMode?[
+      {id:'setNull',label:'Set the selected cell to NULL',disabled:!editable||!hasSelection,why:needs,run:onSetNull},
+      {id:'newRow',label:'Add a new row draft',disabled:!editable,why:needs,run:onNewRow},
+      {id:'deleteRow',label:'Mark the selected row for deletion',disabled:!editable||!hasSelection,why:needs,run:onDeleteRow},
+      {id:'undo',label:'Undo the last draft change',disabled:!canUndo,why:'Nothing to undo',run:onUndo},
+      {id:'redo',label:'Redo the draft change',disabled:!canRedo,why:'Nothing to redo',run:onRedo},
+      {id:'pending',label:'Review pending changes and their SQL',run:onDrawer},
+      ...(invalidCount>0?[{id:'invalid',label:'Go to the next invalid cell',run:onInvalid}]:[]),
+      ...['record','checkboxes','paste','bulk','duplicate','prevEdit','nextEdit','changesOnly','deletionsOnly','checks','tabAdds'].map(id=>({id,label:id==='record'?'Edit one record as attribute / value pairs':actions[id].label,disabled:actions[id].disabled,why:['prevEdit','nextEdit','deletionsOnly'].includes(id)?'Nothing staged yet':needs,run:actions[id].onClick}))
+    ]:[])
+  ];
+  useEffect(()=>registerGridActions({element:rootRef.current,get:()=>paletteActions.current()}),[]);
+  return <div ref={rootRef} className="grid-edit-bar" role="toolbar" aria-label="Edit result rows">
     <button type="button" className="grid-edit-toggle" aria-pressed={editMode} title={editMode?'Leave edit mode (pending edits stay until discarded)':'Edit rows of this result (explicit edit mode)'} onClick={onToggle}><Pencil size={13}/>{editMode?'Editing':'Edit rows'}</button>
     {editMode&&<>
       <button type="button" disabled={!editable||!hasSelection} title="Set the selected cell to NULL (an explicit value, different from empty text)" onClick={onSetNull}>Set NULL</button>

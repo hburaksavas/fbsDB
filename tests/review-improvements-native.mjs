@@ -2010,6 +2010,14 @@ try {
   await cdp.evaluate(`(()=>{const input=document.querySelector('.cell-editor');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'1.234,5');input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))})()`);
   await cdp.until(`document.querySelector('[data-cell="0:1"]')?.dataset.draft==='edited'&&!document.querySelector('[data-cell="0:1"]').hasAttribute('data-invalid')`, 'A locale-formatted number is accepted');
   await cdp.until(`document.body.textContent.includes('Read “1.234,5” as 1234.5')`, 'The reading is shown');
+  // The command palette offers the grid edit actions of the visible result.
+  await cdp.key('p', 2); await cdp.until(`document.querySelector('.ide-command-palette')`);
+  await cdp.evaluate(`(()=>{const input=document.querySelector('.ide-command-palette input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'Grid: ');input.dispatchEvent(new Event('input',{bubbles:true}));input.focus()})()`);
+  await cdp.until(`[...document.querySelectorAll('.ide-palette-results [role="option"]')].some(o=>o.textContent.includes('Grid: Add a new row draft'))`, 'Grid actions are listed in the palette');
+  assert.equal(await cdp.evaluate(`[...document.querySelectorAll('.ide-palette-results [role="option"]')].some(o=>o.textContent.includes('Grid: Bulk edit'))`), true, 'Rarely used tools are searchable too');
+  await cdp.evaluate(`(()=>{const input=document.querySelector('.ide-command-palette input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'Grid: Add a new row draft');input.dispatchEvent(new Event('input',{bubbles:true}));input.focus()})()`);
+  await cdp.frame(); await cdp.key('Enter');
+  await cdp.until(`document.querySelector('[data-new-row="1"]')`, 'The palette command adds a new row draft');
   await cdp.evaluate(`window.dispatchEvent(new CustomEvent('fbsdb.draftsCleared',{detail:{tabId:'tab-1'}}))`);
  });
  await check('paste: spreadsheet data is previewed, filled by position or matched by key, and staged as drafts', async () => {

@@ -62,6 +62,7 @@ import { assertMiniToolSelect } from './miniTools';
 import { draftSnapshot, parseDraftSnapshot } from './draftRecovery';
 import { EditorSymbolBreadcrumb } from './EditorSymbolBreadcrumb';
 import { IdeCommandPalette } from './IdeCommandPalette';
+import { activeGridActions } from './gridActionBridge';
 import { actionableState } from './workbenchUx';
 import { ActionableState } from './ActionableState';
 import { EditorToolbarOverflow } from './EditorToolbarOverflow';
@@ -2516,6 +2517,7 @@ export function App() {
         {id:'lastExecution',label:'Return to latest executed SQL',detail:resolveSetting(settings,'editor.shortcuts').value.lastExecution,run:returnToExecution},
         {id:'layoutLock',label:layout.locked?'Unlock panel layout':'Lock panel layout',run:()=>updateLayout(current=>({...current,locked:!current.locked}))},
         {id:'structure',label:'Show file structure panel',run:()=>{setFilePanelView('structure');showDockPanel('files')}},
+        ...activeGridActions(),
         {id:'outline',label:'Show file outline',run:()=>setPaletteMode('outline')},
         {id:'density',label:'Toggle compact / comfortable workbench density',run:()=>setWorkbenchDensity(value=>value==='compact'?'comfortable':'compact')},
         {id:'focus',label:'Toggle editor focus mode',detail:'Ctrl+Alt+Z',run:()=>setFocusMode(value=>!value)},
