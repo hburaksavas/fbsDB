@@ -2059,6 +2059,35 @@ try {
   await cdp.until(`document.querySelector('.ide-command-palette')`, 'The object search opens');
   await cdp.key('Escape'); await cdp.until(`!document.querySelector('.ide-command-palette')`);
  });
+ await check('held drafts: unapplied edits are announced while another result is shown, and can be discarded', async () => {
+  await cdp.evaluate(`document.querySelector('[aria-label="Close cell value"]')?.click()`);
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const run = async (sql, columns, rows) => {
+   const before = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length`);
+   await cdp.click('[data-editor-tab="tab-1"] [role="tab"]'); await cdp.until(`${editor}`);
+   await cdp.evaluate(`${editor}.setValue(${JSON.stringify(sql)});${editor}.setPosition({lineNumber:1,column:1})`); await new Promise(resolve => setTimeout(resolve, 400)); await cdp.evaluate(`${editor}.focus()`); await cdp.key('Enter', 2);
+   await cdp.until(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length>${before}`, 'Query sent');
+   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify(columns)},rows:${JSON.stringify(rows)},rowsAffected:null,elapsedMs:2,returnedRows:${rows.length},truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
+  };
+  const column = (name, type) => ({ name, type, sourceSchema: 'APP', sourceTable: 'HELD_ITEMS', sourceColumn: name });
+  await run('SELECT id, name FROM held_items', [column('ID', 'NUMBER'), column('NAME', 'VARCHAR2')], [['1', 'alpha'], ['2', 'beta']]);
+  await cdp.until(`document.querySelector('[data-cell="0:1"]')?.textContent.includes('alpha')`, 'Held items result');
+  await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
+  await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='HELD_ITEMS')`);
+  const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
+  await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'HELD_ITEMS',columns:['ID']})`);
+  await cdp.until(`[...document.querySelectorAll('.grid-edit-bar button')].some(b=>b.textContent==='New row'&&!b.disabled)`, 'Editing available');
+  await cdp.evaluate(`document.querySelector('[data-cell="0:1"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));document.querySelector('.grid-wrap').focus()`);
+  await cdp.evaluate(`document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'F2',bubbles:true,cancelable:true}))`);
+  await cdp.until(`document.querySelector('.cell-editor')`);
+  await cdp.evaluate(`(()=>{const input=document.querySelector('.cell-editor');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'changed');input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))})()`);
+  await cdp.until(`document.querySelector('.grid-edit-pending')?.textContent.includes('Pending: 1')`, 'One edit staged');
+  assert.equal(await cdp.evaluate(`document.querySelector('.held-drafts-notice')`), null, 'No notice while the edited result is shown');
+  await run('SELECT 1 AS one FROM dual', [{ name: 'ONE', type: 'NUMBER' }], [['1']]);
+  await cdp.until(`document.querySelector('.held-drafts-notice')?.textContent.includes('1 unapplied grid edit is kept for APP.HELD_ITEMS')`, 'Another result shows the held-edits notice');
+  await cdp.evaluate(`[...document.querySelectorAll('.held-drafts-notice button')].find(b=>b.textContent==='Discard').click()`);
+  await cdp.until(`!document.querySelector('.held-drafts-notice')`, 'Discard clears the notice');
+ });
  await check('paste: spreadsheet data is previewed, filled by position or matched by key, and staged as drafts', async () => {
   await cdp.evaluate(`document.querySelector('[aria-label="Close cell value"]')?.click()`);
   await new Promise(resolve => setTimeout(resolve, 500));

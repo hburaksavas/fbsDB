@@ -131,3 +131,6 @@ tr[data-row-error] td.rownum::after{content:'✖';margin-left:2px}
 .operation-progress-text{display:flex;flex-direction:column;flex:1;min-width:0}
 .operation-progress-text small{color:var(--muted);font-size:10px}
 .operation-progress-time{color:var(--muted);font-variant-numeric:tabular-nums}
+
+.held-drafts-notice{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0;padding:3px 8px;border-bottom:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:11px}
+.held-drafts-notice button{font-size:10px;padding:0 6px}
