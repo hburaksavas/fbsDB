@@ -83,3 +83,11 @@ tr[data-row-error] td.rownum::after{content:'✖';margin-left:2px}
 .commit-check-results li[data-status=attention]{font-weight:700}
 .commit-check-new{flex-basis:100%;display:grid;gap:4px;border:1px solid var(--line);border-radius:5px;padding:4px 8px}
 .grid-edit-label{width:200px;font-size:10px}
+
+.vertical-record header{display:flex;justify-content:space-between;align-items:center;flex-basis:100%}
+.vertical-fields{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:4px 16px;margin:0;flex-basis:100%;max-height:220px;overflow:auto}
+.vertical-fields>div{display:grid;grid-template-columns:110px 1fr;gap:6px;align-items:center}
+.vertical-fields dt{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vertical-fields dd{margin:0;display:flex;gap:6px;align-items:center}
+.vertical-fields input[data-edited]{font-style:italic;box-shadow:inset 3px 0 0 var(--accent)}
+.vertical-readonly{color:var(--muted)}

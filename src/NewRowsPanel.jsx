@@ -1,7 +1,7 @@
 import {missingRequired} from './gridDrafts';
 
 // Sectioned entry form for new rows. Only filled fields are sent; empty ones use the database default, and NULL is an explicit choice.
-export function NewRowsPanel({rows,columns,editability,onChange,onRemove}) {
+export function NewRowsPanel({rows,columns,editability,onChange,onRemove,onSaveTemplate}) {
   const fields = columns.map((column, index) => ({ column, index })).filter(({ index }) => editability.columns[index]?.editable);
   return <section className="new-rows-panel" aria-label="New rows">
     {rows.map(row => {
@@ -16,6 +16,7 @@ export function NewRowsPanel({rows,columns,editability,onChange,onRemove}) {
           </label>;
         })}</div>
         <button type="button" onClick={() => onRemove(row.id)}>Remove new row</button>
+        {onSaveTemplate && <button type="button" aria-label={`Save new row ${row.id} as template`} title="Keep these field values as a reusable preset (keys, locked and secret-looking columns are left out)" onClick={() => { const name = globalThis.prompt?.('Template name'); if (name) onSaveTemplate(row.id, name); }}>Save as template…</button>}
       </fieldset>;
     })}
   </section>;

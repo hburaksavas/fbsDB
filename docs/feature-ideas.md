@@ -30,6 +30,8 @@ Bu sıralama ilk uçtan uca akışı tanımlar; sonraki fazların tümünü bekl
 
 ### Uygulama ilerlemesi — 2026-11-01
 
+- **FI-199 / FI-227 · Tamamlandı (kayıt görünümü, satır şablonları):** (1) "Record view": seçili satırı öznitelik/değer çiftleri olarak düzenler (düzenlenebilir sütunlarda girdi + NULL kutusu; anahtar 🔑, kilitli ve LOB sütunlar 🔒/salt okunur); Enter veya Alt+PageDown sonraki, Alt+PageUp önceki kayda geçer ve aynı alan odakta kalır, böylece bir sütun liste boyunca doldurulur. Bu çalışma sırasında bir hata da giderildi: taslak hazırlanınca ızgara seçimi ve kaydırma konumu sıfırlanıyordu, artık yalnızca gerçek veri değişiminde sıfırlanır. (2) Yeni satır formundaki "Save as template…" alan ön ayarlarını tablo başına bu bilgisayarda saklar; anahtar, kimlik, kilitli ve parola/token gibi adlı sütunlar şablona girmez (kaydederken söylenir) ve "From template…" seçimiyle bu ön ayarlarla yeni satır taslağı açılır, sonuçta olmayan sütunlar bildirilir. Birim (681) ve WebView2 testi geçti.
+
 - **FI-085 · Tamamlandı (Oracle regex atölyesi):** Komut paleti "Oracle regex workbench…" (seçili metni desen olarak alır) REGEXP_SUBSTR / REPLACE / INSTR / COUNT / LIKE çağrılarını örnek metin üzerinde yerelde, veritabanı olmadan çalıştırır: konum, oluşum, alt ifade (grup), geri başvurulu (` `) yerine koyma, `i` / `c` / `n` / `m` eşleşme parametreleri, POSIX sınıfları (`[[:digit:]]` vb.) ve `\A` / `\Z` desteklenir; sonuç, eşleşme sayısı ve konumları gösterilir. Oracle'da bulunmayan yapılar (ileri/geri bakış, ``, adlandırılmış grup, satır içi bayrak, `x` parametresi) yaklaşık sonuç verilmeden gerekçeyle reddedilir. "Insert the call" desenin tırnaklanmış (`'` → `''`) hâliyle hazır REGEXP_* çağrısını imlece ekler. Birim (678) ve WebView2 testi geçti.
 
 - **FI-118 / FI-086 · Tamamlandı (renk ve tarih biçimi):** (1) Dize değişmezlerinin ve yorumların içinde yazılmış `#rgb`, `#rrggbb`, `#rrggbbaa`, `rgb()` ve `rgba()` renkleri Monaco'nun renk sağlayıcısıyla küçük bir renk kutusu ve seçici alır; seçici renk değerini kullanılan yazımla geri yazar. Koddaki `#` veya benzer görünen metinler (`#ggg`, 5 haneli hex, 300'lü rgb) renk sayılmaz. (2) Komut paleti "Date format designer…": TO_CHAR biçim modelini örnek bir tarih üzerinde yerelde önizler (YYYY/YY/MM/MON/MONTH/DD/DDD/DAY/DY/D/HH/HH12/HH24/MI/SS/FF1-9/AM/PM/Q/FM ve tırnaklı metin; MONTH/DAY Oracle gibi 9 karaktere doldurulur, FM kaldırır), tarih dili İngilizce ya da Türkçe seçilir (NLS_DATE_LANGUAGE'in oturum ayarı olduğu söylenir), yazılan metni TO_DATE yönünde aynı modelle okur ve gerçek olmayan tarihi, desteklenmeyen öğeyi (ör. WW) veya yalnızca yazdırılabilen öğeyi (DAY) gerekçeyle reddeder; biçimi imleç konumuna tırnaklı değişmez olarak ekleyebilir. Birim (673) ve WebView2 testi geçti.
@@ -979,7 +981,7 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 
 - [x] **FI-198 · R4** — Bulk arithmetic: preview transformations such as percentage increases, addition and rounding on selected numeric cells, preserving Oracle numeric precision and validating range/scale constraints.
 
-- [ ] **FI-199 · R4** — Vertical record editing: edit a row in an attribute/value view and retain field focus when moving between records.
+- [x] **FI-199 · R4** — Vertical record editing: edit a row in an attribute/value view and retain field focus when moving between records.
 
 - [x] **FI-204 · R4** — Key-matched paste: match spreadsheet rows by reliable keys rather than grid position, separating updates, new records, unmatched and ambiguous entries.
 
@@ -995,7 +997,7 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 
 - [ ] **FI-219 · R4** — Drag-copy rows between grids: map source columns to a target table and stage INSERT drafts rather than execute mutations on drop.
 
-- [ ] **FI-227 · R4** — Row draft templates: save reusable new-record field presets while excluding keys, generated fields and sensitive values as appropriate.
+- [x] **FI-227 · R4** — Row draft templates: save reusable new-record field presets while excluding keys, generated fields and sensitive values as appropriate.
 
 ## 4. Roadmap bakım kuralı
 
