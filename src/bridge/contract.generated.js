@@ -3044,6 +3044,25 @@ export const bridgeContract = {
         },
         "required": []
       }
+    },
+    "result.relations": {
+      "handler": "oracle",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "schema": {
+            "type": "string"
+          },
+          "table": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "schema",
+          "table"
+        ]
+      }
     }
   },
   "replies": {
@@ -5354,6 +5373,36 @@ export const bridgeContract = {
         },
         "transactionPending": {
           "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "result.relations": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "schema": {
+          "type": "string"
+        },
+        "table": {
+          "type": "string"
+        },
+        "children": {
+          "type": "array"
+        },
+        "parents": {
+          "type": "array"
+        },
+        "error": {
+          "type": "string"
         }
       },
       "required": []

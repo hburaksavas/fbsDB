@@ -1852,6 +1852,19 @@ try {
   // Edit a proposed value directly in the list.
   await cdp.evaluate(`(()=>{const input=document.querySelector('[aria-label="New value of row 2 CODE"]');input.focus();Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'B2');input.dispatchEvent(new Event('input',{bubbles:true}));input.blur()})()`);
   await cdp.until(`document.querySelector('[data-cell="1:1"]')?.textContent.includes('B2')`, 'Value edited in the change list');
+  // Related records are checked only on request.
+  const relationReads = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.relations').length`);
+  await cdp.evaluate(`[...document.querySelectorAll('.pending-drawer button')].find(b=>b.textContent==='Check related records…').click()`);
+  await cdp.until(`__uxFixture.commands.filter(m=>m.command==='result.relations').length>${relationReads}`, 'Relationships requested on click');
+  const relationRequest = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.relations').at(-1)`);
+  await cdp.evaluate(`__uxFixture.emit({type:'result.relations',requestId:${JSON.stringify(relationRequest.id)},tabId:'tab-1',schema:'APP',table:'REVIEW',children:[{owner:'APP',table:'LINES',constraint:'FK_LINES',deleteRule:'NO ACTION',pairs:[{child:'REVIEW_ID',parent:'ID'}]}],parents:[{owner:'APP',table:'GROUPS',constraint:'FK_G',deleteRule:'NO ACTION',pairs:[{child:'GROUP_ID',parent:'ID'}]}]})`);
+  await cdp.until(`__uxFixture.commands.some(m=>m.command==='sql.evaluate'&&/FROM "APP"\."LINES"/.test(m.payload.sql))`, 'Child count requested');
+  const countRequest = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.evaluate'&&/FROM "APP"\."LINES"/.test(m.payload.sql)).at(-1)`);
+  assert.equal(countRequest.payload.sql, 'SELECT COUNT(*) FROM "APP"."LINES" WHERE ("REVIEW_ID" = :r0k0)'); assert.deepEqual(countRequest.payload.parameters.map(item => item.value), ['3']);
+  await cdp.evaluate(`__uxFixture.emit({type:'sql.evaluated',requestId:${JSON.stringify(countRequest.id)},tabId:'tab-1',columns:[{name:'C',type:'NUMBER'}],rows:[[2]],truncated:false,elapsedMs:2,transactionPending:false})`);
+  await cdp.until(`document.querySelector('[aria-label="Related record checks"]')?.textContent.includes('APP.LINES: 2 rows reference these rows and would block the delete (ORA-02292).')`, 'Blocking children reported');
+  assert.match(await cdp.evaluate(`document.querySelector('[aria-label="Known relationships"]').textContent`), /Referenced by APP\.LINES \(REVIEW_ID\) · NO ACTION[\s\S]*References APP\.GROUPS/);
+  assert.match(await cdp.evaluate(`document.querySelector('[aria-label="Related record checks"]').textContent`), /Another session may change this before you apply/);
   // Choose what to apply.
   await cdp.click('[aria-label="Include row 1 in Apply"]');
   await cdp.evaluate(`[...document.querySelectorAll('.pending-drawer button')].find(b=>b.textContent.startsWith('Apply to Oracle')).click()`);

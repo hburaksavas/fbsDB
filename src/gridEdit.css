@@ -95,3 +95,7 @@ tr[data-row-error] td.rownum::after{content:'✖';margin-left:2px}
 .grid-edit-option{display:inline-flex;gap:3px;align-items:center;font-size:10px}
 
 .cell-description{color:var(--muted);font-size:10px}
+
+.pending-related{margin:4px 0}
+.pending-related-results{list-style:none;margin:2px 0;padding:0}
+.pending-related-results li[data-status=blocked]{font-weight:700}

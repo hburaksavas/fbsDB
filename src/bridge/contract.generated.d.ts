@@ -668,6 +668,10 @@ export interface CommandPayloads {
   "sql.rollbackGridBatch": {
   "tabId"?: string;
 };
+  "result.relations": {
+  "schema": string;
+  "table": string;
+};
 }
 export interface ReplyMessages {
   "analysis.state": { type: "analysis.state" } & {
@@ -1388,6 +1392,15 @@ export interface ReplyMessages {
   "ok"?: boolean;
   "error"?: string;
   "transactionPending"?: boolean;
+};
+  "result.relations": { type: "result.relations" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "schema"?: string;
+  "table"?: string;
+  "children"?: Array<JsonValue>;
+  "parents"?: Array<JsonValue>;
+  "error"?: string;
 };
 }
 export type NativeCommandName = keyof CommandPayloads;

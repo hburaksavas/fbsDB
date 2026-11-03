@@ -1,9 +1,10 @@
 import {dmlPreviewText,impactSummary} from './dmlPreview';
 import {constraintGuidance} from './oracleErrorMap';
 import {notifyFeedback} from './Feedback';
+import {relationLabel} from './relatedChecks';
 
 // Everything staged locally, with the exact parameterized SQL it would run. Applying is a separate, explicit step.
-export function PendingChangesDrawer({changes,columns,preview,onGo,onRevertCell,onRevertRow,onClose,apply,onAskApply,onCancelApply,onApply,onPolicy,conflicts=[],onResolve,errors=[],constraintInfo={},onStop,excluded=new Set(),onToggle,onEditCell}) {
+export function PendingChangesDrawer({changes,columns,preview,onGo,onRevertCell,onRevertRow,onClose,apply,onAskApply,onCancelApply,onApply,onPolicy,conflicts=[],onResolve,errors=[],constraintInfo={},related=null,onCheckRelated,onStop,excluded=new Set(),onToggle,onEditCell}) {
   const counts=preview.statements.reduce((all,item)=>({...all,[item.kind]:(all[item.kind]||0)+1}),{}),impact=impactSummary(preview.statements);
   const identity=column=>column?.sourceTable?`${column.sourceSchema?`${column.sourceSchema}.`:''}${column.sourceTable}.${column.sourceColumn||column.name}`:column?.name;
   const label=(statement,index)=>`${statement.kind==='insert'?`New row ${statement.id}`:`Row ${statement.row+1}`} ${statement.kind}`;
@@ -15,6 +16,10 @@ export function PendingChangesDrawer({changes,columns,preview,onGo,onRevertCell,
       {change.kind==='delete'&&<>{onToggle&&<input type="checkbox" aria-label={`Include deletion of row ${change.row+1} in Apply`} checked={!excluded.has(`d:${change.row}`)} onChange={()=>onToggle(`d:${change.row}`)}/>}<span className="pending-kind">Delete</span><button type="button" className="pending-go" onClick={()=>onGo(change.row,0)}>Row {change.row+1}</button><button type="button" aria-label={`Revert deletion of row ${change.row+1}`} onClick={()=>onRevertRow(change.row)}>Revert</button></>}
       {change.kind==='insert'&&<>{onToggle&&<input type="checkbox" aria-label={`Include new row ${change.id} in Apply`} checked={!excluded.has(`i:${change.id}`)} onChange={()=>onToggle(`i:${change.id}`)}/>}<span className="pending-kind">Insert</span><span>New row {change.id}: {Object.entries(change.values).map(([col,value])=>`${columns[col]?.name} = ${value.isNull?'NULL':value.value}`).join(', ')||'(no values yet)'}</span></>}
     </li>)}</ul>
+    {onCheckRelated&&changes.some(change=>change.kind==='delete')&&<div className="pending-related"><button type="button" disabled={related?.running} title="Counts the rows that reference the deleted rows, with your session. Nothing is changed." onClick={onCheckRelated}>{related?.running?'Checking…':'Check related records…'}</button>
+      {related?.error&&<p role="alert">{related.error}</p>}
+      {related?.relations&&<details open><summary>Known relationships</summary><ul aria-label="Known relationships">{related.relations.children.map(item=><li key={`c${item.constraint}`}>Referenced by {relationLabel(item)}</li>)}{related.relations.parents.map(item=><li key={`p${item.constraint}`}>References {item.owner}.{item.table} ({item.pairs.map(pair=>pair.parent).join(', ')})</li>)}{!related.relations.children.length&&!related.relations.parents.length&&<li>No foreign keys found (or none are visible to this user).</li>}</ul></details>}
+      {related?.results?.length>0&&<ul role="status" aria-label="Related record checks" className="pending-related-results">{related.results.map((item,at)=><li key={at} data-status={item.status}>{item.message}</li>)}</ul>}</div>}
     {conflicts.length>0&&<div className="pending-conflicts" role="group" aria-label="Conflicts"><h4>Conflicts</h4><ul>{conflicts.map((conflict,index)=><li key={index} data-kind={conflict.kind}><span>{conflict.message}</span>{conflict.kind==='changed'?<><button type="button" onClick={()=>onResolve(conflict,'mine')}>Keep my edit</button><button type="button" onClick={()=>onResolve(conflict,'theirs')}>Use the database value</button></>:<button type="button" onClick={()=>onResolve(conflict,'dismiss')}>Dismiss</button>}</li>)}</ul></div>}
     {preview.problems.map(problem=><p key={problem} role="alert" className="pending-problem">{problem}</p>)}
     {preview.statements.length>0&&!apply&&<div className="pending-apply"><button type="button" className="button-primary" disabled={preview.problems.length>0} title={preview.problems.length?'Fix the problems above first':'Send these statements to Oracle (explicit step)'} onClick={onAskApply}>Apply to Oracle…</button></div>}

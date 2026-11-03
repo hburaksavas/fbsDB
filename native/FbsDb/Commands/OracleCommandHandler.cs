@@ -93,6 +93,17 @@ public sealed partial class MainPage
                     var metadata=await Task.Run(()=>_oracle.GetPrimaryKeyAsync(payload.GetProperty("schema").GetString()??"",payload.GetProperty("table").GetString()??""));
                     Send(sender,new{type="result.primaryKey",requestId=id,metadata.Schema,metadata.Table,metadata.Columns,message="No primary key found."});break;
                 }
+                case "result.relations": {
+                    var relationOwner = payload.GetProperty("schema").GetString() ?? "";
+                    var relationTable = payload.GetProperty("table").GetString() ?? "";
+                    try
+                    {
+                        var relations = await Task.Run(() => _oracle.GetRelationsAsync(relationOwner, relationTable));
+                        Send(sender, new { type = "result.relations", requestId = id, tabId, schema = relationOwner, table = relationTable, children = relations.Children, parents = relations.Parents });
+                    }
+                    catch (Exception ex) { Send(sender, new { type = "result.relations", requestId = id, tabId, schema = relationOwner, table = relationTable, children = Array.Empty<object>(), parents = Array.Empty<object>(), error = ex.Message }); }
+                    break;
+                }
                 case "result.constraintInfo": {
                     var constraintOwner = payload.GetProperty("owner").GetString() ?? "";
                     var constraintName = payload.GetProperty("name").GetString() ?? "";

@@ -77,6 +77,22 @@ public sealed partial class OracleSessionService
             if(columns.Count==0||columns.Any(c=>!values.ContainsKey(c.Name)))throw new InvalidOperationException("Enter every primary-key value.");
             return "SELECT * FROM "+QuoteIdentifier(schema)+"."+QuoteIdentifier(table)+" WHERE "+string.Join(" AND ",columns.Select(c=>QuoteIdentifier(c.Name)+" = "+KeyLiteral(values[c.Name],c.Type)))+";";
         }
+        // Known foreign keys of a table in both directions (rows that reference it, and the parents it references). Metadata only: no row is read.
+        public async Task<TableRelations> GetRelationsAsync(string owner,string table) {
+            await _gate.WaitAsync();try {
+                if(_connection?.State!=System.Data.ConnectionState.Open)throw new InvalidOperationException("Connect before reading relationships.");
+                async Task<List<ForeignKeyRelation>> Read(bool children) {
+                    using var command=_connection.CreateCommand();command.BindByName=true;
+                    command.CommandText=@"SELECT f.owner,f.table_name,f.constraint_name,f.delete_rule,fc.column_name,pc.column_name FROM all_constraints f JOIN all_constraints p ON p.owner=f.r_owner AND p.constraint_name=f.r_constraint_name JOIN all_cons_columns fc ON fc.owner=f.owner AND fc.constraint_name=f.constraint_name JOIN all_cons_columns pc ON pc.owner=p.owner AND pc.constraint_name=p.constraint_name AND pc.position=fc.position WHERE f.constraint_type='R' AND "+(children?"p.owner=NVL(:o,SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) AND p.table_name=:t":"f.owner=NVL(:o,SYS_CONTEXT('USERENV','CURRENT_SCHEMA')) AND f.table_name=:t")+" ORDER BY f.owner,f.table_name,f.constraint_name,fc.position";
+                    command.Parameters.Add("o",OracleDbType.Varchar2).Value=string.IsNullOrWhiteSpace(owner)?DBNull.Value:NormalizeIdentifier(owner.Trim());command.Parameters.Add("t",OracleDbType.Varchar2).Value=NormalizeIdentifier(table.Trim());
+                    var groups=new Dictionary<string,(string Owner,string Table,string Constraint,string Rule,List<ForeignKeyPair> Pairs)>();
+                    using var reader=await command.ExecuteReaderAsync();
+                    while(await reader.ReadAsync()){var key=reader.GetString(0)+"."+reader.GetString(2);if(!groups.TryGetValue(key,out var item))item=(reader.GetString(0),reader.GetString(1),reader.GetString(2),reader.IsDBNull(3)?"NO ACTION":reader.GetString(3),new());item.Pairs.Add(new(reader.GetString(4),reader.GetString(5)));groups[key]=item;}
+                    return groups.Values.Select(item=>new ForeignKeyRelation(item.Owner,item.Table,item.Constraint,item.Rule,item.Pairs)).ToList();
+                }
+                return new TableRelations(await Read(true),await Read(false));
+            }finally{Touch(); _gate.Release();}
+        }
         // What a named constraint requires (CHECK condition, key columns), so a rejected value can be explained without reading the DDL.
         public async Task<ConstraintInfo?> GetConstraintInfoAsync(string owner,string name) {
             await _gate.WaitAsync();try {

@@ -49,6 +49,9 @@ public sealed record LookupColumn(string Name,string Type);
 public sealed record PrimaryKeyInfo(string Schema,string Table,IReadOnlyList<LookupColumn> Columns);
 public sealed record RelatedRecordLink(string Label,string Sql);
 
+public sealed record ForeignKeyRelation(string Owner,string Table,string Constraint,string DeleteRule,IReadOnlyList<ForeignKeyPair> Pairs);
+public sealed record ForeignKeyPair(string Child,string Parent);
+public sealed record TableRelations(IReadOnlyList<ForeignKeyRelation> Children,IReadOnlyList<ForeignKeyRelation> Parents);
 public sealed record ConstraintInfo(string Owner,string Name,string Type,string? Condition,string? ReferencedConstraint,IReadOnlyList<string> Columns);
 public sealed record ColumnConstraint(string Name,string Type,string? Condition,string Status);
 public sealed record ColumnDefinition(string Schema,string Table,string Name,string Type,int? Size,int? Precision,int? Scale,bool Nullable,string? DefaultValue,IReadOnlyList<ColumnConstraint> Constraints);

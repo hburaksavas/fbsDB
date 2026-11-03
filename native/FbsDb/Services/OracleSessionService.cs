@@ -292,6 +292,7 @@ public sealed partial class OracleSessionService : IDisposable
     public static string BuildPrimaryKeySql(string schema,string table,IReadOnlyList<LookupColumn> columns,IReadOnlyDictionary<string,string> values) => MetadataOperations.BuildPrimaryKeySql(schema, table, columns, values);
 
     public Task<PrimaryKeyInfo> GetPrimaryKeyAsync(string schema,string table) => _metadata.GetPrimaryKeyAsync(schema, table);
+    public Task<TableRelations> GetRelationsAsync(string owner,string table) => _metadata.GetRelationsAsync(owner, table);
     public Task<ConstraintInfo?> GetConstraintInfoAsync(string owner,string name) => _metadata.GetConstraintInfoAsync(owner, name);
 
     public Task<IReadOnlyList<RelatedRecordLink>> ChildRecordsSqlAsync(string owner,string table,IReadOnlyDictionary<string,object?> values) => _metadata.ChildRecordsSqlAsync(owner, table, values);
