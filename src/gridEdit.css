@@ -91,3 +91,7 @@ tr[data-row-error] td.rownum::after{content:'✖';margin-left:2px}
 .vertical-fields dd{margin:0;display:flex;gap:6px;align-items:center}
 .vertical-fields input[data-edited]{font-style:italic;box-shadow:inset 3px 0 0 var(--accent)}
 .vertical-readonly{color:var(--muted)}
+
+.grid-edit-option{display:inline-flex;gap:3px;align-items:center;font-size:10px}
+
+.cell-description{color:var(--muted);font-size:10px}

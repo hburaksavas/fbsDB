@@ -5,13 +5,15 @@ import {lengthMeter} from './cellValidation';
 import {useState} from 'react';
 
 // Explicit edit mode: results are read-only until this is switched on, and the bar always says what is pending.
-export function GridEditBar({editability,loading,editMode,onToggle,summary,canUndo,canRedo,onUndo,onRedo,onSetNull,onDeleteRow,onNewRow,templates=[],onTemplate,onDuplicate,onBulk,onRecord,onPaste,onCheckboxes,onDrawer,drawerOpen,onStep,hasSelection,invalidCount=0,onInvalid,changesOnly=false,onChangesOnly,deletionsOnly=false,onDeletionsOnly,txText='',txState,onDismissTx,txLabel='',onTxLabel,onChecks,canUndoBatch,onUndoBatch,verification,canVerify,canRestore,canReceipt,onVerify,onRestore,onReceipt}) {
+export function GridEditBar({editability,loading,editMode,onToggle,summary,canUndo,canRedo,onUndo,onRedo,onSetNull,onDeleteRow,onNewRow,tabAddsRow=false,onTabAddsRow,templates=[],onTemplate,onDuplicate,onBulk,onRecord,onPaste,onCheckboxes,onDrawer,drawerOpen,onStep,hasSelection,invalidCount=0,onInvalid,changesOnly=false,onChangesOnly,deletionsOnly=false,onDeletionsOnly,onDescriptions,txText='',txState,onDismissTx,txLabel='',onTxLabel,onChecks,canUndoBatch,onUndoBatch,verification,canVerify,canRestore,canReceipt,onVerify,onRestore,onReceipt}) {
   const blocked = editability && !editability.editable;
   return <div className="grid-edit-bar" role="toolbar" aria-label="Edit result rows">
     <button type="button" className="grid-edit-toggle" aria-pressed={editMode} title={editMode?'Leave edit mode (pending edits stay until discarded)':'Edit rows of this result (explicit edit mode)'} onClick={onToggle}><Pencil size={13}/>{editMode?'Editing':'Edit rows'}</button>
+    <button type="button" title="Show a description beside key values, read with your own query" onClick={onDescriptions}>Descriptions…</button>
     {editMode&&<>
       <button type="button" disabled={!editability?.editable||!hasSelection} title="Set the selected cell to NULL (an explicit value, different from empty text)" onClick={onSetNull}>Set NULL</button>
       <button type="button" disabled={!editability?.editable} title="Add a new row; omitted columns use their database defaults" onClick={onNewRow}>New row</button>
+      <label className="grid-edit-option" title="While editing a cell, Tab moves to the next editable cell. Past the last one, start a new row draft with the required fields first."><input type="checkbox" aria-label="Tab adds a row" checked={tabAddsRow} disabled={!editability?.editable} onChange={onTabAddsRow}/>Tab adds a row</label>
       {templates.length>0&&<select aria-label="New row from template" disabled={!editability?.editable} value="" onChange={event=>{if(event.target.value)onTemplate(event.target.value)}}><option value="">From template…</option>{templates.map(item=><option key={item.name} value={item.name}>{item.name}</option>)}</select>}
       <button type="button" disabled={!editability?.editable} title="Edit one record as attribute / value pairs; Alt+PageUp/PageDown moves between records and keeps the field" onClick={onRecord}>Record view</button>
       <button type="button" disabled={!editability?.editable} title="Show Y/N or 1/0 columns as checkboxes while editing" onClick={onCheckboxes}>Checkbox columns…</button>

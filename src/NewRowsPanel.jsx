@@ -1,8 +1,9 @@
 import {missingRequired} from './gridDrafts';
+import {newRowFieldOrder} from './tabEntry';
 
 // Sectioned entry form for new rows. Only filled fields are sent; empty ones use the database default, and NULL is an explicit choice.
 export function NewRowsPanel({rows,columns,editability,onChange,onRemove,onSaveTemplate}) {
-  const fields = columns.map((column, index) => ({ column, index })).filter(({ index }) => editability.columns[index]?.editable);
+  const fields = newRowFieldOrder(columns, editability.columns).map(index => ({ column: columns[index], index }));
   return <section className="new-rows-panel" aria-label="New rows">
     {rows.map(row => {
       const missing = missingRequired(columns, editability.columns, row.values);

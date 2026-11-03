@@ -30,6 +30,8 @@ Bu sıralama ilk uçtan uca akışı tanımlar; sonraki fazların tümünü bekl
 
 ### Uygulama ilerlemesi — 2026-11-01
 
+- **FI-180 / FI-182 · Tamamlandı (Tab ile giriş, anahtar açıklamaları):** (1) Hücre düzenlenirken Tab yalnızca düzenlenebilir hücreleri sırayla gezer (kilitli sütunları atlar, satır sonunda sonraki satıra sarar, Shift+Tab geri gider). Son düzenlenebilir hücreden sonra "Tab adds a row" kapalıysa son hücre olduğu söylenir; açıksa yeni satır taslağı başlar ve odak, zorunlu alanlar (NOT NULL, varsayılansız, kimliksiz) önce gelecek şekilde sıralanmış formun ilk zorunlu alanına gider (kimlik sütunu sunulmaz). Düzenleme dışında Tab'ın klavye odağını ızgaradan çıkarma davranışı değişmedi. (2) "Descriptions…": bir sütun için `SELECT id, name FROM müşteri WHERE id IN ({keys})` gibi kendi sorgunu kaydedersin; yalnızca "Save and load"a basınca yüklü farklı anahtar değerleri (en çok 50) bind olarak gönderilip okunur, ilk sütun anahtar, kalanı açıklama olur ve hücrede anahtarın yanında "· Ada" diye görünür; saklanan değer hiçbir zaman değişmez, yazım sırasında hiçbir şey çalışmaz, kaç değerin kapsandığı söylenir. Birim (689) ve WebView2 testi geçti.
+
 - **FI-199 / FI-227 · Tamamlandı (kayıt görünümü, satır şablonları):** (1) "Record view": seçili satırı öznitelik/değer çiftleri olarak düzenler (düzenlenebilir sütunlarda girdi + NULL kutusu; anahtar 🔑, kilitli ve LOB sütunlar 🔒/salt okunur); Enter veya Alt+PageDown sonraki, Alt+PageUp önceki kayda geçer ve aynı alan odakta kalır, böylece bir sütun liste boyunca doldurulur. Bu çalışma sırasında bir hata da giderildi: taslak hazırlanınca ızgara seçimi ve kaydırma konumu sıfırlanıyordu, artık yalnızca gerçek veri değişiminde sıfırlanır. (2) Yeni satır formundaki "Save as template…" alan ön ayarlarını tablo başına bu bilgisayarda saklar; anahtar, kimlik, kilitli ve parola/token gibi adlı sütunlar şablona girmez (kaydederken söylenir) ve "From template…" seçimiyle bu ön ayarlarla yeni satır taslağı açılır, sonuçta olmayan sütunlar bildirilir. Birim (681) ve WebView2 testi geçti.
 
 - **FI-085 · Tamamlandı (Oracle regex atölyesi):** Komut paleti "Oracle regex workbench…" (seçili metni desen olarak alır) REGEXP_SUBSTR / REPLACE / INSTR / COUNT / LIKE çağrılarını örnek metin üzerinde yerelde, veritabanı olmadan çalıştırır: konum, oluşum, alt ifade (grup), geri başvurulu (` `) yerine koyma, `i` / `c` / `n` / `m` eşleşme parametreleri, POSIX sınıfları (`[[:digit:]]` vb.) ve `\A` / `\Z` desteklenir; sonuç, eşleşme sayısı ve konumları gösterilir. Oracle'da bulunmayan yapılar (ileri/geri bakış, ``, adlandırılmış grup, satır içi bayrak, `x` parametresi) yaklaşık sonuç verilmeden gerekçeyle reddedilir. "Insert the call" desenin tırnaklanmış (`'` → `''`) hâliyle hazır REGEXP_* çağrısını imlece ekler. Birim (678) ve WebView2 testi geçti.
@@ -965,11 +967,11 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 
 - [x] **FI-167 · R4** — Bulk cell assignment: fill selected editable cells with a value or NULL and preview the affected cell count and validation failures.
 
-- [ ] **FI-180 · R4** — Tab-driven entry: navigate editable cells with Tab and optionally create a new local row draft after the final cell, prioritizing required input fields.
+- [x] **FI-180 · R4** — Tab-driven entry: navigate editable cells with Tab and optionally create a new local row draft after the final cell, prioritizing required input fields.
 
 - [ ] **FI-181 · R4** — Load cell value from file: stage text/JSON files for CLOBs and binary files for BLOBs with size and content previews before applying.
 
-- [ ] **FI-182 · R4** — Lookup descriptions: display configured related-record descriptions beside foreign-key IDs while retaining the actual key as the stored value.
+- [x] **FI-182 · R4** — Lookup descriptions: display configured related-record descriptions beside foreign-key IDs while retaining the actual key as the stored value.
 
 - [x] **FI-183 · R4** — Bulk find/replace: preview old/new values in selected editable text cells before creating replacement drafts.
 
