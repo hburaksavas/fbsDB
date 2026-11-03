@@ -1564,6 +1564,12 @@ try {
   assert.ok(await cdp.evaluate(`document.querySelector('[data-result-row="1"]').hasAttribute('data-row-error')`), 'The row carries the error too');
   assert.match(await cdp.evaluate(`document.querySelector('[data-cell="1:1"]').dataset.appTooltip||document.querySelector('[data-cell="1:1"]').title`), /Oracle rejected this value: ORA-12899/);
   assert.ok(await cdp.evaluate(`!![...document.querySelectorAll('[aria-label="Apply results"] button')].find(b=>b.textContent==='Show NAME')`), 'The outcome links to the cell');
+  const failedButtons = await cdp.evaluate(`[...document.querySelectorAll('[aria-label="Apply results"] button')].map(b=>b.textContent)`);
+  assert.ok(failedButtons.includes('Correct this value') && failedButtons.includes('Copy error'), 'A failed statement offers to correct the value and copy the error: ' + failedButtons.join('|'));
+  await cdp.evaluate(`[...document.querySelectorAll('[aria-label="Apply results"] button')].find(b=>b.textContent==='Correct this value').click()`);
+  await cdp.until(`document.querySelector('.cell-editor')`, 'Correct this value starts editing the failing cell');
+  await cdp.evaluate(`document.querySelector('.cell-editor').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}))`);
+  await cdp.until(`!document.querySelector('.cell-editor')`, 'Escape leaves the correction');
   await drawerClick('Dismiss');
   await cdp.evaluate(`document.querySelector('[data-cell="1:1"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));document.querySelector('.grid-wrap').focus()`);
   await cdp.evaluate(`document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'F2',bubbles:true,cancelable:true}))`);
@@ -2035,6 +2041,20 @@ try {
   await cdp.frame(); await cdp.key('Enter');
   await cdp.until(`document.querySelector('[data-new-row="1"]')`, 'The palette command adds a new row draft');
   await cdp.evaluate(`window.dispatchEvent(new CustomEvent('fbsdb.draftsCleared',{detail:{tabId:'tab-1'}}))`);
+ });
+ await check('query failure: a missing-object error offers to find the object', async () => {
+  await cdp.evaluate(`document.querySelector('[aria-label="Close cell value"]')?.click()`);
+  await new Promise(resolve => setTimeout(resolve, 500));
+  const before = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length`);
+  await cdp.click('[data-editor-tab="tab-1"] [role="tab"]'); await cdp.until(`${editor}`);
+  await cdp.evaluate(`${editor}.setValue('SELECT * FROM missing_table');${editor}.setPosition({lineNumber:1,column:1})`); await new Promise(resolve => setTimeout(resolve, 400)); await cdp.evaluate(`${editor}.focus()`); await cdp.key('Enter', 2);
+  await cdp.until(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length>${before}`, 'Query sent');
+  await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'host.error',tabId:request.tabId,requestId:request.id,message:'ORA-00942: table or view does not exist'})})()`);
+  await cdp.until(`[...document.querySelectorAll('.result-notice-actions button')].some(b=>b.textContent==='Find the object…')`, 'Find the object offered');
+  assert.ok(await cdp.evaluate(`[...document.querySelectorAll('.result-notice-actions button')].some(b=>b.textContent.includes('Copy error'))`), 'The usual actions remain');
+  await cdp.evaluate(`[...document.querySelectorAll('.result-notice-actions button')].find(b=>b.textContent==='Find the object…').click()`);
+  await cdp.until(`document.querySelector('.ide-command-palette')`, 'The object search opens');
+  await cdp.key('Escape'); await cdp.until(`!document.querySelector('.ide-command-palette')`);
  });
  await check('paste: spreadsheet data is previewed, filled by position or matched by key, and staged as drafts', async () => {
   await cdp.evaluate(`document.querySelector('[aria-label="Close cell value"]')?.click()`);

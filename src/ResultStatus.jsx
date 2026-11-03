@@ -1,6 +1,7 @@
 import {Feedback} from './Feedback';
 import {useEffect,useState} from 'react';
 import {AlertCircle,CheckCircle2,Rows3,Table2,Timer,Square,Code2,Copy,LoaderCircle,CircleSlash} from 'lucide-react';
+import {queryFailureActions} from './errorActions';
 import {LONG_QUERY_MS,elapsedQueryTime,formatQueryDuration,queryFailureDetails,transactionRecoveryHint} from './resultStatus.js';
 
 export function ResultIdle({guidance,onAction}){
@@ -24,7 +25,7 @@ export function ResultRunning({startedAt,cancelling=false,onCancel,fetching=fals
   </div>;
 }
 
-export function ResultNotice({kind='idle',title,detail,metric,raw,code,onEdit,onClear}){
+export function ResultNotice({kind='idle',title,detail,metric,raw,code,onEdit,onClear,extraActions=[]}){
   const [copyError,setCopyError]=useState(false);
   const Icon=kind==='error'||kind==='timeout'?AlertCircle:kind==='success'?CheckCircle2:kind==='empty'?Rows3:kind==='cancelled'?CircleSlash:null;
   return <section className="result-notice" data-kind={kind} role={kind==='error'||kind==='timeout'?'alert':'status'}>
@@ -35,12 +36,13 @@ export function ResultNotice({kind='idle',title,detail,metric,raw,code,onEdit,on
         {onEdit&&<button type="button" onClick={onEdit}><Code2 size={13}/>Return to SQL</button>}
         {raw&&<button type="button" onClick={async()=>{try{await navigator.clipboard.writeText(raw);setCopyError(false)}catch{setCopyError(true)}}}><Copy size={12}/>Copy error</button>}
         {onClear&&<button type="button" onClick={onClear}>Clear local filters</button>}
+        {extraActions.map(action=><button key={action.id} type="button" onClick={action.run}>{action.label}</button>)}
         {copyError&&<Feedback title="Copy failed">Clipboard unavailable</Feedback>}
       </div>}
     </div>
   </section>;
 }
-export function ResultFailure({outcome,onEdit}){
+export function ResultFailure({outcome,onEdit,onAction}){
   const value=queryFailureDetails(outcome);
-  return <ResultNotice {...value} detail={[value.hint,transactionRecoveryHint(outcome)].filter(Boolean).join(' ')} raw={value.message} onEdit={onEdit} metric={Number.isFinite(outcome.elapsedMs)?formatQueryDuration(outcome.elapsedMs):undefined}/>;
+  return <ResultNotice {...value} extraActions={queryFailureActions(value.code).map(action=>({...action,run:()=>onAction?.(action.id)}))} detail={[value.hint,transactionRecoveryHint(outcome)].filter(Boolean).join(' ')} raw={value.message} onEdit={onEdit} metric={Number.isFinite(outcome.elapsedMs)?formatQueryDuration(outcome.elapsedMs):undefined}/>;
 }

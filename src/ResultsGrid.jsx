@@ -515,7 +515,7 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, columns
     notifyFeedback({kind:'info',title:'Row duplicated',message:'A new row draft was created. Key, identity and locked columns are left for the database to fill in.'});
   }
   function deleteFocusedRow(){const cell=focusedCell();if(cell)setDrafts(current=>toggleDeleted(current,cell.rowIndex))}
-  function goToEdit(rowIndex,col){const position=rows.findIndex(item=>item.index===rowIndex),column=Math.max(0,visible.indexOf(col));if(position>=0){reveal(position,column);root.current?.focus()}else notifyFeedback({kind:'info',title:'Pending changes',message:`Row ${rowIndex+1} is not in the current view (hidden by a filter, frozen or not loaded).`})}
+  function goToEdit(rowIndex,col,startEditing=false){const position=rows.findIndex(item=>item.index===rowIndex),column=Math.max(0,visible.indexOf(col));if(position>=0){reveal(position,column);root.current?.focus();if(startEditing)requestAnimationFrame(()=>beginEdit(position,column))}else notifyFeedback({kind:'info',title:'Pending changes',message:`Row ${rowIndex+1} is not in the current view (hidden by a filter, frozen or not loaded).`})}
   function stepEdit(direction){const focus=focusedCell(),target=adjacentEdit(drafts,focus?{row:focus.rowIndex,col:focus.col}:null,direction);if(target)goToEdit(target.row,target.col)}
   function keyDown(event) {
     if((event.ctrlKey||event.metaKey)&&event.shiftKey&&event.key.toLowerCase()==='p'){event.preventDefault();onTools?.('Commands');return;}

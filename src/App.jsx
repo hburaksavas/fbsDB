@@ -402,7 +402,7 @@ function ResultRenderMeasurement({result,onMeasured}){
   return null;
 }
 
-function SqlResultsView({ onRun, runShortcut, result, editorSql, runState, executing, cancelling, outcome,startedAt,onCancel, filter = "", pageSize = 1000, region,language='en',onFetchMore, fetching = false, pageError = "", initialView = {}, onViewStateChange, onResultRendered,onSql, onRelated, onStreamExport, streamState, onCancelExport, onServerFilter, onClearServerFilter, onConnect, connected, onEdit, onExportColumns, onLookup, onClearFilter, onChildren, onSourceDefinition,sourceDefinition,onCloseSourceDefinition, onUpdateDraft,onGenerateSql,onMetadata,onPin,onExplain,memoryItems=[],onReleaseResult,onExportInsert,liveAppearance,onAppearanceApplied,onSelectionSummary,onSmartObject,linkedColumn,onColumnSource,budget }) {
+function SqlResultsView({ onRun, runShortcut, onFindObject, result, editorSql, runState, executing, cancelling, outcome,startedAt,onCancel, filter = "", pageSize = 1000, region,language='en',onFetchMore, fetching = false, pageError = "", initialView = {}, onViewStateChange, onResultRendered,onSql, onRelated, onStreamExport, streamState, onCancelExport, onServerFilter, onClearServerFilter, onConnect, connected, onEdit, onExportColumns, onLookup, onClearFilter, onChildren, onSourceDefinition,sourceDefinition,onCloseSourceDefinition, onUpdateDraft,onGenerateSql,onMetadata,onPin,onExplain,memoryItems=[],onReleaseResult,onExportInsert,liveAppearance,onAppearanceApplied,onSelectionSummary,onSmartObject,linkedColumn,onColumnSource,budget }) {
   const [page, setPage] = useState(initialView.page || 0), [requestedPage, setRequestedPage] = useState(null);
   const [sortColumn, setSortColumn] = useState(initialView.sortColumn ?? -1);
   const [sortDirection, setSortDirection] = useState(initialView.sortDirection || "asc");
@@ -485,7 +485,7 @@ function SqlResultsView({ onRun, runShortcut, result, editorSql, runState, execu
   }}/>;
   let body;
   if (executing) body=<ResultRunning startedAt={startedAt} cancelling={cancelling} onCancel={onCancel}/>;
-  else if (outcome) body=<ResultFailure outcome={outcome} onEdit={outcome.kind==='cancelled'?undefined:onEdit}/>;
+  else if (outcome) body=<ResultFailure outcome={outcome} onEdit={outcome.kind==='cancelled'?undefined:onEdit} onAction={action=>action==='connection'?onConnect?.():onFindObject?.()}/>;
   else if (!result) body=<ResultIdle guidance={idleGuidance({connected,executing,hasSql:Boolean(editorSql?.trim()),runShortcut})} onAction={action=>action==='connect'?onConnect?.():action==='run'?onRun?.():onEdit?.()}/>;
   else if (result.released) body=<ResultNotice title="Result data released" detail="Run the SELECT again to load records."/>;
   else if (!result.columns?.length) body=<ResultNotice kind="success" title="Statement completed" metric={result.rowsAffected>=0&&result.rowsAffected!=null?`${result.rowsAffected} rows affected`:undefined} detail={`${result.transactionPending?'Pending transaction · commit or rollback when ready. ':''}${result.elapsedMs??0} ms`}/>;
@@ -2585,7 +2585,7 @@ export function App() {
         {['Results','Output'].includes(resultTab)&&<StackTraceLinks items={tabSession.runtimeProblems} onNavigate={navigateProblem}/>}
         {['Results','Output'].includes(resultTab)&&<ResultSourceProvenance result={resultTab==='Output'?view.outputProvenance:queryResult} document={activeEditorTab||{}} connection={editorConnection} context={tabSession.sessionContext}/>}
         {resultTab === "Problems" ? <ProblemsPanel onReturnToEditor={()=>editorRef.current?.focus()} items={allProblems} activeTabId={activeTabId} onNavigate={navigateProblem} /> : resultTab === "Explain" ? <Suspense fallback={<div role="status">Loading…</div>}><ExplainPlanView result={explainResult} loading={executing && executionKind === "explain"} error={explainMessage} mode={view.planPresentation || "diagram"} onModeChange={mode => updateTabResult("planPresentation", mode, activeTabId)} /></Suspense> : resultTab === "Results"
-          ? <SqlResultsView onRun={()=>runQueryRef.current?.()} runShortcut={resolveSetting(settings,'editor.shortcuts').value.run}
+          ? <SqlResultsView onFindObject={()=>setPaletteMode('files')} onRun={()=>runQueryRef.current?.()} runShortcut={resolveSetting(settings,'editor.shortcuts').value.run}
               liveAppearance={resultTab==='Results'&&resultLiveAppearance?.key===currentAppearanceKey?resultLiveAppearance:null} onAppearanceApplied={sequence=>setResultLiveAppearance(current=>current?.sequence===sequence?null:current)}
               budget={{maxRows:resolveSetting(settings,'results.budgetRows').value,maxMemoryMb:resolveSetting(settings,'results.budgetMemoryMb').value,action:resolveSetting(settings,'results.budgetAction').value}}
               onSelectionSummary={summary=>updateTabResult('selectionSummary',summary,activeTabId)} onExportInsert={exportResultsInsertSql} onSmartObject={showSmartObject} linkedColumn={linkedProjectionColumn} onColumnSource={showProjectionSource}
