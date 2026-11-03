@@ -4,6 +4,7 @@ import {fromCalendarValue,toCalendarValue} from './gridEditability';
 import {lengthMeter} from './cellValidation';
 import {useState} from 'react';
 import {layoutActions,loadPinned,savePinned,togglePinned} from './gridBarLayout';
+import {chooseHint,dismissHint,loadHintPrefs,saveHintPrefs} from './editHints';
 
 // The "More" menu keeps the rarely needed edit tools off the bar. Arrow keys move through it, Escape closes it and returns focus to its button.
 function MoreMenu({items,pinned,onPin}) {
@@ -39,10 +40,13 @@ function MoreMenu({items,pinned,onPin}) {
 }
 
 // Explicit edit mode: results are read-only until this is switched on, and the bar always says what is pending.
-export function GridEditBar({editability,loading,editMode,onToggle,summary,canUndo,canRedo,onUndo,onRedo,onSetNull,onDeleteRow,onNewRow,tabAddsRow=false,onTabAddsRow,templates=[],onTemplate,onDuplicate,onBulk,onRecord,onPaste,onCheckboxes,onDrawer,drawerOpen,onStep,hasSelection,invalidCount=0,onInvalid,changesOnly=false,onChangesOnly,deletionsOnly=false,onDeletionsOnly,onDescriptions,txText='',txState,onDismissTx,txLabel='',onTxLabel,onChecks,canUndoBatch,onUndoBatch,verification,canVerify,canRestore,canReceipt,onVerify,onRestore,onReceipt}) {
+export function GridEditBar({editability,loading,editMode,onToggle,summary,canUndo,canRedo,onUndo,onRedo,onSetNull,onDeleteRow,onNewRow,tabAddsRow=false,onTabAddsRow,templates=[],onTemplate,onDuplicate,onBulk,onRecord,onPaste,onCheckboxes,onDrawer,drawerOpen,onStep,hasSelection,invalidCount=0,onInvalid,changesOnly=false,onChangesOnly,deletionsOnly=false,onDeletionsOnly,onDescriptions,selectedCells=0,selectedRows=0,applying=false,txText='',txState,onDismissTx,txLabel='',onTxLabel,onChecks,canUndoBatch,onUndoBatch,verification,canVerify,canRestore,canReceipt,onVerify,onRestore,onReceipt}) {
   const blocked = editability && !editability.editable;
   const editable = !!editability?.editable;
   const [pinned,setPinned]=useState(()=>loadPinned(globalThis.localStorage));
+  const [hintPrefs,setHintPrefs]=useState(()=>loadHintPrefs(globalThis.localStorage));
+  const changeHints=next=>{setHintPrefs(next);saveHintPrefs(globalThis.localStorage,next)};
+  const hint=chooseHint({editMode,editable,selectedCells,selectedRows,pending:summary.total,applying},hintPrefs);
   const pin=id=>setPinned(current=>{const next=togglePinned(current,id);savePinned(globalThis.localStorage,next);return next});
   const actions={
     descriptions:{label:'Descriptions…',title:'Show a description beside key values, read with your own query',onClick:onDescriptions},
@@ -77,6 +81,7 @@ export function GridEditBar({editability,loading,editMode,onToggle,summary,canUn
       <button type="button" aria-expanded={drawerOpen} aria-label="Pending changes" className="grid-edit-pending" title="Review pending changes and the SQL they would run" onClick={onDrawer}>Pending: {summary.total}{summary.total?` (${[summary.updates&&`${summary.updates} upd`,summary.inserts&&`${summary.inserts} ins`,summary.deletes&&`${summary.deletes} del`].filter(Boolean).join(', ')})`:''}</button>
       <span className="grid-edit-note">Local drafts only; nothing is sent to Oracle until you apply.</span>
     </>}
+    {hint&&<p className="grid-edit-hint" role="note" data-hint={hint.id}>{hint.text}<button type="button" aria-label="Dismiss this tip" title="Do not show this tip again" onClick={()=>changeHints(dismissHint(hintPrefs,hint.id))}>Got it</button><button type="button" title="Stop showing tips under the edit bar" onClick={()=>changeHints({...hintPrefs,off:true})}>Turn off tips</button></p>}
     {txText&&<span className="grid-edit-tx" role="status" aria-label="Applied changes" data-state={txState}>{txText}{txState==='pending'&&<input className="grid-edit-label" aria-label="Label for this work" placeholder="Label this work (local note)" title="A note for you and for the receipt. It does not change what Commit or Rollback affects." value={txLabel} onChange={event=>onTxLabel(event.target.value)}/>}{canUndoBatch&&<button type="button" onClick={onUndoBatch} title="Roll Oracle back to just before the last Apply">Undo last Apply…</button>}{canReceipt&&<button type="button" onClick={onReceipt} title="Copy a summary of what this grid committed">Copy receipt</button>}{canVerify&&<button type="button" onClick={onVerify} title="Read the changed rows again and compare them with what was applied">Verify against the database</button>}{canRestore&&<button type="button" onClick={onRestore} title="Turn the rolled-back changes back into drafts you can correct and apply again">Keep my edits as drafts</button>}{txState!=='pending'&&<button type="button" aria-label="Dismiss applied changes note" onClick={onDismissTx}>×</button>}</span>}
     {verification&&<div className="grid-edit-verification" role="status" aria-label="Verification">{verification.running?'Reading the changed rows…':verification.error?verification.error:<><ul>{verification.results.map(result=><li key={result.label} data-status={result.status}>{result.message}</li>)}</ul><small>This is a read of the current data. A difference may also come from another session that changed the row after your commit; it does not mean the commit failed.</small></>}</div>}
     {editMode&&loading&&<span role="status" className="grid-edit-note">Checking the primary key…</span>}

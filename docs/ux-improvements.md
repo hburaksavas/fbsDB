@@ -13,7 +13,7 @@ Grid düzenleme sırasında araç çubuğuna ve panellere çok sayıda eylem ekl
 | # | Öneri | Etki | Efor |
 | --- | --- | --- | --- |
 | UX-01 ✅ | **Düzenleme araç çubuğunu kademelendir:** her zaman görünen çekirdek (Düzenle, Uygula, Geri al) ve "Daha fazla" menüsüne alınan gelişmiş araçlar (Toplu düzenle, Yapıştır, Açıklamalar, Mantıksal sütunlar). Kullanım sıklığına göre kullanıcı sabitleyebilsin. | Y | M |
-| UX-02 | **Bağlama duyarlı ipucu şeridi:** düzenleme modunda seçime göre tek satırlık öneri ("Satırı kopyalamak için…", "Birden çok hücre seçili: Toplu düzenle"). Kapatılabilir ve bir kez gösterilir. | O | S |
+| UX-02 ✅ | **Bağlama duyarlı ipucu şeridi:** düzenleme modunda seçime göre tek satırlık öneri ("Satırı kopyalamak için…", "Birden çok hücre seçili: Toplu düzenle"). Kapatılabilir ve bir kez gösterilir. | O | S |
 | UX-03 | **Komut paletinde grid eylemleri:** tüm grid düzenleme eylemleri `IdeCommandPalette` içinde aranabilir olsun; araç çubuğunda yer olmayan eylemler buradan bulunur. | Y | S |
 | UX-04 | **Boş durum yönlendirmeleri:** sonuç yok, düzenlenemeyen sonuç, bekleyen değişiklik yok gibi durumlarda bir sonraki adımı söyleyen kısa metin (düzenlenemiyorsa neden ve ne yapılabileceği). `ActionableState` bileşeni genişletilebilir. | O | S |
 
@@ -57,6 +57,7 @@ Grid düzenleme sırasında araç çubuğuna ve panellere çok sayıda eylem ekl
 ## Durum
 
 - **UX-01 tamamlandı:** çekirdek eylemler çubukta, gelişmiş araçlar "More" menüsünde (ok tuşları, Escape ile odağı geri verme, çubuğa sabitleme; açık bir süzgeç menüde gizlenmez). Birim test (`tests/grid-bar-layout.test.mjs`) ve WebView2 masaüstü testi geçti (124 kontrol).
+- **UX-02 tamamlandı:** düzenleme çubuğunun altında seçime ve hazırlanan değişikliklere göre tek satırlık ipucu (seçim yok / tek hücre / çok hücre → Bulk edit / bekleyen değişiklik). "Got it" ipucunu kalıcı kapatır, "Turn off tips" hepsini kapatır. Birim test (`tests/edit-hints.test.mjs`) ve masaüstü testi (124 kontrol) geçti.
 
 ## Önerilen sıra
 

@@ -1954,8 +1954,16 @@ try {
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'PRICES',columns:['ID']})`);
   await cdp.until(`[...document.querySelectorAll('.grid-edit-bar button')].some(b=>b.textContent==='New row'&&!b.disabled)`, 'Editing available');
+  await cdp.evaluate(`localStorage.removeItem('fbsdb.editHints')`);
+  assert.equal(await cdp.evaluate(`document.querySelector('.grid-edit-hint')?.dataset.hint`), 'select', 'Nothing selected: the tip says how to start');
   await cdp.evaluate(`document.querySelector('[data-cell="0:1"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));document.querySelector('.grid-wrap').focus()`);
   for (let i = 0; i < 2; i++) await cdp.evaluate(`document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',shiftKey:true,bubbles:true,cancelable:true}))`);
+  await cdp.until(`document.querySelector('.grid-edit-hint')?.dataset.hint==='multi'`, 'A multi-cell selection points to Bulk edit');
+  assert.match(await cdp.evaluate(`document.querySelector('.grid-edit-hint').textContent`), /3 cells selected.*Bulk edit/);
+  await cdp.evaluate(`document.querySelector('[aria-label="Dismiss this tip"]').click()`);
+  await cdp.until(`!document.querySelector('.grid-edit-hint')`, 'A dismissed tip disappears');
+  assert.equal(await cdp.evaluate(`JSON.parse(localStorage.getItem('fbsdb.editHints')).dismissed.includes('multi')`), true, 'The dismissal is remembered');
+  await cdp.evaluate(`localStorage.removeItem('fbsdb.editHints')`);
   await clickBar(cdp,'Bulk edit…');
   await cdp.until(`document.querySelector('[aria-label="Bulk edit"]')`, 'Bulk panel');
   const setSelect = value => cdp.evaluate(`(()=>{const el=document.querySelector('[aria-label="Bulk operation"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('change',{bubbles:true}))})()`);
