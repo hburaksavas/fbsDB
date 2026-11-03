@@ -8,6 +8,15 @@ import {defaultProjectRules} from '../src/projectRules.js';
 const [endpoint,root]=process.argv.slice(2),cdp=await connectNativePage(endpoint),checks=[];
 const editor=`window.monaco?.editor.getEditors().find(e=>document.contains(e.getDomNode()))`;
 let installed,failure;
+// Edit tools live on the bar when pinned and otherwise in the "More" menu; this finds the action in either place.
+async function clickBar(cdp,label){
+  const find=`(()=>{const bar=document.querySelector('.grid-edit-bar');return [...bar.querySelectorAll('button,[role=menuitem],[role=menuitemcheckbox]')].find(b=>b.textContent===${JSON.stringify(label)}||b.getAttribute('aria-label')===${JSON.stringify(label)})})()`;
+  if(!await cdp.evaluate(`!!${find}`)){
+    if(!await cdp.evaluate(`document.querySelector('.grid-edit-more-button')?.getAttribute('aria-expanded')==='true'`))await cdp.evaluate(`document.querySelector('.grid-edit-more-button').click()`);
+    await cdp.until(find,`More menu item ${label}`);
+  }
+  await cdp.evaluate(`${find}.click()`);
+}
 async function check(name,fn){await cdp.evaluate(`window.__currentCheck=${JSON.stringify(name)}`).catch(()=>{});await fn();checks.push(name);console.log('PASS '+name)}
 try {
  const source=nativeUxFixture+`;(()=>{
@@ -1665,12 +1674,12 @@ try {
   await cdp.evaluate(`(()=>{const input=document.querySelector('.cell-editor');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'B2');input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))})()`);
   await cdp.until(`document.querySelector('[data-cell="1:1"]')?.dataset.draft==='edited'`);
   assert.equal(await cdp.evaluate(`document.querySelectorAll('[data-result-row]').length`), 3, 'All rows are shown normally');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Changes only').click()`);
+  await clickBar(cdp,'Changes only');
   await cdp.until(`document.querySelectorAll('[data-result-row]').length===1`, 'Only the changed row remains');
   assert.deepEqual(await cdp.evaluate(`[...document.querySelectorAll('.result-grid thead th small, .result-grid thead th')].map(th=>th.textContent).join('|').includes('EXTRA')`), false, 'The unchanged column is hidden');
   assert.equal(await cdp.evaluate(`document.querySelector('[data-cell="0:0"]').textContent.trim()`), '2', 'The identifying key stays');
   assert.equal(await cdp.evaluate(`document.querySelector('[data-cell="0:1"]').dataset.draft`), 'edited');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Changes only').click()`);
+  await clickBar(cdp,'Changes only');
   await cdp.until(`document.querySelectorAll('[data-result-row]').length===3&&document.body.textContent.includes('EXTRA')`, 'Back to the full result');
   // Duplicate keys among staged values are reported before Apply.
   await cdp.evaluate(`document.querySelector('[data-cell="0:0"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));document.querySelector('.grid-wrap').focus()`);
@@ -1886,10 +1895,10 @@ try {
   await cdp.until(`document.querySelector('[data-result-row="2"]')?.dataset.rowDraft==='deleted'&&document.querySelector('[data-cell="1:1"]')?.dataset.draft==='edited'`, 'Edits are drafts again');
   assert.equal(await cdp.evaluate(`document.querySelector('[data-cell="0:1"]').dataset.draft`), 'edited', 'The unselected change stayed a draft');
   // Review the deletions on their own.
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Deletions only').click()`);
+  await clickBar(cdp,'Deletions only');
   await cdp.until(`document.querySelectorAll('[data-result-row]').length===1&&document.querySelector('[data-result-row]').dataset.rowDraft==='deleted'`, 'Only the deletion is listed');
   assert.equal(await cdp.evaluate(`document.querySelectorAll('thead th[data-column-index]').length`), 1, 'Only the identifying key column remains');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Deletions only').click()`);
+  await clickBar(cdp,'Deletions only');
   await cdp.until(`document.querySelectorAll('[data-result-row]').length===3`, 'Back to all rows');
   await cdp.evaluate(`window.dispatchEvent(new CustomEvent('fbsdb.draftsCleared',{detail:{tabId:'tab-1'}}))`);
  });
@@ -1921,7 +1930,7 @@ try {
   await cdp.evaluate(`document.querySelector('.cell-editor').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}))`);
   await cdp.until(`!document.querySelector('.cell-editor')`);
   await pick(0, 1);
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Duplicate row').click()`);
+  await clickBar(cdp,'Duplicate row');
   await cdp.until(`document.querySelector('[data-new-row="1"]')`, 'Duplicate became a new row draft');
   assert.equal(await cdp.evaluate(`document.querySelector('[aria-label="New row 1 CODE"]').value`), 'x', 'Values are copied');
   assert.equal(await cdp.evaluate(`document.querySelector('[aria-label="New row 1 ID"]').value`), '', 'The key is left for the database');
@@ -1947,8 +1956,7 @@ try {
   await cdp.until(`[...document.querySelectorAll('.grid-edit-bar button')].some(b=>b.textContent==='New row'&&!b.disabled)`, 'Editing available');
   await cdp.evaluate(`document.querySelector('[data-cell="0:1"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));document.querySelector('.grid-wrap').focus()`);
   for (let i = 0; i < 2; i++) await cdp.evaluate(`document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',shiftKey:true,bubbles:true,cancelable:true}))`);
-  await cdp.until(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Bulk edit…')`);
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Bulk edit…').click()`);
+  await clickBar(cdp,'Bulk edit…');
   await cdp.until(`document.querySelector('[aria-label="Bulk edit"]')`, 'Bulk panel');
   const setSelect = value => cdp.evaluate(`(()=>{const el=document.querySelector('[aria-label="Bulk operation"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('change',{bubbles:true}))})()`);
   const setAmount = value => cdp.evaluate(`(()=>{const el=document.querySelector('[aria-label="Bulk amount"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('input',{bubbles:true}))})()`);
@@ -1962,6 +1970,31 @@ try {
   assert.equal(await cdp.evaluate(`document.querySelector('[data-cell="2:1"]').dataset.draft||''`), '', 'The NULL cell was skipped');
   await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.getAttribute('aria-label')==='Undo draft change').click()`);
   await cdp.until(`!document.querySelector('[data-cell="0:1"]').dataset.draft&&!document.querySelector('[data-cell="1:1"]').dataset.draft`, 'One Undo takes the whole bulk edit back');
+  const bar = `[...document.querySelectorAll('.grid-edit-bar > button')]`; // edit bar menu
+  assert.equal(await cdp.evaluate(`${bar}.some(b=>b.textContent==='Bulk edit…')`), false, 'Bulk edit is not on the bar by default');
+  assert.equal(await cdp.evaluate(`${bar}.some(b=>b.textContent==='New row')&&${bar}.some(b=>b.textContent==='Delete row')`), true, 'The core actions stay on the bar');
+  await cdp.evaluate(`document.querySelector('.grid-edit-more-button').click()`);
+  await cdp.until(`document.querySelector('.grid-edit-menu[role="menu"]')&&document.activeElement?.closest('.grid-edit-menu')`, 'Menu opens with focus inside');
+  const first = await cdp.evaluate(`document.activeElement.textContent`);
+  await cdp.evaluate(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',bubbles:true,cancelable:true}))`);
+  assert.notEqual(await cdp.evaluate(`document.activeElement.textContent+document.activeElement.getAttribute('aria-label')`), first + 'null', 'ArrowDown moves to another item');
+  await cdp.evaluate(`document.activeElement.dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}))`);
+  await cdp.until(`!document.querySelector('.grid-edit-menu')&&document.activeElement===document.querySelector('.grid-edit-more-button')`, 'Escape closes the menu and returns focus to the More button');
+  // Pinning moves the action onto the bar and remembers it.
+  await cdp.evaluate(`document.querySelector('.grid-edit-more-button').click()`);
+  await cdp.until(`document.querySelector('[aria-label="Pin Bulk edit… to the bar"]')`);
+  await cdp.evaluate(`document.querySelector('[aria-label="Pin Bulk edit… to the bar"]').click()`);
+  await cdp.until(`${bar}.some(b=>b.textContent==='Bulk edit…')`, 'Pinned action is on the bar');
+  assert.equal(await cdp.evaluate(`JSON.parse(localStorage.getItem('fbsdb.gridEditBar.pinned')).includes('bulk')`), true, 'The pin is remembered');
+  await cdp.evaluate(`document.querySelector('[aria-label="Unpin Bulk edit… from the bar"]').click()`);
+  await cdp.until(`!${bar}.some(b=>b.textContent==='Bulk edit…')`, 'Unpinned action returns to the menu');
+  // A switched-on filter is never hidden inside the closed menu.
+  await clickBar(cdp, 'Changes only');
+  await cdp.until(`${bar}.some(b=>b.textContent==='Changes only'&&b.getAttribute('aria-pressed')==='true')`, 'Active toggle shown on the bar');
+  await cdp.evaluate(`${bar}.find(b=>b.textContent==='Changes only').click()`);
+  await cdp.until(`!${bar}.some(b=>b.textContent==='Changes only')`, 'Switched off, it returns to the menu');
+  await cdp.evaluate(`document.querySelector('.grid-edit-menu')&&document.querySelector('.grid-edit-more-button').click()`);
+  await cdp.evaluate(`localStorage.removeItem('fbsdb.gridEditBar.pinned')`);
   // Numbers are read the way the locale writes them.
   await cdp.evaluate(`document.querySelector('[data-cell="0:1"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));document.querySelector('.grid-wrap').focus()`);
   await cdp.evaluate(`document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'F2',bubbles:true,cancelable:true}))`);
@@ -1991,7 +2024,7 @@ try {
   const pick = (r, c) => cdp.evaluate(`document.querySelector('[data-cell="${r}:${c}"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));document.querySelector('.grid-wrap').focus()`);
   const clickLabel = label => cdp.evaluate(`document.querySelector('[aria-label="${label}"]').click()`);
   await clipboard('A\tN1\nB\tN2'); await pick(0, 1);
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Paste…').click()`);
+  await clickBar(cdp,'Paste…');
   await cdp.until(`document.querySelector('[aria-label="Paste into the grid"]')`, 'Paste panel');
   await cdp.until(`document.querySelector('[aria-label="Paste preview"]')?.textContent.includes('4 cells would change')`, 'Positional preview');
   assert.equal(await cdp.evaluate(`document.querySelector('[data-cell="0:1"]').dataset.draft||''`), '', 'The preview stages nothing');
@@ -2024,7 +2057,7 @@ try {
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'FLAGS',columns:['ID']})`);
   await cdp.until(`[...document.querySelectorAll('.grid-edit-bar button')].some(b=>b.textContent==='New row'&&!b.disabled)`, 'Editing available');
   assert.equal(await cdp.evaluate(`!!document.querySelector('[aria-label="Toggle ACTIVE"]')`), false, 'Plain text until a mapping is chosen');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Checkbox columns…').click()`);
+  await clickBar(cdp,'Checkbox columns…');
   await cdp.until(`document.querySelector('[aria-label="Checkbox mapping for ACTIVE"]')`, 'Mapping panel');
   assert.equal(await cdp.evaluate(`!!document.querySelector('[aria-label="Checkbox mapping for ID"]')`), true);
   await cdp.evaluate(`(()=>{const el=document.querySelector('[aria-label="Checkbox mapping for ACTIVE"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,'yn');el.dispatchEvent(new Event('change',{bubbles:true}))})()`);
@@ -2074,7 +2107,7 @@ try {
   await cdp.evaluate(`(()=>{const input=document.querySelector('[aria-label="Label for this work"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'Fix codes');input.dispatchEvent(new Event('input',{bubbles:true}))})()`);
   await cdp.until(`document.querySelector('.grid-edit-tx')?.textContent.includes('“Fix codes”: 1 grid change applied')`, 'Label shown with the summary');
   // A user-written check.
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Checks…').click()`);
+  await clickBar(cdp,'Checks…');
   await cdp.until(`document.querySelector('[aria-label="Pre-commit checks"]')`);
   const type = (label, value, tag = 'INPUT') => cdp.evaluate(`(()=>{const el=document.querySelector('[aria-label="${label}"]');const proto=el.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('input',{bubbles:true}))})()`);
   await type('Check name', 'Short codes'); await type('Check query', 'SELECT id FROM batches WHERE LENGTH(code) > 3');
@@ -2164,7 +2197,7 @@ try {
   const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'RECORDS',columns:['ID']})`);
   await cdp.until(`[...document.querySelectorAll('.grid-edit-bar button')].some(b=>b.textContent==='New row'&&!b.disabled)`, 'Editing available');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Record view').click()`);
+  await clickBar(cdp,'Record view');
   await cdp.until(`document.querySelector('[aria-label="Record editor"]')`, 'Record editor');
   assert.match(await cdp.evaluate(`document.querySelector('[aria-label="Record editor"] header').textContent`), /Record 1 of 3/);
   assert.equal(await cdp.evaluate(`document.querySelector('[aria-label="Record editor"] [data-locked] dt').textContent.includes('🔒')`), true, 'Locked fields are marked and not editable');
@@ -2205,6 +2238,7 @@ try {
   await cdp.until(`document.body.textContent.includes('Left out (key, locked or secret-looking): ID, API_TOKEN.')`, 'Key and secret-looking columns are left out');
   const stored = await cdp.evaluate(`localStorage.getItem('fbsdb.rowTemplates')`);
   assert.ok(!stored.includes('secret') && !stored.includes('99'), 'Nothing sensitive or identifying is stored');
+  await cdp.evaluate(`document.querySelector('.grid-edit-more-button').click()`);
   await cdp.until(`document.querySelector('[aria-label="New row from template"]')`, 'Template selector appears');
   await cdp.evaluate(`(()=>{const el=document.querySelector('[aria-label="New row from template"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,'Open item');el.dispatchEvent(new Event('change',{bubbles:true}))})()`);
   await cdp.until(`document.querySelector('[data-new-row="2"]')&&document.querySelector('[aria-label="New row 2 STATUS"]').value==='NEW'`, 'A new row is filled from the template');
@@ -2236,7 +2270,7 @@ try {
   await tab();
   await cdp.until(`document.body.textContent.includes('That was the last editable cell')`, 'The end is reported when Tab does not add rows');
   assert.equal(await cdp.evaluate(`!!document.querySelector('[data-new-row]')`), false);
-  await cdp.click('[aria-label="Tab adds a row"]');
+  await clickBar(cdp,'Tab adds a row');
   await edit(0, 2); await cdp.until(`document.querySelector('[data-cell="0:2"] .cell-editor')`); await tab();
   await cdp.until(`document.querySelector('[data-new-row="1"]')`, 'A new row draft starts');
   await cdp.until(`document.activeElement?.getAttribute('aria-label')==='New row 1 NAME'`, 'Focus lands on the first required field');
@@ -2256,7 +2290,7 @@ try {
   const column = (name, type) => ({ name, type, sourceSchema: 'APP', sourceTable: 'ORDERS_DESC', sourceColumn: name });
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('ID', 'NUMBER'), column('CUST_ID', 'NUMBER')])},rows:[['1','7'],['2','8'],['3','7']],rowsAffected:null,elapsedMs:2,returnedRows:3,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
   await cdp.until(`document.querySelector('[data-cell="2:1"]')?.textContent.includes('7')`, 'Orders result');
-  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Descriptions…').click()`);
+  await clickBar(cdp,'Descriptions…');
   await cdp.until(`document.querySelector('[aria-label="Key descriptions"]')`, 'Descriptions panel');
   const type = (label, value) => cdp.evaluate(`(()=>{const el=document.querySelector('[aria-label="${label}"]');const proto=el.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLTextAreaElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event(el.tagName==='SELECT'?'change':'input',{bubbles:true}))})()`);
   await type('Description column', '1'); await type('Description query', 'SELECT id, name FROM customers WHERE id IN ({keys})');

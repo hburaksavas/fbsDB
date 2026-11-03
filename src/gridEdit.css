@@ -99,3 +99,15 @@ tr[data-row-error] td.rownum::after{content:'✖';margin-left:2px}
 .pending-related{margin:4px 0}
 .pending-related-results{list-style:none;margin:2px 0;padding:0}
 .pending-related-results li[data-status=blocked]{font-weight:700}
+
+.grid-edit-more{position:relative;display:inline-block}
+.grid-edit-menu{position:absolute;left:0;top:calc(100% + 3px);z-index:60;min-width:230px;padding:4px;border:1px solid var(--line);border-radius:5px;background:var(--panel2);color:var(--text);box-shadow:0 10px 30px var(--shadow-color)}
+.grid-edit-menu-row{display:flex;align-items:center;gap:2px}
+.grid-edit-menu-row>button:first-child,.grid-edit-menu-field{flex:1;text-align:left;justify-content:flex-start}
+.grid-edit-menu button{padding:4px 8px}
+.grid-edit-menu button:hover:not(:disabled),.grid-edit-menu button:focus-visible{background:var(--hover-bg)}
+.grid-edit-menu button:disabled{opacity:.45}
+.grid-edit-menu [role=menuitemcheckbox][aria-checked=true]::before{content:"✓ ";margin-right:2px}
+.grid-edit-pin{flex:0 0 auto;opacity:.5}
+.grid-edit-pin[aria-pressed=true]{opacity:1;color:var(--accent-text)}
+.grid-edit-menu select{width:100%}
