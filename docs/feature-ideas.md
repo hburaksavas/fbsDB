@@ -30,6 +30,8 @@ Bu sıralama ilk uçtan uca akışı tanımlar; sonraki fazların tümünü bekl
 
 ### Uygulama ilerlemesi — 2026-11-01
 
+- **FI-217 / FI-218 / FI-211 / FI-216 · Tamamlandı (giriş kolaylıkları):** (1) Sayı sütunlarında yazılan değer kullanıcının yerel ayarına göre okunur (tr: "1.234,5" → 1234.5, "19,99" → 19.99; veritabanı biçimi ve İngilizce biçim de kabul); okunuş "Read … as …" ile gösterilir, belirsiz/bozuk girdi ("1,2,3", üçlü olmayan binlik grupları) tahmin edilmeden hata olarak işaretlenir. (2) "Checkbox columns…" ile düzenlenebilir metin/sayı sütunları Y/N, 1/0, T/F, TRUE/FALSE eşlemesiyle onay kutusu olur; NULL üçüncü (belirsiz) durumdur ve tıklayınca açık olur, eşleme dışı değer metin olarak görünür kalır, yalnızca eşlenen değerler yazılır; seçim `fbsdb.booleanColumns`'ta saklanır. (3) Metin hücresi düzenlenirken yüklü satırlardaki farklı değerler (sık olandan başlayarak, en çok 30) öneri olur; kapsam "N of M distinct values in the K loaded rows. Any other text can still be typed." diye söylenir, serbest giriş korunur. (4) Toplu düzenleme "Change only the date" / "Change only the time" işlemleriyle zaman damgasının yalnızca tarih ya da saat kısmını (kesir ve diğer kısım korunarak) değiştirir; geçersiz tarih/saat ve tarih olmayan değerler atlananlar arasında nedeniyle listelenir. Birim (662) ve WebView2 testi geçti.
+
 - **FI-167 / FI-183 / FI-198 / FI-166 / FI-204 · Tamamlandı (toplu giriş):** (1) "Bulk edit…" seçili hücreleri tek seferde değiştirir: değere ayarla, NULL yap, metinde bul-değiştir (düz metin, büyük/küçük harf seçenekli), sayı ekle, çarp, yüzde artır. Önce önizleme gösterilir ("N hücre değişir, M atlandı", eski → yeni, atlananların nedeni: NULL, sayı değil, kilitli sütun); hiçbir şey hazırlanmaz, "Stage" tek bir Geri Al adımıdır. (2) "Paste…" / Ctrl+V panodaki tablo (sekmeyle ayrılmış, tırnaklı hücreler ve Windows satır sonları destekli) verisini önizler: ilk satır başlık olarak atlanabilir; etkin hücreden itibaren konum sırasıyla doldurur ya da tek anahtar sütunu varsa ilk yapıştırılan sütunu anahtar sayıp satırları anahtarla eşler (yüklü olmayan anahtar atlananlar arasında). Boş hücre NULL olur, grid dışına taşan sütun/satırlar bildirilir. Birim (652) ve WebView2 testi geçti.
 
 - **FI-179 / FI-229 / FI-197 / FI-164 · Tamamlandı (düzenleme kolaylıkları):** (1) Bekleyen değişiklikler çekmecesindeki "Copy as script", deyimleri ve bind değerlerini (yorum olarak, NULL açıkça) gözden geçirilebilir bir betik olarak kopyalar; başlığı "COMMIT içermez" der. (2) Commit sonrası "Copy receipt": zaman, sekme, tablo, işlem sayıları, satır anahtarları ve eski → yeni değerler; kapsam notu yalnızca gridden gönderilenlerin listelendiğini söyler. (3) Ctrl+D etkin hücreye bir üst satırın görünen değerini (NULL dahil) taslak olarak kopyalar. (4) "Duplicate row" seçili satırı yeni satır taslağı yapar; anahtar, kimlik ve kilitli sütunlar veritabanına bırakılır. Birim (643) ve WebView2 testi geçti.
@@ -977,13 +979,13 @@ Her alt başlık bir konu grubunun ilgili fazdaki kapsamını toplar. Özellikle
 
 - [ ] **FI-205 · R4** — Related-record insertion: stage parent/child records together, show execution order and propagate supported generated keys within the same transaction.
 
-- [ ] **FI-211 · R4** — Existing-value suggestions: suggest values from the loaded result while editing text cells, retaining free entry and explaining suggestion scope.
+- [x] **FI-211 · R4** — Existing-value suggestions: suggest values from the loaded result while editing text cells, retaining free entry and explaining suggestion scope.
 
-- [ ] **FI-216 · R4** — Date/time component editing: change only the date or time component of selected timestamps while preserving other components and type semantics.
+- [x] **FI-216 · R4** — Date/time component editing: change only the date or time component of selected timestamps while preserving other components and type semantics.
 
-- [ ] **FI-217 · R4** — Locale-aware numeric input: parse user-entered number formats using an explicit locale and preview the precise numeric value sent to Oracle.
+- [x] **FI-217 · R4** — Locale-aware numeric input: parse user-entered number formats using an explicit locale and preview the precise numeric value sent to Oracle.
 
-- [ ] **FI-218 · R4** — Boolean-like column mappings: configure Y/N or 1/0 columns as checkboxes with a separate NULL state and explicit stored-value mappings.
+- [x] **FI-218 · R4** — Boolean-like column mappings: configure Y/N or 1/0 columns as checkboxes with a separate NULL state and explicit stored-value mappings.
 
 - [ ] **FI-219 · R4** — Drag-copy rows between grids: map source columns to a target table and stage INSERT drafts rather than execute mutations on drop.
 

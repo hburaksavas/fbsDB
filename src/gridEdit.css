@@ -75,3 +75,6 @@ tr[data-row-error] td.rownum::after{content:'✖';margin-left:2px}
 .bulk-preview{flex-basis:100%}
 .bulk-preview ul{margin:2px 0;padding-left:16px;max-height:90px;overflow:auto}
 .bulk-edit-panel footer{flex-basis:100%;display:flex;gap:6px}
+
+.boolean-cell{display:inline-flex;gap:4px;align-items:center}
+.cell-suggest-note{font-size:9px;color:var(--muted)}

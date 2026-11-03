@@ -1,5 +1,7 @@
 // Bulk edits are previews first: each operation turns the selected cells into proposed changes (and reasons for skipped cells);
 // nothing is staged until the user accepts the preview, and then it is a single undo step.
+import { replaceTemporalPart } from './valueSuggestions.js';
+
 export const bulkModes = Object.freeze([
   { id: 'set', label: 'Set to a value', needs: 'value' },
   { id: 'null', label: 'Set to NULL', needs: null },
@@ -7,6 +9,8 @@ export const bulkModes = Object.freeze([
   { id: 'add', label: 'Add a number', needs: 'amount' },
   { id: 'multiply', label: 'Multiply by a number', needs: 'amount' },
   { id: 'percent', label: 'Increase by a percentage', needs: 'amount' },
+  { id: 'setdate', label: 'Change only the date (keep the time)', needs: 'value', hint: 'YYYY-MM-DD' },
+  { id: 'settime', label: 'Change only the time (keep the date)', needs: 'value', hint: 'HH:MM[:SS]' },
 ]);
 
 const numeric = text => typeof text === 'string' && /^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/.test(text.trim());
@@ -23,6 +27,13 @@ export function planBulkEdit(cells, { mode, value = '', find = '', replacement =
     if (!cell.editable) { skipped.push({ ...cell, reason: cell.reason || 'This column cannot be edited.' }); continue; }
     const base = { rowIndex: cell.rowIndex, col: cell.col, name: cell.name, from: cell.text };
     if (mode === 'set') { if (cell.text !== value) changes.push({ ...base, to: value, isNull: false }); continue; }
+    if (mode === 'setdate' || mode === 'settime') {
+      if (cell.text == null) { skipped.push({ ...cell, reason: 'The value is NULL.' }); continue; }
+      const part = replaceTemporalPart(cell.text, mode === 'setdate' ? 'date' : 'time', value.trim());
+      if (part.error) { skipped.push({ ...cell, reason: part.error }); continue; }
+      if (part.value !== cell.text) changes.push({ ...base, to: part.value, isNull: false });
+      continue;
+    }
     if (mode === 'null') { if (cell.text !== null) changes.push({ ...base, to: null, isNull: true }); continue; }
     if (mode === 'replace') {
       if (cell.text == null) { skipped.push({ ...cell, reason: 'The value is NULL.' }); continue; }

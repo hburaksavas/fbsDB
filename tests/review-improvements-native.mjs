@@ -1901,6 +1901,13 @@ try {
   await cdp.evaluate(`document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'d',ctrlKey:true,bubbles:true,cancelable:true}))`);
   await cdp.until(`document.querySelector('[data-cell="1:1"]')?.dataset.draft==='edited'&&document.querySelector('[data-cell="1:1"]').textContent.includes('x')`, 'Ctrl+D copied the value above');
   await pick(0, 1);
+  await cdp.evaluate(`document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'F2',bubbles:true,cancelable:true}))`);
+  await cdp.until(`document.querySelector('.cell-editor')`, 'Editor for suggestions');
+  assert.deepEqual(await cdp.evaluate(`[...document.querySelectorAll('#cell-suggestions option')].map(o=>o.value)`), ['x', 'y'], 'Loaded values are suggested');
+  assert.match(await cdp.evaluate(`document.querySelector('.cell-editor-wrap').textContent`), /2 of 2 distinct values in the 2 loaded rows\. Any other text can still be typed\./);
+  await cdp.evaluate(`document.querySelector('.cell-editor').dispatchEvent(new KeyboardEvent('keydown',{key:'Escape',bubbles:true,cancelable:true}))`);
+  await cdp.until(`!document.querySelector('.cell-editor')`);
+  await pick(0, 1);
   await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Duplicate row').click()`);
   await cdp.until(`document.querySelector('[data-new-row="1"]')`, 'Duplicate became a new row draft');
   assert.equal(await cdp.evaluate(`document.querySelector('[aria-label="New row 1 CODE"]').value`), 'x', 'Values are copied');
@@ -1942,6 +1949,13 @@ try {
   assert.equal(await cdp.evaluate(`document.querySelector('[data-cell="2:1"]').dataset.draft||''`), '', 'The NULL cell was skipped');
   await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.getAttribute('aria-label')==='Undo draft change').click()`);
   await cdp.until(`!document.querySelector('[data-cell="0:1"]').dataset.draft&&!document.querySelector('[data-cell="1:1"]').dataset.draft`, 'One Undo takes the whole bulk edit back');
+  // Numbers are read the way the locale writes them.
+  await cdp.evaluate(`document.querySelector('[data-cell="0:1"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));document.querySelector('.grid-wrap').focus()`);
+  await cdp.evaluate(`document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'F2',bubbles:true,cancelable:true}))`);
+  await cdp.until(`document.querySelector('.cell-editor')`);
+  await cdp.evaluate(`(()=>{const input=document.querySelector('.cell-editor');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'1.234,5');input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))})()`);
+  await cdp.until(`document.querySelector('[data-cell="0:1"]')?.dataset.draft==='edited'&&!document.querySelector('[data-cell="0:1"]').hasAttribute('data-invalid')`, 'A locale-formatted number is accepted');
+  await cdp.until(`document.body.textContent.includes('Read “1.234,5” as 1234.5')`, 'The reading is shown');
   await cdp.evaluate(`window.dispatchEvent(new CustomEvent('fbsdb.draftsCleared',{detail:{tabId:'tab-1'}}))`);
  });
  await check('paste: spreadsheet data is previewed, filled by position or matched by key, and staged as drafts', async () => {
@@ -1977,6 +1991,40 @@ try {
   await cdp.until(`document.querySelector('[aria-label="Paste preview"]')?.textContent.includes('Row 3 CODE: c → Q')`, 'Key-matched preview');
   await cdp.evaluate(`[...document.querySelectorAll('[aria-label="Paste into the grid"] button')].find(b=>b.textContent.startsWith('Stage')).click()`);
   await cdp.until(`document.querySelector('[data-cell="2:1"]')?.dataset.draft==='edited'&&document.querySelector('[data-cell="2:1"]').textContent.includes('Q')`, 'Key-matched paste staged on the right row');
+  await cdp.evaluate(`window.dispatchEvent(new CustomEvent('fbsdb.draftsCleared',{detail:{tabId:'tab-1'}}))`);
+ });
+ await check('checkbox columns: a Y/N column is edited as a checkbox with NULL kept as the third state', async () => {
+  await cdp.evaluate(`document.querySelector('[aria-label="Close cell value"]')?.click()`);
+  await new Promise(resolve => setTimeout(resolve, 500));
+  await cdp.evaluate(`localStorage.removeItem('fbsdb.booleanColumns')`);
+  const before = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length`);
+  await cdp.click('[data-editor-tab="tab-1"] [role="tab"]'); await cdp.until(`${editor}`);
+  await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);if(request)__uxFixture.result(request,[['1']],false)})()`); await new Promise(resolve => setTimeout(resolve, 300));
+  await cdp.evaluate(`${editor}.setValue('SELECT id, active FROM flags');${editor}.setPosition({lineNumber:1,column:1})`); await new Promise(resolve => setTimeout(resolve, 400)); await cdp.evaluate(`${editor}.focus()`); await cdp.key('Enter', 2);
+  await cdp.until(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length>${before}`, 'Query sent');
+  const column = (name, type) => ({ name, type, sourceSchema: 'APP', sourceTable: 'FLAGS', sourceColumn: name });
+  await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('ID', 'NUMBER'), column('ACTIVE', 'VARCHAR2')])},rows:[['1','Y'],['2',null],['3','maybe']],rowsAffected:null,elapsedMs:2,returnedRows:3,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
+  await cdp.until(`document.querySelector('[data-cell="0:1"]')?.textContent.includes('Y')`, 'Flags result');
+  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Edit rows').click()`);
+  await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='FLAGS')`);
+  const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
+  await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'FLAGS',columns:['ID']})`);
+  await cdp.until(`[...document.querySelectorAll('.grid-edit-bar button')].some(b=>b.textContent==='New row'&&!b.disabled)`, 'Editing available');
+  assert.equal(await cdp.evaluate(`!!document.querySelector('[aria-label="Toggle ACTIVE"]')`), false, 'Plain text until a mapping is chosen');
+  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent==='Checkbox columns…').click()`);
+  await cdp.until(`document.querySelector('[aria-label="Checkbox mapping for ACTIVE"]')`, 'Mapping panel');
+  assert.equal(await cdp.evaluate(`!!document.querySelector('[aria-label="Checkbox mapping for ID"]')`), true);
+  await cdp.evaluate(`(()=>{const el=document.querySelector('[aria-label="Checkbox mapping for ACTIVE"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,'yn');el.dispatchEvent(new Event('change',{bubbles:true}))})()`);
+  await cdp.until(`document.querySelectorAll('[aria-label="Toggle ACTIVE"]').length===3`, 'Checkboxes shown');
+  assert.deepEqual(await cdp.evaluate(`[...document.querySelectorAll('[aria-label="Toggle ACTIVE"]')].map(box=>box.indeterminate?'null':box.checked?'on':'off')`), ['on', 'null', 'off']);
+  assert.match(await cdp.evaluate(`document.querySelector('[data-cell="2:1"]').textContent`), /maybe/, 'A value outside the mapping stays visible');
+  await cdp.evaluate(`document.querySelectorAll('[aria-label="Toggle ACTIVE"]')[0].click()`);
+  await cdp.until(`document.querySelector('[data-cell="0:1"]')?.dataset.draft==='edited'&&!document.querySelectorAll('[aria-label="Toggle ACTIVE"]')[0].checked`, 'Y toggled to N');
+  await cdp.evaluate(`document.querySelectorAll('[aria-label="Toggle ACTIVE"]')[1].click()`);
+  await cdp.until(`document.querySelectorAll('[aria-label="Toggle ACTIVE"]')[1].checked`, 'NULL becomes on, not a new value');
+  await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Pending changes')).click()`);
+  await cdp.until(`document.querySelector('[aria-label="Draft SQL preview"]')?.textContent.includes(':c1 VARCHAR2 = "N"')&&document.querySelector('[aria-label="Draft SQL preview"]').textContent.includes(':c1 VARCHAR2 = "Y"')`, 'Only mapped values are written');
+  await cdp.evaluate(`localStorage.removeItem('fbsdb.booleanColumns')`);
   await cdp.evaluate(`window.dispatchEvent(new CustomEvent('fbsdb.draftsCleared',{detail:{tabId:'tab-1'}}))`);
  });
  await check('workspace hub: pinned/recent destinations and template choice send only the explicit workspace action',async()=>{
