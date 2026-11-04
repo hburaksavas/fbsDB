@@ -23,11 +23,18 @@ export default defineConfig({
     },
   },
   optimizeDeps: {
+    // Otherwise the scan treats every HTML file in artifacts/ as an entry.
+    entries: ["index.html"],
     include: ["react", "react-dom/client"],
   },
   server: {
     host: "0.0.0.0",
     allowedHosts: ["terminal.local"],
+    watch: {
+      // Test and build output, which grows with every desktop run. Watching
+      // .artifacts alone keeps the dev server from ever answering.
+      ignored: ["**/.artifacts/**", "**/artifacts/**", "**/.tools/**", "**/.claude/**", "**/dist/**"],
+    },
     warmup: {
       clientFiles: ["./src/main.jsx"],
     },
