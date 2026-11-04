@@ -17,5 +17,5 @@ export function workbenchStatus({session={},connection={},selection,error=''}){
 export function transactionStatus(session={}){
  if(session.analysisReadOnly)return 'Read-only analysis';
  if(session.connectionLost&&session.transactionPending)return 'Transaction state unverified';
- return (session.autoCommit?'Auto commit':'Manual commit')+(session.transactionPending?' · pending':'');
+ return (session.autoCommit?'Auto commit':'Manual commit')+(session.transactionPending?' · not committed':'');
 }

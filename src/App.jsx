@@ -144,6 +144,7 @@ import { clearTabDrafts, countTabDrafts, draftStoreKey } from "./draftStore.js";
 import { HeldDraftsNotice } from './HeldDraftsNotice';
 import { ShortcutMapDialog } from './ShortcutMapDialog';
 import { LiveAnnouncer } from './LiveAnnouncer';
+import { FooterDrafts } from './FooterDrafts';
 import { announce, resultAnnouncement } from './announcer';
 import { contextOf, opensShortcutMap } from './shortcutMap';
 import { InlineBindZone } from "./InlineBindZone.jsx";
@@ -2624,7 +2625,7 @@ export function App() {
     </div>
       </DockWorkbench></LayoutLockContext.Provider>
     </div>
-    <footer className="app-status"><div className="footer-workspace"><Folder size={12}/><span title={workspace.root||'Open a workspace'}>{workspace.name}</span></div><div className="footer-context"><button type="button" aria-label="Getting started" onClick={()=>setShowGettingStarted(true)}><CircleHelp size={11}/><span>Getting started</span></button><WorkbenchStatus session={{...summarySession,exporting:!!tabResults[visibleOrigin]?.streamState?.busy}} connection={visibleConnection} selection={visibleOrigin===activeTabId&&resultTab==='Results'?view.selectionSummary:null} error={visibleOrigin===activeTabId?view.pageError:''}/></div><div className="footer-transaction" title={`${visibleConnection.profileName} · ${transactionStatus(summarySession)}`}><LockKeyhole size={12}/><span>{transactionStatus(summarySession)}</span></div></footer>
+    <footer className="app-status"><div className="footer-workspace"><Folder size={12}/><span title={workspace.root||'Open a workspace'}>{workspace.name}</span></div><button type="button" className="footer-target" aria-label={`Connection ${visibleConnection.profileName||'none'}${visibleConnection.environment&&visibleConnection.environment!=='UNKNOWN'?`, ${visibleConnection.environment}`:''}. Choose another connection`} onClick={()=>setShowPicker(true)}><EnvironmentBadge compact environment={visibleConnection.environment} profileName={visibleConnection.profileName}/><span>{visibleConnection.profileName||'No connection'}</span></button><FooterDrafts tabId={activeTabId} onShow={()=>setResultTab('Results')}/><div className="footer-context"><button type="button" aria-label="Getting started" onClick={()=>setShowGettingStarted(true)}><CircleHelp size={11}/><span>Getting started</span></button><WorkbenchStatus session={{...summarySession,exporting:!!tabResults[visibleOrigin]?.streamState?.busy}} connection={visibleConnection} selection={visibleOrigin===activeTabId&&resultTab==='Results'?view.selectionSummary:null} error={visibleOrigin===activeTabId?view.pageError:''}/></div><div className="footer-transaction" title={`${visibleConnection.profileName} · ${transactionStatus(summarySession)}`}><LockKeyhole size={12}/><span>{transactionStatus(summarySession)}</span></div></footer>
     {showPicker && <ConnectionPicker items={dbConnections.map(item => ({ ...item, recent: recentProfiles.includes(item.id) }))} current={activeConnection} onClose={() => setShowPicker(false)} onConnect={switchConnection} favorites={favorites} setFavorites={setFavorites} groups={connectionGroupNames} onManage={()=>{setShowPicker(false);setProfileEditor(true)}} managementError={managementError}
       onNew={() => { setShowPicker(false); setProfileEditor({}); }}
       onEdit={(profile) => { setShowPicker(false); setProfileEditor(profile); }}

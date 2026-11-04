@@ -193,7 +193,7 @@ try {
   await cdp.until(`document.querySelector('.app-status .workbench-context-status')?.textContent.includes('1 cells')`,'Selection footer');
   await cdp.evaluate(`__uxFixture.emit({type:'transaction.state',tabId:'tab-1',state:'pending',pending:true})`);
   await cdp.until(`document.querySelector('.workbench-context-status')?.textContent.includes('Transaction pending')`,'Pending footer');
-  assert.match(await cdp.evaluate(`document.querySelector('.app-status').textContent`),/Manual commit · pending/);
+  assert.match(await cdp.evaluate(`document.querySelector('.app-status').textContent`),/Manual commit · not committed/);
   await cdp.evaluate(`__uxFixture.emit({type:'transaction.state',tabId:'tab-1',state:'committed',pending:false});__uxFixture.emit({type:'transaction.autoCommit',tabId:'tab-1',enabled:true,autoCommit:true});${editor}.focus()`);
   await cdp.until(`document.querySelector('.app-status').textContent.includes('Auto commit')`,'Auto commit footer');
   await cdp.key('Enter',2);
@@ -2107,11 +2107,14 @@ try {
   await cdp.evaluate(`(()=>{const input=document.querySelector('.cell-editor');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'changed');input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))})()`);
   await cdp.until(`document.querySelector('.grid-edit-pending')?.textContent.includes('Pending: 1')`, 'One edit staged');
   await cdp.until(`document.querySelector('[data-announcer="polite"]').textContent==='1 pending change.'`, 'Staging is announced');
+  await cdp.until(`document.querySelector('.footer-drafts')?.textContent==='1 unapplied edit'`, 'The footer reminds that an edit is unapplied');
+  assert.ok(await cdp.evaluate(`!!document.querySelector('.app-status .footer-target')?.textContent.trim()`), 'The footer names the active connection');
   assert.equal(await cdp.evaluate(`document.querySelector('.held-drafts-notice')`), null, 'No notice while the edited result is shown');
   await run('SELECT 1 AS one FROM dual', [{ name: 'ONE', type: 'NUMBER' }], [['1']]);
   await cdp.until(`document.querySelector('.held-drafts-notice')?.textContent.includes('1 unapplied grid edit is kept for APP.HELD_ITEMS')`, 'Another result shows the held-edits notice');
   await cdp.evaluate(`[...document.querySelectorAll('.held-drafts-notice button')].find(b=>b.textContent==='Discard').click()`);
   await cdp.until(`!document.querySelector('.held-drafts-notice')`, 'Discard clears the notice');
+  await cdp.until(`!document.querySelector('.footer-drafts')`, 'The footer reminder goes with the discarded edit');
  });
  await check('paste: spreadsheet data is previewed, filled by position or matched by key, and staged as drafts', async () => {
   await cdp.evaluate(`document.querySelector('[aria-label="Close cell value"]')?.click()`);

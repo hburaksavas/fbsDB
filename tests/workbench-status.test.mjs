@@ -11,5 +11,5 @@ test('footer priority keeps running/cancellation and actual errors ahead of pend
  assert.match(workbenchStatus({session:{scriptRun:{running:true,awaitingSourceReview:{index:1}}},connection}).text,/statement 2/);
 });
 test('footer transaction text follows the physical session mode and disconnected ambiguity',()=>{
- assert.equal(transactionStatus({autoCommit:true}),'Auto commit');assert.equal(transactionStatus({transactionPending:true}),'Manual commit · pending');assert.equal(transactionStatus({analysisReadOnly:true,transactionPending:true}),'Read-only analysis');assert.equal(transactionStatus({connectionLost:true,transactionPending:true}),'Transaction state unverified');
+ assert.equal(transactionStatus({autoCommit:true}),'Auto commit');assert.equal(transactionStatus({transactionPending:true}),'Manual commit · not committed');assert.equal(transactionStatus({analysisReadOnly:true,transactionPending:true}),'Read-only analysis');assert.equal(transactionStatus({connectionLost:true,transactionPending:true}),'Transaction state unverified');
 });
