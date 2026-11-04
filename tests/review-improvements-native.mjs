@@ -40,6 +40,18 @@ try {
   assert.equal(idle.buttons.length, 1, 'One matching action is offered');
   assert.ok(['Choose a connection', 'Run statement', 'Go to the editor'].includes(idle.buttons[0]), 'The action matches the situation: ' + idle.buttons[0]);
  });
+ await check('dialog focus: opening moves focus inside, Tab stays inside, Escape closes and returns focus to the opener',async()=>{
+  for (const trigger of ['[aria-label="History"]', '[aria-label="Settings"]']) {
+   await cdp.evaluate(`document.querySelector(${JSON.stringify(trigger)}).focus()`);
+   await cdp.evaluate(`document.querySelector(${JSON.stringify(trigger)}).click()`);
+   await cdp.until(`document.querySelector('.modal-backdrop [role="dialog"],.modal-backdrop [role="alertdialog"]')&&document.activeElement?.closest('.modal-backdrop')`, `Focus moves into the dialog opened by ${trigger}`);
+   for (let i = 0; i < 12; i++) await cdp.key('Tab');
+   assert.equal(await cdp.evaluate(`!!document.activeElement?.closest('.modal-backdrop')`), true, `Tab stays inside the dialog (${trigger})`);
+   await cdp.key('Escape');
+   await cdp.until(`!document.querySelector('.modal-backdrop')`, `Escape closes the dialog (${trigger})`);
+   assert.equal(await cdp.evaluate(`document.activeElement===document.querySelector(${JSON.stringify(trigger)})`), true, `Focus returns to the opener (${trigger})`);
+  }
+ });
  await check('history UI reflects configured count and removes expired/excluded SQL',async()=>{
   await cdp.click('[aria-label="History"]');await cdp.until(`document.getElementById('query-history-title')`);
   const text=await cdp.evaluate(`document.querySelector('.query-history-modal').textContent`);
