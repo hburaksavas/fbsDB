@@ -23,6 +23,14 @@ For a signed release add `-RequireSigned -CertificateThumbprint <thumbprint>` us
 
 Extract an upgrade to a new directory rather than overwriting a running app. Close sessions, resolve transactions, save SQL, and back up `%LOCALAPPDATA%/fbsDB` and workspace `.fbsdb` first; WebView2 history/preferences reside in the configured WebView2 profile and should be backed up with the app closed. Credentials use current-user DPAPI and are not portable across users. Smoke-test the new build before removing the old directory. To roll back, close it and restore the previous application plus its matching settings/workspace/profile backup; newer settings may be read-only in older builds. Workspace tools remain format version 1 with additive metadata, but older writers can discard newer fields; do not edit shared tools with old builds after upgrading.
 
+## Publishing a release
+
+1. Set the new version in `package.json` and `package-lock.json`; packaging stamps it into the application. Add a matching `## X.Y.Z` section to `CHANGELOG.md`.
+2. Pass the release gate above and push to `master`.
+3. Tag and push: `git tag vX.Y.Z`, then `git push origin vX.Y.Z`. The [release workflow](ci.md#release-workflow) builds and publishes the package.
+
+The hosted workflow does not launch the application or sign it, so the gate on the release owner's machine is the only desktop and live Oracle check. A signed release cannot go through this workflow until a certificate is available to it.
+
 ## User-visible performance budgets
 
 Provisional targets on a documented reference Windows machine: packaged editor ready p95 <= 3 seconds, first local connection/SELECT <= 5 seconds, first schema discovery <= 5 seconds. Record machine, Oracle version, network conditions, sample count and cold/warm distinction. Browser bundle size is diagnostic, not acceptance for desktop startup. The desktop regression report records navigation-relative WebView2 shell/editor measurements; live regression reports connection and metadata durations. These are not process-launch-to-ready or production-network guarantees. Use at least 20 independent samples for release p95; a single regression run proves functionality only. Revisit targets after the pilot.

@@ -9,6 +9,8 @@ $publishDir = Join-Path $artifactsRoot "fbsDB-win-x64"
 $archivePath = Join-Path $artifactsRoot "fbsDB-win-x64.zip"
 $appDir = Join-Path $publishDir "app"
 $launcherPath = Join-Path $repoRoot ".artifacts\portable-launcher\fbsDB.exe"
+# package.json is the single source of the release version.
+$version = (Get-Content -LiteralPath (Join-Path $repoRoot "package.json") -Raw -Encoding UTF8 | ConvertFrom-Json).version
 
 if (-not (Test-Path (Join-Path $localDotnet "dotnet.exe"))) {
     & (Join-Path $PSScriptRoot "setup-dotnet.ps1")
@@ -39,7 +41,7 @@ try {
 
     & (Join-Path $localDotnet "dotnet.exe") publish $project -c Release -r win-x64 `
         -p:Platform=x64 -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true `
-        --self-contained true -o $appDir
+        "-p:Version=$version" --self-contained true -o $appDir
     if ($LASTEXITCODE -ne 0) { throw "The x64 desktop publish failed." }
 
     Copy-Item -LiteralPath $launcherPath -Destination (Join-Path $publishDir 'fbsDB.exe')
@@ -49,8 +51,8 @@ try {
         }
     }
 
-    @'
-fbsDB portable Windows x64 build
+    (@'
+fbsDB __VERSION__ portable Windows x64 build
 
 Extract the entire ZIP, then run fbsDB.exe in this folder.
 Keep the app/ folder next to fbsDB.exe when moving or sharing this build.
@@ -64,7 +66,7 @@ Microsoft Edge WebView2 Runtime (Evergreen) must be installed on the machine.
 
 Configure Oracle aliases through a tnsnames.ora file. ODP.NET Core is bundled;
 an Oracle client installation is not needed for ordinary TCP connections.
-'@ | Set-Content -LiteralPath (Join-Path $publishDir "README-portable.txt") -Encoding UTF8
+'@).Replace('__VERSION__', $version) | Set-Content -LiteralPath (Join-Path $publishDir "README-portable.txt") -Encoding UTF8
 
     $signTargets = @((Join-Path $publishDir 'fbsDB.exe'), (Join-Path $appDir 'fbsDB.exe'))
     if ($CertificateThumbprint) {
@@ -76,7 +78,9 @@ an Oracle client installation is not needed for ordinary TCP connections.
         }
     }
     Compress-Archive -Path (Join-Path $publishDir "*") -DestinationPath $archivePath -CompressionLevel Optimal
-    Write-Host "Portable package created: $archivePath"
+    $archiveHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
+    [IO.File]::WriteAllText("$archivePath.sha256", "$archiveHash  $(Split-Path -Leaf $archivePath)`n")
+    Write-Host "Portable package $version created: $archivePath"
 }
 finally {
     Pop-Location

@@ -7,7 +7,7 @@ The job performs these checks in order:
 1. Install JavaScript dependencies with `npm ci`.
 2. Reject stale generated bridge files, then typecheck the TypeScript bridge API and the history and query outcome helpers.
 3. Build the web bundle and reject generated theme-file drift.
-4. Run JavaScript tests with console and JUnit reports. The build runs first because the Sites packaging test inspects `dist`.
+4. Run JavaScript tests with console and JUnit reports.
 5. Run the load smoke scenarios with budgets enforced.
 6. Run the eleven database-independent native smoke projects listed explicitly in `scripts/test-native.ps1`.
 7. Run the large TNS smoke, `tests/ScaleLoad` with 1,000 aliases and no database.
@@ -36,6 +36,10 @@ dotnet build native/FbsDb/FbsDb.csproj -c Release -r win-x64 -p:Platform=x64 -p:
 ```
 
 The native runner accepts `-DotnetExe <absolute-path>` for a workspace-local SDK and `-ReportDirectory <path>` for an alternate report location. It returns a failure if any allowlisted project fails or the suite does not finish. JavaScript reporter flags can be passed through `npm test -- ...`.
+
+## Release workflow
+
+`.github/workflows/release.yml` runs when a `vX.Y.Z` tag is pushed. It reruns the validation job, rejects a tag that differs from the `package.json` version or has no `CHANGELOG.md` section, builds the portable package and publishes it with its `.sha256` file as a GitHub release. Only this job has write access to the repository. The steps are in [Product and release](product-and-release.md#publishing-a-release).
 
 ## Separate integration checks
 

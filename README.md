@@ -4,6 +4,10 @@
 
 > The project is in active development. The desktop app needs Windows and a reachable Oracle database for live SQL features; the browser build is a UI preview.
 
+## Download
+
+Get `fbsDB-win-x64.zip` from the [latest release](https://github.com/hburaksavas/fbsDB/releases/latest), extract the whole ZIP and run `fbsDB.exe`. It needs Windows x64 and Microsoft Edge WebView2 Runtime; .NET and the Oracle driver are bundled. Builds are not code-signed yet, so SmartScreen may warn on first launch. Changes are listed in the [changelog](CHANGELOG.md).
+
 ## Highlights
 
 - **Connection-aware editing:** save Oracle connection profiles using Basic host/service or SID, TNS aliases, or a custom Oracle Net descriptor. Each SQL tab keeps its own session and pending transaction.
@@ -181,7 +185,7 @@ npm run typecheck:domain
 .\scripts\test-workspace.ps1
 ```
 
-The JavaScript tests cover editor, workbench, results, and bridge behavior. Additional .NET smoke projects under `tests/` cover native services; some require a configured live Oracle database. `npm run test:sites` checks the browser worker build.
+The JavaScript tests cover editor, workbench, results, and bridge behavior. Additional .NET smoke projects under `tests/` cover native services; some require a configured live Oracle database.
 
 `npm run test:load` runs repeatable database-independent load scenarios for large result filtering/sorting, CSV export, schema completion, SQL batches and workspace search. Use `-- --profile smoke --enforce-budgets` for the CI check, or `-- --profile stress` for larger datasets. JSON reports go to `.artifacts/load/`. Workload sizes, timed runs, measurement limits and complementary live Oracle scenarios are described in [Load testing](docs/load-testing.md).
 
@@ -202,8 +206,7 @@ Document state, native command handlers, and the shared bridge contract are desc
 | `native/FbsDb/` | WinUI shell, WebView2 host, Oracle and local services |
 | `tests/` | JavaScript and .NET checks |
 | `scripts/` | Desktop build/run/package and local demo database setup |
-| `worker/` | Browser build asset worker |
-| `docs/` | Architecture, CI, load testing, release acceptance, UI decisions and [remaining work](docs/remaining-work.md) |
+| `docs/` | Architecture, CI, load testing, release acceptance and UI decisions |
 
 The optional `scripts/setup-banking-db.ps1` sets up a local sample banking database for development on a machine with Oracle Free installed. Review the script and its database prerequisites before running it.
 
