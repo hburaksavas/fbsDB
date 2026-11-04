@@ -2,6 +2,12 @@
 
 The React workbench runs inside a WinUI WebView2 host. Oracle access and local file operations run in the native process. The browser preview uses the same UI with native commands disabled.
 
+## Monaco
+
+Monaco ships inside the application bundle and is never downloaded at runtime. `src/monacoEditor.js` is the only module that imports `@monaco-editor/react`; it passes the bundled `monaco-editor` to the loader, whose default would otherwise fetch the editor from a CDN. The module is loaded lazily to stay out of the startup chunk. `monaco-editor` is pinned to an exact version, so upgrades are deliberate.
+
+The native splash stays up until `ui.ready`. The workbench sends it after `src/editorStartup.js` reports the editor presentable, meaning mounted, with SQL colors and fonts loaded and painted, so the user never sees the editor finish loading. That wait is time-limited and cannot fail, so it can never keep the splash up.
+
 ## Documents and sessions
 
 `src/documentSessions.js` owns document order, active document identity, content, path, dirty state, disk version, and external-change notices. Every transition runs through `documentSessionsReducer`. `useDocumentSessions` subscribes through React's `useSyncExternalStore`; active editor fields are derived from this state. Asynchronous callbacks read the same store directly, without copies synchronized after a render.

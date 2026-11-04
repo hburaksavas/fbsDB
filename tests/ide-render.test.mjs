@@ -36,7 +36,7 @@ test('workbench and IDE dialogs render with disconnected session and explicit co
     export const html=renderToString(<App/>);
     export const palette=renderToString(<IdeCommandPalette mode="commands" files={[]} objects={[]} connections={[]} outline={[]} commands={[{id:'run',label:'Run SQL',disabled:true}]} onClose={()=>{}} onChoose={()=>{}}/>);
     export const script=renderToString(<SqlScriptDialog source="CREATE TABLE t(x NUMBER); SELECT :x FROM dual;" run={null} timeout={0} onTimeout={()=>{}} onStart={()=>{}} onCancel={()=>{}} onClose={()=>{}} disabled={true}/>);
-  `,resolveDir:process.cwd(),loader:'jsx'},bundle:true,write:false,format:'cjs',platform:'node',jsx:'automatic',logLevel:'silent',banner:{js:`globalThis.window={innerHeight:900,chrome:{webview:{postMessage(){}}}};globalThis.document={activeElement:null};globalThis.localStorage={getItem(){return null},setItem(){}};`}});
+  `,resolveDir:process.cwd(),loader:'jsx'},bundle:true,write:false,format:'cjs',platform:'node',jsx:'automatic',logLevel:'silent',plugins:[{name:'server-render-without-monaco',setup(build){build.onResolve({filter:/monacoEditor.js$/},()=>({path:'monaco',namespace:'stub'}));build.onLoad({filter:/.*/,namespace:'stub'},()=>({contents:'export default ()=>null;export const DiffEditor=()=>null;',loader:'js'}))}}],banner:{js:`globalThis.window={innerHeight:900,chrome:{webview:{postMessage(){}}}};globalThis.document={activeElement:null};globalThis.localStorage={getItem(){return null},setItem(){}};`}});
   const module={exports:{}};
   new Function('module','exports','require',output.outputFiles[0].text)(module,module.exports,createRequire(import.meta.url));
   assert.match(module.exports.environment,/data-env="PROD"/);

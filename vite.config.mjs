@@ -14,6 +14,14 @@ export default defineConfig({
       },
     },
   },
+  worker: {
+    rollupOptions: {
+      output: {
+        // The WinUI resource indexer reads ".worker-<hash>" in a file name as an invalid qualifier.
+        entryFileNames: (chunk) => `assets/${chunk.name.replaceAll(".", "-")}-[hash].js`,
+      },
+    },
+  },
   optimizeDeps: {
     include: ["react", "react-dom/client"],
   },

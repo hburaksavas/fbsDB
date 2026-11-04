@@ -2439,10 +2439,8 @@ try {
   await cdp.click('[aria-label="Create Oracle package project"]');await cdp.until(`__uxFixture.commands.some(c=>c.command==='workspace.create'&&c.payload.template==='oracle-package')`);
   assert.equal(await cdp.evaluate(`__uxFixture.commands.filter(c=>c.command==='sql.execute').length`),count);
  });
- // Monaco's diff editor starts a cross-origin web worker and falls back to the main thread; the browser reports that as an opaque
- // "Script error." with no file or line. Only that exact signal, only while a diff view is open, is tolerated.
  const errorLog=await cdp.evaluate('window.__errorLog');
- assert.deepEqual(errorLog.filter(entry=>!(entry.message==='Script error.'&&!entry.file&&!entry.line&&/local history|comparison/.test(entry.during||''))),[],JSON.stringify(errorLog));
+ assert.deepEqual(errorLog,[],JSON.stringify(errorLog));
 } catch(error){failure=error;console.error(error.stack)}
 finally {
  await writeFile(path.join(root,'review-improvements.json'),JSON.stringify({status:failure?'failed':'passed',coverage:'real WebView2, simulated replies, database and file operations blocked',checks,error:failure?.message},null,2));

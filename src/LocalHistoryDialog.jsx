@@ -3,7 +3,7 @@ import {ModalBackdrop} from './ModalBackdrop';
 import {useDialogFocus} from './ConnectionManager';
 import {sendNativeCommand,subscribeNativeMessages} from './nativeBridge';
 
-const DiffEditor=lazy(()=>import('@monaco-editor/react').then(module=>({default:module.DiffEditor})));
+const DiffEditor=lazy(()=>import('./monacoEditor.js').then(module=>({default:module.DiffEditor})));
 const size=bytes=>bytes<1024?`${bytes} B`:`${(bytes/1024).toFixed(bytes<10240?1:0)} KB`;
 
 // Compares earlier saved versions with the editor text. Restoring only edits the editor (undoable); nothing is written to disk.

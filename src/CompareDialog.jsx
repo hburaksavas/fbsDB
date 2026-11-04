@@ -3,7 +3,7 @@ import {ModalBackdrop} from './ModalBackdrop';
 import {useDialogFocus} from './ConnectionManager';
 import {comparisonSummary,placeSources,readDroppedFiles} from './compareSources';
 
-const DiffEditor=lazy(()=>import('@monaco-editor/react').then(module=>({default:module.DiffEditor})));
+const DiffEditor=lazy(()=>import('./monacoEditor.js').then(module=>({default:module.DiffEditor})));
 
 // Read-only comparison of up to two sources (editor text, clipboard, dropped files). Nothing is opened, saved or executed.
 export function CompareDialog({initial,editorText,theme,onClose}) {

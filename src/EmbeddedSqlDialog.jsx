@@ -1,5 +1,5 @@
 import {useRef,useState} from 'react';
-import Editor from '@monaco-editor/react';
+import Editor from './monacoEditor.js';
 import {ModalBackdrop} from './ModalBackdrop';
 import {useDialogFocus} from './ConnectionManager';
 import {formatOracleSql} from './sqlFormatter.js';
