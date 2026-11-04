@@ -7,7 +7,9 @@ export function desktopRegressionFixture(root, workspace = false) {
     const normalize = value => value.split(String.fromCharCode(92)).join('/').toLowerCase();
     const inside = value => typeof value === 'string' && normalize(value).startsWith(normalize(root) + '/') && !value.replace(/\\\\/g, '/').split('/').includes('..');
     window.addEventListener('error', event => state.errors.push(event.message));
-    window.addEventListener('unhandledrejection', event => state.errors.push(String(event.reason)));
+    // Monaco leaves some cancelled delays unhandled, such as WordHighlighter when a
+    // peek editor closes. Its own error handler does not count cancellation as an error.
+    window.addEventListener('unhandledrejection', event => { if (event.reason?.name !== 'Canceled') state.errors.push(String(event.reason?.stack || event.reason)); });
     const nativePost = chrome.webview.postMessage.bind(chrome.webview);
     const nativeAdd = chrome.webview.addEventListener.bind(chrome.webview);
     const nativeRemove = chrome.webview.removeEventListener.bind(chrome.webview);

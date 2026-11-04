@@ -18,6 +18,7 @@ string? sourceProcedure = null;
 string? sourcePackage = null;
 string? sourcePackageName = null;
 Exception? failure = null;
+var gridTables = new List<string>();
 void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
 async Task Check(string name, Func<Task> action)
 {
@@ -247,6 +248,7 @@ try
         await Reject<InvalidOperationException>(() => b.FetchNextPageAsync(cursor.ResultId!, 100));
         Require(Convert.ToInt32((await b.ExecuteAsync("SELECT 45 FROM dual")).Rows[0][0]) == 45, "Resumed session cannot execute queries.");
     });
+    await new GridApplyChecks(a, b, user, Check, Require, gridTables).RunAsync();
 }
 catch (Exception error) { failure = error; Console.Error.WriteLine(error.Message); }
 finally
@@ -262,6 +264,11 @@ finally
         try { await a.ExecuteAsync($"DROP TABLE {table}"); checks.Add(new { name = "temporary table removed", status = "passed" }); Console.WriteLine("PASS temporary table removed"); }
         catch (Exception error) { failure ??= error; checks.Add(new { name = "temporary table removed", status = "failed", error = error.Message }); }
     }
+    foreach (var gridTable in gridTables)
+    {
+        try { await a.ExecuteAsync($"DROP TABLE {gridTable}"); }
+        catch (Exception error) { failure ??= error; checks.Add(new { name = "grid fixture table removed", status = "failed", error = error.Message }); }
+    }
     if (sourceProcedure is not null && a.IsConnected)
     {
         try { await a.ExecuteAsync($"DROP PROCEDURE {sourceProcedure}"); checks.Add(new { name = "temporary source procedure removed", status = "passed" }); }
@@ -274,7 +281,7 @@ finally
     }
     await File.WriteAllTextAsync(reportPath, JsonSerializer.Serialize(new {
         startedAt, completedAt = DateTimeOffset.UtcNow, profileId, status = failure is null ? "passed" : "failed",
-        scope = "Live Oracle services; temporary-table DML and uniquely named temporary procedure/package sources only; queued metadata cancellation; no user-table updates or saved-credential changes.",
+        scope = "Live Oracle services; DML only on temporary tables and uniquely named fixture tables, which are dropped afterwards; uniquely named temporary procedure/package sources; queued metadata cancellation; no user-table updates or saved-credential changes.",
         checks, error = failure?.Message
     }, new JsonSerializerOptions { WriteIndented = true }));
     Console.WriteLine("Report: " + reportPath);

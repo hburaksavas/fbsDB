@@ -17,7 +17,7 @@ Run five task sessions with representative users, recording outcomes in a local 
 
 ## Release gate
 
-Run `npm run test:release -- -OracleProfile FBSDB_LOCAL`. A local test database and saved credentials are mandatory; the live suite restricts profiles to localhost and uses temporary fixture objects. Desktop and portable checks run isolated application copies. Keep reports under `.artifacts/desktop-regression`, `.artifacts/oracle-live`, and `.artifacts/portable-smoke` with the release record and the emitted package SHA256.
+Run `npm run test:release -- -OracleProfile FBSDB_LOCAL`. A local test database and saved credentials are mandatory; the live suite restricts profiles to localhost and uses temporary fixture objects. Its profile needs CREATE SESSION, CREATE TABLE and CREATE PROCEDURE and a tablespace quota; use a dedicated test user, since the fixtures are real tables that are dropped afterwards. The value after `-OracleProfile` is the profile's ID in `settings.json`, not its display name. Desktop and portable checks run isolated application copies. Keep reports under `.artifacts/desktop-regression`, `.artifacts/oracle-live`, and `.artifacts/portable-smoke` with the release record and the emitted package SHA256.
 
 For a signed release add `-RequireSigned -CertificateThumbprint <thumbprint>` using a trusted code-signing certificate in CurrentUser/My with its private key. The packaging script signs the launcher and application before archiving and rejects invalid signatures. No certificate is bundled or generated automatically. Signing and external timestamp access require the release owner's environment.
 

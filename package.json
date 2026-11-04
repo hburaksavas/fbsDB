@@ -16,6 +16,7 @@
     "test": "node scripts/test-unit.mjs",
     "test:load": "node scripts/test-load.mjs",
     "test:desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-desktop.ps1",
+    "clean:test-output": "node scripts/clean-test-output.mjs",
     "typecheck:domain": "tsc -p tsconfig.domain.json",
     "test:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-release.ps1"
   },
