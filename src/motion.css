@@ -1,0 +1,10 @@
+/* Last-resort guard for people who ask the system for less motion: no animation or transition can run long, and no animation repeats.
+   Components may still set `animation:none` for spinners, which says "busy" with text instead. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

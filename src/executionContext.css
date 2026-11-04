@@ -31,3 +31,5 @@
 
 .app-status .footer-workspace{min-width:0;max-width:190px}.footer-workspace span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.app-status .footer-context{flex:1;min-width:0;margin:0 12px;overflow:hidden}.footer-context>button{display:flex;align-items:center;gap:4px;flex-shrink:0}.app-status .workbench-context-status{display:flex;gap:5px;align-items:center;min-width:0;overflow:hidden}.workbench-context-status span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.workbench-context-status[data-kind=error]{color:var(--danger)}.workbench-context-status[data-kind=warning]{color:var(--warning)}.workbench-context-status[data-kind=busy]{color:var(--info)}.app-status .footer-transaction{flex-shrink:0;white-space:nowrap}
 @media(max-width:700px){.app-status .footer-workspace{display:none}.footer-context>button>span{display:none}.app-status .footer-context{margin-left:0;margin-right:6px}}
+
+@media(prefers-reduced-motion:reduce){.tab-connection-badge[data-state=connecting] svg{animation:none}}
