@@ -58,7 +58,7 @@ let update;
 const errors=[];window.addEventListener('error',e=>errors.push(e.message));
 const longTasks=[];if(PerformanceObserver.supportedEntryTypes.includes('longtask'))new PerformanceObserver(list=>longTasks.push(...list.getEntries().map(e=>e.duration))).observe({type:'longtask'});
 function Harness(){const[state,setState]=useState({rows:[],sort:-1});update=setState;
-return <main className="desktop-shell" data-theme="default" style={{height:'100vh',width:'100vw'}}><section className="result-panel" style={{height:'100%',display:'flex',flexDirection:'column',minHeight:0}}><ResultsGrid rows={state.rows} allRows={state.rows} columns={columns} sortColumn={state.sort} sortDirection="asc" onSort={()=>{}} onInspect={()=>{}} options={{sortLocale:'tr-TR'}}/></section></main>}
+return <main className="desktop-shell" data-theme="default" style={{height:'100vh',width:'100vw'}}><section className="result-panel" style={{height:'100%',display:'flex',flexDirection:'column',minHeight:0}}><ResultsGrid rows={state.rows} allRows={state.rows} columns={state.columns||columns} sortColumn={state.sort} sortDirection="asc" onSort={()=>{}} onInspect={()=>{}} options={{sortLocale:'tr-TR'}}/></section></main>}
 flushSync(()=>createRoot(document.getElementById('root')).render(<Harness/>));
 const paint=()=>new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
 const require=(value,message)=>{if(!value)throw Error(message)};
@@ -81,6 +81,25 @@ await measure('csv',async()=>{const text=csvText(data,columns);require(text.spli
 }
 checks.push({count,iterations:5,status:'passed',measurements:Object.fromEntries(Object.entries(samples).map(([name,values])=>[name,{p95Ms:p95(values),maxMs:Math.max(...values)}]))});
 }
+// Wide result: many columns make every row heavier; vertical and horizontal scrolling and a selection must stay responsive.
+{
+const wideColumns=Array.from({length:120},(_,c)=>({name:'COL_'+c,type:c%3===0?'NUMBER':'VARCHAR2'}));
+const wideCount=20000,wide=Array.from({length:wideCount},(_,i)=>wideColumns.map((_,c)=>c%3===0?String(i*c):'v'+i+'_'+c));
+const samples={mount:[],scrollY:[],scrollX:[],select:[]};
+const measure=async(name,action)=>{const start=performance.now();await action();samples[name].push(performance.now()-start)};
+for(let repeat=0;repeat<5;repeat++){
+await measure('mount',async()=>{flushSync(()=>update({rows:getVisibleResultRows(wide,wideColumns),sort:-1,columns:wideColumns}));await paint()});
+require(document.querySelectorAll('[data-cell]').length>0&&document.querySelectorAll('[data-cell]').length<8000,'Wide grid virtualization failed: '+document.querySelectorAll('[data-cell]').length);
+await measure('scrollY',async()=>{const grid=document.querySelector('.grid-wrap');grid.scrollTop=grid.scrollHeight;grid.dispatchEvent(new Event('scroll'));await paint();await paint();require(!!document.querySelector('[data-cell="'+(wideCount-1)+':0"]'),'Last wide row not rendered')});
+await measure('scrollX',async()=>{const grid=document.querySelector('.grid-wrap');grid.scrollLeft=grid.scrollWidth;grid.dispatchEvent(new Event('scroll'));await paint();await paint();require(!!document.querySelector('[data-cell="'+(wideCount-1)+':119"]'),'Last wide column not rendered')});
+await measure('select',async()=>{const cell=document.querySelector('[data-cell="'+(wideCount-1)+':119"]');cell.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));await paint();require(!!document.querySelector('.selected-cell'),'Selection not shown')});
+}
+const stats=Object.fromEntries(Object.entries(samples).map(([name,values])=>[name,{p95Ms:p95(values),maxMs:Math.max(...values)}]));
+const budgets={mount:4000,scrollY:1500,scrollX:1500,select:500};
+for(const [name,limit] of Object.entries(budgets))require(stats[name].p95Ms<limit,'Wide result '+name+' p95 '+Math.round(stats[name].p95Ms)+' ms exceeds the '+limit+' ms budget');
+checks.push({count:wideCount,columns:120,iterations:5,status:'passed',budgetsMs:budgets,measurements:stats});
+}
+
 require(errors.length===0,errors.join('\\n'));
 return {checks,longTasks:{count:longTasks.length,maxMs:longTasks.length?Math.max(...longTasks):0,totalMs:longTasks.reduce((a,b)=>a+b,0)},userAgent:navigator.userAgent};
 })();
@@ -92,8 +111,8 @@ return {checks,longTasks:{count:longTasks.length,maxMs:longTasks.length?Math.max
     await new Promise(r => setTimeout(r, 100));
   }
   result = await evaluate(`document.getElementById('desktop-load-fixture').contentWindow.loadDone`);
-  assert.equal(result?.checks.length, 2, 'Fixture did not produce both datasets');
-  for (const check of result.checks) console.log(`PASS WebView2 ${check.count} rows: ${JSON.stringify(check.measurements)}`);
+  assert.equal(result?.checks.length, 3, 'Fixture did not produce all datasets');
+  for (const check of result.checks) console.log(`PASS WebView2 ${check.count} rows${check.columns ? ` x ${check.columns} columns` : ''}: ${JSON.stringify(check.measurements)}`);
 } catch (error) { failure = error; console.error(error); }
 finally {
   if (socket?.readyState === WebSocket.OPEN) {
