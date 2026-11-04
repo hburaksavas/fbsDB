@@ -52,6 +52,16 @@ try {
    assert.equal(await cdp.evaluate(`document.activeElement===document.querySelector(${JSON.stringify(trigger)})`), true, `Focus returns to the opener (${trigger})`);
   }
  });
+ await check('shortcut map: ? opens a searchable map with the editor, grid and global shortcuts, and Escape closes it',async()=>{
+  await cdp.evaluate(`document.activeElement?.blur?.();document.body.dispatchEvent(new KeyboardEvent('keydown',{key:'?',bubbles:true,cancelable:true}))`);
+  await cdp.until(`document.querySelector('[role="dialog"][aria-label="Keyboard shortcuts"]')`, 'Shortcut map opens');
+  const text = await cdp.evaluate(`document.querySelector('[aria-label="Keyboard shortcuts"]').textContent`);
+  for (const piece of ['Run SQL', 'Ctrl+Enter', 'Edit the selected cell', 'F2', 'Search files, objects, commands and settings']) assert.ok(text.includes(piece), 'The map lists ' + piece);
+  await cdp.evaluate(`(()=>{const input=document.querySelector('[aria-label="Filter shortcuts"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'bulk');input.dispatchEvent(new Event('input',{bubbles:true}))})()`);
+  await cdp.until(`document.querySelector('[aria-label="Keyboard shortcuts"] [role="status"]')?.textContent.includes('No shortcut matches')`, 'Filter narrows the list');
+  await cdp.key('Escape');
+  await cdp.until(`!document.querySelector('[aria-label="Keyboard shortcuts"]')`, 'Escape closes the map');
+ });
  await check('history UI reflects configured count and removes expired/excluded SQL',async()=>{
   await cdp.click('[aria-label="History"]');await cdp.until(`document.getElementById('query-history-title')`);
   const text=await cdp.evaluate(`document.querySelector('.query-history-modal').textContent`);

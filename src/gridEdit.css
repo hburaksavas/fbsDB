@@ -134,3 +134,11 @@ tr[data-row-error] td.rownum::after{content:'✖';margin-left:2px}
 
 .held-drafts-notice{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0;padding:3px 8px;border-bottom:1px solid var(--line);background:var(--panel2);color:var(--text);font-size:11px}
 .held-drafts-notice button{font-size:10px;padding:0 6px}
+
+.shortcut-map{width:min(560px,calc(100vw - 40px));max-height:calc(100vh - 80px);display:flex;flex-direction:column;gap:8px}
+.shortcut-map>input{margin:0 18px}
+.shortcut-map-body{overflow:auto;padding:0 18px}
+.shortcut-map-body h3{margin:10px 0 4px;font-size:11px;color:var(--muted);text-transform:uppercase}
+.shortcut-map-body ul{list-style:none;margin:0;padding:0}
+.shortcut-map-body li{display:flex;justify-content:space-between;gap:12px;padding:3px 0;border-bottom:1px solid var(--line);font-size:12px}
+.shortcut-map-body kbd{font-family:inherit;color:var(--muted);white-space:nowrap}
