@@ -526,72 +526,22 @@ public sealed partial class MainPage
             return true;
         }
 
-        // Applies staged grid edits one statement at a time in the tab's session, after a savepoint. It stops at the first failure or unexpected
-        // row count; by default it then rolls back to the savepoint (earlier unrelated session work is untouched). It never commits and refuses to
-        // run while auto commit is on, because a half-applied batch could not be taken back.
+        // Runs the batch in GridDmlBatch and reports it to the tab that asked; sql.stopApplyDml reaches it through _gridApplies.
         private async Task ApplyGridDmlAsync(CoreWebView2 sender, string? requestId, JsonElement payload)
         {
             var tabId = Context.Tab.Id;
-            void Refuse(string message) => Send(sender, new { type = "sql.dmlApplied", requestId, tabId, outcomes = Array.Empty<object>(), transactionPending = _oracle.HasPendingTransaction, autoCommit = _oracle.AutoCommit, error = message });
-            if (_oracle.AutoCommit) { Refuse("Turn auto commit off before applying grid edits, so the whole batch can be committed or rolled back together."); return; }
             var items = payload.GetProperty("statements").EnumerateArray().ToList();
-            if (items.Count > GridDmlGuard.MaxStatements) { Refuse($"At most {GridDmlGuard.MaxStatements} statements can be applied at once."); return; }
             var timeout = payload.TryGetProperty("timeoutSeconds", out var timeoutValue) && timeoutValue.TryGetInt32(out var seconds) ? Math.Clamp(seconds, 1, 300) : 60;
             var keepOnFailure = payload.TryGetProperty("onFailure", out var policy) && policy.GetString() == "keep";
-            var outcomes = new List<Dictionary<string, object?>>();
-            var stopped = false;
-            var stoppedByUser = false;
-            const string savepoint = "fbsdb_grid_batch";
             using var stop = new CancellationTokenSource();
             _gridApplies[tabId] = stop;
-            try {
-            try { await Task.Run(() => _oracle.ExecuteAsync("SAVEPOINT " + savepoint, null, 1, default, timeoutSeconds: timeout)); }
-            catch (Exception ex) { Refuse("The batch could not start: " + ex.Message); return; }
-            for (var index = 0; index < items.Count; index++)
+            try
             {
-                if (stopped) { outcomes.Add(new() { ["index"] = index, ["status"] = "skipped" }); continue; }
-                if (stop.IsCancellationRequested) { stoppedByUser = true; stopped = true; outcomes.Add(new() { ["index"] = index, ["status"] = "skipped" }); continue; }
-                try
-                {
-                    var item = items[index];
-                    var sql = item.GetProperty("sql").GetString() ?? string.Empty;
-                    GridDmlGuard.Assert(sql);
-                    var parameters = new List<SqlBindParameter>();
-                    if (item.TryGetProperty("binds", out var binds) && binds.ValueKind == JsonValueKind.Array)
-                    {
-                        foreach (var bind in binds.EnumerateArray())
-                        {
-                            var name = bind.TryGetProperty("name", out var nameValue) ? nameValue.GetString() : null;
-                            var type = bind.TryGetProperty("type", out var typeValue) ? typeValue.GetString() : null;
-                            var value = bind.TryGetProperty("value", out var valueValue) && valueValue.ValueKind == JsonValueKind.String ? valueValue.GetString() : null;
-                            if (!string.IsNullOrWhiteSpace(name) && !string.IsNullOrWhiteSpace(type)) parameters.Add(new SqlBindParameter(name, type, value));
-                        }
-                    }
-                    var expected = item.TryGetProperty("expectRows", out var expectValue) && expectValue.TryGetInt32(out var expectedRows) ? expectedRows : 1;
-                    var result = await Task.Run(() => _oracle.ExecuteAsync(sql, parameters, 1, default, timeoutSeconds: timeout));
-                    var affected = result.RowsAffected ?? 0;
-                    if (affected != expected) { outcomes.Add(new() { ["index"] = index, ["status"] = "mismatch", ["rowsAffected"] = affected, ["expected"] = expected }); stopped = true; }
-                    else outcomes.Add(new() { ["index"] = index, ["status"] = "applied", ["rowsAffected"] = affected });
-                }
-                catch (Exception ex) { outcomes.Add(new() { ["index"] = index, ["status"] = "failed", ["error"] = ex.Message }); stopped = true; }
+                var result = await GridDmlBatch.RunAsync(_oracle, items, timeout, keepOnFailure, stop.Token);
+                if (result.Error is { } error) Send(sender, new { type = "sql.dmlApplied", requestId, tabId, outcomes = Array.Empty<object>(), transactionPending = _oracle.HasPendingTransaction, autoCommit = _oracle.AutoCommit, error });
+                else Send(sender, new { type = "sql.dmlApplied", requestId, tabId, outcomes = result.Outcomes, transactionPending = _oracle.HasPendingTransaction, autoCommit = _oracle.AutoCommit, recovery = result.Recovery, stoppedByUser = result.StoppedByUser });
             }
-            string? recovery = null;
-            if (stoppedByUser)
-            {
-                recovery = $"Stopped by you: {outcomes.Count(o => (string?)o["status"] == "applied")} statement(s) were applied and are in your open transaction (Commit or Rollback decides them); the rest were not sent and remain drafts. Nothing was committed or retried.";
-            }
-            else if (stopped && !keepOnFailure)
-            {
-                try
-                {
-                    await Task.Run(() => _oracle.ExecuteAsync("ROLLBACK TO SAVEPOINT " + savepoint, null, 1, default, timeoutSeconds: timeout));
-                    foreach (var outcome in outcomes.Where(o => (string?)o["status"] == "applied")) outcome["status"] = "rolledBack";
-                    recovery = "The batch was rolled back to its starting point; other work in this session was not touched.";
-                }
-                catch (Exception ex) { recovery = "The batch could not be rolled back automatically (" + ex.Message + "). Use Rollback to discard the session's pending work."; }
-            }
-            Send(sender, new { type = "sql.dmlApplied", requestId, tabId, outcomes, transactionPending = _oracle.HasPendingTransaction, autoCommit = _oracle.AutoCommit, recovery, stoppedByUser });
-            } finally { _gridApplies.TryRemove(tabId, out _); }
+            finally { _gridApplies.TryRemove(tabId, out _); }
         }
 
         // Runs one explicit "SELECT (expression) FROM dual" in the tab's session; the result never reaches the result grid or history.

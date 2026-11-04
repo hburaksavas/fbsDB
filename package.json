@@ -16,13 +16,17 @@
     "test": "node scripts/test-unit.mjs",
     "test:load": "node scripts/test-load.mjs",
     "test:desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-desktop.ps1",
+    "clean:test-output": "node scripts/clean-test-output.mjs",
     "typecheck:domain": "tsc -p tsconfig.domain.json",
     "test:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-release.ps1"
   },
   "dependencies": {
+    "@fontsource/dm-mono": "5.3.0",
+    "@fontsource/dm-sans": "5.3.0",
     "@monaco-editor/react": "^4.7.0",
     "@vitejs/plugin-react": "5.0.4",
     "lucide-react": "^1.61.0",
+    "monaco-editor": "0.55.1",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "vite": "6.4.2"

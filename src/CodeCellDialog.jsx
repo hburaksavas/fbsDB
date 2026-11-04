@@ -5,7 +5,7 @@ import {formatStructuredValue} from './resultFeatures';
 import {formatOracleDocument} from './sqlFormatter';
 import {detectCodeLanguage} from './codeCellModel';
 
-const Editor=lazy(()=>import('@monaco-editor/react'));
+const Editor=lazy(()=>import('./monacoEditor.js'));
 const languages=[['sql','SQL / PL/SQL'],['json','JSON'],['xml','XML'],['plaintext','Plain text']];
 
 // A local scratch view of one result value: edits never reach the database or the result grid.

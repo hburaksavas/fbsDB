@@ -3,7 +3,7 @@ import {ModalBackdrop} from './ModalBackdrop';
 import {useDialogFocus} from './ConnectionManager';
 import {sendNativeCommand,subscribeNativeMessages} from './nativeBridge';
 import {databaseSourceChanged,sourceBaselineMatches} from './sourceCompilation';
-const DiffEditor=lazy(()=>import('@monaco-editor/react').then(module=>({default:module.DiffEditor})));
+const DiffEditor=lazy(()=>import('./monacoEditor.js').then(module=>({default:module.DiffEditor})));
 
 export function SourceCompileDialog({document,prepared,tabId,profileId,theme,valid,transactionPending,onBaseline,onCompile,onClose,confirmLabel="Compile reviewed source",reviewContext}) {
   const ref=useRef(null);useDialogFocus(ref,onClose);

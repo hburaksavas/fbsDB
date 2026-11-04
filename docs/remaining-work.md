@@ -18,7 +18,7 @@
 ## Okurken
 
 - ⚠ engel ya da uyarı notudur; alt madde kutuları (\[x\] / \[ \]) gerçek durumu gösterir.
-- **Canlı Oracle uyarısı:** son oturumlarda yazılan yerel kod (Apply, savepoint ile geri alma, kısıt ve ilişki sorguları, Commit akışı, doğrulama sorgusu) yalnızca derlendi ve sahte (fixture) ortamda test edildi; gerçek Oracle'a karşı çalıştırılmadı. `npm run test:release` bir Oracle profili parametresi ister ve çalıştırılamadı.
+- **Canlı Oracle durumu (2026-11-05):** `tests/OracleLiveRegression` artık grid Apply'ı gerçek Oracle'da çalıştırır: gridin kendi kodunun ürettiği deyimler, savepoint'e geri dönme, başka oturumun değişikliği, FK hatası ve ilişki sorguları, kilit zaman aşımı, otomatik commit reddi ve durdurma. **Hâlâ canlı denenmeyenler:** Commit sırasında bağlantı kopması, kullanıcı yazımı Commit öncesi denetimler, TIMESTAMP WITH TIME ZONE sütunları ve uygulamanın WebView2 üzerinden Oracle'a giden tam akışı.
 - FI-044 kullanıcı kararıyla atlanmıştır.
 - Bazı maddelerin uzun açıklamaları ve alt maddeleri katalogda eski bir bozulma nedeniyle kısalmış olabilir; kısmen yapılmış olup alt maddesi görünmeyen maddeler (ör. FI-170, FI-068) "hiç başlanmamış" altında listelenir.
 

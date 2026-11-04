@@ -66,5 +66,10 @@ try {
         [Environment]::SetEnvironmentVariable($regressionKey, $regressionPreviousEnvironment[$regressionKey], 'Process')
     }
     if ($regressionProcess -and -not $regressionProcess.HasExited) { Stop-Process -Id $regressionProcess.Id }
+    # Old runs only: this run is among the newest kept. A cleanup problem must not change the test result.
+    try {
+        node scripts/clean-test-output.mjs --apply
+        if ($LASTEXITCODE -ne 0) { Write-Warning 'Could not clean old test output.' }
+    } catch { Write-Warning "Could not clean old test output: $_" }
     Pop-Location
 }

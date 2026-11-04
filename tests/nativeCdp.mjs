@@ -29,7 +29,7 @@ export async function connectNativePage(endpoint, timeoutMs = 45000) {
     call(method, params = {}) {
       return new Promise((resolve, reject) => {
         const id = ++sequence;
-        const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Debugger timeout: ${method}`)); }, 15000);
+        const timer = setTimeout(() => { pending.delete(id); reject(new Error(`Debugger timeout: ${method} ${String(params.expression ?? '').slice(0, 240)}`)); }, 15000);
         pending.set(id, { resolve, reject, timer });
         socket.send(JSON.stringify({ id, method, params }));
       });
@@ -57,7 +57,8 @@ export async function connectNativePage(endpoint, timeoutMs = 45000) {
       assert.ok(await api.evaluate(`(() => { const element = [...document.querySelectorAll(${JSON.stringify(selector)})].find(element => element.textContent.trim() === ${JSON.stringify(text)}); if (!element || element.disabled) return false; element.focus(); element.click(); return true; })()`), `Missing/enabled control: ${text}`);
       await api.frame();
     },
-    frame: () => api.evaluate('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))'),
+    // A hidden window can stop animation frames, so waiting for a frame must not depend on one arriving.
+    frame: () => api.evaluate('new Promise(resolve => { setTimeout(resolve, 250); requestAnimationFrame(() => requestAnimationFrame(resolve)); })'),
     async key(key, modifiers = 0) {
       const code = /^[a-z]$/i.test(key) ? `Key${key.toUpperCase()}` : key;
       const windowsVirtualKeyCode = { Shift:16,Control:17,Alt:18,Meta:91,Enter: 13, Escape: 27, Tab: 9,Home:36,End:35,PageUp:33,PageDown:34,ArrowLeft:37,ArrowUp:38,ArrowRight:39,ArrowDown:40 }[key] || (/^F\d+$/.test(key)?111+Number(key.slice(1)):key.toUpperCase().charCodeAt(0));
