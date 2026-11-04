@@ -35,19 +35,26 @@ async function main(args) {
   const root = resolve('.artifacts', 'desktop-regression');
   const entries = await readdir(root, { withFileTypes: true });
   const runs = runsToClean(entries.filter(entry => entry.isDirectory()).map(entry => entry.name), keep);
-  let total = 0;
+  let total = 0, cleaned = 0, locked = 0;
   for (const run of runs) {
+    let found = false;
     for (const name of REMOVABLE) {
       const path = join(root, run, name);
       if (!await exists(path)) continue;
-      total += await sizeOf(path);
-      if (apply) await rm(path, { recursive: true, force: true });
+      try {
+        const size = await sizeOf(path);
+        if (apply) await rm(path, { recursive: true, force: true });
+        total += size;
+        found = true;
+      } catch { locked++; } // Usually a file still in use. The next cleanup tries again.
     }
+    if (found) cleaned++;
   }
   const size = `${(total / 1024 ** 3).toFixed(2)} GB`;
+  const skipped = locked ? ` ${locked} folders could not be removed and were left for the next cleanup.` : '';
   console.log(apply
-    ? `Removed ${size} from ${runs.length} old runs. Reports were kept.`
-    : `Would remove ${size} from ${runs.length} old runs and keep every report and the newest ${keep} runs. Run again with --apply to remove it.`);
+    ? `Removed ${size} from ${cleaned} old runs. Reports were kept.${skipped}`
+    : `Would remove ${size} from ${cleaned} old runs and keep every report and the newest ${keep} runs. Run again with --apply to remove it.`);
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) await main(process.argv.slice(2));
