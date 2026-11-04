@@ -10,6 +10,7 @@
 - **SQL tools in the editor:** Oracle-aware completion, schema suggestions, snippets, formatting, diagnostics, bind prompts, and execution-plan viewing.
 - **Workspace-first workflow:** browse and search SQL files, keep multiple files and drafts open, and remember a file's connection profile without running its SQL on open.
 - **Results built for investigation:** fetch paged rows from the original cursor; inspect, select, sort, filter, group, pivot, and format loaded data. Export to formats including CSV, JSON, SQL INSERT, and XLSX, with streaming options for larger CSV exports.
+- **Editable results:** turn on row editing for a single-table result with a primary key, stage changes locally, review the exact SQL, and Apply without committing.
 - **Control over database changes:** DML uses explicit Commit/Rollback; query cancellation, `DBMS_OUTPUT`, and per-tab execution context remain visible.
 - **Adjustable workbench:** dockable panels, resizable areas, themes, editor preferences, keyboard shortcuts, and result defaults.
 
@@ -22,7 +23,7 @@
 | Oracle access | ODP.NET Core (`Oracle.ManagedDataAccess.Core`) |
 | Credential storage | Windows current-user DPAPI |
 
-The UI and Oracle service communicate through a tab-aware WebView2 message bridge. The Vite build can also be served as a browser preview, where native database commands are unavailable.
+The UI and Oracle service communicate through a tab-aware WebView2 message bridge. Monaco and the fonts ship inside the application bundle, so the editor needs no network access at runtime. The Vite build can also be served as a browser preview, where native database commands are unavailable.
 
 ## Get started on Windows
 
@@ -94,7 +95,8 @@ rule persistence, custom-source discovery/grouping, independent unsaved text and
 caret positions, grouped close review, saving one member and opening a related
 test. Oracle commands are blocked; the actual file handlers and rule storage run
 against a temporary workspace. Its report is `project-rules-report.json` under
-`.artifacts/desktop-regression/`.
+`.artifacts/desktop-regression/`. The same flag also runs the source comparison,
+run configuration and script source fixtures.
 
 ## Source compilation and database comparison
 
@@ -146,6 +148,14 @@ Right-click a title, or focus it and press Shift+F10/the menu key, to select/cop
 
 `node tests/column-menu-native.mjs [debug-endpoint]` runs an isolated ResultsGrid fixture in native WebView2 (default endpoint port 9338), covering all three themes and narrow layouts without database calls, screenshots, or system clipboard writes.
 
+## Editing result rows
+
+Turn on editing with the pencil in the result toolbar. A result is editable only when it comes from one source table and includes that table's primary key columns; otherwise the grid lists the reasons. Computed, generated, expression, LOB and binary columns stay locked and explain why in their header.
+
+Edits are local drafts until you apply them: F2 edits a cell, **Set NULL** stores an explicit NULL (different from empty text), **New row** adds a row whose omitted columns use database defaults, **Delete row** marks a row, and Ctrl+Z/Ctrl+Y undo and redo draft changes. Rarer tools sit in **More** and can be pinned to the edit row: record view, checkbox columns, spreadsheet paste with preview, bulk edit, duplicate row, row templates, changes-only and deletions-only views, and SELECT checks. Every edit action is also in the command palette (Ctrl+P) with a `Grid: ` prefix. Drafts stay in memory for the tab and table, are never written to disk, and a notice offers to discard them when another result is showing.
+
+**Pending** shows each change with the parameterized SQL it would run. **Apply** states the effect, the target connection and a production warning, then sends the statements one at a time after a savepoint in the tab's session. Apply never commits and is refused while auto commit is on. It stops at the first failure or unexpected row count and by default returns to the savepoint; values changed by another session are reported rather than overwritten. The last Apply can be undone back to its savepoint, and corrected drafts can be retried without resending what already succeeded. Commit or Rollback remains your explicit step. Before deleting, **related-record checks** list foreign keys in both directions and can count referencing rows.
+
 ## SQL mini tools
 
 Run a SELECT, then open **SQL mini tools** in the activity rail and choose **Save SELECT as tool**. Name the tool, edit bind labels/types/required fields, and select visible result columns under **SQL and view definition**. **Save tool** writes a versioned JSON definition containing SQL and view settings to `<workspace>/.fbsdb/tools/`.
@@ -166,6 +176,7 @@ The connection control now contains the tab's profile/environment, available Ora
 npm run build
 npm test
 npm run typecheck:bridge
+npm run typecheck:domain
 .\.tools\dotnet\dotnet.exe run --project tests/BridgeContractSmoke/BridgeContractSmoke.csproj -c Release
 .\scripts\test-workspace.ps1
 ```
@@ -174,32 +185,36 @@ The JavaScript tests cover editor, workbench, results, and bridge behavior. Addi
 
 `npm run test:load` runs repeatable database-independent load scenarios for large result filtering/sorting, CSV export, schema completion, SQL batches and workspace search. Use `-- --profile smoke --enforce-budgets` for the CI check, or `-- --profile stress` for larger datasets. JSON reports go to `.artifacts/load/`. Workload sizes, timed runs, measurement limits and complementary live Oracle scenarios are described in [Load testing](docs/load-testing.md).
 
-`npm run test:desktop` builds and launches an isolated WinUI/WebView2 copy, then checks startup, tab editing/switching, native file open/save, Save As, save acknowledgement ordering, dirty close, external changes, and draft recovery/discard. It uses separate settings and browser storage, blocks Oracle commands, and keeps a JSON report under `.artifacts/desktop-regression/`. Picker path selection is substituted by the fixture; actual file reads/writes use the native handlers. The Windows picker window itself is not covered. Use `npm run test:desktop -- -SkipBuild` to reuse the current web bundle while still building a separate desktop copy.
+`npm run test:desktop` builds and launches an isolated WinUI/WebView2 copy, then checks startup, tab editing/switching, native file open/save, Save As, save acknowledgement ordering, dirty close, external changes, and draft recovery/discard. It uses separate settings and browser storage, blocks Oracle commands, and keeps a JSON report under `.artifacts/desktop-regression/`. Picker path selection is substituted by the fixture; actual file reads/writes use the native handlers. The Windows picker window itself is not covered. Use `npm run test:desktop -- -SkipBuild` to reuse the current web bundle while still building a separate desktop copy. `-LoadTest` runs the desktop grid load fixture and `-DragTest` the Object Explorer drag fixture. Each run removes the app copies, WebView2 profiles and test files of all but the newest 5 runs and keeps every report; `npm run clean:test-output` lists that removal without performing it.
 
-Live Oracle service regression: `.\.tools\dotnet\dotnet.exe run --project tests/OracleLiveRegression/OracleLiveRegression.csproj -c Release -- FBSDB_LOCAL`. It requires an open local test database, saved credentials, and permission to create a temporary table. It creates a uniquely named global temporary table, tests real DML/Commit/Rollback on that fixture only, and drops it during cleanup. It also checks independent sessions, paging, cancellation, timeout, queued metadata cancellation, and explicit/idle reconnect. JSON reports go to `.artifacts/oracle-live/`; user tables and saved credentials are not changed.
+Live Oracle service regression: `.\.tools\dotnet\dotnet.exe run --project tests/OracleLiveRegression/OracleLiveRegression.csproj -c Release -- FBSDB_LOCAL`. It accepts only localhost profiles and requires an open local test database, saved credentials, Node.js, and CREATE SESSION, CREATE TABLE and CREATE PROCEDURE with a tablespace quota; run it from the repository root with a dedicated test user. It creates uniquely named temporary tables, procedures and packages, tests real DML/Commit/Rollback on those fixtures only, and drops them during cleanup. It also checks independent sessions, paging, cancellation, timeout, queued metadata cancellation, explicit/idle reconnect, source compilation, and grid Apply using the statements the grid's own code generates. JSON reports go to `.artifacts/oracle-live/`; user tables and saved credentials are not changed.
 
 Document state, native command handlers, and the shared bridge contract are described in [Architecture](docs/architecture.md). After changing `contracts/native-bridge.json`, run `npm run generate:bridge`; the production build checks that generated JavaScript, TypeScript, and C# files are up to date.
 
-[Windows CI](docs/ci.md) validates PRs and `master` pushes with JavaScript tests, bridge generation/type checks, ten database-independent native smoke projects, and a Windows x64 Release build. The shared native suite is available locally as `scripts/test-native.ps1`; desktop UI and live Oracle checks remain separate integration commands.
+[Windows CI](docs/ci.md) validates PRs and `master` pushes with JavaScript tests, bridge generation/type checks, load smoke scenarios, eleven database-independent native smoke projects, a large TNS smoke, and a Windows x64 Release build. The shared native suite is available locally as `scripts/test-native.ps1`; desktop UI and live Oracle checks remain separate integration commands.
 
 ## Repository map
 
 | Path | Purpose |
 | --- | --- |
 | `src/` | React workbench, Monaco integration, SQL helpers, results UI |
+| `contracts/` | Native bridge contract that generates the JavaScript, TypeScript and C# bindings |
 | `native/FbsDb/` | WinUI shell, WebView2 host, Oracle and local services |
 | `tests/` | JavaScript and .NET checks |
 | `scripts/` | Desktop build/run/package and local demo database setup |
 | `worker/` | Browser build asset worker |
+| `docs/` | Architecture, CI, load testing, release acceptance, UI decisions and [remaining work](docs/remaining-work.md) |
 
 The optional `scripts/setup-banking-db.ps1` sets up a local sample banking database for development on a machine with Oracle Free installed. Review the script and its database prerequisites before running it.
 
 Product focus, execution acceptance, history privacy, upgrade/rollback and the signed release gate: [Product and release](docs/product-and-release.md).
 
+## Feature notes
 
-Editor context: explicit DEV/TEST/UAT/PROD labels appear on the editor border,
-file tabs and saved file/profile associations in the project tree. Unknown
-classifications stay unknown. Tab state text distinguishes connecting, connected,
+Editor context: explicit DEV/TEST/UAT/PROD labels appear on the editor border and
+saved file/profile associations in the project tree. File tabs show PROD as text
+and other environments as a small colored dot with an accessible label and tooltip
+([accepted UI decisions](docs/ui-decisions.md)). Unknown classifications stay unknown. Tab state text distinguishes connecting, connected,
 disconnected, inactive and pending transactions. Result provenance compares the
 captured editor text and session context with the current document; a matching
 snapshot does not imply current database data. Reverting to the executed text
@@ -240,7 +255,7 @@ View > Layout can lock panel placement and resizing. The lock applies to pointer
 and keyboard resizing, including dock splits, results height and detail widths.
 Use the visible unlock action or View menu to resume arranging panels. Same-name
 file tabs show the shortest distinguishing directory suffix; full paths remain in
-tooltips. Separate views of the same path are labeled as copies.
+tooltips. A second view of the same file gets a number such as `(2)`.
 
 
 Ctrl+Alt+Home/PageUp/PageDown navigate tracked edit locations; Ctrl+Alt+End returns
@@ -338,7 +353,7 @@ View → Quick applies editor font/line spacing, coordinated compact/comfortable
 
 View → Layout previews three presets (Ctrl+Alt+1/2/3) and up to twelve named saved panel arrangements. Header buttons or a double-click on empty header space temporarily maximize the editor/results; Escape restores the arrangement. Panel snapshots exclude workspace expansion paths. Long editor, connection, object, workspace, File and column action menus support action search; Escape first clears a filter, then closes the menu.
 
-Package specifications expose a Public API reference with source links, overloads, parameter modes, exact default expressions, documentation and public types. Bodies and incomplete/unsupported specifications do not produce an API reference. Hover a SQL tab or press Alt+Down on its tab button to preview bounded source, profile and latest status. Open Editors is a searchable, resizable vertical list.
+Package specifications expose a Public API reference with source links, overloads, parameter modes, exact default expressions, documentation and public types. Bodies and incomplete/unsupported specifications do not produce an API reference. Hover a SQL tab or press Alt+Down on its tab button to preview its path, environment, profile, connection state, relevant flags and bounded source. Open Editors is a searchable, resizable vertical list.
 
 SQL documents of at least 524,288 characters open in large file mode. Lightweight rendering disables expensive automatic completion/navigation, diagnostics, outline/folding and source identity/comparison; opt into each separately for the current document. The native reader still limits files to 8 MB. Normal settings return when a smaller document is active.
 

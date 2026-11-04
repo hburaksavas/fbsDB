@@ -5,15 +5,17 @@
 The job performs these checks in order:
 
 1. Install JavaScript dependencies with `npm ci`.
-2. Reject stale generated bridge files and typecheck the TypeScript bridge API.
+2. Reject stale generated bridge files, then typecheck the TypeScript bridge API and the history and query outcome helpers.
 3. Build the web bundle and reject generated theme-file drift.
 4. Run JavaScript tests with console and JUnit reports. The build runs first because the Sites packaging test inspects `dist`.
-5. Run the ten database-independent native smoke projects listed explicitly in `scripts/test-native.ps1`.
-6. Sync the editor bundle and build the unpackaged Windows x64 application in Release configuration.
+5. Run the load smoke scenarios with budgets enforced.
+6. Run the eleven database-independent native smoke projects listed explicitly in `scripts/test-native.ps1`.
+7. Run the large TNS smoke, `tests/ScaleLoad` with 1,000 aliases and no database.
+8. Sync the editor bundle and build the unpackaged Windows x64 application in Release configuration.
 
 The workflow uses read-only repository permissions, does not persist checkout credentials, and pins actions by commit SHA. npm's download cache is keyed by `package-lock.json`. Older in-progress runs for the same PR/ref are canceled. The job has a 30-minute limit.
 
-Reports under `.artifacts/ci/` are uploaded even when a check fails and retained for 14 days. They include JavaScript JUnit output, individual native-project logs, the native JSON summary, and the Windows MSBuild binary log when that build step was reached. They are diagnostics, not a signed application release.
+Reports under `.artifacts/ci/` are uploaded even when a check fails and retained for 14 days. They include JavaScript JUnit output, the load and TNS smoke reports, individual native-project logs, the native JSON summary, and the Windows MSBuild binary log when that build step was reached. They are diagnostics, not a signed application release.
 
 ## Local verification
 
@@ -23,9 +25,12 @@ From a Windows checkout with Node.js 24 and the SDK required by `global.json`:
 npm ci
 npm run check:bridge
 npm run typecheck:bridge
+npm run typecheck:domain
 npm run build
 npm test
+npm run test:load -- --profile smoke --enforce-budgets
 .\scripts\test-native.ps1
+dotnet run --project tests/ScaleLoad/ScaleLoad.csproj -c Release -- tns 1000 1 .artifacts/ci/tns-load.json
 node scripts/sync-webcontent.mjs
 dotnet build native/FbsDb/FbsDb.csproj -c Release -r win-x64 -p:Platform=x64 -p:WindowsPackageType=None
 ```
@@ -34,8 +39,8 @@ The native runner accepts `-DotnetExe <absolute-path>` for a workspace-local SDK
 
 ## Separate integration checks
 
-Hosted validation does not launch the WinUI/WebView2 workbench or connect to Oracle. `npm run test:desktop` remains the isolated desktop integration command. `OracleLiveRegression`, `OracleAcceptance`, `PagingSmoke`, and `TabSessionsSmoke` require a configured live database and are intentionally absent from the native CI allowlist. No Oracle secret is required by the workflow.
+Hosted validation does not launch the WinUI/WebView2 workbench or connect to Oracle. `npm run test:desktop` remains the isolated desktop integration command. `OracleLiveRegression` and `OracleLoad` require a configured live database and are intentionally absent from the native CI allowlist; the Oracle mode of `ScaleLoad` does too and is not run by the workflow. No Oracle secret is required by the workflow.
 
-The workflow becomes available after these files are committed and pushed. To require it before merging, a repository administrator can add `Windows validation` as a required check in the repository's branch rules; this change does not modify those remote rules.
+To require the workflow before merging, a repository administrator can add `Windows validation` as a required check in the repository's branch rules.
 
 Action and runner references: [setup-node](https://github.com/actions/setup-node), [setup-dotnet](https://github.com/actions/setup-dotnet), [Windows runner image](https://github.com/actions/runner-images/blob/main/images/windows/Windows2025-Readme.md).

@@ -1,10 +1,10 @@
-# UX iyileştirme önerileri
+# UX iyileştirmeleri
 
-Bu liste, son dönemde eklenen özelliklerin (özellikle grid düzenleme araçları) ve `src/` altındaki bileşen envanterinin incelenmesinden çıkarıldı. **Kullanıcı araştırmasına dayanmaz**; hepsi öneridir. Öncelik ve kapsam senin kararındır. Onayladıkların `docs/feature-ideas.md` kataloğuna (`FI-232`'den başlayarak) taşınabilir.
+Bu liste, grid düzenleme araçlarının ve `src/` altındaki bileşen envanterinin incelenmesinden çıkarıldı; **kullanıcı araştırmasına dayanmaz**. 21 maddenin tamamı 4 Kasım 2026'da işlendi. Bu dosya artık yapılanların ve bilinçli olarak yapılmayanların kaydıdır: maddelerin sonucu [Durum](#durum) bölümünde, hâlâ açık noktalar [Açık kalan noktalar](#açık-kalan-noktalar) bölümündedir. Özellik düzeyinde kalan işler için: [Kalan işler](remaining-work.md).
 
 Kısıtlar:
 - Sekme başlıkları ve üzerine gelince açılan önizlemeler `docs/ui-decisions.md`'deki onaylı kararlara bağlıdır; bu listedeki hiçbir madde onları değiştirmez.
-- Ölçek: **Etki** (Y/O/D) kullanıcının günlük akışına etkisi, **Efor** (S/M/L) tahmini iş büyüklüğü.
+- Ölçek: **Etki** (Y/O/D) kullanıcının günlük akışına etkisi, **Efor** (S/M/L) tahmini iş büyüklüğü. İkisi de tahmindir, ölçüm değildir.
 
 ## A. Keşfedilebilirlik ve yoğunluk
 
@@ -78,15 +78,13 @@ Grid düzenleme sırasında araç çubuğuna ve panellere çok sayıda eylem ekl
 - **UX-21 düzeltme (önceki notum yanlıştı):** arayüz dili `effectiveLanguage()` ile baştan beri (ilk commit) `'en'`e sabit; Türkçe sözlük (`localeProfile.js`) şu an hiçbir yerde devreye girmiyor ve bir dil ayarı yok. Yani "karışık dil" sorunu yok: arayüz tutarlı biçimde İngilizce. Sözlükteki 9 bozuk (çift kodlanmış) satırı onarmak yine de doğruydu ve koruma testi (`tests/text-encoding.test.mjs`) kaldı, ama bunun kullanıcıya görünür bir etkisi yoktu. Yeni arayüz metinleri çevrilmedi çünkü çeviriyi açan bir mekanizma yok. Türkçe arayüz istenirse önce dil ayarı + bağlam (context) altyapısı ve eksik çeviri çıkarımı gerekir; bu ayrı bir karar/iş.
 - **Kısmi maddelerin kapanışı:** UX-08 — dışa aktarma ilerleme satırına geçen süre eklendi (`12,000 rows · … · 1m 05s`); ifade-ifade Apply sayacı native taraf olay göndermediği için yapılmadı, LOB okuma henüz yok (FI-103). UX-12 — `prefers-contrast: more` için `src/contrast.css` (daha güçlü ayırıcı çizgiler, tam güçte ikincil metin, kalın odak halkası); bu bir birim/CSS testle doğrulandı, masaüstünde sistem karşıtlık modu emüle edilerek denenmedi. UX-18 — proje ağacında klasör yüklenirken "Loading…" yazısı yerine 300 ms gecikmeli iskelet; sonuç ızgarası zaten "Running query…" ve süre gösteriyor. UX-14 — şema adı hâlâ gösterilmiyor (görünür bağlantı nesnesinde güvenilir şema alanı yok).
 
-## Önerilen sıra
+## Açık kalan noktalar
 
-1. **Hızlı kazançlar (S efor, yüksek etki):** UX-03, UX-04, UX-06, UX-11, UX-13.
-2. **Güveni artıranlar:** UX-05, UX-07, UX-09.
-3. **Yapısal:** UX-01, UX-14, UX-10, UX-21.
+Yukarıdaki ✅ işareti maddenin kararının verildiğini gösterir; aşağıdakiler bilinçli olarak yapılmadı:
 
-Her madde için mevcut döngü uygulanır: uygula → birim test → gerçek WebView2 masaüstü testi → katalogda `[x]` ve ilerleme günlüğü.
-
-## Doğrulanmamış varsayımlar
-
-- UX-21 (karışık dil) ve UX-15 (gezinme geçmişi) için mevcut durumu kodda tek tek doğrulamadım; başlamadan önce kısa bir envanter gerekir.
-- Etki/efor değerleri tahmindir.
+- **UX-08:** Apply için ifade-ifade ilerleme yok; native taraf ilerleme olayı göndermiyor. LOB okuma ilerlemesi FI-103'e bağlı.
+- **UX-12:** `prefers-contrast` ve `prefers-reduced-motion` yalnızca CSS/test düzeyinde doğrulandı, masaüstünde emüle edilmedi.
+- **UX-14:** durum çubuğunda şema adı gösterilmiyor; görünür bağlantı nesnesinde güvenilir şema alanı yok.
+- **UX-20:** hover/odak/basılı durumları ve simge boyutları için jeton yok; yalnızca aralık ölçeği yapıldı.
+- **UX-21:** arayüz dili `effectiveLanguage()` ile `en`e sabit. Türkçe arayüz için önce dil ayarı ve çeviri altyapısı gerekir; ayrı bir karar.
+- **UX-11:** grid ve genel kısayol listesi `src/shortcutMap.js` içinde elle tutuluyor; kodda yeni kısayol eklenince burası da güncellenmeli.

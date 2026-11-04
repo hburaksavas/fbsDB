@@ -1,5 +1,7 @@
 # Açılış performansı — 31 Ekim 2026
 
+> **Geçmiş ölçüm.** Bu rapor 31 Ekim 2026 derlemesini anlatır ve o tarihten sonra yeniden ölçülmedi. 4 Kasım 2026'dan beri Monaco ve yazı tipleri uygulama paketinin içindedir ve çalışma anında indirilmez; yerel splash de editör hazır olana kadar açık kalır ([mimari](architecture.md#monaco)). Aşağıdaki paket boyutları, "Monaco dış kaynaktan yüklendi" koşulu ve süreler bugünkü derlemeyi temsil etmez.
+
 Üretim derlemeleri, Windows üzerinde headless Microsoft Edge ve yerel Vite preview ile karşılaştırıldı. Her sürüm için beş ayrı tarayıcı bağlamı açıldı. Oracle bağlantısı kullanılmadı; Monaco dış kaynaktan yüklendi. Yerel HTTP ve makine/işletim sistemi önbellekleri nedeniyle bu sonuçlar paketli WebView2 açılış süresi olarak yorumlanmamalıdır.
 
 | Ölçüm | Önce | Sonra |
