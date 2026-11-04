@@ -8,7 +8,11 @@ tests/**/obj/
 artifacts/
 .artifacts/
 .vscode/
+.claude/
 .tools/
+# Internal planning notes stay local.
+docs/remaining-work.md
+docs/ux-improvements.md
 *.png
 !native/FbsDb/Assets/SplashScreen.scale-200.png
 # Required native application assets must be present in clean CI checkouts.

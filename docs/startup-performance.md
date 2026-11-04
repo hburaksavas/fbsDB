@@ -29,6 +29,6 @@ npx vite preview --host 127.0.0.1 --port 4173
 node scripts/measure-startup.mjs <playwright/index.mjs> http://127.0.0.1:4173/ 5
 ```
 
-Ham örnekler: [startup-performance-2026-10-31.json](startup-performance-2026-10-31.json). Build manifesti `dist/client/.vite/manifest.json` içindedir.
+Build manifesti `dist/client/.vite/manifest.json` içindedir.
 
 Doğrulama: 270 birim testi, bridge tür kontrolü, üretim derlemesi ve Edge üzerinde ihtiyaç halinde yüklenen ayarlar/mini araçlar kontrolü. İlk alias kolon isteğinin 60 ms'den geç gelen metadata ile ikinci tuşa gerek kalmadan tamamlanması test edildi. Gerçek Oracle sunucusuyla uçtan uca kolon gecikmesi ölçülmedi.
