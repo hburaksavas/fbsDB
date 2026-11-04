@@ -62,6 +62,17 @@ try {
   await cdp.key('Escape');
   await cdp.until(`!document.querySelector('[aria-label="Keyboard shortcuts"]')`, 'Escape closes the map');
  });
+ await check('palette resets the panel layout and settings categories mark non-default values',async()=>{
+  await cdp.key('p', 2); await cdp.until(`document.querySelector('.ide-command-palette')`);
+  await cdp.evaluate(`(()=>{const input=document.querySelector('.ide-command-palette input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'Reset panel layout');input.dispatchEvent(new Event('input',{bubbles:true}));input.focus()})()`);
+  await cdp.until(`[...document.querySelectorAll('.ide-palette-results [role="option"]')].some(o=>o.textContent.includes('Reset panel layout'))`, 'Reset panel layout is offered by the palette');
+  await cdp.key('Escape'); await cdp.until(`!document.querySelector('.ide-command-palette')`);
+  await cdp.evaluate(`document.querySelector('[aria-label="Settings"]').click()`);
+  await cdp.until(`document.querySelector('.settings-frame nav')`, 'Settings open');
+  const consistency = await cdp.evaluate(`(()=>{const buttons=[...document.querySelectorAll('.settings-frame nav button')];return {total:buttons.length,described:buttons.filter(b=>b.hasAttribute('data-changed')&&b.getAttribute('aria-description')).length,flagged:buttons.filter(b=>b.hasAttribute('data-changed')).length}})()`);
+  assert.ok(consistency.total > 3 && consistency.described === consistency.flagged, 'A changed category says so to assistive technology: ' + JSON.stringify(consistency));
+  await cdp.key('Escape'); await cdp.until(`!document.querySelector('.modal-backdrop')`);
+ });
  await check('history UI reflects configured count and removes expired/excluded SQL',async()=>{
   await cdp.click('[aria-label="History"]');await cdp.until(`document.getElementById('query-history-title')`);
   const text=await cdp.evaluate(`document.querySelector('.query-history-modal').textContent`);

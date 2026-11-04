@@ -147,3 +147,5 @@ tr[data-row-error] td.rownum::after{content:'✖';margin-left:2px}
 
 .footer-target,.footer-drafts{display:inline-flex;align-items:center;gap:5px;font-size:inherit;padding:0 6px}
 .footer-drafts{font-weight:700}
+
+.settings-frame nav button[data-changed]::after{content:' ●';color:var(--accent-text)}

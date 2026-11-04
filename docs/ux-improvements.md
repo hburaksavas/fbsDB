@@ -41,9 +41,9 @@ Grid düzenleme sırasında araç çubuğuna ve panellere çok sayıda eylem ekl
 | # | Öneri | Etki | Efor |
 | --- | --- | --- | --- |
 | UX-14 ✅ | **Durum çubuğunda etkin bağlam:** bağlantı, şema, ortam ve işlem durumunu (bekleyen değişiklik sayısı dahil) her zaman görünen tek bir şeritte topla; tıklayınca ilgili ayar/panele git. | Y | M |
-| UX-15 | **Son kullanılanlar ve geri dönüş:** son açılan nesneler/sorgular/sonuçlar için tek bir "Son" listesi; Alt+Sol/Sağ ile gezinme geçmişi (varsa tutarlı hale getir). | O | M |
-| UX-16 | **Ayarlarda arama ve değişiklik işareti:** ayar sayfalarında tek arama kutusu ve varsayılandan farklı ayarlar için "Değiştirildi" rozeti + tek tıkla sıfırlama. | O | M |
-| UX-17 | **Geri alınabilir yerleşim:** panel yerleşimini bozan kullanıcı için "Yerleşimi sıfırla" eylemi ve kayıtlı yerleşim önizlemesi (`SavedLayouts`). | O | S |
+| UX-15 ✅ | **Son kullanılanlar ve geri dönüş:** son açılan nesneler/sorgular/sonuçlar için tek bir "Son" listesi; Alt+Sol/Sağ ile gezinme geçmişi (varsa tutarlı hale getir). | O | M |
+| UX-16 ✅ | **Ayarlarda arama ve değişiklik işareti:** ayar sayfalarında tek arama kutusu ve varsayılandan farklı ayarlar için "Değiştirildi" rozeti + tek tıkla sıfırlama. | O | M |
+| UX-17 ✅ | **Geri alınabilir yerleşim:** panel yerleşimini bozan kullanıcı için "Yerleşimi sıfırla" eylemi ve kayıtlı yerleşim önizlemesi (`SavedLayouts`). | O | S |
 
 ## E. Performans algısı ve cilâ
 
@@ -71,6 +71,7 @@ Grid düzenleme sırasında araç çubuğuna ve panellere çok sayıda eylem ekl
 - **UX-12 kısmen tamamlandı:** `src/motion.css` (son yüklenen stil dosyası) `prefers-reduced-motion` için tüm animasyon/geçişleri kısaltır ve tekrarı keser; sonsuz animasyonlu her stil dosyasında kendi kuralı olduğunu denetleyen test eklendi ve eksik bir dosya (`executionContext.css` sekme bağlantı döndürücüsü) düzeltildi. Durum göstergeleri zaten yalnız renge dayanmıyor (⚠, ✖, noktalı çerçeve, yazı); `forced-colors` odak kuralı mevcut (testle sabitlendi). **Yapılmadı:** gerçek yüksek karşıtlık (`prefers-contrast`) paletleri ve tema renk çiftleri için otomatik karşıtlık ölçümü; reduced-motion davranışı masaüstünde emüle edilerek denenmedi, yalnızca CSS/test düzeyinde doğrulandı (`tests/motion-accessibility.test.mjs`).
 - **UX-13 tamamlandı:** tek bir gizli canlı bölge çifti (`LiveAnnouncer`, polite + assertive) ve `announce()` yardımcısı. Duyurulanlar: biten sorgunun satır sayısı/süresi, düzenleme modunun açılıp kapanması, bekleyen değişiklik sayısı, Oracle'ın reddedeceği değer sayısı. Mevcut bildirimler (Feedback, sonuç durumu) zaten `alert`/`status` rolündeydi. Birim test (`tests/announcer.test.mjs`) ve masaüstü testi (129 kontrol) geçti.
 - **UX-14 tamamlandı:** alt çubukta (zaten çalışma alanı, durum ve işlem metni vardı) artık her zaman görünen bağlantı adı + ortam düğmesi (tıklayınca bağlantı seçici) ve sekmede uygulanmamış grid düzenlemesi varsa "N unapplied edits" hatırlatıcısı (tıklayınca sonuçlar öne gelir). İşlem metni UX-06 sözlüğüne hizalandı ("Manual commit · not committed"). **Yapılmayan:** şema adı gösterilmedi (görünür bağlantı nesnesinde güvenilir şema alanı yok); `Transaction pending` yazan diğer yerler (WorkbenchStatus, editör oturum durumu) çok sayıda teste bağlı olduğu için olduğu gibi bırakıldı. Masaüstü testi (129 kontrol) geçti.
+- **UX-15/16/17 (çoğu zaten vardı, kod incelenerek doğrulandı):** gezinme geçmişi (Alt+Sol/Sağ, "Return to last edit", önceki/sonraki düzenleme konumu), sorgu geçmişi ve son çalışma alanları mevcut olduğundan yeni "Son kullanılanlar" listesi yazılmadı (UX-15 yeni kod gerektirmedi). Ayarlarda arama, "Changed only" süzgeci ve kategori sıfırlama zaten vardı; eklenen: varsayılandan farklı değer içeren kategori adlarının yanında ● işareti ve `aria-description` (UX-16). Görünüm menüsünde "Reset Panel Layout" ve kayıtlı yerleşimler zaten vardı; eklenen: komut paletinde "Reset panel layout" (UX-17). Masaüstü testi (130 kontrol) geçti.
 
 ## Önerilen sıra
 

@@ -2531,6 +2531,7 @@ export function App() {
         {id:'layoutLock',label:layout.locked?'Unlock panel layout':'Lock panel layout',run:()=>updateLayout(current=>({...current,locked:!current.locked}))},
         {id:'structure',label:'Show file structure panel',run:()=>{setFilePanelView('structure');showDockPanel('files')}},
         ...activeGridActions(),
+        {id:'resetLayout',label:'Reset panel layout',detail:'Restores the default panel arrangement',run:resetPanelLayout},
         {id:'shortcutMap',label:'Keyboard shortcut map',detail:'?',run:()=>setShortcutMap({context:'general'})},
         {id:'outline',label:'Show file outline',run:()=>setPaletteMode('outline')},
         {id:'density',label:'Toggle compact / comfortable workbench density',run:()=>setWorkbenchDensity(value=>value==='compact'?'comfortable':'compact')},
