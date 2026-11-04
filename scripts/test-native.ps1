@@ -10,8 +10,8 @@ if (-not $ReportDirectory) { $ReportDirectory = Join-Path $nativeTestRepo '.arti
 $ReportDirectory = [System.IO.Path]::GetFullPath($ReportDirectory)
 New-Item -ItemType Directory -Path $ReportDirectory -Force | Out-Null
 
-# Explicit allowlist: OracleAcceptance, OracleLiveRegression, PagingSmoke and
-# TabSessionsSmoke require live credentials/database access and are not CI tests.
+# Explicit allowlist: OracleLiveRegression requires live credentials/database
+# access and is not a CI test.
 $nativeTestProjects = @(
     'tests/BridgeContractSmoke/BridgeContractSmoke.csproj'
     'tests/ConnectionOrganizationSmoke/FbsDb.ConnectionOrganizationSmoke.csproj'

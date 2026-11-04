@@ -1,6 +1,6 @@
 # Kalan işler
 
-`docs/feature-ideas.md` kataloğundan üretilmiştir; tamamlanan maddeler ve ayrıntılı ilerleme günlüğü o dosyadadır.
+Eski `docs/feature-ideas.md` kataloğundan üretilmiştir. Katalog çalışma ağacından kaldırıldı; tamamlanan maddeler ve ilerleme günlüğü için: `git show 2bbc282^:docs/feature-ideas.md`.
 
 ## Özet
 
@@ -20,7 +20,7 @@
 - ⚠ engel ya da uyarı notudur; alt madde kutuları (\[x\] / \[ \]) gerçek durumu gösterir.
 - **Canlı Oracle durumu (2026-11-05):** `tests/OracleLiveRegression` artık grid Apply'ı gerçek Oracle'da çalıştırır: gridin kendi kodunun ürettiği deyimler, savepoint'e geri dönme, başka oturumun değişikliği, FK hatası ve ilişki sorguları, kilit zaman aşımı, otomatik commit reddi ve durdurma. **Hâlâ canlı denenmeyenler:** Commit sırasında bağlantı kopması, kullanıcı yazımı Commit öncesi denetimler, TIMESTAMP WITH TIME ZONE sütunları ve uygulamanın WebView2 üzerinden Oracle'a giden tam akışı.
 - FI-044 kullanıcı kararıyla atlanmıştır.
-- Bazı maddelerin uzun açıklamaları ve alt maddeleri katalogda eski bir bozulma nedeniyle kısalmış olabilir; kısmen yapılmış olup alt maddesi görünmeyen maddeler (ör. FI-170, FI-068) "hiç başlanmamış" altında listelenir.
+- Bazı maddelerin uzun açıklamaları katalogda eski bir bozulma nedeniyle kısalmış olabilir.
 
 ## 1. Kısmen yapılmış maddeler
 
@@ -39,10 +39,13 @@ Ana özellik çalışıyor; aşağıdaki alt maddeler açık.
 
 - **FI-156** (R3) — Tür farkında hücre düzenleyicileri: tarih seçiciler, genişletilmiş metin düzenleyicileri ve yapılandırılmış ilişkili kayıt seçicileri sun; NULL atamayı açık bir eylem yap.
   - [x] Düz DATE/TIMESTAMP için takvim denetimi; uzun/çok satırlı metin için çok satırlı düzenleyici (Ctrl+Enter ile hazırlar); NULL açık eylem.
+  - [ ] Yapılandırılmış ilişkili kayıt seçici.
 - **FI-163** (R3) — Düzenlenebilirlik açıklamaları: düzenleme kullanılamadığında hesaplanmış sütunları, belirsiz kaynak tabloları, güvenilir satır kimliği eksikliğini veya yetersiz yetkileri açıkla. Rastgele SELECT sonuçlarının güvenle güncellenebileceğini varsayma.
   - [x] Hesaplanmış/sanal sütun, birden çok kaynak tablo, kaynak tablo yok, birincil anahtar yok/eksik ve LOB-ikili sütun nedenleri gerekçesiyle gösterilir.
+  - [ ] Yetersiz yetki nedeni (uygulama adımında).
 - **FI-185** (R3) — Düzenlenen satırları görünür tut: yerel olarak düzenlenmiş ve artık geçerli süzgece uymayan satırları geçici olarak koru ve bu durumu açıkça etiketle.
   - [x] Süzgeç ve sıralama saklanan değerlere uygulandığı için düzenlenen satır taslak değerle süzgeçten düşmez.
+  - [ ] Taslak değeri süzgece uymayan satırın açıkça etiketlenmesi.
 - **FI-194** (R3) — Düzenlenebilir sütun üst verisi: üretilmiş, kimlik (identity) veya yetkisiz sütunların neden kilitli olduğunu gerçek Oracle yeteneklerine ve yetkilerine dayanarak açıkla.
   - [x] Sanal/hesaplanmış, GENERATED ALWAYS, LOB-ikili ve ifade sütunları başlıkta 🔒 ve nedeni içeren ipucuyla işaretlenir.
 
@@ -50,11 +53,13 @@ Ana özellik çalışıyor; aşağıdaki alt maddeler açık.
   - ⚠ Gerçek Oracle yetkilerini (ALL_TAB_PRIVS / oturum ayrıcalıkları) okuyan yeni bir native sorgu gerekir.
 - **FI-177** (R3) — Düzeltilmiş hataları yeniden dene: onaylanmış uygulanan sonuçları koru, kullanıcıların başarısız taslakları düzeltmesine izin ver ve başarılı DML'i yeniden gönderme. Belirsiz sonuçlar yeniden denemeden önce mutabakat gerektirir; toplu işlem atomikliğini açıkça tanımla.
   - [x] Uygulanan değişiklikler korunur ve yeniden gönderilmez; başarısız/uyuşmayan/geri alınan/atlanan taslaklar düzeltilip yeniden denenebilir.
+  - [ ] Belirsiz sonuç (bağlantı kopması) için mutabakat.
 
 ### R4 — Proje ölçeği ve ileri üretkenlik (1)
 
 - **FI-015** (R4) — Güvenli silme: bir prosedürü veya parametreyi kaldırmadan önce proje başvurularını bul ve etkilenen kodu göster. Tam kapsam iddia etmek yerine analiz kapsamını ve çözülemeyen dinamik başvuruları bildir.
   - [x] Geçerli belgede çözülen başvuruları ve sınırlı çalışma alanı metin adaylarını silme öncesi incelemede göster; belirsiz kapsamı açıkla.
+  - [ ] Proje çapı semantik doğrulama ve gerçek silme akışına inceleme kapısı ekle; atlanan/okunamayan dosyaları ayrı raporla.
 
 ## 2. Hiç başlanmamış maddeler
 
@@ -68,6 +73,10 @@ Ana özellik çalışıyor; aşağıdaki alt maddeler açık.
   - ⚠ Gerçek Oracle LOB konumlayıcısı ve oturum yaşam döngüsü gerekir; canlı veritabanı olmadan doğrulanamaz.
 - **FI-108** (R2) — Ağır sütunların ertelenmiş yüklenmesi: desteklenen büyük LOB değerlerini başlangıçta dışarıda bırak ve seçilen hücreleri isteğe bağlı getir; kararlı satır kimliği ile net tutarlılık/oturum ömrü davranışı olsun.
   - ⚠ Gerçek Oracle LOB okuması ve kararlı satır kimliği gerekir; canlı veritabanı olmadan doğrulanamaz.
+
+### R3 — Güvenilir grid düzenleme (1)
+
+- **FI-170** (R3) — Veritabanının ürettiği değerleri geri oku: Apply sonrasında desteklenen varsayılan, identity ve tetikleyici değerlerini aynı işlem içinde al; geri okuma hatalarını DML hatalarından açıkça ayır.
 
 ### R4 — Proje ölçeği ve ileri üretkenlik (30)
 
