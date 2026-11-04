@@ -33,10 +33,10 @@ export function desktopRegressionFixture(root, workspace = false) {
       const message = typeof value === 'string' ? JSON.parse(value) : value;
       if (message.type === 'ui.ready') { state.ready = true; nativePost(value); return; }
       const allowed = ['file.new', 'file.activate', 'file.open', 'file.openPath', 'file.save', 'file.poll', 'tab.close', 'system.locale', 'ui.setTheme', 'ui.setZoom', 'connection.list'];
-      if (${JSON.stringify(workspace)}) allowed.push('workspace.projectRules','workspace.projectRules.save','workspace.sources','workspace.refresh','workspace.children','workspace.git','workspace.runs.list','workspace.runs.save','workspace.search');
+      if (${JSON.stringify(workspace)}) allowed.push('workspace.projectRules','workspace.projectRules.save','workspace.sources','workspace.refresh','workspace.children','workspace.git','workspace.runs.list','workspace.runs.save','workspace.search','workspace.binds.load');
       if (message.type !== 'command' || !allowed.includes(message.command)) { state.blocked.push(message.command || message.type); return; }
       const payload = message.payload || {};
-      if (message.command.startsWith('workspace.') && message.command !== 'workspace.refresh' && message.command !== 'workspace.children' && message.command !== 'workspace.git' && normalize(payload.root || '') !== normalize(root)) throw new Error('Workspace command escaped the isolated test root.');
+      if (message.command.startsWith('workspace.') && message.command !== 'workspace.refresh' && message.command !== 'workspace.children' && message.command !== 'workspace.git' && message.command !== 'workspace.binds.load' && normalize(payload.root || '') !== normalize(root)) throw new Error('Workspace command escaped the isolated test root.');
       state.commands.push({ id: message.id, command: message.command, tabId: message.tabId, path: payload.path });
       if (state.commands.length > 512) state.commands.shift();
       if (message.command === 'file.open') {
