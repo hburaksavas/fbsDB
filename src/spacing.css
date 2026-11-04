@@ -1,0 +1,10 @@
+/* Spacing scale for new layout work. Components may still use plain even pixel values; odd values are ratcheted down by tests/design-scale.test.mjs. */
+:root {
+  --space-1: 2px;
+  --space-2: 4px;
+  --space-3: 6px;
+  --space-4: 8px;
+  --space-5: 12px;
+  --space-6: 16px;
+  --space-7: 24px;
+}
