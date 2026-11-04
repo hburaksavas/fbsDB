@@ -12,5 +12,5 @@
 .subquery-trial-dialog{max-width:min(760px,96vw)}
 .trial-table{margin:8px 18px;max-height:240px;overflow:auto;border:1px solid var(--line);border-radius:5px}
 .trial-table table{border-collapse:collapse;width:100%;font-size:11px}
-.trial-table th,.trial-table td{padding:3px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+.trial-table th,.trial-table td{padding:4px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
 .trial-table small{display:block;padding:4px 8px;color:var(--muted)}

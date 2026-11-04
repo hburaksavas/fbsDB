@@ -83,6 +83,7 @@ import './iconTheme.css';
 import './gridEdit.css';
 import './dateFormat.css';
 import './spacing.css';
+import './contrast.css';
 import './motion.css';
 
 import "./executionContext.css";

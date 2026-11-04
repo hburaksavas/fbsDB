@@ -382,7 +382,7 @@
   color: var(--settings-field-text);
   font: inherit;
   font-size: 11px;
-  padding: 5px 8px;
+  padding: 6px 8px;
 }
 .desktop-shell .settings-workspace input:not([type="checkbox"]):not([type="color"]):not([type="file"])::placeholder,
 .desktop-shell .settings-workspace textarea::placeholder { color: var(--settings-field-placeholder); }

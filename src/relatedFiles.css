@@ -2,7 +2,7 @@
 .related-file-create p{margin:4px 0 0;font-size:11px;color:var(--muted)}
 .related-file-body{padding:6px 18px;max-height:min(62vh,520px);overflow:auto}
 .related-file-choices{display:grid;gap:4px}
-.related-file-choices label{display:grid;grid-template-columns:auto 130px 1fr auto;gap:8px;align-items:center;padding:5px 8px;border:1px solid var(--line);border-radius:4px;font-size:11px}
+.related-file-choices label{display:grid;grid-template-columns:auto 130px 1fr auto;gap:8px;align-items:center;padding:6px 8px;border:1px solid var(--line);border-radius:4px;font-size:11px}
 .related-file-choices small{color:var(--warning)}
-.related-file-body h3{margin:10px 0 3px;font-size:11px}
+.related-file-body h3{margin:10px 0 4px;font-size:11px}
 .related-file-body pre{margin:0;padding:6px 8px;background:var(--surface-2);border:1px solid var(--line);border-radius:4px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:220px;overflow:auto;font-size:11px}

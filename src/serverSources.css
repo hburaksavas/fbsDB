@@ -5,7 +5,7 @@
 .server-sources h4 span{font-weight:400}
 .server-source-entry{display:flex;flex-wrap:wrap;align-items:center;gap:4px;padding:2px 0}
 .server-source-name{flex:1 1 100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.server-source-open{display:inline-flex;gap:5px;align-items:center;padding:1px 6px;font-size:10px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--text)}
+.server-source-open{display:inline-flex;gap:6px;align-items:center;padding:1px 6px;font-size:10px;border:1px solid var(--line);border-radius:4px;background:transparent;color:var(--text)}
 .server-badge{padding:0 4px;border-radius:3px;background:var(--accent);color:var(--on-accent);font-size:9px;font-weight:700}
 .server-sources-empty{color:var(--muted);margin:4px 0}
 .server-sources-error{color:var(--text);margin:0}

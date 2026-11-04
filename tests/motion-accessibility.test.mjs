@@ -16,3 +16,9 @@ test('every stylesheet that repeats an animation forever has its own reduced-mot
 test('forced-colors mode keeps keyboard focus visible',()=>{
  assert.ok(css.some(name=>/forced-colors:\s*active/.test(read(name))&&/focus-visible/.test(read(name))));
 });
+test('a higher-contrast preference strengthens separators and secondary text without touching the tokens',()=>{
+ const rule=read('contrast.css');
+ for(const piece of ['prefers-contrast: more','--line: var(--line-strong)','--muted: var(--foreground)'])assert.ok(rule.includes(piece),`contrast.css lacks ${piece}`);
+ const imports=[...read('main.jsx').matchAll(/import '\.\/([\w.-]+\.css)';/g)].map(match=>match[1]);
+ assert.ok(imports.includes('contrast.css')&&imports.indexOf('contrast.css')<imports.indexOf('motion.css'));
+});

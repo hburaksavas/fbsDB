@@ -4,6 +4,6 @@
 .inline-bind-field input[type=text],.inline-bind-field input[type=datetime-local]{width:130px}
 .inline-bind-null{display:inline-flex;gap:2px;align-items:center;color:var(--muted)}
 .inline-bind-usage{background:var(--highlight-teal-bg);outline:1px solid var(--accent)}
-.inline-bind-pick{font-size:10px;padding:0 5px}
+.inline-bind-pick{font-size:10px;padding:0 6px}
 .picker-choice{display:block;width:100%;text-align:left;background:transparent;color:var(--text);border:0;padding:2px 0}
 .picker-choice:disabled{color:var(--muted)}

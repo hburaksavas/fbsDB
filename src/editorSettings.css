@@ -2,15 +2,15 @@
 .settings-frame nav button.settings-editor-child{padding-left:22px}
 .editor-style-settings,.editor-shortcuts-panel{display:grid;gap:10px}
 .editor-settings-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 12px}
-.editor-settings-fields label{display:grid;gap:5px;font-size:11px;color:var(--muted)}
+.editor-settings-fields label{display:grid;gap:6px;font-size:11px;color:var(--muted)}
 .editor-settings-fields input,.editor-settings-fields select,.editor-shortcuts-panel>input,.editor-shortcut-row input{height:30px;min-width:0;width:100%;border:1px solid var(--line);border-radius:5px;background:var(--input);color:var(--foreground);padding:0 8px}
 .editor-settings-fields input:focus,.editor-settings-fields select:focus,.editor-shortcuts-panel input:focus{border-color:var(--accent-border);outline:0;box-shadow:none}
-.editor-settings-toggles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;font-size:11px;color:var(--foreground)}
+.editor-settings-toggles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;font-size:11px;color:var(--foreground)}
 .editor-settings-toggles label{display:flex;align-items:center;gap:6px}
 .editor-settings-toggles input{accent-color:var(--accent)}
 .editor-shortcuts-panel>small{font-size:10px;color:var(--muted)}
-.editor-shortcut-row{display:grid;grid-template-columns:minmax(100px,1fr) minmax(150px,1.3fr) auto auto;align-items:center;gap:7px;padding:7px 0;border-bottom:1px solid var(--line);font-size:11px;color:var(--foreground)}
-.editor-shortcut-row button{font-size:10px;padding:4px 7px}
+.editor-shortcut-row{display:grid;grid-template-columns:minmax(100px,1fr) minmax(150px,1.3fr) auto auto;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);font-size:11px;color:var(--foreground)}
+.editor-shortcut-row button{font-size:10px;padding:4px 8px}
 .formatter-presets{display:flex;align-items:center;gap:6px}
 .formatter-presets button[aria-pressed=true]{background:var(--selection-bg);color:var(--foreground);border-color:var(--accent-border)}
 .formatter-presets span{font-size:10px;color:var(--muted)}
@@ -23,7 +23,7 @@
 .completion-settings legend{padding:0;font-size:11px;font-weight:600;color:var(--foreground)}
 .completion-settings .preference-toggle{display:flex;gap:6px}
 .completion-actions{display:flex;gap:8px}
-.completion-actions button{font-size:11px;padding:5px 9px}
+.completion-actions button{font-size:11px;padding:6px 10px}
 /* Selected projections stay available; focus restores full contrast for acceptance. */
 .monaco-editor .suggest-widget .monaco-list-row[aria-label*=", SELECT’te mevcut,"]:not(.focused) .label-name,
 .monaco-editor .suggest-widget .monaco-list-row[aria-label*=", SELECT’te mevcut,"]:not(.focused) .suggest-icon {

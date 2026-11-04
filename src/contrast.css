@@ -1,0 +1,9 @@
+/* Higher contrast on request (system "increase contrast"): stronger separators and full-strength secondary text.
+   Theme tokens stay the source of truth; this only re-points two of them. */
+@media (prefers-contrast: more) {
+  .desktop-shell[data-theme], .theme-scope[data-theme] {
+    --line: var(--line-strong) !important;
+    --muted: var(--foreground) !important;
+  }
+  .desktop-shell :focus-visible, .theme-scope :focus-visible { outline-width: 3px; }
+}

@@ -2,14 +2,14 @@
 .run-console p{margin:4px 0 0;font-size:11px;color:var(--muted)}
 .run-console-body{display:grid;grid-template-columns:260px 1fr;gap:12px;padding:8px 18px;min-height:260px;max-height:min(60vh,520px)}
 .run-console-list{list-style:none;margin:0;padding:0;overflow:auto;border-right:1px solid var(--line)}
-.run-console-list button{display:grid;gap:1px;width:100%;text-align:left;padding:5px 8px;border:0;border-bottom:1px solid var(--line);background:transparent;color:inherit;font-size:11px}
+.run-console-list button{display:grid;gap:1px;width:100%;text-align:left;padding:6px 8px;border:0;border-bottom:1px solid var(--line);background:transparent;color:inherit;font-size:11px}
 .run-console-list button[aria-pressed=true]{background:var(--hover-bg)}
 .run-console-list button[data-ok=false] b{color:var(--danger)}
 .run-console-list small{color:var(--muted)}
 .run-console-detail{overflow:auto;font-size:11px}
-.run-console-detail dl{display:grid;gap:3px;margin:0}
+.run-console-detail dl{display:grid;gap:4px;margin:0}
 .run-console-detail dl>div{display:grid;grid-template-columns:90px 1fr}
 .run-console-detail dt{color:var(--muted)}
 .run-console-detail dd{margin:0;overflow-wrap:anywhere}
-.run-console-detail h3{margin:10px 0 3px;font-size:11px}
+.run-console-detail h3{margin:10px 0 4px;font-size:11px}
 .run-console-detail pre{margin:0;padding:6px 8px;background:var(--surface-2);border:1px solid var(--line);border-radius:4px;white-space:pre-wrap;overflow-wrap:anywhere;max-height:150px;overflow:auto}

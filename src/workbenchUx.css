@@ -13,30 +13,30 @@
 .editor-toolbar-overflow{display:block;position:relative;flex:none}
 .editor-overflow-menu{position:fixed;z-index:450;width:270px;max-width:calc(100vw - 16px);max-height:calc(100vh - 24px);overflow:auto;padding:6px;border:1px solid var(--line);border-radius:6px;background:var(--surface);box-shadow:0 8px 24px var(--shadow-color);color:var(--foreground);font-family:var(--ui-font-family,'Segoe UI',sans-serif)}
 .editor-overflow-menu :is(button,select):focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.editor-overflow-menu>button{width:100%;padding:9px;text-align:left;display:flex;justify-content:space-between;gap:8px;background:transparent;color:inherit}
+.editor-overflow-menu>button{width:100%;padding:10px;text-align:left;display:flex;justify-content:space-between;gap:8px;background:transparent;color:inherit}
 .editor-overflow-menu>button:hover{background:color-mix(in srgb,var(--accent) 12%,transparent)}
 .editor-overflow-menu kbd{font-size:9px;opacity:.7}
 .editor-overflow-menu label{padding:8px;display:grid;gap:8px}
-.editor-overflow-menu select{color:inherit;background:var(--surface);border:1px solid var(--line);padding:5px}
+.editor-overflow-menu select{color:inherit;background:var(--surface);border:1px solid var(--line);padding:6px}
 @container sql-workspace (max-width:620px){.editor-status>span:not(.editor-position):not(.execution-target-status){display:none}}
-@container sql-workspace (max-width:360px){.connection-control-mark{display:none}.connection-control-copy{max-width:150px}.connection-control-environment{max-width:38px}.commandbar{gap:3px!important}.editor-status .execution-target-status{max-width:130px}}
-.ide-search-kinds{display:flex;gap:5px;padding:8px 10px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
-.ide-search-kinds button{padding:5px 8px;font:inherit;font-size:11px;color:inherit;background:transparent;border:1px solid var(--line);border-radius:4px}
+@container sql-workspace (max-width:360px){.connection-control-mark{display:none}.connection-control-copy{max-width:150px}.connection-control-environment{max-width:38px}.commandbar{gap:4px!important}.editor-status .execution-target-status{max-width:130px}}
+.ide-search-kinds{display:flex;gap:6px;padding:8px 10px;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+.ide-search-kinds button{padding:6px 8px;font:inherit;font-size:11px;color:inherit;background:transparent;border:1px solid var(--line);border-radius:4px}
 .ide-search-kinds button[aria-pressed="true"]{border-color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,transparent)}
 .ide-palette-results [role="option"]>span{display:flex;flex:1;min-width:0;flex-direction:column;gap:4px}
 .ide-palette-results [role="option"] b,.ide-palette-results [role="option"] small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:400}
 .ide-palette-results [role="option"] small{font-size:10px;opacity:.75}
 .ide-search-help,.ide-search-empty{padding:10px 12px;font-size:10px;color:var(--muted)}
 .ide-search-empty button,.editor-tabs-empty button{padding:6px;color:var(--accent-text);background:transparent;text-align:left}
-.editor-tabs-search{display:block;padding:5px;position:sticky;top:0;z-index:1;background:var(--surface)}
-.editor-tabs-search input{width:100%;box-sizing:border-box;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:7px;font:inherit}
-.editor-tabs-empty{display:grid;gap:5px;padding:12px}
-.actionable-state{display:flex;flex-direction:column;gap:9px;align-items:flex-start;padding:14px;font-size:11px;line-height:1.5;overflow-wrap:anywhere}
+.editor-tabs-search{display:block;padding:6px;position:sticky;top:0;z-index:1;background:var(--surface)}
+.editor-tabs-search input{width:100%;box-sizing:border-box;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:4px;padding:8px;font:inherit}
+.editor-tabs-empty{display:grid;gap:6px;padding:12px}
+.actionable-state{display:flex;flex-direction:column;gap:10px;align-items:flex-start;padding:14px;font-size:11px;line-height:1.5;overflow-wrap:anywhere}
 .actionable-state>span{white-space:pre-wrap;max-height:180px;overflow:auto}
 .actionable-state.output-empty{align-items:center;justify-content:center}
-.result-scope{display:flex;align-items:center;flex-wrap:wrap;gap:5px;padding:5px 10px;border-bottom:1px solid var(--line);font-size:10px;max-height:110px;overflow:auto;flex:none}
+.result-scope{display:flex;align-items:center;flex-wrap:wrap;gap:6px;padding:6px 10px;border-bottom:1px solid var(--line);font-size:10px;max-height:110px;overflow:auto;flex:none}
 .result-scope-label{color:var(--muted);margin-right:4px}
-.scope-chip{display:inline-flex;align-items:center;gap:7px;padding:3px 6px;min-height:24px;border:1px solid var(--line);border-radius:4px;background:transparent;color:inherit;font:inherit}
+.scope-chip{display:inline-flex;align-items:center;gap:8px;padding:4px 6px;min-height:24px;border:1px solid var(--line);border-radius:4px;background:transparent;color:inherit;font:inherit}
 .scope-chip>span:first-child{max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .scope-chip.server-scope{border-color:var(--accent);color:var(--accent-text)}
 .desktop-shell .result-hover-popover{max-width:calc(100vw - 16px);max-height:calc(100vh - 24px);box-sizing:border-box;overflow:auto}
@@ -44,7 +44,7 @@
 .ide-palette-results{min-height:0;overflow:auto}
 @media(forced-colors:active){.desktop-shell :focus-visible{outline-color:Highlight!important}.sql-execution-target{outline:1px solid Highlight}.scope-chip{border-color:ButtonText}}
 
-.ide-search-group{padding:7px 12px 4px;font-size:10px;font-weight:600;color:var(--muted);border-top:1px solid var(--line)}
+.ide-search-group{padding:8px 12px 4px;font-size:10px;font-weight:600;color:var(--muted);border-top:1px solid var(--line)}
 
 /* FI-000: left-aligned editor toolbar; overflow and maximize sit together at the far right. */
 .commandbar{justify-content:flex-start;flex-wrap:nowrap!important;overflow:hidden}.commandbar .command-left{flex:0 1 auto;flex-wrap:nowrap!important;min-width:0}.commandbar .command-end{display:flex;align-items:center;gap:4px;margin-left:auto;flex:none}
