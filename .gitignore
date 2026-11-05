@@ -12,6 +12,7 @@ artifacts/
 .tools/
 # Internal planning notes stay local.
 docs/remaining-work.md
+docs/roadmap.md
 docs/ux-improvements.md
 *.png
 !native/FbsDb/Assets/SplashScreen.scale-200.png
