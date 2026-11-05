@@ -76,3 +76,24 @@ test('zoned columns bind with their zone and a session-relative key is refused',
   assert.equal(byLocal.statements.length,0);
   assert.match(byLocal.problems[0],/cannot be identified exactly/);
 });
+
+test('privileges decide what can be changed and unknown privileges lock nothing',()=>{
+  const source=name=>({name,type:'VARCHAR2',sourceSchema:'APP',sourceTable:'T',sourceColumn:name}),columns=[source('ID'),source('A'),source('B')];
+  const of=privileges=>explainEditability(columns,{primaryKey:['ID'],privileges});
+  const open=explainEditability(columns,{primaryKey:['ID']});
+  assert.equal(open.editable,true);assert.equal(open.canInsert,true);assert.equal(open.canDelete,true);assert.deepEqual(open.limits,[]);
+  const none=of({update:false,insert:false,delete:false,updateColumns:[],insertColumns:[]});
+  assert.equal(none.editable,false);assert.match(none.reasons.join(' '),/no UPDATE, INSERT or DELETE privilege on APP\.T/);
+  const insertOnly=of({update:false,insert:true,delete:false,updateColumns:[],insertColumns:[]});
+  assert.equal(insertOnly.editable,true);assert.equal(insertOnly.canInsert,true);assert.equal(insertOnly.canDelete,false);
+  assert.equal(insertOnly.columns[1].editable,false);assert.match(insertOnly.columns[1].reason,/no UPDATE privilege on this column/);assert.equal(insertOnly.insertColumns[1].editable,true);
+  assert.deepEqual(insertOnly.limits,['You cannot change existing rows: you have no UPDATE privilege on APP.T.','You cannot delete rows: you have no DELETE privilege on APP.T.']);
+  const deleteOnly=of({update:false,insert:false,delete:true,updateColumns:[],insertColumns:[]});
+  assert.equal(deleteOnly.editable,true);assert.equal(deleteOnly.canInsert,false);assert.equal(deleteOnly.canDelete,true);
+  const byColumn=of({update:false,insert:false,delete:false,updateColumns:['a'],insertColumns:['B']});
+  assert.deepEqual(byColumn.columns.map(item=>item.editable),[false,true,false],'A column grant unlocks that column, whatever its case');
+  assert.deepEqual(byColumn.insertColumns.map(item=>item.editable),[false,false,true],'INSERT and UPDATE grants are separate');
+  assert.deepEqual(of({update:true,insert:true,delete:true,updateColumns:[],insertColumns:[]}).limits,[]);
+  const virtual=explainEditability([source('ID'),{...source('V'),virtual:true}],{primaryKey:['ID'],privileges:{update:true,insert:true,delete:true}});
+  assert.match(virtual.columns[1].reason,/virtual or computed/,'A privilege does not unlock a computed column');
+});

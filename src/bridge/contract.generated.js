@@ -5266,6 +5266,12 @@ export const bridgeContract = {
         "columns": {
           "type": "array"
         },
+        "privileges": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
         "error": {
           "type": "string"
         }

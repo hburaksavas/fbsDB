@@ -111,7 +111,7 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, columns
   useEffect(()=>{
     if(!editMode||!sourceTable||!isNativeHost||identity)return undefined;
     const requestId=sendNativeCommand('result.editIdentity',{schema:sourceTable.schema,table:sourceTable.table});
-    return subscribeNativeMessages(message=>{if(message.type==='result.editIdentity'&&message.requestId===requestId)setIdentity({columns:message.error?[]:message.columns||[],error:message.error})});
+    return subscribeNativeMessages(message=>{if(message.type==='result.editIdentity'&&message.requestId===requestId)setIdentity({columns:message.error?[]:message.columns||[],error:message.error,privileges:message.privileges??null})});
   },[editMode,sourceTable?.schema,sourceTable?.table,identity===null]);
   useEffect(()=>{
     if(!storeKey)return;
@@ -163,7 +163,7 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, columns
     setCheckResults(results);
   };
   const editabilityRef=useRef(null);
-  const editability=useMemo(()=>editMode?explainEditability(columns,{primaryKey:identity?.columns?.length?identity.columns:manualKey?manualKey.map(index=>columns[index].sourceColumn||columns[index].name):identity?.columns??null}):null,[editMode,columns,identity,manualKey]);
+  const editability=useMemo(()=>editMode?explainEditability(columns,{primaryKey:identity?.columns?.length?identity.columns:manualKey?manualKey.map(index=>columns[index].sourceColumn||columns[index].name):identity?.columns??null,privileges:identity?.privileges??null}):null,[editMode,columns,identity,manualKey]);
   editabilityRef.current=editability;
   useEffect(()=>{
     const old=lastSourceRows.current;lastSourceRows.current=originalRows;
@@ -438,14 +438,14 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, columns
   function newRowFromTemplate(name){
     const template=tableTemplates.find(item=>item.name===name);
     if(!template)return;
-    const {values,missing}=valuesFromTemplate(template,columns,editability.columns);
+    const {values,missing}=valuesFromTemplate(template,columns,editability.insertColumns);
     setDrafts(current=>insertRow(current,values));
     notifyFeedback({kind:missing.length?'warning':'info',title:'New row from template',message:`Template “${template.name}” filled ${Object.keys(values).length} field${Object.keys(values).length===1?'':'s'}.${missing.length?` Not available in this result: ${missing.join(', ')}.`:''}`});
   }
   function saveTemplate(rowId,name){
     const row=drafts.inserted.find(item=>item.id===rowId),key=templateTableKey(columns.find(item=>item.sourceTable));
     if(!row||!key)return;
-    const {template,left}=templateFromRow(row.values,columns,editability.columns,editability.identity,name);
+    const {template,left}=templateFromRow(row.values,columns,editability.insertColumns,editability.identity,name);
     if(!template.name){notifyFeedback({kind:'warning',title:'Row template',message:'Give the template a name.'});return}
     setTemplates(saveRowTemplate(globalThis.localStorage,key,template));
     notifyFeedback({kind:'success',title:'Row template saved',message:`“${template.name}” stores ${Object.keys(template.values).length} field preset${Object.keys(template.values).length===1?'':'s'}.${left.length?` Left out (key, locked or secret-looking): ${left.join(', ')}.`:''}`});
@@ -453,7 +453,7 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, columns
   function tabFrom(r,c,direction){
     const step=nextEditableCell({rowCount:rows.length,visible,isEditable:col=>Boolean(editability?.columns[col]?.editable)},{r,c},direction);
     if(step.end){
-      if(tabAddsRow){
+      if(tabAddsRow&&editability?.canInsert!==false){
         setDrafts(current=>insertRow(current,{}));
         setFocusNewRow({ticket:Date.now()});
       }else notifyFeedback({kind:'info',title:'End of the result',message:'That was the last editable cell. Turn on “Tab adds a row” to start a new row here.'});
@@ -464,7 +464,7 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, columns
   }
   useEffect(()=>{
     if(!focusNewRow||!editability?.editable||!drafts.inserted.length)return;
-    const last=drafts.inserted.at(-1),first=newRowFieldOrder(columns,editability.columns)[0];
+    const last=drafts.inserted.at(-1),first=newRowFieldOrder(columns,editability.insertColumns)[0];
     if(first==null)return;
     const id=requestAnimationFrame(()=>{document.querySelector(`[aria-label="New row ${last.id} ${columns[first].name}"]`)?.focus();setFocusNewRow(null)});
     return()=>cancelAnimationFrame(id);
@@ -511,7 +511,7 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, columns
   function duplicateFocusedRow(){
     const cell=focusedCell();
     if(!cell)return;
-    const values=duplicateValues(columns,editability.columns,editability.identity,originalRows.get(cell.rowIndex)||[]);
+    const values=duplicateValues(columns,editability.insertColumns,editability.identity,originalRows.get(cell.rowIndex)||[]);
     setDrafts(current=>insertRow(current,values));
     notifyFeedback({kind:'info',title:'Row duplicated',message:'A new row draft was created. Key, identity and locked columns are left for the database to fill in.'});
   }

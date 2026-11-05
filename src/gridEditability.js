@@ -5,7 +5,8 @@ const tableName = column => column.sourceTable ? `${column.sourceSchema ? `${col
 
 // Why a result can or cannot be edited, and which columns are the row identity. A SELECT is never assumed to be updatable.
 // `primaryKey` is the key column names of the single source table (from the database), or null when unknown/absent.
-export function explainEditability(columns, { primaryKey = null, readOnly = false } = {}) {
+// `privileges` is what this session may change there, or null when unknown: then nothing is locked and Oracle stays the authority.
+export function explainEditability(columns, { primaryKey = null, readOnly = false, privileges = null } = {}) {
   const reasons = [];
   if (readOnly) reasons.push('This tab is read-only.');
   const tables = [...new Set(columns.map(tableName).filter(Boolean))];
@@ -13,7 +14,7 @@ export function explainEditability(columns, { primaryKey = null, readOnly = fals
   if (tables.length > 1) reasons.push(`The columns come from several tables (${tables.join(', ')}); editing needs exactly one source table.`);
   const table = tables.length === 1 ? { schema: columns.find(tableName)?.sourceSchema || '', name: columns.find(tableName).sourceTable } : null;
 
-  const perColumn = columns.map((column, index) => {
+  const available = columns.map((column, index) => {
     if (!column.sourceTable || tableName(column) !== tables[0]) return { index, editable: false, reason: 'This column is an expression or comes from another table.' };
     if (column.virtual || column.computed) return { index, editable: false, reason: 'A virtual or computed column is derived by Oracle and cannot be set.' };
     if (column.identityAlways || column.generatedAlways) return { index, editable: false, reason: 'A GENERATED ALWAYS column is set by Oracle.' };
@@ -21,6 +22,16 @@ export function explainEditability(columns, { primaryKey = null, readOnly = fals
     if (!column.sourceColumn) return { index, editable: false, reason: 'The source column is unknown.' };
     return { index, editable: true, reason: '' };
   });
+  // A grant can cover the table or single columns, and differs for UPDATE and INSERT, so a new row may offer other columns than the cells.
+  const granted = (kind, whole, named) => available.map(item => {
+    if (!item.editable || !privileges || whole || (named || []).some(name => upper(name) === upper(columns[item.index].sourceColumn))) return item;
+    return { ...item, editable: false, reason: `You have no ${kind} privilege on this column.` };
+  });
+  const perColumn = granted('UPDATE', privileges?.update, privileges?.updateColumns), insertColumns = granted('INSERT', privileges?.insert, privileges?.insertColumns);
+  const canUpdate = perColumn.some(item => item.editable), canInsert = insertColumns.some(item => item.editable), canDelete = !privileges || Boolean(privileges.delete);
+  const qualified = table ? `${table.schema ? `${table.schema}.` : ''}${table.name}` : '';
+  if (table && privileges && !canUpdate && !canInsert && !canDelete) reasons.push(`You have no UPDATE, INSERT or DELETE privilege on ${qualified}.`);
+  const limits = !privileges || !table ? [] : [[canUpdate, 'change existing rows', 'UPDATE'], [canInsert, 'add rows', 'INSERT'], [canDelete, 'delete rows', 'DELETE']].filter(([allowed]) => !allowed).map(([, action, kind]) => `You cannot ${action}: you have no ${kind} privilege on ${qualified}.`);
 
   let identity = [], keyProblem = null;
   if (table) {
@@ -35,9 +46,9 @@ export function explainEditability(columns, { primaryKey = null, readOnly = fals
       else identity = found;
     }
   }
-  const editable = !reasons.length && perColumn.some(item => item.editable);
+  const editable = !reasons.length && (canUpdate || canInsert || (canDelete && Boolean(privileges)));
   if (!reasons.length && !editable) reasons.push('No column of this result can be edited.');
-  return { editable, reasons, table, identity, keyProblem, columns: perColumn };
+  return { editable, reasons, table, identity, keyProblem, columns: perColumn, insertColumns, canInsert, canDelete, limits: reasons.length ? [] : limits };
 }
 
 // Which editor a cell gets: a calendar for plain DATE/TIMESTAMP values, a multi-line editor for long or multi-line text, otherwise a line.

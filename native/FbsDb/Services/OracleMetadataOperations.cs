@@ -121,6 +121,40 @@ public sealed partial class OracleSessionService
                 return new(owner,name,columns);
             }finally{Touch(); _gate.Release();}
         }
+        // What this session may change in a table: as owner, through object grants to the user, PUBLIC or an enabled role, per column, or through ANY and schema privileges.
+        // Null when the name is not a table or view there, such as a synonym: its grants live on the real object, so nothing can be claimed.
+        public async Task<EditPrivileges?> GetEditPrivilegesAsync(string owner,string table) {
+            await _gate.WaitAsync();try {
+                if(_connection?.State!=System.Data.ConnectionState.Open)throw new InvalidOperationException("Connect before reading privileges.");
+                // The provider leaves the schema empty for an unqualified name, which means the session's current schema.
+                if(string.IsNullOrWhiteSpace(owner)){using var current=_connection.CreateCommand();current.CommandText="SELECT SYS_CONTEXT('USERENV','CURRENT_SCHEMA') FROM dual";owner=Convert.ToString(await current.ExecuteScalarAsync())??"";}
+                using(var found=_connection.CreateCommand()){
+                    found.BindByName=true;found.CommandText="SELECT COUNT(*) FROM all_objects WHERE owner=:o AND object_name=:t AND object_type IN ('TABLE','VIEW','MATERIALIZED VIEW')";
+                    found.Parameters.Add("o",OracleDbType.Varchar2).Value=owner;found.Parameters.Add("t",OracleDbType.Varchar2).Value=table;
+                    if(Convert.ToInt32(await found.ExecuteScalarAsync(),CultureInfo.InvariantCulture)==0)return null;
+                }
+                var whole=new HashSet<string>(StringComparer.Ordinal);var columns=new Dictionary<string,List<string>>(StringComparer.Ordinal){["UPDATE"]=[],["INSERT"]=[]};
+                const string grantee="(grantee IN (USER,'PUBLIC') OR grantee IN (SELECT role FROM session_roles)) AND privilege IN ('UPDATE','INSERT','DELETE')";
+                using(var command=_connection.CreateCommand()){
+                    command.BindByName=true;
+                    command.CommandText=$@"SELECT privilege,NULL FROM all_tab_privs WHERE table_schema=:o AND table_name=:t AND {grantee}
+UNION ALL SELECT privilege,column_name FROM all_col_privs WHERE table_schema=:o AND table_name=:t AND {grantee}
+UNION ALL SELECT SUBSTR(privilege,1,6),NULL FROM session_privs WHERE privilege IN ('UPDATE ANY TABLE','INSERT ANY TABLE','DELETE ANY TABLE')
+UNION ALL SELECT p.column_value,NULL FROM TABLE(sys.odcivarchar2list('UPDATE','INSERT','DELETE')) p WHERE :o=USER";
+                    command.Parameters.Add("o",OracleDbType.Varchar2).Value=owner;command.Parameters.Add("t",OracleDbType.Varchar2).Value=table;
+                    using var reader=await command.ExecuteReaderAsync();
+                    while(await reader.ReadAsync()){if(reader.IsDBNull(1))whole.Add(reader.GetString(0));else if(columns.TryGetValue(reader.GetString(0),out var list))list.Add(reader.GetString(1));}
+                }
+                try{
+                    using var command=_connection.CreateCommand();command.BindByName=true;
+                    command.CommandText="SELECT SUBSTR(privilege,1,6) FROM session_schema_privs WHERE schema=:o AND privilege IN ('UPDATE ANY TABLE','INSERT ANY TABLE','DELETE ANY TABLE')";
+                    command.Parameters.Add("o",OracleDbType.Varchar2).Value=owner;
+                    using var reader=await command.ExecuteReaderAsync();
+                    while(await reader.ReadAsync())whole.Add(reader.GetString(0));
+                }catch(OracleException error) when(error.Number==942){/* Schema privileges exist from Oracle 23. */}
+                return new(whole.Contains("UPDATE"),whole.Contains("INSERT"),whole.Contains("DELETE"),[.. columns["UPDATE"]],[.. columns["INSERT"]]);
+            }finally{Touch(); _gate.Release();}
+        }
         public async Task<IReadOnlyList<RelatedRecordLink>> ChildRecordsSqlAsync(string owner,string table,IReadOnlyDictionary<string,object?> values) {
             await _gate.WaitAsync();try {
                 if(_connection?.State!=System.Data.ConnectionState.Open)throw new InvalidOperationException("Connect before reading relationships.");

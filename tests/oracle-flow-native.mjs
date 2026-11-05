@@ -153,6 +153,14 @@ try{
     await cdp.until(`!document.querySelector('.connection-control').dataset.pending`,'Committed');
   });
 
+  await check('privileges: a table this user was never granted explains why it cannot be edited',async()=>{
+    await read(`SELECT DUMMY FROM SYS.DUAL`);
+    await cdp.until(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]')`,'Edit switch');
+    if(await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').getAttribute('aria-pressed')==='false'`))await cdp.click('.results-toolbar [aria-label="Edit rows of this result"]');
+    await cdp.until(`document.querySelector('.grid-edit-reasons')?.textContent.includes('You have no UPDATE, INSERT or DELETE privilege on SYS.DUAL')`,'The missing privilege is named',20000);
+    await cdp.click('.results-toolbar [aria-label="Edit rows of this result"]');
+  });
+
   await check('grid: an edit stays private after Apply, becomes visible after Commit and shows what Oracle stored',async()=>{
     await appliedEdit(1,0,'Çağrı İĞÜŞÖ');
     assert.equal(await nameIn(tabB,1),'n1','Another session saw uncommitted work.');

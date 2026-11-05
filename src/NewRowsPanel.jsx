@@ -3,10 +3,10 @@ import {newRowFieldOrder} from './tabEntry';
 
 // Sectioned entry form for new rows. Only filled fields are sent; empty ones use the database default, and NULL is an explicit choice.
 export function NewRowsPanel({rows,columns,editability,onChange,onRemove,onSaveTemplate}) {
-  const fields = newRowFieldOrder(columns, editability.columns).map(index => ({ column: columns[index], index }));
+  const fields = newRowFieldOrder(columns, editability.insertColumns).map(index => ({ column: columns[index], index }));
   return <section className="new-rows-panel" aria-label="New rows">
     {rows.map(row => {
-      const missing = missingRequired(columns, editability.columns, row.values);
+      const missing = missingRequired(columns, editability.insertColumns, row.values);
       return <fieldset key={row.id} className="new-row" data-new-row={row.id}>
         <legend>New row {row.id} <span className="new-row-state" role="status">{missing.length ? `Missing required: ${missing.map(item => item.column.name).join(', ')}` : 'Ready'}</span></legend>
         <div className="new-row-fields">{fields.map(({ column, index }) => {

@@ -40,7 +40,7 @@ export function executionTarget(text, { start = 0, end = start, caret = start, o
 
 export function actionableState({ connected, error = '', hasItems = false, filtered = false }) {
   if (!connected) return { title: 'No Oracle connection', detail: 'Connect this SQL tab to load accessible Oracle objects.', action: 'Connect', command: 'connect' };
-  if (error) return /ORA-0*1031\b|insufficient privileges|permission denied/i.test(error)
+  if (error) return /ORA-0*1031\b|ORA-41900\b|insufficient privileges|permission denied/i.test(error)
     ? { title: 'Oracle access denied', detail: error, action: 'Choose another profile', command: 'connect' }
     : /ORA-0*942\b/i.test(error) ? { title: 'Oracle object missing or inaccessible', detail: error, action: 'Retry metadata', command: 'retry' }
     : { title: 'Metadata unavailable', detail: error, action: 'Retry metadata', command: 'retry' };

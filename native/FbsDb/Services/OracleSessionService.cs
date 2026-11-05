@@ -7,6 +7,8 @@ using Oracle.ManagedDataAccess.Client;
 
 namespace FbsDb.Services;
 
+public sealed record EditPrivileges(bool Update, bool Insert, bool Delete, string[] UpdateColumns, string[] InsertColumns);
+
 // The connection failed during the automatic Commit after a statement: Oracle may or may not have saved it.
 public sealed class OracleCommitOutcomeUnknownException(Exception inner)
     : Exception("The connection failed while committing this statement. Oracle may or may not have saved it: " + inner.Message, inner);
@@ -297,6 +299,7 @@ public sealed partial class OracleSessionService : IDisposable
     public static string BuildPrimaryKeySql(string schema,string table,IReadOnlyList<LookupColumn> columns,IReadOnlyDictionary<string,string> values) => MetadataOperations.BuildPrimaryKeySql(schema, table, columns, values);
 
     public Task<PrimaryKeyInfo> GetPrimaryKeyAsync(string schema,string table) => _metadata.GetPrimaryKeyAsync(schema, table);
+    public Task<EditPrivileges?> GetEditPrivilegesAsync(string owner,string table) => _metadata.GetEditPrivilegesAsync(owner, table);
     public Task<TableRelations> GetRelationsAsync(string owner,string table) => _metadata.GetRelationsAsync(owner, table);
     public Task<ConstraintInfo?> GetConstraintInfoAsync(string owner,string name) => _metadata.GetConstraintInfoAsync(owner, name);
 

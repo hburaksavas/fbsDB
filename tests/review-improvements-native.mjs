@@ -2443,6 +2443,30 @@ try {
   await cdp.click('[aria-label="Create Oracle package project"]');await cdp.until(`__uxFixture.commands.some(c=>c.command==='workspace.create'&&c.payload.template==='oracle-package')`);
   assert.equal(await cdp.evaluate(`__uxFixture.commands.filter(c=>c.command==='sql.execute').length`),count);
  });
+ await check('privileges: missing INSERT and DELETE are named, their actions are off and locked cells say why',async()=>{
+  await cdp.evaluate(`document.querySelector('[aria-label="Welcome workspace hub"] [aria-label="Close"]')?.click()`);
+  await cdp.key('Escape');
+  await cdp.click('[data-editor-tab="tab-1"] [role="tab"]'); await cdp.until(`${editor}`);
+  const before = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length`);
+  await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);if(request)__uxFixture.result(request,[['1']],false)})()`); await new Promise(resolve => setTimeout(resolve, 300));
+  await cdp.evaluate(`${editor}.setValue('SELECT id, code, note FROM limited');${editor}.setPosition({lineNumber:1,column:1})`); await new Promise(resolve => setTimeout(resolve, 400)); await cdp.evaluate(`${editor}.focus()`); await cdp.key('Enter', 2);
+  await cdp.until(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length>${before}`, 'Query sent');
+  const column = name => ({ name, type: name === 'ID' ? 'NUMBER' : 'VARCHAR2', sourceSchema: 'APP', sourceTable: 'LIMITED', sourceColumn: name });
+  await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('ID'), column('CODE'), column('NOTE')])},rows:[['1','a','n']],rowsAffected:null,elapsedMs:2,returnedRows:1,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
+  await cdp.until(`document.querySelector('[data-cell="0:1"]')?.textContent.includes('a')`, 'Result shown');
+  if (await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').getAttribute('aria-pressed')==='false'`)) await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
+  await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='LIMITED')`);
+  const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
+  await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'LIMITED',columns:['ID'],privileges:{update:false,insert:false,delete:false,updateColumns:['CODE'],insertColumns:[]}})`);
+  await cdp.until(`document.querySelector('[aria-label="What your privileges do not allow"]')`, 'Limits named');
+  const limits = await cdp.evaluate(`document.querySelector('[aria-label="What your privileges do not allow"]').textContent`);
+  assert.match(limits, /You cannot add rows: you have no INSERT privilege on APP\.LIMITED/); assert.match(limits, /You cannot delete rows: you have no DELETE privilege on APP\.LIMITED/); assert.doesNotMatch(limits, /change existing rows/);
+  const button = name => `[...document.querySelectorAll('.grid-edit-bar button')].find(b=>b.textContent===${JSON.stringify(name)})`;
+  assert.equal(await cdp.evaluate(`${button('New row')}.disabled`), true); assert.match(await cdp.evaluate(`${button('New row')}.dataset.appTooltip`), /no INSERT privilege/);
+  assert.equal(await cdp.evaluate(`${button('Delete row')}.disabled`), true); assert.match(await cdp.evaluate(`${button('Delete row')}.dataset.appTooltip`), /no DELETE privilege/);
+  assert.match(await cdp.evaluate(`[...document.querySelectorAll('[data-edit-lock="locked"]')].map(h=>h.dataset.appTooltip||h.title).join(' ')`), /Locked: You have no UPDATE privilege on this column/, 'The locked column says why');
+  assert.equal(await cdp.evaluate(`[...document.querySelectorAll('[data-edit-lock="locked"]')].some(h=>h.textContent.includes('CODE'))`), false, 'The granted column stays editable');
+ });
  const errorLog=await cdp.evaluate('window.__errorLog');
  assert.deepEqual(errorLog,[],JSON.stringify(errorLog));
 } catch(error){failure=error;console.error(error.stack)}

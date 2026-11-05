@@ -14,7 +14,7 @@ export function queryFailureDetails(outcome){
   if(outcome?.kind==='cancelled')return {kind:'cancelled',title:'Query cancelled',message:'',hint:'',code:null};
   if(outcome?.kind==='timeout')return {kind:'timeout',title:'Query timed out',hint:'The configured query timeout was reached.',message,code};
   if(code==='ORA-00942')return {kind:'error',title:'Object missing or inaccessible',hint:'Check the object name, schema and access permissions.',message,code};
-  if(code==='ORA-01031')return {kind:'error',title:'Insufficient privileges',hint:'This connection does not have permission for the statement.',message,code};
+  if(code==='ORA-01031'||code==='ORA-41900')return {kind:'error',title:'Insufficient privileges',hint:'This connection does not have permission for the statement.',message,code};
   return {kind:'error',title:'Query failed',hint:'Review the SQL and the database message below.',message,code};
 }
 

@@ -55,6 +55,7 @@ test('narrow toolbar retains frequent actions without duplicating or reordering 
 test('metadata empty states distinguish disconnected, denied, failed and empty searches', () => {
   assert.equal(actionableState({connected:false}).command,'connect');
   assert.equal(actionableState({connected:true,error:'ORA-01031: insufficient privileges'}).title,'Oracle access denied');
+  assert.equal(actionableState({connected:true,error:'ORA-41900: missing UPDATE privilege on "SYS"."DUAL"'}).title,'Oracle access denied');
   assert.equal(actionableState({connected:true,error:'ORA-00942: table or view does not exist'}).title,'Oracle object missing or inaccessible');
   assert.equal(actionableState({connected:true,error:'Network interrupted'}).command,'retry');
   assert.equal(actionableState({connected:true,filtered:true}).command,'clear');

@@ -120,7 +120,11 @@ public sealed partial class MainPage
                     try
                     {
                         var identity = await Task.Run(() => _oracle.GetPrimaryKeyAsync("\"" + (payload.GetProperty("schema").GetString() ?? "").Replace("\"", "\"\"") + "\"", "\"" + (payload.GetProperty("table").GetString() ?? "").Replace("\"", "\"\"") + "\""));
-                        Send(sender, new { type = "result.editIdentity", requestId = id, tabId, schema = payload.GetProperty("schema").GetString(), table = payload.GetProperty("table").GetString(), columns = identity.Columns.Select(column => column.Name).ToArray() });
+                        // Unknown privileges claim nothing: a wrong lock is worse than Oracle refusing a statement.
+                        EditPrivileges? privileges = null;
+                        try { privileges = await Task.Run(() => _oracle.GetEditPrivilegesAsync(payload.GetProperty("schema").GetString() ?? "", payload.GetProperty("table").GetString() ?? "")); }
+                        catch (Exception error) when (error is Oracle.ManagedDataAccess.Client.OracleException or InvalidOperationException) { Debug.WriteLine("Edit privileges: " + error.Message); }
+                        Send(sender, new { type = "result.editIdentity", requestId = id, tabId, schema = payload.GetProperty("schema").GetString(), table = payload.GetProperty("table").GetString(), columns = identity.Columns.Select(column => column.Name).ToArray(), privileges });
                     }
                     catch (Exception ex) { Send(sender, new { type = "result.editIdentity", requestId = id, tabId, schema = payload.GetProperty("schema").GetString(), table = payload.GetProperty("table").GetString(), columns = Array.Empty<string>(), error = ex.Message }); }
                     break;

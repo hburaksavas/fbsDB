@@ -1363,6 +1363,7 @@ export interface ReplyMessages {
   "schema"?: string;
   "table"?: string;
   "columns"?: Array<JsonValue>;
+  "privileges"?: Record<string, JsonValue> | null;
   "error"?: string;
 };
   "sql.dmlApplied": { type: "sql.dmlApplied" } & {

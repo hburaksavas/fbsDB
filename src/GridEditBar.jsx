@@ -45,6 +45,7 @@ function MoreMenu({items,pinned,onPin}) {
 export function GridEditBar({editability,loading,editMode,onToggle,summary,canUndo,canRedo,onUndo,onRedo,onSetNull,onDeleteRow,onNewRow,tabAddsRow=false,onTabAddsRow,templates=[],onTemplate,onDuplicate,onBulk,onRecord,onPaste,onCheckboxes,onDrawer,drawerOpen,onStep,hasSelection,invalidCount=0,onInvalid,changesOnly=false,onChangesOnly,deletionsOnly=false,onDeletionsOnly,onDescriptions,selectedCells=0,selectedRows=0,applying=false,txText='',txState,onDismissTx,txLabel='',onTxLabel,onChecks,canUndoBatch,onUndoBatch,verification,canVerify,canRestore,canReceipt,onVerify,onRestore,onReceipt}) {
   const blocked = editability && !editability.editable;
   const editable = !!editability?.editable;
+  const canInsert = editable && editability.canInsert !== false, canDelete = editable && editability.canDelete !== false;
   const [pinned,setPinned]=useState(()=>loadPinned(globalThis.localStorage));
   const [hintPrefs,setHintPrefs]=useState(()=>loadHintPrefs(globalThis.localStorage));
   const changeHints=next=>{setHintPrefs(next);saveHintPrefs(globalThis.localStorage,next)};
@@ -56,14 +57,14 @@ export function GridEditBar({editability,loading,editMode,onToggle,summary,canUn
     checkboxes:{label:'Checkbox columns…',disabled:!editable,title:'Show Y/N or 1/0 columns as checkboxes while editing',onClick:onCheckboxes},
     paste:{label:'Paste…',disabled:!editable||!hasSelection,title:'Paste spreadsheet data (Ctrl+V) from the active cell, with a preview',onClick:onPaste},
     bulk:{label:'Bulk edit…',disabled:!editable||!hasSelection,title:'Change all selected cells at once: set a value or NULL, find and replace, or arithmetic, with a preview',onClick:onBulk},
-    duplicate:{label:'Duplicate row',disabled:!editable||!hasSelection,title:'Copy the selected row into a new row draft (keys and locked columns are left out)',onClick:onDuplicate},
+    duplicate:{label:'Duplicate row',disabled:!canInsert||!hasSelection,title:'Copy the selected row into a new row draft (keys and locked columns are left out)',onClick:onDuplicate},
     prevEdit:{label:'Previous edited cell',disabled:!summary.cells,title:'Previous edited cell',onClick:()=>onStep(-1),keepOpen:true},
     nextEdit:{label:'Next edited cell',disabled:!summary.cells,title:'Next edited cell',onClick:()=>onStep(1),keepOpen:true},
     changesOnly:{label:'Changes only',toggle:true,pressed:changesOnly,title:'Show only changed rows and columns, keeping the identifying key columns',onClick:onChangesOnly},
     deletionsOnly:{label:'Deletions only',toggle:true,pressed:deletionsOnly,disabled:!summary.deletes,title:'Review only the rows marked for deletion, with their identifying key columns',onClick:onDeletionsOnly},
     checks:{label:'Checks…',title:"Run your own SELECT checks inside the session's transaction",onClick:onChecks},
-    tabAdds:{label:'Tab adds a row',toggle:true,pressed:tabAddsRow,disabled:!editable,ariaLabel:'Tab adds a row',keepOpen:true,title:'While editing a cell, Tab moves to the next editable cell. Past the last one, start a new row draft with the required fields first.',onClick:onTabAddsRow},
-    template:{label:'New row from template',render:close=><select aria-label="New row from template" data-menu-focus disabled={!editable} value="" onChange={event=>{if(event.target.value){onTemplate(event.target.value);close(true)}}}><option value="">From template…</option>{templates.map(item=><option key={item.name} value={item.name}>{item.name}</option>)}</select>}
+    tabAdds:{label:'Tab adds a row',toggle:true,pressed:tabAddsRow,disabled:!canInsert,ariaLabel:'Tab adds a row',keepOpen:true,title:'While editing a cell, Tab moves to the next editable cell. Past the last one, start a new row draft with the required fields first.',onClick:onTabAddsRow},
+    template:{label:'New row from template',render:close=><select aria-label="New row from template" data-menu-focus disabled={!canInsert} value="" onChange={event=>{if(event.target.value){onTemplate(event.target.value);close(true)}}}><option value="">From template…</option>{templates.map(item=><option key={item.name} value={item.name}>{item.name}</option>)}</select>}
   };
   const {inline,menu}=layoutActions({editMode,pinned,active:[changesOnly&&'changesOnly',deletionsOnly&&'deletionsOnly'].filter(Boolean),hidden:templates.length?[]:['template']});
   const entry=id=>({id,pinnable:id!=='tabAdds'&&id!=='template',...actions[id]});
@@ -75,8 +76,8 @@ export function GridEditBar({editability,loading,editMode,onToggle,summary,canUn
     {id:'descriptions',label:'Show descriptions beside key values…',run:onDescriptions},
     ...(editMode?[
       {id:'setNull',label:'Set the selected cell to NULL',disabled:!editable||!hasSelection,why:needs,run:onSetNull},
-      {id:'newRow',label:'Add a new row draft',disabled:!editable,why:needs,run:onNewRow},
-      {id:'deleteRow',label:'Mark the selected row for deletion',disabled:!editable||!hasSelection,why:needs,run:onDeleteRow},
+      {id:'newRow',label:'Add a new row draft',disabled:!canInsert,why:needs,run:onNewRow},
+      {id:'deleteRow',label:'Mark the selected row for deletion',disabled:!canDelete||!hasSelection,why:needs,run:onDeleteRow},
       {id:'undo',label:'Undo the last draft change',disabled:!canUndo,why:'Nothing to undo',run:onUndo},
       {id:'redo',label:'Redo the draft change',disabled:!canRedo,why:'Nothing to redo',run:onRedo},
       {id:'pending',label:'Review pending changes and their SQL',run:onDrawer},
@@ -91,8 +92,8 @@ export function GridEditBar({editability,loading,editMode,onToggle,summary,canUn
     <button type="button" className="grid-edit-toggle" aria-pressed={editMode} title={editMode?'Leave edit mode (pending edits stay until discarded)':'Edit rows of this result (explicit edit mode)'} onClick={onToggle}><Pencil size={13}/>{editMode?'Editing':'Edit rows'}</button>
     {editMode&&<>
       <button type="button" disabled={!editable||!hasSelection} title="Set the selected cell to NULL (an explicit value, different from empty text)" onClick={onSetNull}>Set NULL</button>
-      <button type="button" disabled={!editable} title="Add a new row; omitted columns use their database defaults" onClick={onNewRow}>New row</button>
-      <button type="button" disabled={!editable||!hasSelection} title="Mark the selected row for deletion (shown struck through until applied or discarded)" onClick={onDeleteRow}>Delete row</button>
+      <button type="button" disabled={!canInsert} title={editable&&!canInsert?'You have no INSERT privilege on this table':'Add a new row; omitted columns use their database defaults'} onClick={onNewRow}>New row</button>
+      <button type="button" disabled={!canDelete||!hasSelection} title={editable&&!canDelete?'You have no DELETE privilege on this table':'Mark the selected row for deletion (shown struck through until applied or discarded)'} onClick={onDeleteRow}>Delete row</button>
       <button type="button" aria-label="Undo draft change" disabled={!canUndo} title="Undo the last unapplied edit (Ctrl+Z)" onClick={onUndo}><Undo2 size={13}/></button>
       <button type="button" aria-label="Redo draft change" disabled={!canRedo} title="Redo (Ctrl+Y)" onClick={onRedo}><Redo2 size={13}/></button>
     </>}
@@ -107,7 +108,7 @@ export function GridEditBar({editability,loading,editMode,onToggle,summary,canUn
     {txText&&<span className="grid-edit-tx" role="status" aria-label="Applied changes" data-state={txState}>{reversibility(txState)&&<b className="grid-edit-reversible" data-tone={reversibility(txState).tone}>{reversibility(txState).line}</b>} {txText}{txState==='pending'&&<input className="grid-edit-label" aria-label="Label for this work" placeholder="Label this work (local note)" title="A note for you and for the receipt. It does not change what Commit or Rollback affects." value={txLabel} onChange={event=>onTxLabel(event.target.value)}/>}{canUndoBatch&&<button type="button" onClick={onUndoBatch} title="Roll Oracle back to just before the last Apply">Undo last Apply…</button>}{canReceipt&&<button type="button" onClick={onReceipt} title="Copy a summary of what this grid committed">Copy receipt</button>}{canVerify&&<button type="button" onClick={onVerify} title="Read the changed rows again and compare them with what was applied">Verify against the database</button>}{canRestore&&<button type="button" onClick={onRestore} title="Turn the rolled-back changes back into drafts you can correct and apply again">Keep my edits as drafts</button>}{txState!=='pending'&&<button type="button" aria-label="Dismiss applied changes note" onClick={onDismissTx}>×</button>}</span>}
     {verification&&<div className="grid-edit-verification" role="status" aria-label="Verification">{verification.running?'Reading the changed rows…':verification.error?verification.error:<><ul>{verification.results.map(result=><li key={result.label} data-status={result.status}>{result.message}</li>)}</ul><small>This is a read of the current data. A difference may also come from another session that changed the row after your commit; it does not mean the commit failed.</small></>}</div>}
     {editMode&&loading&&<span role="status" className="grid-edit-note">Checking the primary key…</span>}
-    {editMode&&blocked&&<ul className="grid-edit-reasons" role="status" aria-label="Why this result cannot be edited">{editability.reasons.map(reason=><li key={reason}>{reason}</li>)}</ul>}
+    {editMode&&editable&&editability.limits?.length>0&&<ul className="grid-edit-reasons" role="status" aria-label="What your privileges do not allow">{editability.limits.map(limit=><li key={limit}>{limit}</li>)}</ul>}{editMode&&blocked&&<ul className="grid-edit-reasons" role="status" aria-label="Why this result cannot be edited">{editability.reasons.map(reason=><li key={reason}>{reason}</li>)}</ul>}
   </div>;
 }
 
