@@ -507,7 +507,8 @@ public sealed partial class MainPage
             catch (Exception ex)
             {
                 onError?.Invoke(ex.Message);
-                Send(sender, new { type = "host.error", requestId, message = ex.Message, transactionPending = _oracle.HasPendingTransaction, connected = _oracle.IsConnected });
+                // No transaction state is claimed when the automatic Commit's outcome is unknown; the interface then says it is unconfirmed.
+                Send(sender, new { type = "host.error", requestId, message = ex.Message, transactionPending = ex is OracleCommitOutcomeUnknownException ? null : (bool?)_oracle.HasPendingTransaction, connected = _oracle.IsConnected });
                 return false;
             }
             onResult?.Invoke(result);

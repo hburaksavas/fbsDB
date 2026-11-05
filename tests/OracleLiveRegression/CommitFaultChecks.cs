@@ -60,6 +60,49 @@ sealed class CommitFaultChecks(OracleSessionService observer, ConnectionProfile 
         await session.DisconnectAsync(rollbackPending: false).WaitAsync(TimeSpan.FromSeconds(30));
     }
 
+    private async Task LoseConnectionDuringAutoCommit(FaultProxy.Cut cut, int id, int expectedRows)
+    {
+        using var proxy = new FaultProxy(profile.Host, int.Parse(profile.Port));
+        var throughProxy = profile with { Method = "basic", Descriptor = $"(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=127.0.0.1)(PORT={proxy.Port}))(CONNECT_DATA=(SERVICE_NAME={profile.Service})))" };
+        using var session = new OracleSessionService();
+        await session.ConnectAsync(throughProxy, "", "", null);
+        await session.SetAutoCommitAsync(true);
+
+        Exception? failure = null;
+        var reachedCommit = false;
+        var armAtCommit = new InlineProgress(stage => { if (stage == "Committing statement") { reachedCommit = true; proxy.Arm(cut); } });
+        try { await session.ExecuteAsync($"INSERT INTO {_table} (ID) VALUES ({id})", progress: armAtCommit).WaitAsync(TimeSpan.FromSeconds(60)); }
+        catch (Exception error) { failure = error; }
+        proxy.Disarm();
+
+        require(reachedCommit, "The statement never reached its automatic Commit.");
+        require(failure is OracleCommitOutcomeUnknownException, $"The outcome was not reported as unknown: {failure?.GetType().Name}: {failure?.Message}");
+        require(!session.IsConnected && !session.HasPendingTransaction, "A transaction outlived its connection.");
+        require(await Rows(id) == expectedRows, $"Oracle holds a different result than this scenario produces (expected {expectedRows} row).");
+
+        await session.ConnectAsync(throughProxy, "", "", null).WaitAsync(TimeSpan.FromSeconds(30));
+        require(session.IsConnected && !session.HasPendingTransaction, "Reconnecting did not give the tab a clean session.");
+    }
+
+    private async Task LoseConnectionBeforeAutoCommit(int id)
+    {
+        using var proxy = new FaultProxy(profile.Host, int.Parse(profile.Port));
+        var throughProxy = profile with { Method = "basic", Descriptor = $"(DESCRIPTION=(ADDRESS=(PROTOCOL=TCP)(HOST=127.0.0.1)(PORT={proxy.Port}))(CONNECT_DATA=(SERVICE_NAME={profile.Service})))" };
+        using var session = new OracleSessionService();
+        await session.ConnectAsync(throughProxy, "", "", null);
+        await session.SetAutoCommitAsync(true);
+
+        proxy.Arm(FaultProxy.Cut.BeforeServer);
+        Exception? failure = null;
+        try { await session.ExecuteAsync($"INSERT INTO {_table} (ID) VALUES ({id})").WaitAsync(TimeSpan.FromSeconds(60)); }
+        catch (Exception error) { failure = error; }
+        proxy.Disarm();
+
+        require(failure is not null && failure is not OracleCommitOutcomeUnknownException, $"A statement that never reached Commit was reported wrongly: {failure?.GetType().Name}: {failure?.Message}");
+        require(!session.IsConnected && !session.HasPendingTransaction, "A transaction outlived its connection.");
+        require(await Rows(id) == 0, "A statement that never ran was saved.");
+    }
+
     public async Task RunAsync()
     {
         await check("commit fault fixture table is created", async () => {
@@ -69,5 +112,8 @@ sealed class CommitFaultChecks(OracleSessionService observer, ConnectionProfile 
         await check("connection lost before Commit reaches Oracle: reported as failed connection, nothing is saved, the tab reconnects", () => LoseConnectionDuringCommit(FaultProxy.Cut.BeforeServer, 1, 0));
         await check("connection lost after Oracle commits: reported as failed connection, the row is saved, the tab reconnects", () => LoseConnectionDuringCommit(FaultProxy.Cut.AfterServer, 2, 1));
         await check("connection lost during Rollback: the failure is reported, nothing is saved, the tab can disconnect", () => LoseConnectionDuringRollback(3));
+        await check("auto commit, connection lost before the automatic Commit reaches Oracle: outcome unknown, nothing is saved", () => LoseConnectionDuringAutoCommit(FaultProxy.Cut.BeforeServer, 4, 0));
+        await check("auto commit, connection lost after Oracle commits: outcome unknown, the row is saved", () => LoseConnectionDuringAutoCommit(FaultProxy.Cut.AfterServer, 5, 1));
+        await check("auto commit, connection lost before the statement runs: an ordinary failure, not an unknown outcome", () => LoseConnectionBeforeAutoCommit(6));
     }
 }

@@ -2090,6 +2090,7 @@ try {
   await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'host.error',tabId:request.tabId,requestId:request.id,message:'ORA-00942: table or view does not exist'})})()`);
   await cdp.until(`[...document.querySelectorAll('.result-notice-actions button')].some(b=>b.textContent==='Find the object…')`, 'Find the object offered');
   assert.ok(await cdp.evaluate(`[...document.querySelectorAll('.result-notice-actions button')].some(b=>b.textContent.includes('Copy error'))`), 'The usual actions remain');
+  assert.match(await cdp.evaluate(`document.body.textContent`), /Transaction outcome is unconfirmed/, 'A failure that claims no transaction state, as after a lost automatic Commit, says the outcome is unconfirmed');
   await cdp.evaluate(`[...document.querySelectorAll('.result-notice-actions button')].find(b=>b.textContent==='Find the object…').click()`);
   await cdp.until(`document.querySelector('.ide-command-palette')`, 'The object search opens');
   await cdp.key('Escape'); await cdp.until(`!document.querySelector('.ide-command-palette')`);

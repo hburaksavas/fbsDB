@@ -7,6 +7,10 @@ using Oracle.ManagedDataAccess.Client;
 
 namespace FbsDb.Services;
 
+// The connection failed during the automatic Commit after a statement: Oracle may or may not have saved it.
+public sealed class OracleCommitOutcomeUnknownException(Exception inner)
+    : Exception("The connection failed while committing this statement. Oracle may or may not have saved it: " + inner.Message, inner);
+
 public sealed partial class OracleSessionService : IDisposable
 {
     private readonly string _credentialDirectory;
@@ -222,7 +226,8 @@ public sealed partial class OracleSessionService : IDisposable
             if (_autoCommit && beginsTransaction && _transaction is not null)
             {
                 progress?.Report("Committing statement");
-                await _transaction.CommitAsync(operationToken);
+                try { await _transaction.CommitAsync(operationToken); }
+                catch (Exception ex) when (!IsConnected) { throw new OracleCommitOutcomeUnknownException(ex); }
                 await _transaction.DisposeAsync();
                 _transaction = null;
                 transactionPending = false;
@@ -233,7 +238,7 @@ public sealed partial class OracleSessionService : IDisposable
                 .Select(parameter => new SqlOutputParameter(parameter.ParameterName, parameter.OracleDbType switch { OracleDbType.Decimal => "NUMBER", OracleDbType.Varchar2 => "VARCHAR2", OracleDbType.NVarchar2 => "NVARCHAR2", OracleDbType.Date => "DATE", OracleDbType.TimeStamp => "TIMESTAMP", _ => parameter.OracleDbType.ToString() }, OutputParameterValue(parameter.Value))).ToArray();
             return new SqlExecutionResult([], [], affected, timer.ElapsedMilliseconds, 0, false, transactionPending, outputLines) { SqlId = command.SqlId, OutParameters = outParameters };
         }
-        catch (Exception ex) when (Volatile.Read(ref timeoutElapsed) == 1 && !cancellationToken.IsCancellationRequested)
+        catch (Exception ex) when (ex is not OracleCommitOutcomeUnknownException && Volatile.Read(ref timeoutElapsed) == 1 && !cancellationToken.IsCancellationRequested)
         {
             if (_transaction is not null) _autoCommit = false;
             _activeCommand = null;
@@ -245,7 +250,7 @@ public sealed partial class OracleSessionService : IDisposable
             }
             throw new TimeoutException($"Query exceeded the configured timeout of {timeoutSeconds} seconds.", ex);
         }
-        catch (Exception ex) when (operationCancellation?.IsCancellationRequested == true && ex is not OperationCanceledException)
+        catch (Exception ex) when (operationCancellation?.IsCancellationRequested == true && ex is not OperationCanceledException and not OracleCommitOutcomeUnknownException)
         {
             if (_transaction is not null) _autoCommit = false;
             _activeCommand = null;
