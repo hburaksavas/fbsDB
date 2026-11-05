@@ -37,3 +37,47 @@ test('duplicating a row leaves keys, locked columns and unsupported values out a
  const values=duplicateValues(cols,editable,[0],['1','Ada',null,'blob',{kind:'temporal',value:'2026-01-02 03:04:05'}]);
  assert.deepEqual(values,{1:{value:'Ada'},2:{isNull:true},4:{value:'2026-01-02 03:04:05'}});
 });
+
+import {mergeAppliedEntries,reconcileApplied,reconciliationNote,reconciliationQuery} from '../src/postCommit.js';
+const edit=(row,key,name,original,value='new')=>({kind:'update',row,key,cells:{[name]:{value,isNull:false,original}}});
+test('an unknown Commit is told apart row by row: saved, not saved or neither',()=>{
+ const results=rows=>reconcileApplied({identity:[0],entries:[edit(0,['1'],1,'old')],selected:[0,1],rows}).map(item=>item.status);
+ assert.deepEqual(results([[1,'new']]),['saved']);
+ assert.deepEqual(results([[1,'old']]),['notSaved']);
+ assert.deepEqual(results([[1,'someone else']]),['unknown'],'Neither value: never offered for a retry');
+ assert.deepEqual(results([]),['unknown'],'A missing row is not assumed to be either');
+ const deleted=rows=>reconcileApplied({identity:[0],entries:[{kind:'delete',row:0,key:['1'],cells:{}}],selected:[0,1],rows})[0].status;
+ assert.equal(deleted([]),'saved');assert.equal(deleted([[1,'x']]),'notSaved');
+});
+test('a changed key is looked for under both keys',()=>{
+ const entries=[{kind:'update',row:0,key:['1'],cells:{0:{value:'10',isNull:false,original:'1'}}}];
+ assert.deepEqual(reconciliationQuery({columns,identity:[0],entries}).parameters.map(item=>item.value),['10','1']);
+ const status=rows=>reconcileApplied({identity:[0],entries,selected:[0,1],rows})[0].status;
+ assert.equal(status([[10,'x']]),'saved');assert.equal(status([[1,'x']]),'notSaved');assert.equal(status([]),'unknown');
+});
+test('several Applies to one row compare the value before the first with the value after the last',()=>{
+ const entries=[edit(0,['1'],1,'first','second'),edit(0,['1'],1,'second','third')];
+ assert.deepEqual(mergeAppliedEntries(entries)[0].cells[1],{value:'third',isNull:false,original:'first'});
+ const status=rows=>reconcileApplied({identity:[0],entries,selected:[0,1],rows})[0].status;
+ assert.equal(status([[1,'third']]),'saved');assert.equal(status([[1,'first']]),'notSaved');assert.equal(status([[1,'second']]),'unknown');
+ assert.equal(mergeAppliedEntries([edit(0,['1'],1,'a'),{kind:'delete',row:0,key:['1'],cells:{}}])[0].kind,'delete');
+});
+test('datetimes compare as datetimes and a NULL is a value',()=>{
+ const cell={kind:'temporal',oracleType:'DATE',value:'2026-03-04T05:06:07'};
+ const entries=[edit(0,['1'],1,null,'2026-03-04 05:06:07')];
+ assert.equal(reconcileApplied({identity:[0],entries,selected:[0,1],rows:[[1,cell]]})[0].status,'saved');
+ assert.equal(reconcileApplied({identity:[0],entries,selected:[0,1],rows:[[1,null]]})[0].status,'notSaved');
+ assert.equal(compareVerification({identity:[0],entries,selected:[0,1],rows:[[1,cell]]})[0].status,'ok','Verify after a Commit agrees');
+ const zoned={kind:'temporal',oracleType:'TIMESTAMP WITH TIME ZONE',value:'2026-03-04T05:06:07.500000000',offset:'+03:00'};
+ assert.equal(reconcileApplied({identity:[0],entries:[edit(0,['1'],1,null,'2026-03-04 02:06:07.5Z')],selected:[0,1],rows:[[1,zoned]]})[0].status,'saved','The same instant');
+});
+test('a zoned key binds with its zone',()=>{
+ const zonedColumns=[{name:'T',type:'TIMESTAMP WITH TIME ZONE',sourceSchema:'APP',sourceTable:'T',sourceColumn:'T'},columns[1]];
+ const query=verificationQuery({columns:zonedColumns,identity:[0],entries:[{kind:'delete',row:0,key:['2026-03-04T05:06:07+03:00'],cells:{}}]});
+ assert.equal(query.parameters[0].type,'TIMESTAMPTZ');
+});
+test('the note counts each result, names what was not checked and explains a mix',()=>{
+ assert.match(reconciliationNote([{status:'saved'},{status:'saved'}]),/^2 saved\. This covers only the changes sent from this grid/);
+ assert.match(reconciliationNote([{status:'saved'},{status:'notSaved'},{status:'unknown'}],2),/^1 saved, 1 not saved, 1 unclear, 2 new rows not checked\..*this mix means another session/);
+ assert.doesNotMatch(reconciliationNote([{status:'notSaved'}]),/mix/);
+});

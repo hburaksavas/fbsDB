@@ -1,4 +1,5 @@
-import { pendingSummary } from './gridDrafts.js';
+import { settleTransaction } from './appliedTransaction.js';
+import { isDirty, pendingSummary } from './gridDrafts.js';
 
 // Unapplied grid edits outlive the result view: a re-run, a tab switch or a refresh remounts the grid, and the drafts must not vanish with it.
 // Entries are kept per tab and source table, in memory only (never written to disk, so sensitive values are not persisted).
@@ -25,6 +26,20 @@ export function saveStoredDrafts(key, entry) {
   if (!key) return;
   if (!entry) store.delete(key); else store.set(key, entry);
   changed();
+}
+// A kept transaction record follows what happens to the tab's session while its grid is not on screen. A new session has no pending work of the old one;
+// an unconfirmed outcome stays, because it can still be checked.
+export function settleStoredTransactions(tabId, state) {
+  let touched = false;
+  for (const [key, entry] of [...store]) {
+    if (!key.startsWith(`${tabId}|`) || !entry.tx) continue;
+    const tx = state === 'reconnected' ? (entry.tx.state === 'pending' ? null : entry.tx) : settleTransaction(entry.tx, state);
+    const open = tx?.state === 'pending' || tx?.state === 'unconfirmed';
+    touched = true;
+    if (!open && !isDirty(entry.drafts) && !entry.conflicts?.length) store.delete(key);
+    else store.set(key, { ...entry, tx: open ? tx : null, appliedLog: open ? entry.appliedLog : [], txLabel: open ? entry.txLabel : '' });
+  }
+  if (touched) changed();
 }
 export const hasStoredDrafts = key => Boolean(key && store.get(key));
 export const clearAllStoredDrafts = () => { store.clear(); changed(); };

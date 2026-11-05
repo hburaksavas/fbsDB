@@ -2,7 +2,7 @@ import { pendingChanges } from './gridDrafts.js';
 
 const quote = name => `"${String(name).replaceAll('"', '""')}"`;
 // Zoned columns get a zoned bind: as plain TIMESTAMP, Oracle would silently apply the session's time zone.
-const bindType = type => /NUMBER|INTEGER|INT|DECIMAL|NUMERIC|FLOAT|DOUBLE|REAL/i.test(type || '') ? 'NUMBER' : /TIME ZONE/i.test(type || '') ? 'TIMESTAMPTZ' : /TIMESTAMP/i.test(type || '') ? 'TIMESTAMP' : /DATE/i.test(type || '') ? 'DATE' : 'VARCHAR2';
+export const bindType = type => /NUMBER|INTEGER|INT|DECIMAL|NUMERIC|FLOAT|DOUBLE|REAL/i.test(type || '') ? 'NUMBER' : /TIME ZONE/i.test(type || '') ? 'TIMESTAMPTZ' : /TIMESTAMP/i.test(type || '') ? 'TIMESTAMP' : /DATE/i.test(type || '') ? 'DATE' : 'VARCHAR2';
 const tableSql = table => `${table.schema ? `${quote(table.schema)}.` : ''}${quote(table.name)}`;
 
 // Parameterized INSERT/UPDATE/DELETE statements for the staged changes. Values are always binds, never literals in the text.

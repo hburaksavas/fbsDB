@@ -210,6 +210,19 @@ try{
     assert.equal(await nameIn(tabB,id),saved?'lost commit':`n${id}`,'Oracle holds a different result than this failure produces.');
     await showTab(tabA);
     await connect();
+    await cdp.textClick('.grid-edit-tx button','Check what Oracle stored');
+    await cdp.until(`document.querySelector('.grid-edit-verification li')`,'Stored values were read',20000);
+    assert.match(await cdp.evaluate(`document.querySelector('.grid-edit-verification').textContent`),saved?/saved, it holds the new values/:/not saved, it still holds the old values/);
+    if(saved)assert.equal(await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-verification button')].length`),0,'Nothing saved is offered for a retry.');
+    else{
+      await cdp.evaluate(`document.querySelector('.grid-edit-verification button').click()`);
+      await cdp.until(`document.querySelector('.grid-edit-pending')?.textContent.includes('Pending: 1')`,'The edit is a draft again');
+      await apply();
+      await toolbar('Commit');
+      await cdp.until(`!document.querySelector('.connection-control').dataset.pending`,'Committed');
+      assert.equal(await nameIn(tabB,id),'lost commit','The retried edit was not stored.');
+      await showTab(tabA);
+    }
     assert.equal(await read(`SELECT 46 FROM dual`).then(rows=>rows[0].includes('46')),true,'The reconnected tab cannot run queries.');
   });
 
