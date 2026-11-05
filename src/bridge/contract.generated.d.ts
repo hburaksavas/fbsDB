@@ -1111,6 +1111,7 @@ export interface ReplyMessages {
   "state"?: JsonValue;
   "pending"?: JsonValue;
   "unconfirmed"?: boolean;
+  "connected"?: boolean;
   "message"?: string;
 };
   "ui.theme": { type: "ui.theme" } & {

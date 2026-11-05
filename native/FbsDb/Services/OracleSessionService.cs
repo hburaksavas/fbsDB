@@ -449,12 +449,26 @@ public sealed partial class OracleSessionService : IDisposable
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            if (_transaction is null) return;
-            await _transaction.CommitAsync(cancellationToken);
+            if (_transaction is null)
+            {
+                // A Commit sent after the connection was lost must not be answered as a successful commit.
+                if (_connection is not null && !IsConnected) throw new InvalidOperationException("No Oracle connection is active.");
+                return;
+            }
+            try { await _transaction.CommitAsync(cancellationToken); }
+            catch when (!IsConnected) { await ForgetLostTransactionAsync(); throw; }
             await _transaction.DisposeAsync();
             _transaction = null; _analysisReadOnly = false;
         }
         finally { Touch(); _gate.Release(); }
+    }
+
+    // A transaction cannot outlive its connection: Oracle has already finished it one way or the other. Keeping it would refuse every
+    // reconnect, disconnect and tab close with "uncommitted transaction", and Commit or Rollback could never clear it.
+    private async Task ForgetLostTransactionAsync()
+    {
+        if (_transaction is not null) await _transaction.DisposeAsync();
+        _transaction = null; _analysisReadOnly = false;
     }
 
     public async Task RollbackAsync(CancellationToken cancellationToken = default)
@@ -463,7 +477,8 @@ public sealed partial class OracleSessionService : IDisposable
         try
         {
             if (_transaction is null) return;
-            await _transaction.RollbackAsync(cancellationToken);
+            try { await _transaction.RollbackAsync(cancellationToken); }
+            catch when (!IsConnected) { await ForgetLostTransactionAsync(); throw; }
             await _transaction.DisposeAsync();
             _transaction = null; _analysisReadOnly = false;
         }

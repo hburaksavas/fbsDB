@@ -1290,7 +1290,9 @@ export function App() {
         const owner = message.tabId || operations.owners.get(message.requestId) || operations.lastOwner || documents.activeId; operations.owners.delete(message.requestId);
         setExplainResult(message, owner); setExplainMessage("", owner); setExecuting(false); setCancelling(false); setRunState(`Execution plan · ${message.returnedRows ?? 0} steps · ${message.elapsedMs ?? 0} ms`);
       } else if (message?.type === "transaction.state" && message.unconfirmed) {
-        setUncertainCommit({ message: message.message || '' }); setRunState('Commit outcome not confirmed');
+        setUncertainCommit({ message: message.message || '' }); setRunState('Commit outcome not confirmed'); setTransactionPending(Boolean(message.pending), owner);
+        if (pendingSwitchRef.current?.tabId === owner) setPendingSwitch(null);
+        if (pendingTabCloseRef.current?.tabId === owner) setPendingTabClose(null);
       } else if (message?.type === "transaction.state") {
         if(!message.pending)updateTabSession("analysisReadOnly",false,owner); setTransactionPending(Boolean(message.pending)); setRunState(`Transaction ${message.state}`);
         if (!message.pending && pendingTabCloseRef.current?.tabId === owner && pendingTabCloseRef.current.resolving) { pendingTabCloseRef.current.retry(); setPendingTabClose(null); }

@@ -4398,6 +4398,9 @@ export const bridgeContract = {
         "unconfirmed": {
           "type": "boolean"
         },
+        "connected": {
+          "type": "boolean"
+        },
         "message": {
           "type": "string"
         }

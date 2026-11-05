@@ -47,7 +47,7 @@ Task<SqlExecutionResult> Sleep(OracleSessionService session, TaskCompletionSourc
 
 try
 {
-    var profile = (await new TnsProfileService().GetProfilesAsync()).Single(item => item.Id.Equals(profileId, StringComparison.OrdinalIgnoreCase));
+    var profile = (await new TnsProfileService().GetProfilesAsync()).Single(item => item.Id.Equals(profileId, StringComparison.OrdinalIgnoreCase) || item.Name.Equals(profileId, StringComparison.OrdinalIgnoreCase));
     Require(profile.Host is "127.0.0.1" or "localhost" or "::1", "This regression suite is restricted to a local test database.");
     await Check("two tab sessions connect using existing saved credentials", async () => {
         using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(25));
@@ -249,6 +249,7 @@ try
         Require(Convert.ToInt32((await b.ExecuteAsync("SELECT 45 FROM dual")).Rows[0][0]) == 45, "Resumed session cannot execute queries.");
     });
     await new GridApplyChecks(a, b, user, Check, Require, gridTables).RunAsync();
+    await new CommitFaultChecks(b, profile, user, Check, Require, gridTables).RunAsync();
 }
 catch (Exception error) { failure = error; Console.Error.WriteLine(error.Message); }
 finally

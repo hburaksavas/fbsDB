@@ -1877,13 +1877,15 @@ try {
  });
  await check('uncertain commit: a connection failure during Commit is reported as unconfirmed, with guidance and no retry', async () => {
   const commands = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='transaction.commit').length`);
-  await cdp.evaluate(`__uxFixture.emit({type:'transaction.state',state:'commit outcome unknown',pending:true,unconfirmed:true,message:'ORA-03113: end-of-file on communication channel'})`);
+  await cdp.evaluate(`__uxFixture.emit({type:'transaction.state',state:'commit outcome unknown',pending:false,unconfirmed:true,connected:false,message:'ORA-03113: end-of-file on communication channel'})`);
   await cdp.until(`document.querySelector('[aria-label="Commit not confirmed"]')`, 'Unconfirmed outcome dialog');
   const text = await cdp.evaluate(`document.querySelector('[aria-label="Commit not confirmed"]').textContent`);
   assert.match(text, /may or may not have saved/); assert.match(text, /Nothing was retried/); assert.match(text, /ORA-03113/); assert.doesNotMatch(text, /was committed successfully|rolled back/);
   assert.equal(await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='transaction.commit').length`), commands, 'No automatic retry');
   await cdp.evaluate(`[...document.querySelectorAll('[aria-label="Commit not confirmed"] button')].find(b=>b.textContent==='Close').click()`);
   await cdp.until(`!document.querySelector('[aria-label="Commit not confirmed"]')`);
+  assert.doesNotMatch(await cdp.evaluate(`document.body.innerText`), /Transaction pending|not committed|Transaction state unverified/, 'The lost transaction does not stay pending, which would block reconnecting');
+  await cdp.evaluate(`__uxFixture.emit({type:'session.context',epoch:-1,error:'',connected:true})`);
  });
  await check('review aids: choose which drafts to apply, edit new values in the list, review deletions and see the written column', async () => {
   await cdp.evaluate(`document.querySelector('[aria-label="Close cell value"]')?.click()`);

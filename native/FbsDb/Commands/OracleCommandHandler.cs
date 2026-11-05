@@ -233,7 +233,7 @@ public sealed partial class MainPage
                     catch (Exception ex) when (!_oracle.IsConnected)
                     {
                         // The connection failed during Commit: Oracle may or may not have committed, so neither success nor failure is claimed.
-                        Send(sender, new { type = "transaction.state", state = "commit outcome unknown", pending = true, unconfirmed = true, message = ex.Message, requestId = id });
+                        Send(sender, new { type = "transaction.state", state = "commit outcome unknown", pending = _oracle.HasPendingTransaction, unconfirmed = true, connected = false, message = ex.Message, requestId = id });
                     }
                     break;
                 case "transaction.autoCommit":
@@ -241,8 +241,15 @@ public sealed partial class MainPage
                     Send(sender, new { type = "transaction.autoCommit", requestId = id, enabled = _oracle.AutoCommit });
                     break;
                 case "transaction.rollback":
-                    await Task.Run(() => _oracle.RollbackAsync());
-                    Send(sender, new { type = "transaction.state", state = "rolled back", pending = false, requestId = id });
+                    try
+                    {
+                        await Task.Run(() => _oracle.RollbackAsync());
+                        Send(sender, new { type = "transaction.state", state = "rolled back", pending = false, requestId = id });
+                    }
+                    catch (Exception ex) when (!_oracle.IsConnected)
+                    {
+                        Send(sender, new { type = "host.error", requestId = id, message = ex.Message, transactionPending = _oracle.HasPendingTransaction, connected = false });
+                    }
                     break;
                 case "schema.refresh":
                     await SendSchemaAsync(sender, id);
