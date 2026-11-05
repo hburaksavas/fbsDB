@@ -1,7 +1,8 @@
 import { pendingChanges } from './gridDrafts.js';
 
 const quote = name => `"${String(name).replaceAll('"', '""')}"`;
-const bindType = type => /NUMBER|INTEGER|INT|DECIMAL|NUMERIC|FLOAT|DOUBLE|REAL/i.test(type || '') ? 'NUMBER' : /TIMESTAMP/i.test(type || '') ? 'TIMESTAMP' : /DATE/i.test(type || '') ? 'DATE' : 'VARCHAR2';
+// Zoned columns get a zoned bind: as plain TIMESTAMP, Oracle would silently apply the session's time zone.
+const bindType = type => /NUMBER|INTEGER|INT|DECIMAL|NUMERIC|FLOAT|DOUBLE|REAL/i.test(type || '') ? 'NUMBER' : /TIME ZONE/i.test(type || '') ? 'TIMESTAMPTZ' : /TIMESTAMP/i.test(type || '') ? 'TIMESTAMP' : /DATE/i.test(type || '') ? 'DATE' : 'VARCHAR2';
 const tableSql = table => `${table.schema ? `${quote(table.schema)}.` : ''}${quote(table.name)}`;
 
 // Parameterized INSERT/UPDATE/DELETE statements for the staged changes. Values are always binds, never literals in the text.
@@ -14,6 +15,7 @@ export function buildDml({ table, columns, identity, rowAt, drafts }) {
     identity.forEach((index, at) => {
       const original = rowAt(row)?.[index];
       if (original == null) { problems.push(`Row ${row + 1}: key column ${columns[index].name} is NULL, so the row cannot be identified.`); return; }
+      if (/LOCAL TIME ZONE/i.test(columns[index].type || '')) { problems.push(`Row ${row + 1}: key column ${columns[index].name} is shown in the session's time zone, so the row cannot be identified exactly.`); return; }
       const name = `${prefix}k${at + 1}`;
       conditions.push(`${quote(columns[index].sourceColumn || columns[index].name)} = :${name}`);
       binds.push({ name, type: bindType(columns[index].type), value: String(original) });

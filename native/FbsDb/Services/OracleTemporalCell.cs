@@ -44,6 +44,14 @@ public sealed record OracleTemporalCell(string OracleType,string Value,string? O
         int Number(string name)=>int.Parse(parts.Groups[name].Value,CultureInfo.InvariantCulture);
         return new OracleTimeStamp(Number("year"),Number("month"),Number("day"),Number("hour"),Number("minute"),Number("second"),int.Parse(parts.Groups["fraction"].Value.PadRight(9,'0'),CultureInfo.InvariantCulture));
     }
+    // The offset fixes the instant, which is what Oracle compares, so a stored value read with a region also finds its row by its offset.
+    public static OracleTimeStampTZ ZonedBind(string value)
+    {
+        var parsed=Parse(value,"TIMESTAMP WITH TIME ZONE");
+        if(parsed.Offset is null)throw new InvalidOperationException("A TIME ZONE value needs its offset, such as 2026-11-02 10:30:00+03:00; without one Oracle would apply the session's time zone.");
+        var wall=TimestampBind(parsed.Value);
+        return new OracleTimeStampTZ(wall.Year,wall.Month,wall.Day,wall.Hour,wall.Minute,wall.Second,wall.Nanosecond,parsed.Offset);
+    }
     public static OracleDate DateBind(string value)
     {
         var timestamp=TimestampBind(value);

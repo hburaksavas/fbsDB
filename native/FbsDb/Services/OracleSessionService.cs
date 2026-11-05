@@ -544,6 +544,7 @@ public sealed partial class OracleSessionService : IDisposable
             OracleDbType.Double or OracleDbType.Int16 or OracleDbType.Int32 or OracleDbType.Int64 or OracleDbType.Single => decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var number) ? number : throw new InvalidOperationException($"'{value}' is not a valid number."),
             OracleDbType.Date => OracleTemporalCell.DateBind(value),
             OracleDbType.TimeStamp => OracleTemporalCell.TimestampBind(value),
+            OracleDbType.TimeStampTZ => OracleTemporalCell.ZonedBind(value),
             _ => value,
         };
     }

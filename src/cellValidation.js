@@ -1,5 +1,6 @@
 const encoder = new TextEncoder();
 const datetime = /^\d{4}-\d{2}-\d{2}(?:[ T]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?$/;
+const zonedDatetime = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
 
 export const byteLength = text => encoder.encode(String(text ?? '')).length;
 
@@ -27,7 +28,8 @@ export function validateCell(column, draft) {
     }
     return null;
   }
-  if (/^(DATE|TIMESTAMP)/.test(type) && !/WITH|LOCAL/.test(type)) return datetime.test(text.trim()) ? null : `${name} needs a date such as 2026-11-02 10:30:00.`;
+  if (/TIME ZONE/.test(type)) return zonedDatetime.test(text.trim()) ? null : `${name} needs a date with its offset such as 2026-11-02 10:30:00+03:00.`;
+  if (/^(DATE|TIMESTAMP)/.test(type)) return datetime.test(text.trim()) ? null : `${name} needs a date such as 2026-11-02 10:30:00.`;
   if (/CHAR/.test(type)) {
     const meter = lengthMeter(text, column);
     if (meter.over) return `${name} holds at most ${meter.limit} ${meter.unit}; this value has ${meter.used}.`;

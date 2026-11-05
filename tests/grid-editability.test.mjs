@@ -64,3 +64,15 @@ test('a nominated key must be non-NULL and unique in the loaded rows and is neve
  assert.match(validateManualKey(columns,[...loaded,{index:2,row:[null,'z']}],[0]).error,/NULL/);assert.match(validateManualKey(columns,loaded,[]).error,/at least one/);
  assert.equal(validateManualKey(columns,loaded,[0,1]).ok,true);
 });
+
+test('zoned columns bind with their zone and a session-relative key is refused',()=>{
+  const columns=[{name:'ID',type:'NUMBER',sourceColumn:'ID'},{name:'TS',type:'TIMESTAMP WITH TIME ZONE',sourceColumn:'TS'},{name:'L',type:'TIMESTAMP WITH LOCAL TIME ZONE',sourceColumn:'L'}];
+  const table={schema:'APP',name:'T'},row=[1,null,'2026-06-01T12:00:00[session:+05:00]'];
+  const drafts=editCell(emptyDrafts(),0,1,null,{value:'2026-03-04 05:06:07+03:00'});
+  const built=buildDml({table,columns,identity:[0],rowAt:()=>row,drafts});
+  assert.deepEqual(built.problems,[]);
+  assert.equal(built.statements[0].binds.find(bind=>bind.name==='c1').type,'TIMESTAMPTZ');
+  const byLocal=buildDml({table,columns,identity:[2],rowAt:()=>row,drafts});
+  assert.equal(byLocal.statements.length,0);
+  assert.match(byLocal.problems[0],/cannot be identified exactly/);
+});

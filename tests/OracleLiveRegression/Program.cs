@@ -252,6 +252,7 @@ try
     await new GridApplyChecks(a, b, user, Check, Require, gridTables).RunAsync();
     await new CommitFaultChecks(b, profile, user, Check, Require, gridTables).RunAsync();
     await new CommitCheckChecks(a, b, user, Check, Require, gridTables, checkRoutines).RunAsync();
+    await new TimeZoneChecks(profile, user, Check, Require, gridTables).RunAsync();
 }
 catch (Exception error) { failure = error; Console.Error.WriteLine(error.Message); }
 finally

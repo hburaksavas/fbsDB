@@ -14,6 +14,10 @@ test('numbers are checked for format, precision and scale',()=>{
 });
 test('NULL, dates and text length are checked locally',()=>{
  assert.match(validateCell({name:'ID',type:'NUMBER',nullable:false},{isNull:true}),/does not allow NULL/);assert.equal(validateCell({name:'N',type:'VARCHAR2',nullable:true},{isNull:true}),null);
+ for(const type of ['TIMESTAMP WITH TIME ZONE','TIMESTAMP WITH LOCAL TIME ZONE']){
+  for(const value of ['2026-11-02 10:30:00+03:00','2026-11-02T10:30:00.123456789-03:30','2026-11-02 10:30:00Z'])assert.equal(validateCell({name:'T',type},{value}),null,value);
+  for(const value of ['2026-11-02 10:30:00','2026-11-02 10:30+03:00','2026-11-02 10:30:00 +03:00','2026-11-02T10:30:00-04:00[America/New_York]'])assert.match(validateCell({name:'T',type},{value}),/needs a date with its offset/,value);
+ }
  assert.match(validateCell({name:'D',type:'DATE'},{value:'tomorrow'}),/needs a date/);assert.equal(validateCell({name:'D',type:'DATE'},{value:'2026-11-02 10:30:00'}),null);
  assert.match(validateCell({name:'S',type:'VARCHAR2',size:3},{value:'abcd'}),/at most 3 bytes; this value has 4/);assert.equal(validateCell({name:'S',type:'VARCHAR2',size:3},{value:'abc'}),null);
 });
