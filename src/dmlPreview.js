@@ -3,6 +3,7 @@ import { pendingChanges } from './gridDrafts.js';
 const quote = name => `"${String(name).replaceAll('"', '""')}"`;
 // Zoned columns get a zoned bind: as plain TIMESTAMP, Oracle would silently apply the session's time zone.
 export const bindType = type => /NUMBER|INTEGER|INT|DECIMAL|NUMERIC|FLOAT|DOUBLE|REAL/i.test(type || '') ? 'NUMBER' : /TIME ZONE/i.test(type || '') ? 'TIMESTAMPTZ' : /TIMESTAMP/i.test(type || '') ? 'TIMESTAMP' : /DATE/i.test(type || '') ? 'DATE' : 'VARCHAR2';
+const notReadable = /CLOB|BLOB|BFILE|LONG|RAW|XMLTYPE|JSON|SDO_|OBJECT|REF|ARRAY|TABLE|CURSOR/i;
 const tableSql = table => `${table.schema ? `${quote(table.schema)}.` : ''}${quote(table.name)}`;
 
 // Parameterized INSERT/UPDATE/DELETE statements for the staged changes. Values are always binds, never literals in the text.
@@ -10,6 +11,9 @@ const tableSql = table => `${table.schema ? `${quote(table.schema)}.` : ''}${quo
 // edited columns to still hold the values that were read, so a change made by another session is reported instead of overwritten.
 export function buildDml({ table, columns, identity, rowAt, drafts }) {
   const statements = [], problems = [];
+  // Columns of the source table to read back after a change, in result order. Large and structured values are left out.
+  const readable = columns.map((column, index) => ({ column, index })).filter(({ column }) => column.sourceColumn && !notReadable.test(column.type || ''));
+  const readPlan = readable.length ? { readColumns: readable.map(({ column }) => quote(column.sourceColumn)), readIndexes: readable.map(({ index }) => index), readNames: readable.map(({ column }) => column.name) } : {};
   const keyWhere = (row, prefix) => {
     const binds = [], conditions = [];
     identity.forEach((index, at) => {
@@ -41,14 +45,14 @@ export function buildDml({ table, columns, identity, rowAt, drafts }) {
       else { guards.push(`${column} = :ok${at + 1}`); guardBinds.push({ name: `ok${at + 1}`, type: bindType(columns[cell.col].type), value: String(cell.original) }); }
       return `${column} = :${name}`;
     });
-    statements.push({ kind: 'update', table: tableSql(table), row, expectRows: 1, sql: `UPDATE ${tableSql(table)} SET ${sets.join(', ')} WHERE ${[...where.conditions, ...guards].join(' AND ')}`, binds: [...binds, ...where.binds, ...guardBinds] });
+    statements.push({ kind: 'update', table: tableSql(table), row, expectRows: 1, sql: `UPDATE ${tableSql(table)} SET ${sets.join(', ')} WHERE ${[...where.conditions, ...guards].join(' AND ')}`, binds: [...binds, ...where.binds, ...guardBinds], ...readPlan, sent: Object.fromEntries(cells.map(cell => [cell.col, cell.isNull ? null : cell.value])), before: readable.map(({ index }) => rowAt(row)?.[index] ?? null) });
   }
   for (const change of pendingChanges(drafts)) {
     if (change.kind !== 'insert') continue;
     const entries = Object.entries(change.values).filter(([, value]) => value != null);
     if (!entries.length) { problems.push(`New row ${change.id}: enter at least one value (omitted columns use their database defaults).`); continue; }
     const binds = entries.map(([col, value], at) => ({ name: `i${at + 1}`, type: bindType(columns[col].type), value: value.isNull ? null : value.value }));
-    statements.push({ kind: 'insert', table: tableSql(table), id: change.id, expectRows: 1, sql: `INSERT INTO ${tableSql(table)} (${entries.map(([col]) => quote(columns[col].sourceColumn || columns[col].name)).join(', ')}) VALUES (${binds.map(bind => `:${bind.name}`).join(', ')})`, binds });
+    statements.push({ kind: 'insert', table: tableSql(table), id: change.id, expectRows: 1, sql: `INSERT INTO ${tableSql(table)} (${entries.map(([col]) => quote(columns[col].sourceColumn || columns[col].name)).join(', ')}) VALUES (${binds.map(bind => `:${bind.name}`).join(', ')})`, binds, ...readPlan, sent: Object.fromEntries(entries.map(([col, value]) => [col, value.isNull ? null : value.value])) });
   }
   return { statements, problems };
 }

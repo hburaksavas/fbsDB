@@ -105,6 +105,24 @@ sealed class GridApplyChecks(OracleSessionService a, OracleSessionService b, str
             require(await Count(a, "ID=50") == 0, "Earlier work was committed.");
         });
 
+        await check("grid apply: in a clean session a failure rolls the batch back and leaves no transaction open", async () => {
+            await Reset();
+            require(!a.HasPendingTransaction, "The session was expected to be clean.");
+            var result = await Run(a, await ParentStatements([new(0, "NAME", "changed"), new(1, "NAME", "gamma"), new(2, "NAME", "not sent")]));
+            Statuses(result, "rolledBack", "failed", "skipped");
+            require(result.Recovery?.Contains("rolled back to its starting point") == true, "The batch was not rolled back: " + result.Recovery);
+            require(await One(a, $"SELECT NAME FROM {Parent} WHERE ID=1") == "alpha", "The first statement stayed applied.");
+            require(!a.HasPendingTransaction, "A batch that left nothing behind kept a transaction open.");
+        });
+
+        await check("grid apply: undoing the first Apply of a clean session returns to its savepoint", async () => {
+            await Reset();
+            Statuses(await Run(a, await ParentStatements([new(0, "NOTE", "applied")])), "applied");
+            await a.ExecuteAsync("ROLLBACK TO SAVEPOINT " + GridDmlBatch.Savepoint, null, 1, default, timeoutSeconds: 30);
+            require(await One(a, $"SELECT NOTE FROM {Parent} WHERE ID=1") == "n1", "The Apply was not undone.");
+            await a.RollbackAsync();
+        });
+
         await check("grid apply: the keep policy leaves applied statements in the open transaction", async () => {
             await Reset();
             var result = await Run(a, await ParentStatements([new(0, "NAME", "changed"), new(1, "NAME", "gamma"), new(2, "NAME", "not sent")]), keep: true);

@@ -42,7 +42,7 @@ const text = value => value == null ? null : value?.kind === 'temporal' ? oracle
 const same = (a, b) => a === b || (a != null && b != null && a !== '' && b !== '' && Number.isFinite(Number(a)) && Number.isFinite(Number(b)) && Number(a) === Number(b));
 
 // A datetime is compared as a datetime, so the T or space between date and time and the digits of a fraction do not count as a difference.
-const sameCell = (expected, cell) => { const temporal = expected != null && cell?.kind === 'temporal' ? compareOracleTemporal(cell, String(expected)) : null; return temporal !== null ? temporal === 0 : same(expected == null ? null : String(expected), text(cell)); };
+export const sameCell = (expected, cell) => { const temporal = expected != null && cell?.kind === 'temporal' ? compareOracleTemporal(cell, String(expected)) : null; return temporal !== null ? temporal === 0 : same(expected == null ? null : String(expected), text(cell)); };
 
 // Compares what was applied with what the database returns now. A difference is reported as a difference, not as a failed commit:
 // another session may have changed the row since.

@@ -254,6 +254,7 @@ try
     await new CommitCheckChecks(a, b, user, Check, Require, gridTables, checkRoutines).RunAsync();
     await new TimeZoneChecks(profile, user, Check, Require, gridTables).RunAsync();
     await new PrivilegeChecks(a, user, Check, Require, gridTables).RunAsync();
+    await new ReadbackChecks(a, b, user, Check, Require, gridTables).RunAsync();
 }
 catch (Exception error) { failure = error; Console.Error.WriteLine(error.Message); }
 finally

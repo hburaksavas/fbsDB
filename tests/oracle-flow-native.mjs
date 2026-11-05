@@ -145,7 +145,7 @@ try{
   });
 
   await check('DDL: the confirmation runs the statement and a real table appears',async()=>{
-    await run(`CREATE TABLE ${TABLE} (ID NUMBER(10) PRIMARY KEY, NAME VARCHAR2(40), TS TIMESTAMP(9) WITH TIME ZONE)`,{ddl:true});
+    await run(`CREATE TABLE ${TABLE} (ID NUMBER(10) PRIMARY KEY, NAME VARCHAR2(40), TS TIMESTAMP(9) WITH TIME ZONE, NOTE VARCHAR2(20) DEFAULT 'filled by default')`,{ddl:true});
     assert.ok(!/ORA-\d+/.test(await failureText()),await failureText());
     for(const id of [1,2,3,4,5])await run(`INSERT INTO ${TABLE} (ID,NAME) VALUES (${id},'n${id}')`);
     assert.equal(await cdp.evaluate(`document.querySelector('.connection-control').dataset.pending`),'true','The inserts opened a transaction.');
@@ -168,6 +168,23 @@ try{
     await toolbar('Commit');
     await cdp.until(`!document.querySelector('.connection-control').dataset.pending`,'Committed');
     assert.equal(await nameIn(tabB,1),'Çağrı İĞÜŞÖ','The edit was not stored exactly.');
+  });
+
+  await check('read back: a new row shows what Oracle filled in, and the change stays uncommitted',async()=>{
+    await showTab(tabA);
+    await beginEditing(`SELECT ID, NAME, NOTE FROM ${TABLE} ORDER BY ID`);
+    await cdp.textClick('.grid-edit-bar button','New row');
+    await cdp.until(`document.querySelector('.new-row input[aria-label$=" ID"]')`,'New row form');
+    await set('.new-row input[aria-label$=" ID"]','90');
+    await set('.new-row input[aria-label$=" NAME"]','added');
+    await cdp.frame();
+    await apply();
+    await cdp.until(`document.querySelector('[aria-label="Apply results"]')`,'Apply results');
+    assert.match(await cdp.evaluate(`document.querySelector('[aria-label="Apply results"]').textContent`),/Oracle set NOTE = filled by default\./);
+    assert.equal(await cdp.evaluate(`document.querySelector('.connection-control').dataset.pending`),'true','The change is still open.');
+    await toolbar('Rollback');
+    await cdp.until(`!document.querySelector('.connection-control').dataset.pending`,'Rolled back');
+    assert.deepEqual(await (async()=>{await showTab(tabB);return read(`SELECT ID FROM ${TABLE} WHERE ID=90`)})(),[],'A rolled back row was stored.');
   });
 
   await check('grid: Rollback discards an applied edit',async()=>{

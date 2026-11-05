@@ -452,6 +452,18 @@ public sealed partial class OracleSessionService : IDisposable
         return lines;
     }
 
+    // Without an open transaction the provider commits after each statement, which also erases any savepoint. A batch that needs one starts its transaction first.
+    public async Task EnsureTransactionAsync()
+    {
+        await _gate.WaitAsync();
+        try
+        {
+            if (_connection?.State != System.Data.ConnectionState.Open) throw new InvalidOperationException("No Oracle connection is active.");
+            _transaction ??= _connection.BeginTransaction();
+        }
+        finally { Touch(); _gate.Release(); }
+    }
+
     public async Task CommitAsync(CancellationToken cancellationToken = default)
     {
         await _gate.WaitAsync(cancellationToken);
