@@ -2467,6 +2467,45 @@ try {
   assert.match(await cdp.evaluate(`[...document.querySelectorAll('[data-edit-lock="locked"]')].map(h=>h.dataset.appTooltip||h.title).join(' ')`), /Locked: You have no UPDATE privilege on this column/, 'The locked column says why');
   assert.equal(await cdp.evaluate(`[...document.querySelectorAll('[data-edit-lock="locked"]')].some(h=>h.textContent.includes('CODE'))`), false, 'The granted column stays editable');
  });
+ await check('filter fit: an edited row that no longer matches the filter stays visible and says so',async()=>{
+  const before = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length`);
+  await cdp.evaluate(`${editor}.setValue('SELECT id, code FROM filtered');${editor}.setPosition({lineNumber:1,column:1})`); await new Promise(resolve => setTimeout(resolve, 400)); await cdp.evaluate(`${editor}.focus()`); await cdp.key('Enter', 2);
+  await cdp.until(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length>${before}`, 'Query sent');
+  const column = name => ({ name, type: name === 'ID' ? 'NUMBER' : 'VARCHAR2', sourceSchema: 'APP', sourceTable: 'FILTERED', sourceColumn: name });
+  await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:${JSON.stringify([column('ID'), column('CODE')])},rows:[['1','alpha'],['2','alpine'],['3','beta']],rowsAffected:null,elapsedMs:2,returnedRows:3,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
+  await cdp.until(`document.querySelector('[data-cell="2:1"]')?.textContent.includes('beta')`, 'Result shown');
+  if (await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').getAttribute('aria-pressed')==='false'`)) await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').click()`);
+  await cdp.until(`__uxFixture.commands.some(m=>m.command==='result.editIdentity'&&m.payload.table==='FILTERED')`);
+  const request = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.editIdentity').at(-1)`);
+  await cdp.evaluate(`__uxFixture.emit({type:'result.editIdentity',requestId:${JSON.stringify(request.id)},tabId:'tab-1',schema:'APP',table:'FILTERED',columns:['ID']})`);
+  await cdp.until(`[...document.querySelectorAll('.grid-edit-bar button')].some(b=>b.textContent==='New row'&&!b.disabled)`, 'Editing available');
+  const quickFilters = async () => { if (!await cdp.evaluate(`!!document.querySelector('[aria-label="Quick filters"]')`)) await cdp.click('[aria-label="Filters"]'); await cdp.until(`document.querySelector('[aria-label="Quick filters"]')`, 'Filter panel'); };
+  await quickFilters();
+  await cdp.evaluate(`(()=>{const pick=(label,value)=>{const el=document.querySelector('[aria-label="'+label+'"]');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,value);el.dispatchEvent(new Event('change',{bubbles:true}))};pick('Filter column','1');pick('Filter condition','contains')})()`);
+  await cdp.frame();
+  await cdp.evaluate(`(()=>{const input=document.querySelector('[aria-label="Filter value"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'alp');input.dispatchEvent(new Event('input',{bubbles:true}))})()`);
+  await cdp.textClick('.result-hover-popover button', 'Add filter');
+  await cdp.until(`!document.querySelector('[data-cell="2:1"]')&&document.querySelector('[data-cell="1:1"]')?.textContent.includes('alpine')`, 'The filter hides the other row');
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('[data-row-outside-filter]').length`), 0, 'Nothing is flagged before an edit');
+  const edit = async (row, text) => {
+   await cdp.evaluate(`document.querySelector('[data-cell="${row}:1"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));document.querySelector('.grid-wrap').focus()`);
+   await cdp.frame();
+   await cdp.evaluate(`document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'F2',bubbles:true,cancelable:true}))`);
+   await cdp.until(`document.querySelector('.cell-editor')`);
+   await cdp.evaluate(`(()=>{const input=document.querySelector('.cell-editor');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(text)});input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))})()`);
+   await cdp.frame();
+  };
+  await edit(1, 'alpaca');
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('[data-row-outside-filter]').length`), 0, 'An edit that still matches is not flagged');
+  await edit(0, 'changed');
+  await cdp.until(`document.querySelector('tr[data-row-outside-filter] .row-outside-filter')`, 'The row is marked');
+  assert.equal(await cdp.evaluate(`document.querySelector('tr[data-row-outside-filter]').dataset.resultRow`), '0', 'The edited row is the one marked');
+  assert.match(await cdp.evaluate(`document.querySelector('[data-cell="0:1"]').textContent`), /changed/, 'It stays in place with its new value');
+  assert.match(await cdp.evaluate(`document.querySelector('.outside-filter-note').textContent`), /^1 edited row no longer matches the current filter\. It stays visible/);
+  await quickFilters();
+  await cdp.evaluate(`document.querySelector('.result-popover-rule button').click()`);
+  await cdp.until(`!document.querySelector('.outside-filter-note')&&!document.querySelector('[data-row-outside-filter]')`, 'Clearing the filter clears the label');
+ });
  const errorLog=await cdp.evaluate('window.__errorLog');
  assert.deepEqual(errorLog,[],JSON.stringify(errorLog));
 } catch(error){failure=error;console.error(error.stack)}

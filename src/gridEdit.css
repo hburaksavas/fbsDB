@@ -154,3 +154,6 @@ tr[data-row-error] td.rownum::after{content:'✖';margin-left:2px}
 .loading-skeleton i{display:block;height:10px;margin:8px 0;border-radius:3px;background:var(--line);animation:skeleton-pulse 1.2s ease-in-out infinite}
 @keyframes skeleton-pulse{50%{opacity:.45}}
 @media(prefers-reduced-motion:reduce){.loading-skeleton i{animation:none}}
+tr[data-row-outside-filter]{box-shadow:inset 3px 0 0 var(--accent)}
+.row-outside-filter{color:var(--accent);font-weight:700;margin-right:2px}
+.outside-filter-note{padding:2px 8px}

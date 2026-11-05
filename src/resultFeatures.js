@@ -29,8 +29,10 @@ export function matchesCondition(value, rule) {
     default: return text.includes(query);
   }
 }
+// Filters decided by the row's own values. Marks and duplicates depend on other things, so an edited value alone cannot take a row out of them.
+export const rowMatchesValueFilters = (row, options = {}) => (!options.highlightedOnly || (options.rules||[]).some(rule=>matchesCondition(row[rule.column],{locale:options.sortLocale,...rule}))) && filterTreeMatches(row,options);
 export function applyResultFeatures(indexedRows, columns, options = {}) {
-  let rows = indexedRows.filter(({ row, index }) => (!options.markedOnly || (options.marks || []).includes(index)) && (!options.highlightedOnly || (options.rules||[]).some(rule=>matchesCondition(row[rule.column],{locale:options.sortLocale,...rule}))) && filterTreeMatches(row,options));
+  let rows = indexedRows.filter(({ row, index }) => (!options.markedOnly || (options.marks || []).includes(index)) && rowMatchesValueFilters(row,options));
   if (options.sorts?.length) rows = [...rows].sort((a, b) => {
     for (const sort of options.sorts) {
       const x = a.row[sort.column], y = b.row[sort.column];
