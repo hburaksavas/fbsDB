@@ -19,6 +19,7 @@ string? sourcePackage = null;
 string? sourcePackageName = null;
 Exception? failure = null;
 var gridTables = new List<string>();
+var checkRoutines = new List<string>();
 void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
 async Task Check(string name, Func<Task> action)
 {
@@ -250,6 +251,7 @@ try
     });
     await new GridApplyChecks(a, b, user, Check, Require, gridTables).RunAsync();
     await new CommitFaultChecks(b, profile, user, Check, Require, gridTables).RunAsync();
+    await new CommitCheckChecks(a, b, user, Check, Require, gridTables, checkRoutines).RunAsync();
 }
 catch (Exception error) { failure = error; Console.Error.WriteLine(error.Message); }
 finally
@@ -270,6 +272,11 @@ finally
         try { await a.ExecuteAsync($"DROP TABLE {gridTable}"); }
         catch (Exception error) { failure ??= error; checks.Add(new { name = "grid fixture table removed", status = "failed", error = error.Message }); }
     }
+    foreach (var routine in checkRoutines)
+    {
+        try { await a.ExecuteAsync($"DROP FUNCTION {routine}"); }
+        catch (Exception error) { failure ??= error; checks.Add(new { name = "pre-commit check function removed", status = "failed", error = error.Message }); }
+    }
     if (sourceProcedure is not null && a.IsConnected)
     {
         try { await a.ExecuteAsync($"DROP PROCEDURE {sourceProcedure}"); checks.Add(new { name = "temporary source procedure removed", status = "passed" }); }
@@ -282,7 +289,7 @@ finally
     }
     await File.WriteAllTextAsync(reportPath, JsonSerializer.Serialize(new {
         startedAt, completedAt = DateTimeOffset.UtcNow, profileId, status = failure is null ? "passed" : "failed",
-        scope = "Live Oracle services; DML only on temporary tables and uniquely named fixture tables, which are dropped afterwards; uniquely named temporary procedure/package sources; queued metadata cancellation; no user-table updates or saved-credential changes.",
+        scope = "Live Oracle services; DML only on temporary tables and uniquely named fixture tables, which are dropped afterwards; uniquely named temporary procedure/package/function sources; queued metadata cancellation; no user-table updates or saved-credential changes.",
         checks, error = failure?.Message
     }, new JsonSerializerOptions { WriteIndented = true }));
     Console.WriteLine("Report: " + reportPath);
