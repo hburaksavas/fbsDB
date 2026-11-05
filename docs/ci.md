@@ -43,7 +43,7 @@ The native runner accepts `-DotnetExe <absolute-path>` for a workspace-local SDK
 
 ## Separate integration checks
 
-Hosted validation does not launch the WinUI/WebView2 workbench or connect to Oracle. `npm run test:desktop` remains the isolated desktop integration command. `OracleLiveRegression` and `OracleLoad` require a configured live database and are intentionally absent from the native CI allowlist; the Oracle mode of `ScaleLoad` does too and is not run by the workflow. No Oracle secret is required by the workflow.
+Hosted validation does not launch the WinUI/WebView2 workbench or connect to Oracle. `npm run test:desktop` remains the isolated desktop integration command. Its interface tests use a simulated bridge; `scripts/test-desktop.ps1 -OracleFlowTest` runs the same application against a local, non-production Oracle profile with saved credentials, with nothing faked, and loses the connection through a local relay during Commit and Rollback. `OracleLiveRegression` and `OracleLoad` require a configured live database and are intentionally absent from the native CI allowlist; the Oracle mode of `ScaleLoad` does too and is not run by the workflow. No Oracle secret is required by the workflow.
 
 To require the workflow before merging, a repository administrator can add `Windows validation` as a required check in the repository's branch rules.
 

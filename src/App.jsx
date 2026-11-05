@@ -1048,6 +1048,8 @@ export function App() {
       replyOwnerRef.current = owner;
       try {
       if(typeof message?.autoCommit==='boolean')updateTabSession('autoCommit',message.autoCommit,owner);
+      // Grid Apply and its undo change the session's transaction outside any query result; Commit and Rollback depend on this state.
+      if(['sql.dmlApplied','sql.gridBatchRolledBack'].includes(message?.type)&&typeof message.transactionPending==='boolean')setTransactionPending(message.transactionPending,owner);
       if(message?.type==='transaction.autoCommit'){updateTabSession('autoCommitPending',false,owner);return;}
       if(['workspace.git','workspace.gitDiff','workspace.replacePreview','workspace.replaceApply'].includes(message?.type)) {
         if(workspaceDevRequestsRef.current.get(message.type)!==message.requestId)return;

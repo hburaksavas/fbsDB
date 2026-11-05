@@ -2229,6 +2229,7 @@ try {
   const sent = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.applyDml').at(-1)`);
   await cdp.evaluate(`__uxFixture.emit({type:'sql.dmlApplied',requestId:${JSON.stringify(sent.id)},tabId:'tab-1',outcomes:[{index:0,status:'applied',rowsAffected:1}],transactionPending:true,autoCommit:false,recovery:null})`);
   await cdp.until(`document.querySelector('.grid-edit-tx')?.textContent.includes('1 grid change applied, not committed')`, 'Tracked');
+  assert.equal(await cdp.evaluate(`document.querySelector('.transaction-button[aria-label="Commit"]')?.disabled`), false, 'Commit is available after an Apply');
   // A local label.
   await cdp.evaluate(`(()=>{const input=document.querySelector('[aria-label="Label for this work"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'Fix codes');input.dispatchEvent(new Event('input',{bubbles:true}))})()`);
   await cdp.until(`document.querySelector('.grid-edit-tx')?.textContent.includes('“Fix codes”: 1 grid change applied')`, 'Label shown with the summary');

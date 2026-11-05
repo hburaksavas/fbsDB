@@ -1,4 +1,4 @@
-param([int]$DesktopDebugPort = 9348, [switch]$SkipBuild, [switch]$LoadTest, [switch]$ProjectRulesTest, [switch]$DragTest)
+param([int]$DesktopDebugPort = 9348, [switch]$SkipBuild, [switch]$LoadTest, [switch]$ProjectRulesTest, [switch]$DragTest, [switch]$OracleFlowTest, [string]$OracleProfile = 'FBSDB_LOCAL')
 $ErrorActionPreference = 'Stop'
 $regressionRepo = Split-Path -Parent $PSScriptRoot
 $regressionRoot = Join-Path $regressionRepo ('.artifacts\desktop-regression\' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -14,6 +14,18 @@ if ($ProjectRulesTest) {
     $rulesTestFiles = Join-Path $regressionRoot 'files'
     New-Item -ItemType Directory -Path $rulesTestFiles -Force | Out-Null
     [System.IO.File]::WriteAllText($regressionSettings, (@{lastWorkspace=$rulesTestFiles} | ConvertTo-Json))
+} elseif ($OracleFlowTest) {
+    # Only the named local test profile is copied, pointed at the test's relay. Its saved credentials stay where they are and are read by the app.
+    $oracleSource = Join-Path $env:LOCALAPPDATA 'fbsDB\settings.json'
+    $oracleEntry = @((Get-Content -LiteralPath $oracleSource -Raw | ConvertFrom-Json).connectionProfiles | Where-Object { $_.name -eq $OracleProfile })
+    if ($oracleEntry.Count -ne 1) { throw "Connection profile '$OracleProfile' was not found." }
+    $oracleEntry = $oracleEntry[0]
+    if ($oracleEntry.host -notin '127.0.0.1', 'localhost', '::1' -or $oracleEntry.environment -eq 'PROD' -or $oracleEntry.method -ne 'basic') { throw "The Oracle flow test only runs against a local, non-production basic profile." }
+    $oracleTargetPort = [string]$oracleEntry.port
+    $oracleRelayProbe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, 0)
+    $oracleRelayProbe.Start(); $oracleRelayPort = $oracleRelayProbe.LocalEndpoint.Port; $oracleRelayProbe.Stop()
+    $oracleEntry.host = '127.0.0.1'; $oracleEntry.port = [string]$oracleRelayPort
+    [System.IO.File]::WriteAllText($regressionSettings, (@{connectionProfiles=@($oracleEntry)} | ConvertTo-Json -Depth 6))
 } else { [System.IO.File]::WriteAllText($regressionSettings, '{}') }
 $regressionEnvironment = @{
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$DesktopDebugPort"
@@ -39,7 +51,9 @@ try {
         [Environment]::SetEnvironmentVariable($regressionKey, $regressionEnvironment[$regressionKey], 'Process')
     }
     $regressionProcess = Start-Process -FilePath (Join-Path $regressionApp 'FbsDb.exe') -WorkingDirectory $regressionApp -WindowStyle Hidden -PassThru
-    if ($DragTest) {
+    if ($OracleFlowTest) {
+        node tests/oracle-flow-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot $oracleRelayPort $oracleTargetPort
+    } elseif ($DragTest) {
         node tests/drag-to-sql-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
     } elseif ($ProjectRulesTest) {
         node tests/project-rules-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
@@ -55,11 +69,11 @@ try {
         node tests/desktop-regression-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
     }
     if ($LASTEXITCODE -ne 0) { throw "Desktop test failed. Artifacts: $regressionRoot" }
-    if (-not $LoadTest -and -not $ProjectRulesTest -and -not $DragTest) {
+    if (-not $LoadTest -and -not $ProjectRulesTest -and -not $DragTest -and -not $OracleFlowTest) {
         node tests/review-improvements-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
         if ($LASTEXITCODE -ne 0) { throw "Review improvement UI tests failed. Artifacts: $regressionRoot" }
     }
-    $regressionReportName = if ($ProjectRulesTest) { 'project-rules-report.json' } elseif ($DragTest) { 'drag-to-sql-report.json' } else { 'report.json' }
+    $regressionReportName = if ($ProjectRulesTest) { 'project-rules-report.json' } elseif ($DragTest) { 'drag-to-sql-report.json' } elseif ($OracleFlowTest) { 'oracle-flow-report.json' } else { 'report.json' }
     Write-Output "Desktop test report: $(Join-Path $regressionRoot $regressionReportName)"
 } finally {
     foreach ($regressionKey in $regressionPreviousEnvironment.Keys) {
