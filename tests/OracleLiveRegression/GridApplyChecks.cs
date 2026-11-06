@@ -167,6 +167,8 @@ sealed class GridApplyChecks(OracleSessionService a, OracleSessionService b, str
             require(children.Count == 1, "The child relationship was not found.");
             var childRows = await Read(a, children[0].Sql.TrimEnd(';'));
             require(childRows.Rows.Count == 1, "The generated child query did not find the row: " + children[0].Sql);
+            var parents = (await a.GetRelationsAsync(user, ChildName)).Parents;
+            require(parents.Single().Table == ParentName && parents.Single().Owner == user && parents.Single().Pairs.Single() is { Child: "PARENT_ID", Parent: "ID" }, "A parent relation did not name the parent table.");
             var parentSql = await a.RelatedRecordsSqlAsync(user, ChildName, "PARENT_ID", "1");
             require(parentSql is not null && (await Read(a, parentSql.TrimEnd(';'))).Rows.Count == 1, "The generated parent query did not find the row: " + parentSql);
         });

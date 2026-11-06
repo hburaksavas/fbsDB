@@ -8,6 +8,7 @@ export const menuCatalog = [
   { id: 'checkboxes', pinnable: true, editOnly: true },
   { id: 'paste', pinnable: true, editOnly: true },
   { id: 'bulk', pinnable: true, editOnly: true },
+  { id: 'relatedPick', pinnable: true, editOnly: true },
   { id: 'duplicate', pinnable: true, editOnly: true },
   { id: 'prevEdit', pinnable: true, editOnly: true },
   { id: 'nextEdit', pinnable: true, editOnly: true },

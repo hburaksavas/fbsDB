@@ -1,5 +1,6 @@
+import { bindType } from './dmlPreview.js';
+
 const quote = name => `"${String(name).replaceAll('"', '""')}"`;
-const bindType = type => /NUMBER|INTEGER|INT|DECIMAL|NUMERIC|FLOAT|DOUBLE|REAL/i.test(type || '') ? 'NUMBER' : /TIMESTAMP/i.test(type || '') ? 'TIMESTAMP' : /DATE/i.test(type || '') ? 'DATE' : 'VARCHAR2';
 const pick = (item, ...names) => { for (const name of names) if (item?.[name] !== undefined) return item[name]; return undefined; };
 export const relatedKeyLimit = 50;
 

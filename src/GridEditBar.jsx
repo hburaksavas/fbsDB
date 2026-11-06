@@ -42,7 +42,7 @@ function MoreMenu({items,pinned,onPin}) {
 }
 
 // Explicit edit mode: results are read-only until this is switched on, and the bar always says what is pending.
-export function GridEditBar({editability,loading,editMode,onToggle,summary,canUndo,canRedo,onUndo,onRedo,onSetNull,onDeleteRow,onNewRow,tabAddsRow=false,onTabAddsRow,templates=[],onTemplate,onDuplicate,onBulk,onRecord,onPaste,onCheckboxes,onDrawer,drawerOpen,onStep,hasSelection,invalidCount=0,onInvalid,changesOnly=false,onChangesOnly,deletionsOnly=false,onDeletionsOnly,onDescriptions,selectedCells=0,selectedRows=0,applying=false,txText='',txState,onDismissTx,txLabel='',onTxLabel,onChecks,canUndoBatch,onUndoBatch,verification,canVerify,canRestore,canReceipt,onVerify,onRestore,onReceipt,onKeepUnsaved}) {
+export function GridEditBar({editability,loading,editMode,onToggle,summary,canUndo,canRedo,onUndo,onRedo,onSetNull,onDeleteRow,onNewRow,tabAddsRow=false,onTabAddsRow,templates=[],onTemplate,onDuplicate,onBulk,onRecord,onPaste,onCheckboxes,onDrawer,drawerOpen,onStep,hasSelection,invalidCount=0,onInvalid,changesOnly=false,onChangesOnly,deletionsOnly=false,onDeletionsOnly,onDescriptions,selectedCells=0,selectedRows=0,applying=false,txText='',txState,onDismissTx,txLabel='',onTxLabel,onChecks,canUndoBatch,onUndoBatch,verification,canVerify,canRestore,canReceipt,onVerify,onRestore,onReceipt,onKeepUnsaved,onRelatedPick}) {
   const blocked = editability && !editability.editable;
   const editable = !!editability?.editable;
   const canInsert = editable && editability.canInsert !== false, canDelete = editable && editability.canDelete !== false;
@@ -56,6 +56,7 @@ export function GridEditBar({editability,loading,editMode,onToggle,summary,canUn
     record:{label:'Record view',disabled:!editable,title:'Edit one record as attribute / value pairs; Alt+PageUp/PageDown moves between records and keeps the field',onClick:onRecord},
     checkboxes:{label:'Checkbox columns…',disabled:!editable,title:'Show Y/N or 1/0 columns as checkboxes while editing',onClick:onCheckboxes},
     paste:{label:'Paste…',disabled:!editable||!hasSelection,title:'Paste spreadsheet data (Ctrl+V) from the active cell, with a preview',onClick:onPaste},
+    relatedPick:{label:'Pick related record…',disabled:!editable||!hasSelection,title:'Choose a foreign key value from the rows of its parent table (F4)',onClick:onRelatedPick},
     bulk:{label:'Bulk edit…',disabled:!editable||!hasSelection,title:'Change all selected cells at once: set a value or NULL, find and replace, or arithmetic, with a preview',onClick:onBulk},
     duplicate:{label:'Duplicate row',disabled:!canInsert||!hasSelection,title:'Copy the selected row into a new row draft (keys and locked columns are left out)',onClick:onDuplicate},
     prevEdit:{label:'Previous edited cell',disabled:!summary.cells,title:'Previous edited cell',onClick:()=>onStep(-1),keepOpen:true},
@@ -82,7 +83,7 @@ export function GridEditBar({editability,loading,editMode,onToggle,summary,canUn
       {id:'redo',label:'Redo the draft change',disabled:!canRedo,why:'Nothing to redo',run:onRedo},
       {id:'pending',label:'Review pending changes and their SQL',run:onDrawer},
       ...(invalidCount>0?[{id:'invalid',label:'Go to the next invalid cell',run:onInvalid}]:[]),
-      ...['record','checkboxes','paste','bulk','duplicate','prevEdit','nextEdit','changesOnly','deletionsOnly','checks','tabAdds'].map(id=>({id,label:id==='record'?'Edit one record as attribute / value pairs':actions[id].label,disabled:actions[id].disabled,why:['prevEdit','nextEdit','deletionsOnly'].includes(id)?'Nothing staged yet':needs,run:actions[id].onClick}))
+      ...['record','checkboxes','paste','bulk','relatedPick','duplicate','prevEdit','nextEdit','changesOnly','deletionsOnly','checks','tabAdds'].map(id=>({id,label:id==='record'?'Edit one record as attribute / value pairs':actions[id].label,disabled:actions[id].disabled,why:['prevEdit','nextEdit','deletionsOnly'].includes(id)?'Nothing staged yet':needs,run:actions[id].onClick}))
     ]:[])
   ];
   useEffect(()=>registerGridActions({element:rootRef.current,get:()=>paletteActions.current()}),[]);

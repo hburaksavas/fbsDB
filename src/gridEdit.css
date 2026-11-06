@@ -157,3 +157,6 @@ tr[data-row-error] td.rownum::after{content:'✖';margin-left:2px}
 tr[data-row-outside-filter]{box-shadow:inset 3px 0 0 var(--accent)}
 .row-outside-filter{color:var(--accent);font-weight:700;margin-right:2px}
 .outside-filter-note{padding:2px 8px}
+.related-record-rows{flex-basis:100%;max-height:180px;overflow:auto}
+.related-record-rows table{border-collapse:collapse;font-size:11px}
+.related-record-rows th,.related-record-rows td{padding:1px 8px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line)}

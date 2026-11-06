@@ -7,7 +7,7 @@ import path from 'node:path';
 import {connectNativePage} from './nativeCdp.mjs';
 
 const [endpoint,root,relayPort,oraclePort]=process.argv.slice(2);
-const PROFILE='FBSDB_LOCAL',suffix=Math.random().toString(16).slice(2,12).toUpperCase(),TABLE=`FBSQA_E2E_${suffix}`;
+const PROFILE='FBSDB_LOCAL',suffix=Math.random().toString(16).slice(2,12).toUpperCase(),TABLE=`FBSQA_E2E_${suffix}`,PARENT=`FBSQA_E2E_P${suffix}`,CHILD=`FBSQA_E2E_C${suffix}`;
 const editor=`window.monaco?.editor.getEditors().find(e=>document.contains(e.getDomNode()))`;
 
 // Loses the connection at a chosen moment. `before` drops the next request; `after` delivers it and drops the reply. `holdMs` delays requests so a test can arm a cut at an exact stage.
@@ -130,7 +130,7 @@ try{
     await connect();
     assert.ok(relay.count>0,'The connection did not go through the relay.');
     // A run that was killed cannot clean up after itself; only this test's own prefix is touched.
-    for(const [leftover] of await read(`SELECT table_name FROM user_tables WHERE table_name LIKE 'FBSQA\\_E2E\\_%' ESCAPE '\\'`))await run(`DROP TABLE ${leftover}`,{ddl:true});
+    for(const [leftover] of await read(`SELECT table_name FROM user_tables WHERE table_name LIKE 'FBSQA\\_E2E\\_%' ESCAPE '\\'`))await run(`DROP TABLE ${leftover} CASCADE CONSTRAINTS`,{ddl:true});
     assert.deepEqual(await read(`SELECT table_name FROM user_tables WHERE table_name LIKE 'FBSQA\\_E2E\\_%' ESCAPE '\\'`),[],'Tables from an earlier run were left behind.');
     await cdp.click('[aria-label="New SQL file"]');
     await cdp.until(`document.querySelector('.file-tab.active')?.dataset.editorTab!==${JSON.stringify(tabA)}`,'Second tab');
@@ -185,6 +185,39 @@ try{
     await toolbar('Rollback');
     await cdp.until(`!document.querySelector('.connection-control').dataset.pending`,'Rolled back');
     assert.deepEqual(await (async()=>{await showTab(tabB);return read(`SELECT ID FROM ${TABLE} WHERE ID=90`)})(),[],'A rolled back row was stored.');
+  });
+
+  await check('related record: a foreign key value is searched in its parent table, chosen and saved',async()=>{
+    await showTab(tabA);
+    await run(`CREATE TABLE ${PARENT} (ID NUMBER(10) PRIMARY KEY, LABEL VARCHAR2(40))`,{ddl:true});
+    await run(`CREATE TABLE ${CHILD} (ID NUMBER(10) PRIMARY KEY, PARENT_ID NUMBER(10) REFERENCES ${PARENT}(ID))`,{ddl:true});
+    for(const [id,label] of [[1,'alpha'],[2,'beta'],[3,'Betamax']])await run(`INSERT INTO ${PARENT} VALUES (${id},'${label}')`);
+    await run(`INSERT INTO ${CHILD} VALUES (1,1)`);
+    await toolbar('Commit');
+    await cdp.until(`!document.querySelector('.connection-control').dataset.pending`,'Committed');
+    await beginEditing(`SELECT ID, PARENT_ID FROM ${CHILD} ORDER BY ID`);
+    const pick=(row,col)=>cdp.evaluate(`(()=>{document.querySelector('[data-cell="${row}:${col}"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));document.querySelector('.grid-wrap').focus()})()`);
+    const f4=()=>cdp.evaluate(`document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'F4',bubbles:true,cancelable:true}))`);
+    await pick(0,0);await cdp.frame();await f4();
+    await cdp.until(`document.body.textContent.includes('has no foreign key that can be edited here')&&!document.querySelector('[aria-label="Related record"]')`,'A column without a key is refused');
+    await pick(0,1);await cdp.frame();await f4();
+    await cdp.until(`document.querySelectorAll('[aria-label="Related record"] tbody tr').length===3`,'Parent rows are listed',20000);
+    await set('[aria-label="Search related records"]','BETA');
+    await cdp.textClick('[aria-label="Related record"] button','Search');
+    await cdp.until(`document.querySelectorAll('[aria-label="Related record"] tbody tr').length===2`,'The search narrows the rows, ignoring case',20000);
+    await set('[aria-label="Search related records"]','%');
+    await cdp.textClick('[aria-label="Related record"] button','Search');
+    await cdp.until(`document.querySelector('[aria-label="Related record"]').textContent.includes('No rows found')`,'A wildcard is searched as text',20000);
+    await set('[aria-label="Search related records"]','max');
+    await cdp.textClick('[aria-label="Related record"] button','Search');
+    await cdp.until(`document.querySelectorAll('[aria-label="Related record"] tbody tr').length===1`,'One row found',20000);
+    await cdp.click('[aria-label="Use row 1"]');
+    await cdp.until(`!document.querySelector('[aria-label="Related record"]')&&document.querySelector('.grid-edit-pending')?.textContent.includes('Pending: 1')`,'The value is a draft');
+    await apply();
+    await toolbar('Commit');
+    await cdp.until(`!document.querySelector('.connection-control').dataset.pending`,'Committed');
+    await showTab(tabB);
+    assert.deepEqual((await read(`SELECT PARENT_ID FROM ${CHILD} WHERE ID=1`))[0],['3'],'The chosen key was not stored.');
   });
 
   await check('grid: Rollback discards an applied edit',async()=>{
@@ -288,7 +321,7 @@ finally{
     relay.reset();
     // A failed step can leave tab A's transaction open, and its locks would refuse the DROP. Discarding it through the app also ends the row locks.
     if(tabA&&tabB){await showTab(tabA);await run('ROLLBACK')}
-    if(tabB){await showTab(tabB);await run(`DROP TABLE ${TABLE}`,{ddl:true});assert.ok(!/ORA-\d+/.test(await failureText()),await failureText());console.log('PASS fixture table removed')}
+    if(tabB){await showTab(tabB);for(const table of [CHILD,PARENT])await run(`DROP TABLE ${table} CASCADE CONSTRAINTS`,{ddl:true}).catch(()=>{});await run(`DROP TABLE ${TABLE}`,{ddl:true});assert.ok(!/ORA-\d+/.test(await failureText()),await failureText());console.log('PASS fixture table removed')}
   }catch(error){failure??=error;console.error(`Could not remove ${TABLE}: ${error.message}`)}
   await writeFile(path.join(root,'oracle-flow-report.json'),JSON.stringify({status:failure?'failed':'passed',checks,error:failure?.message,table:TABLE},null,2));
   if(failure)console.error(failure.message);
