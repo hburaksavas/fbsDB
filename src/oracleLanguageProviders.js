@@ -121,6 +121,17 @@ export function installOracleLanguageProviders({ monaco, editor, client, broker,
       return { value: { ...result.signature, signatures: result.signature.signatures.map(signature => ({ ...signature, documentation: {value:[signature.documentationText,signature.documentation?`[Oracle documentation](${signature.documentation})`:null].filter(Boolean).join('\n\n')} })) }, dispose() {} };
     },
   }));
+  // Parameter names before positional arguments, from local routines and metadata already loaded; never written into the source.
+  if (typeof monaco.languages.registerInlayHintsProvider === 'function') disposables.push(monaco.languages.registerInlayHintsProvider('sql', {
+    async provideInlayHints(model, range, token) {
+      const state = snapshot(), empty = { hints: [], dispose() {} };
+      if (!state.settings.parameterNames || state.languageFeatures?.completion === false) return empty;
+      const version = model.getVersionId(), source = model.getValue();
+      const result = await client.request('parameterHints', source, 0, token, { start: model.getOffsetAt(range.getStartPosition()), end: model.getOffsetAt(range.getEndPosition()) });
+      if (disposed || token?.isCancellationRequested || model.isDisposed() || model.getVersionId() !== version || snapshot().tabId !== state.tabId) return empty;
+      return { hints: (result?.hints || []).map(hint => ({ position: model.getPositionAt(hint.offset), label: hint.label, kind: monaco.languages.InlayHintKind.Parameter, paddingRight: true })), dispose() {} };
+    },
+  }));
   disposables.push(monaco.languages.registerHoverProvider('sql', {
     async provideHover(model, position, token) {
       if (!model.getWordAtPosition(position)) return null;

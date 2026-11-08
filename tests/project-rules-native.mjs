@@ -328,6 +328,15 @@ try{
     await cdp.until(`!${dialog}&&${editor}.getPosition().lineNumber===1&&${editor}.getPosition().column===14`,'Table definition opened');
     assert.equal(await cdp.evaluate(`window.__desktopRegression.commands.some(command=>command.command==='sql.execute'||command.command==='connection.connect')`),false);
   });
+  await check('parameter names: Monaco shows names before positional arguments of local routines without changing the text',async()=>{
+    const source='DECLARE\n  PROCEDURE post(p_id NUMBER, p_amount NUMBER, p_note VARCHAR2 DEFAULT NULL) IS BEGIN NULL; END;\nBEGIN\n  post(42, 10, p_note => \'n\');\n  post(7, 8);\nEND;';
+    await cdp.evaluate(`(()=>{const editor=${editor};editor.setValue(${quote(source)});editor.setPosition({lineNumber:1,column:1});editor.focus()})()`);
+    const hints=`${editor}.getModel().getAllDecorations().map(d=>[d.range.startLineNumber,d.range.startColumn,(d.options.before||d.options.after)?.content]).filter(d=>/=>/.test(d[2]||'')).map(d=>d.join(':').replace(/\\u00a0/g,' ')).sort().join(' | ')`;
+    const expected='4:12:p_amount => | 4:8:p_id => | 5:11:p_amount => | 5:8:p_id =>';
+    // Monaco renders the label's spaces as non-breaking spaces.
+    try{await cdp.until(`${hints}===${quote(expected)}`,'Inlay parameter names',20000)}catch(error){error.message+=` Shown: ${await cdp.evaluate(hints)}`;throw error}
+    assert.equal(await cdp.evaluate(`${editor}.getValue()`),source,'Hints must not change the text.');
+  });
   await check('large SQL file opens through the native reader with exact content and lightweight analysis defaults',async()=>{
     const largePath=path.join(files,'large-dump.sql'),content='SELECT 1 FROM dual;\n-- '+'x'.repeat(525000);
     await writeFile(largePath,content);

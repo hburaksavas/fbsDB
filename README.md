@@ -277,6 +277,12 @@ the current document (100,000 characters; first 128 same-name candidates); the U
 reports limits. PL/Scope remains a separate explicit action for collected server
 references. Signature help and hover include attached local comments, available
 metadata descriptions and illustrative bind calls; no example executes itself.
+Positional arguments of PL/SQL calls show their parameter name (`p_id =>`) in front
+of them without changing the text. Names come from routines declared in the same
+source and from database metadata already loaded for the tab, so scrolling never
+queries the database; built-in SQL functions, arguments already passed by name or
+named like their parameter, and positions where overloads disagree get no hint. Turn
+it off with **Parameter names on arguments** in the editor completion settings.
 
 
 Project rules include relative package/migration/script/test folders, saved profile

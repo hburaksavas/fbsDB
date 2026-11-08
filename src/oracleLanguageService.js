@@ -12,7 +12,7 @@ const key = token => token?.quoted ? token.value : token?.value?.toUpperCase();
 const isWord = (token, word) => token?.kind === 'identifier' && !token.quoted && token.value.toUpperCase() === word;
 const markdown = text => String(text || '').replace(/[\\`*_{}\[\]<>]/g, '\\$&');
 const routines = new Set(['PACKAGE', 'PROCEDURE', 'FUNCTION', 'TYPE']);
-const callableContainers = new Set([...routines, 'SYNONYM']);
+export const callableContainers = new Set([...routines, 'SYNONYM']);
 
 export function languageObjects(options = {}) {
   const map = new Map((options.objects || []).map(object => [keyOf(object), object]));
@@ -20,7 +20,7 @@ export function languageObjects(options = {}) {
   return [...map.values()];
 }
 
-function resolveObject(name, owner, objects, currentSchema, types) {
+export function resolveObject(name, owner, objects, currentSchema, types) {
   const candidates = objects.filter(object => object.name === name && (!owner || object.owner === owner) && (!types || types.has(object.type)));
   return candidates.find(object => object.owner === currentSchema) || candidates.find(object => object.owner === 'PUBLIC') || candidates[0];
 }
