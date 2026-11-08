@@ -306,6 +306,15 @@ says which one it used (branches and loops are not followed). Parameters, functi
 results and names without a known value are shown as «…» with the reason. The
 USING values are listed against the bind placeholders, and a count that matches
 neither the placeholders nor their occurrences is flagged.
+**Explain CASE or analytic function** (editor actions menu or command palette)
+explains the innermost CASE expression, CASE statement or analytic function around
+the caret. A CASE is shown as its branches in order, with what happens without ELSE
+and why a simple CASE never matches NULL; when every WHEN is a constant, or every
+condition compares one name with a number, sample inputs show which branch each
+value takes. An analytic function is explained by its PARTITION BY, ORDER BY and
+window frame (the default frame is spelled out) and evaluated on six labeled sample
+rows with a tie and two partitions, marking the rows in one row's frame. Sample
+values are made up and calculated in the app; the query is never run.
 
 
 Project rules include relative package/migration/script/test folders, saved profile

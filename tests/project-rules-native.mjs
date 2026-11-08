@@ -370,6 +370,18 @@ try{
     await cdp.key('Escape');
     assert.equal(await cdp.evaluate(`window.__desktopRegression.commands.some(command=>command.command==='sql.execute')`),false);
   });
+  await check('explain expression: an analytic function at the caret is explained with sample rows and its frame, without running SQL',async()=>{
+    const source='SELECT dept, SUM(amount) OVER (PARTITION BY dept ORDER BY day) AS running\n  FROM payments';
+    await cdp.evaluate(`(()=>{const editor=${editor};editor.setValue(${quote(source)});editor.setPosition({lineNumber:1,column:20});editor.focus()})()`);
+    await cdp.key('p',10);await cdp.until(`document.querySelector('[aria-label="Search workbench"]')`);await fill('[aria-label="Search workbench"]','Explain CASE or analytic function');await cdp.key('Enter');
+    const dialog=`document.querySelector('[aria-label="Explain expression"]')`;
+    await cdp.until(`${dialog}?.querySelector('[aria-label="Analytic function sample rows"]')`,'Explanation',20000);
+    assert.equal(await cdp.evaluate(`${dialog}.querySelector('h2').textContent`),'Analytic function SUM');
+    const rows=await cdp.evaluate(`[...${dialog}.querySelectorAll('[aria-label="Analytic function sample rows"] tbody tr')].map(row=>[...row.cells].map(cell=>cell.textContent).join(' '))`);
+    assert.deepEqual(rows,["1 'A' 10 3 3 ✓","2 'A' 20 1 8 ✓","3 'A' 20 4 8 ✓","4 'A' 30 1 9 ","5 'B' 5 5 5 ","6 'B' 15 9 14 "]);
+    assert.match(await cdp.evaluate(`${dialog}.textContent`),/Default window frame: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW/);    await cdp.textClick('[aria-label="Explain expression"] footer button','Close');
+    assert.equal(await cdp.evaluate(`window.__desktopRegression.commands.some(command=>command.command==='sql.execute'||command.command==='sql.explain')`),false);
+  });
   await check('large SQL file opens through the native reader with exact content and lightweight analysis defaults',async()=>{
     const largePath=path.join(files,'large-dump.sql'),content='SELECT 1 FROM dual;\n-- '+'x'.repeat(525000);
     await writeFile(largePath,content);
