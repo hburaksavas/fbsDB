@@ -105,6 +105,16 @@ as statements of their own, and SQL*Plus commands are skipped. Synonyms, views
 and SQL inside strings are not followed; routines that run dynamic SQL are
 listed with the results.
 
+**Dependency graph** (command palette) draws one object in the middle, the
+objects that use it on the left and the objects it uses on the right: package,
+procedure and trigger calls, table and view reads and writes, the table a
+trigger fires on, foreign keys, sequence use and synonym targets. Tables, views,
+sequences and synonyms come from CREATE statements in workspace files; an object
+that is referenced but created in no indexed file is drawn dashed. It starts from
+the table, view or sequence under the caret, or the object around it. Choosing a
+neighbour moves the focus to it, Back returns, and each edge opens the place
+that creates it. Database dependencies, grants and dynamic SQL are not followed.
+
 Open **Project rules** in the workspace background menu or **Configure project
 rules** in the command palette to edit workspace-specific extension/type
 associations, package path pairs and related test paths. Rules are versioned in

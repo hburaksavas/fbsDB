@@ -308,6 +308,26 @@ try{
     await cdp.until(`!${dialog}&&${editor}.getPosition().lineNumber===6&&${editor}.getPosition().column===5`,'Handler line opened');
     assert.equal(await cdp.evaluate(`window.__desktopRegression.commands.some(command=>command.command==='sql.execute'||command.command==='connection.connect')`),false);
   });
+  await check('dependency graph: a table shows its users from workspace files, focus moves to a neighbour and a definition opens',async()=>{
+    const ddlPath=path.join(files,'calls','orders_ddl.sql');
+    const ddl='CREATE TABLE orders_t (id NUMBER PRIMARY KEY, status VARCHAR2(10));\nCREATE OR REPLACE VIEW open_orders AS SELECT id FROM orders_t WHERE status = \'OPEN\';\n';
+    await writeFile(ddlPath,ddl);
+    await cdp.evaluate(`window.__desktopRegression.post({type:'command',id:'qa-ddl-open',tabId:document.querySelector('.file-tab.active').dataset.editorTab,command:'file.openPath',payload:{path:${quote(ddlPath)}}})`);
+    await cdp.until(`document.querySelector('.file-tab.active .file-tab-name')?.textContent==='orders_ddl.sql'`,'DDL file opened');
+    await cdp.evaluate(`${editor}.setPosition({lineNumber:2,column:60});${editor}.focus()`);
+    await cdp.key('p',10);await cdp.until(`document.querySelector('[aria-label="Search workbench"]')`);await fill('[aria-label="Search workbench"]','Show dependency graph');await cdp.key('Enter');
+    const dialog=`document.querySelector('[aria-label="Dependency graph"]')`,side=name=>`[...${dialog}.querySelectorAll('.dependency-${name} .dependency-node-name strong')].map(b=>b.textContent).join()`;
+    await cdp.until(`${dialog}?.querySelector('.dependency-focus')`,'Graph drawn',20000);
+    assert.equal(await cdp.evaluate(`${dialog}.querySelector('.dependency-focus strong').textContent`),'ORDERS_T','The table under the caret is the focus.');
+    assert.equal(await cdp.evaluate(side('left')),'ORDER_OPS,OPEN_ORDERS');
+    assert.equal(await cdp.evaluate(`${dialog}.querySelectorAll('.dependency-lines path').length`),2);    await cdp.evaluate(`[...${dialog}.querySelectorAll('.dependency-node-name')].find(b=>b.textContent.startsWith('ORDER_OPS')).click()`);
+    await cdp.until(`${dialog}.querySelector('.dependency-focus strong').textContent==='ORDER_OPS'&&${side('right')}==='ORDERS_T'`,'Focus moved to the package');
+    await cdp.textClick('[aria-label="Dependency graph"] button','Back');
+    await cdp.until(`${dialog}.querySelector('.dependency-focus strong').textContent==='ORDERS_T'`,'Back to the table');
+    await cdp.textClick('[aria-label="Dependency graph"] button','Open definition');
+    await cdp.until(`!${dialog}&&${editor}.getPosition().lineNumber===1&&${editor}.getPosition().column===14`,'Table definition opened');
+    assert.equal(await cdp.evaluate(`window.__desktopRegression.commands.some(command=>command.command==='sql.execute'||command.command==='connection.connect')`),false);
+  });
   await check('large SQL file opens through the native reader with exact content and lightweight analysis defaults',async()=>{
     const largePath=path.join(files,'large-dump.sql'),content='SELECT 1 FROM dual;\n-- '+'x'.repeat(525000);
     await writeFile(largePath,content);

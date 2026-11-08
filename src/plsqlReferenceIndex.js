@@ -41,6 +41,44 @@ const SQLPLUS = new Set(['SET', 'PROMPT', 'SPOOL', 'SPO', 'REM', 'REMARK', 'DEFI
 const lineEnd = (source, offset) => { const at = source.indexOf('\n', offset); return at < 0 ? source.length : at; };
 const delimiterLine = (source, token) => token?.value === '/' && source.slice(source.lastIndexOf('\n', token.start - 1) + 1, lineEnd(source, token.end)).trim() === '/';
 
+const chainAt = (tokens, k) => {
+  if (tokens[k]?.kind !== 'identifier') return null;
+  if (tokens[k + 1]?.value === '.' && tokens[k + 2]?.kind === 'identifier') return { owner: keyOf(tokens[k]), name: keyOf(tokens[k + 2]), start: tokens[k].start, end: tokens[k + 2].end, next: k + 3 };
+  return { owner: null, name: keyOf(tokens[k]), start: tokens[k].start, end: tokens[k].end, next: k + 1 };
+};
+const DEFINED = { TABLE: 'TABLE', VIEW: 'VIEW', SEQUENCE: 'SEQUENCE', SYNONYM: 'SYNONYM' };
+
+// The object a CREATE statement defines, with the tables a table's foreign keys reference and the target of a synonym.
+function statementDefinition(tokens, i, end) {
+  if (!word(tokens[i], 'CREATE')) return null;
+  let k = i + 1;
+  if (word(tokens[k], 'OR') && word(tokens[k + 1], 'REPLACE')) k += 2;
+  while (['FORCE', 'NOFORCE', 'EDITIONABLE', 'NONEDITIONABLE', 'EDITIONING', 'GLOBAL', 'PRIVATE', 'TEMPORARY', 'PUBLIC', 'SHARDED', 'DUPLICATED', 'BLOCKCHAIN', 'IMMUTABLE'].includes(plainWord(tokens[k]))) k++;
+  let kind = DEFINED[plainWord(tokens[k])];
+  if (word(tokens[k], 'MATERIALIZED') && word(tokens[k + 1], 'VIEW')) { kind = 'MATERIALIZED VIEW'; k++; }
+  if (!kind) return null;
+  const name = chainAt(tokens, k + 1);
+  if (!name) return null;
+  const links = [];
+  for (let at = name.next; at < end; at++) {
+    if (kind === 'TABLE' && word(tokens[at], 'REFERENCES')) { const target = chainAt(tokens, at + 1); if (target) links.push({ kind: 'references', ...target }); }
+    if (kind === 'SYNONYM' && word(tokens[at], 'FOR')) { const target = chainAt(tokens, at + 1); if (target) links.push({ kind: 'aliases', ...target }); break; }
+  }
+  return { kind, owner: name.owner, name: name.name, nameStart: name.start, links };
+}
+
+// The table or view a trigger fires on; null for database, schema and other system events.
+function triggerTarget(tokens, nameStart) {
+  let k = tokens.findIndex(token => token.start === nameStart);
+  for (k++; k > 0 && k < tokens.length && !['BEGIN', 'DECLARE', 'COMPOUND', 'CALL'].includes(plainWord(tokens[k])); k++) {
+    if (!word(tokens[k], 'ON')) continue;
+    if (['DATABASE', 'SCHEMA', 'PLUGGABLE', 'NESTED'].includes(plainWord(tokens[k + 1]))) return null;
+    const target = chainAt(tokens, k + 1);
+    return target && { owner: target.owner, name: target.name, start: target.start, end: target.end };
+  }
+  return null;
+}
+
 // Script files mix SQL statements, SQL*Plus commands and PL/SQL units. Only PL/SQL units go to the PL/SQL parser: everything else
 // is blanked with spaces so offsets stay the same. SQL statements and EXEC lines become statements of their own, so their table
 // references and calls are indexed too; SQL*Plus commands are skipped.
@@ -70,7 +108,7 @@ export function splitScript(source) {
       else if (tokens[k].value === ';' && !depth || k > i && delimiterLine(source, tokens[k])) break;
     }
     const end = tokens[k] && tokens[k].value === ';' ? tokens[k].end : tokens[k - 1]?.end ?? token.end;
-    statements.push({ start: token.start, end, kind: 'SQL' }); blank.push([token.start, end]);
+    statements.push({ start: token.start, end, kind: 'SQL', defines: statementDefinition(tokens, i, k) }); blank.push([token.start, end]);
     i = tokens[k]?.value === ';' ? k + 1 : k;
   }
   if (!blank.length) return { parseSource: source, statements };
@@ -86,8 +124,9 @@ export function indexPlsqlFile(path, source) {
   const routines = [], bodies = [];
   const record = (routine, bodyStart, end) => { routines.push(routine); if (bodyStart != null) bodies.push({ routine, start: bodyStart, end }); };
   for (const statement of statements) {
-    const label = `${statement.kind === 'EXEC' ? 'EXEC' : 'SQL statement'}, line ${lineAt(statement.start)}`;
-    record({ id: `${path}#${statement.start}`, label, path, kind: 'STATEMENT', part: 'body', owner: null, package: null, name: label, start: statement.start, end: statement.end, nameStart: statement.start, parent: null, anonymous: true }, statement.start, statement.end);
+    const defines = statement.defines;
+    const label = defines ? `${defines.kind} ${[defines.owner, defines.name].filter(Boolean).join('.')}` : `${statement.kind === 'EXEC' ? 'EXEC' : 'SQL statement'}, line ${lineAt(statement.start)}`;
+    record({ id: `${path}#${statement.start}`, label, path, kind: 'STATEMENT', part: 'body', owner: null, package: null, name: label, start: statement.start, end: statement.end, nameStart: statement.start, parent: null, anonymous: true, defines: defines || null }, statement.start, statement.end);
   }
   const visit = (node, context) => {
     if (node.kind === 'block' && !context.parent) {
@@ -113,7 +152,7 @@ export function indexPlsqlFile(path, source) {
     const owner = parent ? context.owner : header.owner;
     const id = nested ? `${parent.id}/${header.name}` : `${owner || ''}.${context.package || ''}.${header.name}`;
     const label = nested ? `${parent.label} › ${header.name}` : [owner, context.package, header.name].filter(Boolean).join('.');
-    const routine = { id, label, path, kind: header.kind, part: node.headerEnd == null && node.begin == null ? 'spec' : 'body', owner, package: context.package || null, name: header.name, start: node.start, end, nameStart: header.nameToken.start, parent: parent || null, local: Boolean(nested) };
+    const routine = { id, label, path, kind: header.kind, part: node.headerEnd == null && node.begin == null ? 'spec' : 'body', owner, package: context.package || null, name: header.name, start: node.start, end, nameStart: header.nameToken.start, parent: parent || null, local: Boolean(nested), ...(header.kind === 'TRIGGER' ? { triggerOn: triggerTarget(tokens, header.nameToken.start) } : {}) };
     record(routine, node.headerEnd ?? node.begin, end);
     for (const child of node.declarations || []) visit(child, { owner, package: context.package, parent: routine });
   };
@@ -137,7 +176,7 @@ export function indexPlsqlFile(path, source) {
     const list = locals.get(symbol.key) || []; list.push({ start: scope.start, end: scope.end, declared: symbol.start }); locals.set(symbol.key, list);
   }
   const shadowed = (name, offset) => (locals.get(name) || []).some(item => item.start <= offset && offset <= item.end && item.declared < offset);
-  const declared = new Set(routines.map(routine => routine.nameStart)), candidates = [], dynamic = [];
+  const declared = new Set(routines.map(routine => routine.nameStart)), candidates = [], dynamic = [], sequences = [];
   const site = (caller, start, end, kind) => dynamic.push({ caller: caller.id, path, start, end, line: lineAt(start), kind });
   for (let i = 0; i < tokens.length; i++) {
     const token = tokens[i];
@@ -149,13 +188,15 @@ export function indexPlsqlFile(path, source) {
     const chain = [token]; let j = i;
     while (tokens[j + 1]?.value === '.' && tokens[j + 2]?.kind === 'identifier' && chain.length < 4) { chain.push(tokens[j + 2]); j += 2; }
     const after = tokens[j + 1];
+    // seq.NEXTVAL and schema.seq.CURRVAL, in SQL and in PL/SQL expressions alike.
+    if (chain.length > 1 && chain.length < 4 && (word(chain.at(-1), 'NEXTVAL') || word(chain.at(-1), 'CURRVAL'))) { sequences.push({ caller: caller.id, path, start: token.start, end: chain.at(-1).end, line: lineAt(token.start), kind: 'sequence', operation: plainWord(chain.at(-1)), owner: chain.length === 3 ? keyOf(chain[0]) : null, sequence: keyOf(chain.at(-2)) }); i = j; continue; }
     if (word(chain[0], 'DBMS_SQL') && chain.length > 1) { site(caller, token.start, chain.at(-1).end, 'DBMS_SQL'); i = j; continue; }
     // Named notation (name => value) and attributes (x%TYPE) are not calls.
     if (chain.length > 3 || after?.value === '%' || after?.value === '=' && tokens[j + 2]?.value === '>' || shadowed(keyOf(chain[0]), token.start)) { i = j; continue; }
     candidates.push({ caller: caller.id, path, names: chain.map(keyOf), start: token.start, end: chain.at(-1).end, line: lineAt(token.start) });
     i = j;
   }
-  const references = sqlReferences(tokens, { callerAt: sweep(), shadowed, lineAt, path });
+  const references = [...sqlReferences(tokens, { callerAt: sweep(), shadowed, lineAt, path }), ...sequences];
   const handlers = exceptionHandlers(model, tokens, { callerAt: sweep(), lineAt, path });
   return { path, routines, candidates, dynamic, references, handlers, errors: model.errors || [], complete: model.complete !== false };
 }
