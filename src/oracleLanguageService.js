@@ -5,6 +5,7 @@ import { plsqlTypeResolver, plsqlMemberPath } from './plsqlTypes.js';
 import { plsqlVisibleRoutines } from './plsqlStructure.js';
 import { applySqlExpectation } from './oracleSqlExpectation.js';
 import { withSqlContinuations } from './oracleInlineCompletion.js';
+import { builtinReturnClass, expectedValueType, resolveTypeClass, typeClass } from './expectedType.js';
 
 const keyOf = item => JSON.stringify([item.owner || '', item.type || '', item.name || '']);
 const id = value => /^[A-Z][A-Z0-9_$#]*$/.test(value || '') ? value : `"${String(value).replace(/"/g, '""')}"`;
@@ -121,10 +122,41 @@ export function oracleSignatureHelp(source, cursor, options = {}) {
     const args = lexOracle(source.slice(call.open + 1, cursor)).filter(token => token.kind !== 'comment'), first = args[0];
     const expected = routine.parameters[0]?.type || '', actual = first?.kind === 'number' ? 'NUMBER' : first?.kind === 'string' ? 'CHAR' : isWord(first, 'TRUE') || isWord(first, 'FALSE') ? 'BOOLEAN' : '';
     const mismatch = actual && expected && !(actual === 'NUMBER' ? /NUMBER|INTEGER|INT|FLOAT|DECIMAL|DOUBLE/i.test(expected) : new RegExp(actual, 'i').test(expected)) ? 4 : 0;
-    return { label, parameters: routine.parameters.map(parameter => ({ label: parameter.name, documentation: `${parameter.mode || 'IN'} ${parameter.type || ''}${parameter.optional ? ' · optional' : ''}` })), allowNamedArguments: !routine.builtin, activeParameter: Math.max(0, namedIndex < 0 ? Math.min(call.argumentIndex, Math.max(0, routine.parameters.length - 1)) : namedIndex), score: (call.argumentName ? namedIndex < 0 ? 10 : 0 : call.argumentIndex >= routine.parameters.length && routine.parameters.at(-1)?.name !== '…' ? 10 : 0) + mismatch, documentation: routine.documentation, documentationText:routineDocumentation(source,routine,call.path,container) };
+    return { label, parameters: routine.parameters.map(parameter => ({ label: parameter.name, type: routine.builtin ? null : parameter.type || null, documentation: `${parameter.mode || 'IN'} ${parameter.type || ''}${parameter.optional ? ' · optional' : ''}` })), allowNamedArguments: !routine.builtin, activeParameter: Math.max(0, namedIndex < 0 ? Math.min(call.argumentIndex, Math.max(0, routine.parameters.length - 1)) : namedIndex), score: (call.argumentName ? namedIndex < 0 ? 10 : 0 : call.argumentIndex >= routine.parameters.length && routine.parameters.at(-1)?.name !== '…' ? 10 : 0) + mismatch, documentation: routine.documentation, documentationText:routineDocumentation(source,routine,call.path,container) };
   });
   const activeSignature = results.reduce((best, item, index) => item.score < results[best].score ? index : best, 0);
   return { signatures: results, activeSignature, activeParameter: results[activeSignature].activeParameter };
+}
+
+// Puts completions whose value class matches what the caret expects (assignment target, RETURN type, comparison side,
+// parameter type, cursor statement) ahead of the rest, and says so in their detail. Nothing is removed.
+function rankByExpectedType(result, source, cursor, call, options, sources) {
+  const context = result.context;
+  if (context.qualifier && context.relation) return;
+  let parameterType = null;
+  if (call) {
+    const help = oracleSignatureHelp(source, cursor, options), active = help?.signatures[help.activeSignature];
+    parameterType = active?.parameters[help.activeParameter]?.type || null;
+  }
+  const expected = expectedValueType(source, cursor, { start: context.start, objects: options.objects, currentSchema: options.currentSchema, sources, parameterType });
+  if (!expected) return;
+  context.expectedType = expected;
+  const resolve = type => resolveTypeClass(type, { source, cursor, objects: options.objects, currentSchema: options.currentSchema });
+  const classOf = candidate => {
+    if (candidate.kind === 'variable' && candidate.symbolKind === 'cursor') return 'CURSOR';
+    if (candidate.valueType) return resolve(candidate.valueType);
+    if (candidate.column?.type) return typeClass(candidate.column.type);
+    if (candidate.kind === 'function') {
+      const member = candidate.member ? candidate.object?.members?.find(item => item.name === candidate.member) : candidate.object?.members?.[0];
+      return member?.returnType ? resolve(member.returnType) : builtinReturnClass(candidate.functionName || candidate.label);
+    }
+    return null;
+  };
+  for (const candidate of result.candidates) {
+    if (candidate.kind === 'keyword' || candidate.kind === 'snippet' || classOf(candidate) !== expected.kind) continue;
+    candidate.rank -= 30; candidate.expectedMatch = expected.kind;
+    candidate.detail = `${candidate.detail || ''} · ${expected.kind.toLowerCase()} expected`.replace(/^ · /, '');
+  }
 }
 
 function aliasFor(name, used) {
@@ -154,7 +186,7 @@ function languageCompletions(source, cursor, options = {}) {
   for (const routine of localTypes.routines) if (completionMatch(routine.name, context.fragment, settings.matchMode, context.quoted) >= 0 && !context.qualifier) {
     result.candidates = result.candidates.filter(item => !(item.kind === 'variable' && item.label === routine.name));
     const parentheses = settings.functionParentheses !== false && !/^\s*\(/.test(source.slice(context.end));
-    result.candidates.push({ key: 'local-routine:' + routine.start, label: routine.name, detail: signatureLabel(routine.name, routine), kind: 'function', rank: 0, insertText: (routine.quoted ? id(routine.name) : routine.name) + (parentheses ? '($0)' : ''), snippet: parentheses, functionName: routine.name, start: context.start, end: context.end });
+    result.candidates.push({ key: 'local-routine:' + routine.start, label: routine.name, detail: signatureLabel(routine.name, routine), kind: 'function', rank: 0, valueType: routine.returnType || null, insertText: (routine.quoted ? id(routine.name) : routine.name) + (parentheses ? '($0)' : ''), snippet: parentheses, functionName: routine.name, start: context.start, end: context.end });
   }
   for (const candidate of result.candidates) if (candidate.column) candidate.object = [...sources.values()].find(item => item.object?.columns?.includes(candidate.column))?.object;
   const call = oracleCallContext(source, cursor);
@@ -211,6 +243,7 @@ function languageCompletions(source, cursor, options = {}) {
     }
   }
   if (options.automatic && blankLine && !context.relation && !context.qualifier) result.candidates = result.candidates.filter(item => ['field', 'variable'].includes(item.kind));
+  rankByExpectedType(result, source, cursor, call, { ...options, objects }, sources);
   applySqlExpectation(result, settings, formatCompletionKeyword);
   result.candidates.sort((a, b) => a.rank - b.rank || a.label.localeCompare(b.label, 'en'));
   result.candidates = result.candidates.slice(0, 300);

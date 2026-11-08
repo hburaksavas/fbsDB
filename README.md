@@ -283,6 +283,14 @@ source and from database metadata already loaded for the tab, so scrolling never
 queries the database; built-in SQL functions, arguments already passed by name or
 named like their parameter, and positions where overloads disagree get no hint. Turn
 it off with **Parameter names on arguments** in the editor completion settings.
+Completion puts values of the expected type first and marks them "date expected",
+"number expected" and so on: after an assignment, in a function's RETURN, on the
+right side of a comparison or BETWEEN, in a call argument (from the parameter
+type), and cursors after OPEN, FETCH, CLOSE and `FOR … IN`. Types are compared by
+class (date and timestamp, number, text, boolean, binary, interval, cursor) and
+followed through `%TYPE` anchors and local subtypes; common built-in functions
+such as SYSDATE and TO_CHAR are classified by their return type. Nothing is
+removed from the list, and an unknown type changes nothing.
 
 
 Project rules include relative package/migration/script/test folders, saved profile

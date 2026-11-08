@@ -337,6 +337,16 @@ try{
     try{await cdp.until(`${hints}===${quote(expected)}`,'Inlay parameter names',20000)}catch(error){error.message+=` Shown: ${await cdp.evaluate(hints)}`;throw error}
     assert.equal(await cdp.evaluate(`${editor}.getValue()`),source,'Hints must not change the text.');
   });
+  await check('expected type: the suggestion list puts DATE values first after an assignment to a DATE variable',async()=>{
+    const source='DECLARE\n  v_count NUMBER;\n  v_name VARCHAR2(30);\n  v_start DATE;\n  v_due DATE;\nBEGIN\n  v_due := \nEND;';
+    await cdp.evaluate(`(()=>{const editor=${editor};editor.setValue(${quote(source)});editor.setPosition({lineNumber:7,column:12});editor.focus();editor.trigger('qa','editor.action.triggerSuggest',{})})()`);
+    const rows=`[...document.querySelectorAll('.suggest-widget.visible .monaco-list-row')].sort((a,b)=>Number(a.dataset.index)-Number(b.dataset.index)).map(row=>row.querySelector('.label-name')?.textContent)`;
+    await cdp.until(`${rows}.length>=4`,'Suggestion list',20000);
+    const shown=await cdp.evaluate(rows);
+    assert.deepEqual(shown.slice(0,2).sort(),['v_due','v_start'],shown.join(', '));
+    assert.ok(shown.indexOf('v_count')>1&&shown.indexOf('v_name')>1,shown.join(', '));
+    await cdp.key('Escape');
+  });
   await check('large SQL file opens through the native reader with exact content and lightweight analysis defaults',async()=>{
     const largePath=path.join(files,'large-dump.sql'),content='SELECT 1 FROM dual;\n-- '+'x'.repeat(525000);
     await writeFile(largePath,content);

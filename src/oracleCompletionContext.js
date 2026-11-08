@@ -113,9 +113,12 @@ export function getOracleCompletionContext(source, cursor = source.length) {
   const prior = tokens.filter(token => token.end <= start), previous = prior.at(-1);
   const scopes = tokens.filter(token => wordIs(token, 'SELECT')).map(token => ({
     start: token.start, depth: token.depth,
-    end: tokens.find(next => next.start > token.start && (next.depth < token.depth || next.depth === token.depth && ['UNION', 'INTERSECT', 'MINUS'].some(word => wordIs(next, word))))?.start ?? statementEnd,
+    // A query also ends at its own ";", so a cursor declared in a PL/SQL block does not swallow the code after it.
+    end: tokens.find(next => next.start > token.start && (next.depth < token.depth || next.depth === token.depth && (next.value === ';' || ['UNION', 'INTERSECT', 'MINUS'].some(word => wordIs(next, word)))))?.start ?? statementEnd,
   }));
-  const scope = scopes.filter(item => item.start <= cursor && cursor <= item.end).sort((a, b) => b.depth - a.depth || b.start - a.start)[0] || { start: statementStart, end: statementEnd, depth: 0 };
+  // Outside any query the scope starts after the last ";" of the block, not at the start of the whole PL/SQL unit.
+  const lastSemicolon = prior.filter(token => token.value === ';' && token.depth === 0).at(-1);
+  const scope = scopes.filter(item => item.start <= cursor && cursor <= item.end).sort((a, b) => b.depth - a.depth || b.start - a.start)[0] || { start: lastSemicolon ? lastSemicolon.end : statementStart, end: statementEnd, depth: 0 };
   const parents = scopes.filter(item => item.start < scope.start && item.end >= scope.end && item.depth < scope.depth).sort((a, b) => a.depth - b.depth);
   const sourceScopes = [...parents, scope];
   const sources = sourceScopes.flatMap(item => sourceRefs(tokens, item).map(ref => ({ ...ref, scopeDepth: item.depth })));

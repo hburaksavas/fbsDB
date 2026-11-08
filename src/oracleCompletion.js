@@ -103,7 +103,7 @@ export function getOracleCompletions(source, cursor, { settings: supplied = {}, 
       const qualify = rows.length > 1 || !!row.ref.alias, qualifier = qualify ? sqlIdentifier(row.ref.aliasKey || row.ref.nameKey) + '.' : '';
       add(name, 'field', 3, `${row.ref.alias || row.ref.name} · ${row.column.type || 'column'}`, { identity: `${row.ref.alias || row.ref.name}.${name}`, insertText: qualifier + sqlIdentifier(name), column: row.column, ...projectionState(row.ref.aliasKey || row.ref.nameKey, row.column) });
     }
-    for (const local of [...context.locals].reverse()) add(local.name, 'variable', 0, `PL/SQL · ${local.type}`, { insertText: local.quoted ? sqlIdentifier(local.name) : local.name });
+    for (const local of [...context.locals].reverse()) add(local.name, 'variable', 0, `PL/SQL · ${local.type}`, { insertText: local.quoted ? sqlIdentifier(local.name) : local.name, valueType: local.type, symbolKind: local.kind });
     for (const [alias, { ref }] of visibleSources) add(ref.alias || ref.name, 'variable', 5, 'Table / query alias', { identity: alias, insertText: sqlIdentifier(ref.aliasKey || ref.nameKey) });
     for (const entry of vocabulary) {
       if (entry.kind === 'keyword' && !sqlKeywordAllowed(context, entry.name)) continue;
