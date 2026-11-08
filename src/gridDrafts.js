@@ -40,6 +40,13 @@ export function insertRow(state, values = {}) {
   const id = state.nextInsertId;
   return commit(state, { inserted: [...state.inserted, { id, values: { ...values } }], nextInsertId: id + 1 });
 }
+// Several new rows at once, taken back by one Undo.
+export function insertRows(state, list) {
+  if (!list.length) return state;
+  let id = state.nextInsertId;
+  const added = list.map(values => ({ id: id++, values: { ...values } }));
+  return commit(state, { inserted: [...state.inserted, ...added], nextInsertId: id });
+}
 // A new row only lists the columns the user filled in: omitted columns use the database default, an explicit NULL is its own state.
 export function editInserted(state, id, col, input) {
   return commit(state, { inserted: state.inserted.map(row => {

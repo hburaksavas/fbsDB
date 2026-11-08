@@ -2163,6 +2163,18 @@ try {
   await cdp.until(`document.querySelector('[aria-label="Paste preview"]')?.textContent.includes('Row 3 CODE: c → Q')`, 'Key-matched preview');
   await cdp.evaluate(`[...document.querySelectorAll('[aria-label="Paste into the grid"] button')].find(b=>b.textContent.startsWith('Stage')).click()`);
   await cdp.until(`document.querySelector('[data-cell="2:1"]')?.dataset.draft==='edited'&&document.querySelector('[data-cell="2:1"]').textContent.includes('Q')`, 'Key-matched paste staged on the right row');
+  // Rows copied with headers from another grid are added as new rows, each pasted column filling the column of the same name.
+  await clipboard('CODE\tNOTE\nD\tw\nE\tNULL'); await pick(0, 1);
+  await cdp.evaluate(`document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'v',ctrlKey:true,bubbles:true,cancelable:true}))`);
+  await cdp.until(`document.querySelector('[aria-label="Paste into the grid"]')`, 'Paste panel for new rows');
+  assert.equal(await cdp.evaluate(`document.querySelector('[aria-label="First pasted row is a header"]').checked`), true, 'Column names on the first line are recognised as a header');
+  await clickLabel('Add as new rows');
+  await cdp.until(`document.querySelector('[aria-label="Paste preview"]')?.textContent.includes('2 new rows filling CODE, NOTE')`, 'New row preview');
+  assert.equal(await cdp.evaluate(`document.querySelector('[aria-label="Column for CODE"]').selectedOptions[0].textContent`), 'CODE');
+  await cdp.evaluate(`[...document.querySelectorAll('[aria-label="Paste into the grid"] button')].find(b=>b.textContent==='Add 2 new rows').click()`);
+  const codes = `[...document.querySelectorAll('[aria-label^="New row "][aria-label$=" CODE"]')].map(input=>input.value)`;
+  await cdp.until(`${codes}.join()==='D,E'`, 'Pasted rows added as new rows');
+  assert.equal(await cdp.evaluate(`[...document.querySelectorAll('[aria-label^="New row "][aria-label$=" NOTE NULL"]')].map(input=>input.checked).join()`), 'false,true', 'The text NULL became NULL');
   await cdp.evaluate(`window.dispatchEvent(new CustomEvent('fbsdb.draftsCleared',{detail:{tabId:'tab-1'}}))`);
  });
  await check('checkbox columns: a Y/N column is edited as a checkbox with NULL kept as the third state', async () => {

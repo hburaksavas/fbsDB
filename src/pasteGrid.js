@@ -52,3 +52,50 @@ export function planPaste({ pasted, header = false, mode = 'position', startRow,
   });
   return { changes, skipped };
 }
+
+const columnKey = name => String(name ?? '').trim().replace(/^"(.*)"$/, '$1').toUpperCase();
+
+// True when the first pasted row looks like the grid's column names (at least half of its cells match one).
+export function looksLikeHeader(pasted, columns) {
+  const first = pasted[0] || [], names = new Set(columns.map(column => columnKey(column.name)));
+  const filled = first.filter(cell => String(cell).trim() !== '');
+  return filled.length > 0 && filled.filter(cell => names.has(columnKey(cell))).length * 2 >= filled.length;
+}
+
+// Plans pasted rows as new rows. Each pasted column fills one column that can be inserted into: by header name, else in
+// order. mapping[i] (a column index, or null to skip) overrides the default for pasted column i. Empty cells are left out so
+// the column default applies; the text NULL becomes an explicit NULL.
+export function planInsertPaste({ pasted, header = false, columns, insertable = [], mapping = {} }) {
+  const data = header ? pasted.slice(1) : pasted;
+  const empty = { rows: [], mapping: [], targets: [], skipped: [], missing: [] };
+  if (!data.length) return { ...empty, error: 'The clipboard has no data rows.' };
+  const targets = columns.map((column, col) => ({ col, name: column.name, editable: Boolean(insertable[col]?.editable), reason: insertable[col]?.reason })).filter(target => target.editable);
+  if (!targets.length) return { ...empty, error: 'No column of this result can be filled in a new row.' };
+  const width = Math.max(...pasted.map(row => row.length)), names = header ? pasted[0] : null;
+  const used = new Set();
+  const resolved = Array.from({ length: width }, (_, index) => {
+    const label = names ? String(names[index] ?? '').trim() || `Column ${index + 1}` : `Column ${index + 1}`;
+    let col = index in mapping ? mapping[index] : names ? columns.findIndex(column => columnKey(column.name) === columnKey(names[index])) : targets[index]?.col ?? -1;
+    if (col == null || col < 0) return { index, label, col: null, reason: index in mapping ? 'Skipped' : names ? 'No column with this name' : 'No column left to fill' };
+    if (!insertable[col]?.editable) return { index, label, col: null, reason: insertable[col]?.reason || `${columns[col].name} cannot be filled in a new row` };
+    if (used.has(col)) return { index, label, col: null, reason: `${columns[col].name} is already filled from another pasted column` };
+    used.add(col);
+    return { index, label, col, reason: null };
+  });
+  if (resolved.every(item => item.col == null)) return { ...empty, mapping: resolved, targets, error: 'No pasted column fills a column of this result.' };
+  const skipped = [], rows = [];
+  data.forEach((values, at) => {
+    const row = {};
+    for (const item of resolved) {
+      if (item.col == null) continue;
+      const text = values[item.index] ?? '';
+      if (text === '') continue;
+      row[item.col] = text === 'NULL' ? { isNull: true } : { value: text };
+    }
+    if (Object.keys(row).length) rows.push(row); else skipped.push({ name: `pasted row ${at + 1}`, reason: 'All mapped cells are empty.' });
+  });
+  // Required columns (NOT NULL without a default) that a new row leaves empty would be refused by Oracle at Apply.
+  const required = columns.map((column, col) => ({ column, col })).filter(({ column, col }) => insertable[col]?.editable && column.nullable === false && !column.hasDefault && !column.identity);
+  const missing = required.filter(({ col }) => rows.some(row => !(col in row))).map(({ column, col }) => ({ name: column.name, rows: rows.filter(row => !(col in row)).length }));
+  return { rows, mapping: resolved, targets, skipped, missing, error: rows.length ? null : 'Every pasted row is empty in the mapped columns.' };
+}
