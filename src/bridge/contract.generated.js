@@ -1976,6 +1976,32 @@ export const bridgeContract = {
         ]
       }
     },
+    "sql.readLob": {
+      "handler": "oracle",
+      "resumeSession": true,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "lobId": {
+            "type": "string"
+          },
+          "offset": {
+            "type": "number"
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 2147483647
+          },
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "lobId"
+        ]
+      }
+    },
     "sql.runtimePlan": {
       "handler": "oracle",
       "resumeSession": true,
@@ -4137,6 +4163,33 @@ export const bridgeContract = {
         "columns",
         "rows"
       ]
+    },
+    "sql.lobChunk": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "lobId": {},
+        "lobType": {},
+        "offset": {},
+        "length": {},
+        "count": {},
+        "text": {},
+        "base64": {},
+        "complete": {},
+        "error": {}
+      },
+      "required": []
     },
     "sql.pageError": {
       "type": "object",

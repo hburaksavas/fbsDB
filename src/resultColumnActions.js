@@ -23,7 +23,7 @@ export function columnStatistics(rows, column, index) {
     if (value == null) { nulls++; continue; }
     let decimal;
     if (numeric) { try { decimal = new ExactDecimal(value); } catch { /* Non-finite/provider values are counted without numeric aggregation. */ } }
-    distinct.add(decimal ? `number:${decimal.toString()}` : value?.kind === 'temporal' ? `temporal:${oracleTemporalText(value)}` : value?.kind === 'binary' ? `binary:${value.base64}` : `${typeof value}:${String(value)}`);
+    distinct.add(decimal ? `number:${decimal.toString()}` : value?.kind === 'temporal' ? `temporal:${oracleTemporalText(value)}` : value?.kind === 'binary' ? `binary:${value.base64}` : value?.kind === 'lob' ? `lob:${value.lobId}` : `${typeof value}:${String(value)}`);
     if (!decimal) continue;
     numericCount++; sum = sum.add(decimal);
     if (min == null || decimal.compare(min) < 0) min = decimal;

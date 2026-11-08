@@ -256,6 +256,7 @@ try
     void Skipped(string name, string reason) { checks.Add(new { name, status = "skipped", reason }); Console.WriteLine("SKIP " + name + ": " + reason); }
     await new PrivilegeChecks(a, user, Check, Require, gridTables, Skipped).RunAsync();
     await new ReadbackChecks(a, b, user, Check, Require, gridTables, Skipped).RunAsync();
+    await new LobChecks(a, b, user, Check, Require, gridTables).RunAsync();
 }
 catch (Exception error) { failure = error; Console.Error.WriteLine(error.Message); }
 finally

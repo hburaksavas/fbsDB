@@ -5,7 +5,7 @@ export const jsonTreeNodeLimit = 5000;
 
 // Column metadata wins over content sniffing; the user can always override the choice.
 export function defaultValueViewer(column, value) {
-  if (value?.kind === 'binary' || value?.kind === 'temporal' || value == null) return 'raw';
+  if (value?.kind === 'binary' || value?.kind === 'temporal' || value == null || value?.kind === 'lob' && value.lobType === 'BLOB') return 'raw';
   const type = String(column?.type || '').toUpperCase();
   if (/JSON/.test(type)) return 'jsonTree';
   if (/XML/.test(type)) return 'xml';

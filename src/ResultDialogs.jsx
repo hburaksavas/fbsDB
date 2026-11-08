@@ -10,6 +10,8 @@ import { JsonTree } from './JsonTree.jsx';
 import { CoordinateMap } from './CoordinateMap.jsx';
 import { jsonFieldSql } from './jsonPathSql';
 import { elementModel, xmlTableSql } from './xmlTableSql';
+import { isLobPreview } from './lobValues.js';
+import { LobValueViewer } from './LobValueViewer.jsx';
 
 function useResultDialogFocus(enabled=true) {
   const ref=useRef(null);
@@ -27,7 +29,14 @@ function xmlDraft(root,node,column){
   const model=elementModel(root);let element=model;for(const index of indices)element=element.children[index];
   return xmlTableSql({element,root:model,column,sourceSchema:column?.sourceSchema,sourceTable:column?.sourceTable});
 }
-export function ResultValueDialog({ cell, onClose,embedded=false }) {
+// A large value still sent as a preview gets its own viewer; once loaded whole the cell holds the full value and the usual viewer takes over.
+export function ResultValueDialog(props) { return isLobPreview(props.cell?.value) ? <LobValueDialog {...props}/> : <FullValueDialog {...props}/>; }
+function LobValueDialog({ cell, onClose, embedded=false }) {
+  const dialogRef=useResultDialogFocus(!embedded);
+  const content=<section ref={dialogRef} role={embedded?undefined:"dialog"} aria-modal={embedded?undefined:"true"} aria-label="Cell value" className="result-tools-dialog value-dialog"><header><strong>{cell.column?.name} · Row {cell.row}</strong><button aria-label="Close cell value" onClick={onClose}>×</button></header><div className="result-form-row"><span>{cell.column?.type}</span></div><LobValueViewer value={cell.value}/><footer><button onClick={onClose}>Close</button></footer></section>;
+  return embedded?content:<ModalBackdrop onClose={onClose}>{content}</ModalBackdrop>;
+}
+function FullValueDialog({ cell, onClose,embedded=false }) {
   const dialogRef=useResultDialogFocus(!embedded);
   const [format,setFormat]=useState(()=>defaultValueViewer(cell.column,cell.value)),[search,setSearch]=useState(''),[copied,setCopied]=useState(false);
   const structured=useMemo(()=>{try{return {text:cell.value?.kind==='binary'?cell.value.base64:formatStructuredValue(cell.value,format==='jsonTree'?'json':format)}}catch(error){return {text:String(cell.value??'NULL'),error:error.message}}},[cell.value,format]);

@@ -129,7 +129,7 @@ public sealed partial class OracleSessionService : IDisposable
         await test.OpenAsync();
     }
 
-    public async Task<SqlExecutionResult> ExecuteAsync(string sql, IReadOnlyList<SqlBindParameter>? parameters = null, int rowLimit = 1000, CancellationToken cancellationToken = default, int timeoutSeconds = 0, IProgress<string>? progress = null, string? sourceReviewId = null)
+    public async Task<SqlExecutionResult> ExecuteAsync(string sql, IReadOnlyList<SqlBindParameter>? parameters = null, int rowLimit = 1000, CancellationToken cancellationToken = default, int timeoutSeconds = 0, IProgress<string>? progress = null, string? sourceReviewId = null, bool deferLobs = false)
     {
         await _gate.WaitAsync(cancellationToken);
         var timer = Stopwatch.StartNew();
@@ -202,7 +202,7 @@ public sealed partial class OracleSessionService : IDisposable
                 await _results.OpenAsync(command, _connection, _transaction, operationToken);
                 var querySqlId = command.SqlId;
                 progress?.Report("Fetching first page");
-                var page = await _results.ReadPageAsync(Math.Clamp(rowLimit, 1, 10000), HasPendingTransaction, operationToken);
+                var page = await _results.ReadPageAsync(Math.Clamp(rowLimit, 1, 10000), HasPendingTransaction, operationToken, deferLobs);
                 _activeCommand = null;
                 var output = await ReadDbmsOutputAsync(operationToken);
                 if (!string.IsNullOrEmpty(querySqlId)) _executedSqlIds.Add(querySqlId);
@@ -315,7 +315,20 @@ public sealed partial class OracleSessionService : IDisposable
         try { await _results.CloseAsync(resultId); }
         finally { Touch(); _gate.Release(); }
     }
-    public async Task<SqlExecutionResult> FetchNextPageAsync(string resultId, int pageSize, CancellationToken token = default)
+    // Reads part of a large value that a deferred result sent as a preview. count is characters for CLOB/NCLOB and bytes for BLOB.
+    public async Task<LobChunk> ReadLobAsync(string lobId, long offset, int count, CancellationToken token = default)
+    {
+        await _gate.WaitAsync(token);
+        try { return _results.ReadLob(lobId, offset, count); }
+        finally { Touch(); _gate.Release(); }
+    }
+    public async Task<LobChunk> ReadWholeLobAsync(string lobId, CancellationToken token = default)
+    {
+        await _gate.WaitAsync(token);
+        try { return _results.ReadWholeLob(lobId); }
+        finally { Touch(); _gate.Release(); }
+    }
+    public async Task<SqlExecutionResult> FetchNextPageAsync(string resultId, int pageSize, CancellationToken token = default, bool deferLobs = false)
     {
         await _gate.WaitAsync(token);
         using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(token);
@@ -325,7 +338,7 @@ public sealed partial class OracleSessionService : IDisposable
             _results.Activate(resultId);
             Volatile.Write(ref _activeCancellation, cancellation);
             _activeCommand = _results.Command;
-            try { return (await _results.ReadPageAsync(Math.Clamp(pageSize, 1, 10000), HasPendingTransaction, cancellation.Token)) with { ElapsedMs = timer.ElapsedMilliseconds }; }
+            try { return (await _results.ReadPageAsync(Math.Clamp(pageSize, 1, 10000), HasPendingTransaction, cancellation.Token, deferLobs)) with { ElapsedMs = timer.ElapsedMilliseconds }; }
             catch { await ClosePagedResultAsync(); throw; }
         }
         finally { _activeCommand = null; Interlocked.CompareExchange(ref _activeCancellation, null, cancellation); Touch(); _gate.Release(); }

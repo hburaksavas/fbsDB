@@ -165,6 +165,9 @@ public sealed partial class MainPage
                 case "sql.fetchNext":
                     await FetchSqlPageAsync(sender, id, payload);
                     break;
+                case "sql.readLob":
+                    await ReadLobAsync(sender, id, payload);
+                    break;
                 case "session.context":
                     try { var context = await Task.Run(() => _oracle.ReadSessionContextAsync()); Send(sender, new { type = "session.context", requestId = id, epoch = payload.GetProperty("epoch").GetInt32(), context }); }
                     catch (Exception error) { Send(sender, new { type = "session.context", requestId = id, epoch = payload.GetProperty("epoch").GetInt32(), error = error.Message }); }
@@ -497,7 +500,7 @@ public sealed partial class MainPage
             int? scriptIndex = payload.TryGetProperty("scriptIndex",out var scriptIndexValue) ? scriptIndexValue.GetInt32() : null;
             var progress = new Progress<string>(stage => sender.PostWebMessageAsJson(SerializeReply(new { type = "sql.stage", requestId, stage, scriptIndex }, stageTab)));
             var sourceReviewId = payload.TryGetProperty("sourceReviewId", out var reviewValue) && reviewValue.ValueKind == JsonValueKind.String ? reviewValue.GetString() : null;
-            try { result = await Task.Run(() => _oracle.ExecuteAsync(sql, parameters, rowLimit, cancellationToken, timeoutSeconds: timeout, progress: progress, sourceReviewId: sourceReviewId)); }
+            try { result = await Task.Run(() => _oracle.ExecuteAsync(sql, parameters, rowLimit, cancellationToken, timeoutSeconds: timeout, progress: progress, sourceReviewId: sourceReviewId, deferLobs: true)); }
             catch (TimeoutException ex)
             {
                 onError?.Invoke(ex.Message);
@@ -608,7 +611,7 @@ public sealed partial class MainPage
                 if (file is null) { Send(sender, new { type = "result.exportComplete", requestId, resultId, consumed, cancelled = true, success = false, message = "Export cancelled." }); return; }
                 temporaryPath = file.Path + "." + Guid.NewGuid().ToString("N") + ".partial";
                 var columns = payload.GetProperty("columns").EnumerateArray().Select(c => c.GetProperty("name").GetString() ?? "").ToArray();
-                var initialRows = payload.GetProperty("rows").EnumerateArray().Select(row => row.EnumerateArray().Select(cell => cell.ValueKind == JsonValueKind.Null ? null : cell.ValueKind == JsonValueKind.Number ? (object?)cell.GetDecimal() : cell.ValueKind==JsonValueKind.Object&&cell.TryGetProperty("base64",out var binary)?binary.GetString():cell.ValueKind == JsonValueKind.String ? cell.GetString() : cell.ToString()).ToArray());
+                var initialRows = await ExportRowsAsync(payload.GetProperty("rows"));
                 var hasMore = payload.TryGetProperty("hasMore", out var more) && more.GetBoolean();
                 if(format=="xlsx") {
                     var metadata=JsonSerializer.Deserialize<SqlColumn[]>(payload.GetProperty("columns").GetRawText(),WebJsonOptions)??[];
@@ -639,13 +642,49 @@ public sealed partial class MainPage
             finally { if (temporaryPath is not null) { try { File.Delete(temporaryPath); } catch (IOException) { } } _resultExports.TryRemove(tabId, out _); }
         }
 
+        // Rows already in the grid; large values sent as previews are read whole through their locators.
+        private async Task<object?[][]> ExportRowsAsync(JsonElement rows)
+        {
+            var result = new List<object?[]>();
+            foreach (var row in rows.EnumerateArray())
+            {
+                var cells = new List<object?>();
+                foreach (var cell in row.EnumerateArray())
+                {
+                    if (cell.ValueKind == JsonValueKind.Object && cell.TryGetProperty("kind", out var kind) && kind.GetString() == "lob")
+                    {
+                        var lobId = cell.TryGetProperty("lobId", out var lobValue) ? lobValue.GetString() : null;
+                        if (string.IsNullOrEmpty(lobId)) throw new InvalidOperationException("A large value in this result can no longer be read. Run the query again before exporting.");
+                        var whole = await Task.Run(() => _oracle.ReadWholeLobAsync(lobId));
+                        cells.Add(whole.Text ?? whole.Base64);
+                    }
+                    else cells.Add(cell.ValueKind == JsonValueKind.Null ? null : cell.ValueKind == JsonValueKind.Number ? cell.GetDecimal() : cell.ValueKind == JsonValueKind.Object && cell.TryGetProperty("base64", out var binary) ? binary.GetString() : cell.ValueKind == JsonValueKind.String ? cell.GetString() : cell.ToString());
+                }
+                result.Add(cells.ToArray());
+            }
+            return result.ToArray();
+        }
+
+        private async Task ReadLobAsync(CoreWebView2 sender, string? requestId, JsonElement payload)
+        {
+            var lobId = payload.GetProperty("lobId").GetString() ?? "";
+            try
+            {
+                var offset = payload.TryGetProperty("offset", out var offsetValue) && offsetValue.TryGetInt64(out var start) ? Math.Max(0, start) : 0;
+                var requested = payload.TryGetProperty("count", out var countValue) && countValue.TryGetInt32(out var size) ? size : int.MaxValue;
+                var chunk = await Task.Run(() => _oracle.ReadLobAsync(lobId, offset, Math.Max(1, requested)));
+                await SendAsync(sender, new { type = "sql.lobChunk", requestId, chunk.LobId, chunk.LobType, chunk.Offset, chunk.Length, chunk.Count, chunk.Text, chunk.Base64, chunk.Complete });
+            }
+            catch (Exception ex) { Send(sender, new { type = "sql.lobChunk", requestId, lobId, error = ex.Message }); }
+        }
+
         private async Task FetchSqlPageAsync(CoreWebView2 sender, string? requestId, JsonElement payload)
         {
             var resultId = payload.GetProperty("resultId").GetString() ?? "";
             var size = payload.TryGetProperty("pageSize", out var sizeValue) && sizeValue.TryGetInt32(out var requested) ? Math.Clamp(requested, 100, 10000) : 1000;
             try
             {
-                var result = await Task.Run(() => _oracle.FetchNextPageAsync(resultId, size));
+                var result = await Task.Run(() => _oracle.FetchNextPageAsync(resultId, size, deferLobs: true));
                 await SendAsync(sender, new { type = "sql.page", requestId, result.Columns, result.Rows, result.ElapsedMs, result.ReturnedRows, result.TransactionPending, result.ResultId, result.HasMore, result.PageSize, result.Offset });
             }
             catch (Exception ex) { Send(sender, new { type = "sql.pageError", requestId, resultId, message = ex.Message }); }
@@ -681,6 +720,7 @@ public sealed partial class MainPage
             JsonValueKind.True => true,
             JsonValueKind.False => false,
             JsonValueKind.Object when value.TryGetProperty("kind",out var kind)&&kind.GetString()=="temporal" => JsonSerializer.Deserialize<OracleTemporalCell>(value.GetRawText(),WebJsonOptions),
+            JsonValueKind.Object when value.TryGetProperty("kind",out var lob)&&lob.GetString()=="lob" => throw new InvalidOperationException("Open the large value in the cell viewer and load it fully before using it here."),
             JsonValueKind.Object when value.TryGetProperty("base64",out var bytes) => Convert.FromBase64String(bytes.GetString()??""),
             _ => value.ToString()
         };

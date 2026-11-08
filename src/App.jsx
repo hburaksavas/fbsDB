@@ -438,6 +438,7 @@ function SqlResultsView({ onRun, runShortcut, onFindObject, result, editorSql, r
     }else setLoadingAll(false);
   },[loadingAll,fetching,result?.rows?.length,result?.hasMore,pageError]);
   const [previewCell, setPreviewCell] = useState(null);
+  useEffect(()=>{const loaded=event=>{const {lobId,value}=event.detail||{};if(lobId)setPreviewCell(cell=>cell?.value?.kind==='lob'&&cell.value.lobId===lobId?{...cell,value}:cell)};window.addEventListener('fbsdb.result.lobLoaded',loaded);return()=>window.removeEventListener('fbsdb.result.lobLoaded',loaded)},[]);
   const aliasTemplate=useMemo(()=>queryTemplateFingerprint(result?.executedSql),[result?.executedSql]);
   const [columnAliases,setColumnAliases]=useState(()=>loadTemplateAliases(globalThis.localStorage,aliasTemplate));
   useEffect(()=>setColumnAliases(loadTemplateAliases(globalThis.localStorage,aliasTemplate)),[aliasTemplate]);
@@ -869,6 +870,7 @@ export function App() {
   useEffect(()=>{const open=event=>setCodeCell(event.detail);window.addEventListener('fbsdb.result.openCode',open);return()=>window.removeEventListener('fbsdb.result.openCode',open)},[]);
   // SQL drafts from value viewers open as unsaved editor text and are never executed automatically.
   const sqlDraftRef=useRef(null);sqlDraftRef.current=sql=>{setObjectTabActive(false);newSqlFileNow(sql)};
+  useEffect(()=>{const loaded=event=>{const {lobId,value}=event.detail||{};if(lobId&&value!=null)results.replaceLob(lobId,value)};window.addEventListener('fbsdb.result.lobLoaded',loaded);return()=>window.removeEventListener('fbsdb.result.lobLoaded',loaded)},[results]);
   useEffect(()=>{const open=event=>{if(typeof event.detail?.sql==='string')sqlDraftRef.current?.(event.detail.sql)};window.addEventListener('fbsdb.result.sqlDraft',open);return()=>window.removeEventListener('fbsdb.result.sqlDraft',open)},[]);
   const [showProjectRules,setShowProjectRules]=useState(false);
   const [sourceCompile,setSourceCompile]=useState(null);

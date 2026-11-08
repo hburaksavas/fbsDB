@@ -9,7 +9,7 @@ export function estimateResultBytes(rows, columnCount = 0, sample = 200) {
   for (let i = 0; i < count; i += step) {
     const row = rows[i];
     let bytes = 48 + 16 * (row?.length || columnCount);
-    for (const value of row || []) bytes += value == null ? 0 : typeof value === 'object' ? (value.kind === 'binary' ? value.byteLength || 0 : 2 * String(value.value ?? '').length + 64) : 2 * String(value).length;
+    for (const value of row || []) bytes += value == null ? 0 : typeof value === 'object' ? (value.kind === 'binary' ? value.byteLength || 0 : value.kind === 'lob' ? 2 * String(value.preview ?? '').length + 96 : 2 * String(value.value ?? '').length + 64) : 2 * String(value).length;
     total += bytes; measured++;
   }
   return Math.round(total / measured * count);

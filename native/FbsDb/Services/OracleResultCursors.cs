@@ -18,6 +18,7 @@ public sealed partial class OracleSessionService
         private string? _resultId;
         private SqlColumn[] _pageColumns = [];
         private int _pageOffset;
+        private readonly OracleLobLocators _lobs = new();
 
         public async Task OpenAsync(OracleCommand command, OracleConnection connection, OracleTransaction? transaction, CancellationToken token)
         {
@@ -51,11 +52,12 @@ public sealed partial class OracleSessionService
                 };
             }).ToArray();
         }
-        private object?[] ReadCurrentRow()
+        private object?[] ReadCurrentRow(bool deferLobs)
         {
             var row = new object?[_pageReader!.FieldCount];
             for (var i = 0; i < row.Length; i++) {
                 if(_pageReader.IsDBNull(i)){row[i]=null;continue;}
+                if(deferLobs&&_resultId is { } owner&&_pageColumns[i].Type is "Clob" or "NClob" or "Blob"){row[i]=_lobs.Cell(owner,_pageColumns[i].Type,_pageReader,i);continue;}
                 var temporal=_pageColumns[i].TemporalKind;
                 if(temporal is not null){row[i]=temporal switch{"DATE"=>OracleTemporalCell.From(_pageReader.GetOracleDate(i)),"TIMESTAMP"=>OracleTemporalCell.From(_pageReader.GetOracleTimeStamp(i)),"TIMESTAMP WITH TIME ZONE"=>OracleTemporalCell.From(_pageReader.GetOracleTimeStampTZ(i)),_=>OracleTemporalCell.From(_pageReader.GetOracleTimeStampLTZ(i),_pageColumns[i].SessionTimeZone)};continue;}
                 var type=_pageReader.GetFieldType(i);
@@ -63,15 +65,20 @@ public sealed partial class OracleSessionService
             }
             return row;
         }
-        public async Task<SqlExecutionResult> ReadPageAsync(int size, bool transactionPending, CancellationToken token)
+        // deferLobs: large CLOB/BLOB values become previews whose locators stay readable through ReadLob until the result is closed.
+        public async Task<SqlExecutionResult> ReadPageAsync(int size, bool transactionPending, CancellationToken token, bool deferLobs = false)
         {
             var id = _resultId;
             var offset = _pageOffset;
             var columns = _pageColumns;
             var rows = new List<object?[]>();
             if (_nextRow is not null) { rows.Add(_nextRow); _nextRow = null; }
-            while (rows.Count < size && await _pageReader!.ReadAsync(token)) rows.Add(ReadCurrentRow());
-            if (rows.Count == size && await _pageReader!.ReadAsync(token)) _nextRow = ReadCurrentRow();
+            try
+            {
+                while (rows.Count < size && await _pageReader!.ReadAsync(token)) rows.Add(ReadCurrentRow(deferLobs));
+                if (rows.Count == size && await _pageReader!.ReadAsync(token)) _nextRow = ReadCurrentRow(deferLobs);
+            }
+            catch { if (offset == 0 && id is not null) _lobs.Release(id); throw; }
             var hasMore = _nextRow is not null;
             _pageOffset += rows.Count;
             if (!hasMore) await ClosePagedResultAsync();
@@ -88,12 +95,16 @@ public sealed partial class OracleSessionService
             await ClosePagedResultAsync();
             foreach (var cursor in _parkedResults.Values) { await cursor.Reader.DisposeAsync(); await cursor.Command.DisposeAsync(); }
             _parkedResults.Clear();
+            _lobs.ReleaseAll();
         }
         public async Task CloseAsync(string resultId)
         {
+            _lobs.Release(resultId);
             if (_resultId == resultId) await ClosePagedResultAsync();
             else if (_parkedResults.Remove(resultId, out var cursor)) { await cursor.Reader.DisposeAsync(); await cursor.Command.DisposeAsync(); }
         }
+        public LobChunk ReadLob(string lobId, long offset, int count) => _lobs.Read(lobId, offset, count, limitChunk: true);
+        public LobChunk ReadWholeLob(string lobId) => _lobs.Read(lobId, 0, int.MaxValue);
         public async Task ClosePagedResultAsync()
         {
             var reader = _pageReader; var command = _pageCommand;
@@ -114,6 +125,7 @@ public sealed partial class OracleSessionService
 
         public void Dispose()
         {
+            _lobs.ReleaseAll();
             foreach (var cursor in _parkedResults.Values) { cursor.Reader.Dispose(); cursor.Command.Dispose(); }
             _parkedResults.Clear();
             _pageReader?.Dispose(); _pageCommand?.Dispose();

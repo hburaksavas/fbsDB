@@ -9,7 +9,7 @@ export function distinctColumnValues(rows, column, limit = valueListLimit) {
   for (const item of rows) {
     const value = (item.row ?? item)[column];
     if (value == null) { nulls++; continue; }
-    if (typeof value === 'object' && value.kind === 'binary') continue;
+    if (typeof value === 'object' && (value.kind === 'binary' || value.kind === 'lob')) continue;
     const text = String(value);
     counts.set(text, (counts.get(text) || 0) + 1);
   }

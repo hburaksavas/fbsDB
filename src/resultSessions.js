@@ -1,3 +1,4 @@
+import { replaceLobInRows } from './lobValues.js';
 export function createResultSessions() {
   let tabs = {};
   const listeners = new Set(), closed = new Set();
@@ -31,6 +32,17 @@ export function createResultSessions() {
             rows: page.rows.length, elapsedMs: page.elapsedMs, bytes: new TextEncoder().encode(JSON.stringify(page.rows)).length }] } : result;
       store.set({ ...tabs, [owner]: { ...tab, queryResult: append(tab.queryResult),
         resultSets: (tab.resultSets || []).map(item => ({ ...item, result: append(item.result) })) } });
+    },
+    // A large value loaded whole replaces its preview wherever the result is shown.
+    replaceLob(lobId, full) {
+      let changed = false;
+      const next = { ...tabs };
+      for (const [owner, tab] of Object.entries(tabs)) {
+        const replace = result => { if (!result?.rows) return result; const rows = replaceLobInRows(result.rows, lobId, full); return rows === result.rows ? result : { ...result, rows }; };
+        const queryResult = replace(tab.queryResult), resultSets = (tab.resultSets || []).map(item => { const result = replace(item.result); return result === item.result ? item : { ...item, result }; });
+        if (queryResult !== tab.queryResult || resultSets.some((item, index) => item !== tab.resultSets[index])) { changed = true; next[owner] = { ...tab, queryResult, resultSets }; }
+      }
+      if (changed) store.set(next);
     },
     invalidateCursor(owner, resultId) {
       const tab = tabs[owner]; if (!tab) return;

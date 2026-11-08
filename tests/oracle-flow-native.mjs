@@ -327,6 +327,24 @@ try{
     assert.deepEqual((await read(`SELECT OPEN_COL FROM FBSQA_GRANTS.COLUMN_GRANTED WHERE ID=1`))[0],['open'],'A rolled back edit was stored.');
   });
 
+  await check('large value: a CLOB arrives as a preview, loads in parts on request and then replaces the preview in the grid',async()=>{
+    await showTab(tabA);
+    const rows=await read(`SELECT RPAD(TO_CLOB('start-'), 600000, 'x') || TO_CLOB('-end') AS DOC FROM dual`);
+    assert.match(rows[0][0],/^start-x+… \(CLOB, 600,004 characters\)$/,rows[0][0]);
+    await cdp.evaluate(`(()=>{document.querySelector('[data-cell="0:0"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));document.querySelector('.grid-wrap').focus();document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))})()`);
+    const status=`document.querySelector('[aria-label="Cell value"] .lob-value-status [role="status"]')?.textContent`;
+    await cdp.until(`${status}==='Showing the first 2,000 of 600,004 characters (0%)'`,'Preview viewer');
+    await cdp.textClick('[aria-label="Cell value"] .lob-value-status button','Load next 524,288 characters');
+    await cdp.until(`${status}==='Showing the first 526,288 of 600,004 characters (87%)'`,'One more part loaded',20000);
+    await cdp.textClick('[aria-label="Cell value"] .lob-value-status button','Load all');
+    // Loaded whole, the cell holds the value itself and the ordinary viewer takes over.
+    await cdp.until(`!document.querySelector('.lob-value')&&document.querySelector('[aria-label="Cell value"] .result-value-content pre')?.textContent.length===600004`,'Whole value shown',20000);
+    assert.ok(await cdp.evaluate(`document.querySelector('[aria-label="Cell value"] .result-value-content pre').textContent.endsWith('x-end')`),'The loaded value is not the stored one.');
+    const cell=await cdp.evaluate(`document.querySelector('[data-cell="0:0"]').textContent`);
+    assert.ok(cell.startsWith('start-x')&&!cell.includes('600,004 characters)'),cell.slice(0,120));
+    await cdp.click('[aria-label="Close cell value"]');
+  });
+
   await check('rename: a connection label changes in place, connected tabs follow and saved credentials still connect',async()=>{
     const RENAMED=`${PROFILE} renamed`,entry='.connection-tree-entry',field=`[aria-label="Rename ${PROFILE}"]`;
     await showTab(tabA);

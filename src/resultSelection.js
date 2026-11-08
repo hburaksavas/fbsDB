@@ -1,3 +1,4 @@
+import { isLobPreview, lobCopyText } from './lobValues.js';
 export function isResultCellSelected(selection, r, c) {
   let selected = false;
   for (const range of selection?.ranges || []) {
@@ -26,7 +27,7 @@ export function resultSelectionTsv(selection, rows, visible) {
   const cols = [...selectedColumns].sort((a, b) => a - b);
   return selectedRows.map(r => cols.map(c => {
     if (!isResultCellSelected(selection, r, c)) return '';
-    const value = rows[r].row[visible[c]], text = value == null ? 'NULL' : value?.kind==='binary'?value.base64:String(value);
+    const value = rows[r].row[visible[c]], text = value == null ? 'NULL' : isLobPreview(value)?lobCopyText(value):value?.kind==='binary'?value.base64:String(value);
     return /[\t\r\n"]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
   }).join('\t')).join('\r\n');
 }

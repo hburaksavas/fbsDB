@@ -427,6 +427,12 @@ export interface CommandPayloads {
   "pageSize"?: number;
   "tabId"?: string;
 };
+  "sql.readLob": {
+  "lobId": string;
+  "offset"?: number;
+  "count"?: number;
+  "tabId"?: string;
+};
   "sql.runtimePlan": {
   "sqlId": string;
   "tabId"?: string;
@@ -1024,6 +1030,20 @@ export interface ReplyMessages {
   "hasMore"?: boolean;
   "pageSize"?: JsonValue;
   "offset"?: JsonValue;
+};
+  "sql.lobChunk": { type: "sql.lobChunk" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "lobId"?: JsonValue;
+  "lobType"?: JsonValue;
+  "offset"?: JsonValue;
+  "length"?: JsonValue;
+  "count"?: JsonValue;
+  "text"?: JsonValue;
+  "base64"?: JsonValue;
+  "complete"?: JsonValue;
+  "error"?: JsonValue;
 };
   "sql.pageError": { type: "sql.pageError" } & {
   "requestId"?: string | null;

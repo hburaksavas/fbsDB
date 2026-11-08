@@ -150,6 +150,10 @@ Click a result column title to sort ascending/descending; Shift/Ctrl-click adds 
 
 Right-click a title, or focus it and press Shift+F10/the menu key, to select/copy the loaded column, format it, sort/filter, fit/set its width, pin/move/hide/show columns, inspect exact statistics and metadata, add highlights, or insert SQL drafts. **Select All**, column copies and statistics cover loaded rows in the current filtered view across pages. Local view, copy and statistics actions do not fetch additional result rows or run user SQL. Source metadata is loaded only by the explicit source-definition action; generated SQL is inserted without execution. Formatting affects display only. Column types and available source details are in **Column Details**. All menus/popovers use the three theme palettes.
 
+### Large values
+
+CLOB, NCLOB and BLOB values up to 16,384 characters or bytes arrive with the row. Larger ones arrive as a preview (the first 2,000 characters, or 512 bytes for a BLOB) together with their full size. Open the cell (Enter) to load the next part or the whole value, with progress and a Stop button; loaded whole, the value replaces the preview in the grid. Copying a cell that is still a preview copies the preview with a note saying it is incomplete; Export always writes whole values. A preview reads the value as it was when the query ran, even after Commit, Rollback or changes from other sessions, until the result is closed, the query runs again or the tab disconnects; after that it asks you to run the query again.
+
 `node tests/column-menu-native.mjs [debug-endpoint]` runs an isolated ResultsGrid fixture in native WebView2 (default endpoint port 9338), covering all three themes and narrow layouts without database calls, screenshots, or system clipboard writes.
 
 ## Editing result rows

@@ -1,8 +1,9 @@
+import { isLobPreview, lobCopyText, lobDisplayText } from './lobValues.js';
 import { formatOracleTemporal,compareOracleTemporal,oracleTemporalText,oracleTemporalSqlLiteral } from './oracleTemporal.js';
 import { foldResultText,compareResultNumbers } from './resultLocale.js';
 import { formatExact,ExactDecimal } from './exactDecimal.js';
 import { filterTreeMatches, visibleWhitespace } from './resultAdvanced.js';
-export function isExpandableResultValue(column,value){return /\b(CLOB|NCLOB|BLOB|BFILE|LONG(?:\s+RAW)?|XMLTYPE)\b/i.test(String(column?.type||''))||['binary','blob','clob'].includes(String(value?.kind||'').toLowerCase())}
+export function isExpandableResultValue(column,value){return /\b(CLOB|NCLOB|BLOB|BFILE|LONG(?:\s+RAW)?|XMLTYPE)\b/i.test(String(column?.type||''))||['binary','blob','clob','lob'].includes(String(value?.kind||'').toLowerCase())}
 export function matchesCondition(value, rule) {
   if (rule.op === 'null') return value == null;
   if (rule.op === 'notNull') return value != null;
@@ -60,6 +61,7 @@ export function uniqueResultValues(rows, column) {
   return [...values.values()].sort((a, b) => b.count - a.count);
 }
 export function formatResultValue(value, type, options = {}) {
+  if(isLobPreview(value))return lobDisplayText(value);
   if(value?.kind==='binary')return `BLOB · ${value.byteLength} bytes`;
   if (value == null) return options.nullLabel??'NULL';
   if (value === '') return options.emptyLabel??'EMPTY';
@@ -78,7 +80,7 @@ export function selectionStatistics(values) {
  return {count:values.length,numericCount:numbers.length,sum:convert(sum),average:decimals.length?convert(sum.div(decimals.length)):null,min:decimals.length?convert(decimals.reduce((a,b)=>a.compare(b)<=0?a:b)):null,max:decimals.length?convert(decimals.reduce((a,b)=>a.compare(b)>=0?a:b)):null};
 }
 export function copyResultData(rows, columns, format = 'tsv', headers = false) {
-  rows=rows.map(row=>row.map(value=>value?.kind==='binary'?value.base64:value?.kind==='temporal'?oracleTemporalText(value):value));
+  rows=rows.map(row=>row.map(value=>isLobPreview(value)?lobCopyText(value):value?.kind==='binary'?value.base64:value?.kind==='temporal'?oracleTemporalText(value):value));
   const quote = (value, separator) => { const text = value == null ? 'NULL' : String(value); return text.includes(separator) || /[\r\n"]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text; };
   if (format === 'json') {
     const used = new Set(); const names = columns.map((column, i) => { let name = column.name || `COLUMN_${i + 1}`; while (used.has(name)) name += `_${i + 1}`; used.add(name); return name; });
