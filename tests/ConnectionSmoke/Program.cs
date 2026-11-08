@@ -20,6 +20,18 @@ try {
  await service.SaveProfileAsync(reader, "Reader renamed", "FINANCE", tns, "APP_READ", "DEV");
  Check((await service.GetProfilesAsync()).Single(p => p.Id == reader).Name == "Reader renamed", "editing preserves profile identity");
  await Reject(async () => { await service.SaveProfileAsync(null, "Finance admin", "FINANCE", tns, "X", "PROD"); }, "duplicate names rejected");
+ var beforeRename = JsonNode.Parse(await File.ReadAllTextAsync(settings))!;
+ await service.RenameProfileAsync(reader, "  Reader label  ");
+ var afterRename = JsonNode.Parse(await File.ReadAllTextAsync(settings))!;
+ var renamedEntry = afterRename["connectionProfiles"]!.AsArray().Single(p => p!["id"]!.GetValue<string>() == reader)!;
+ Check(renamedEntry["name"]!.GetValue<string>() == "Reader label", "rename trims and stores the label");
+ renamedEntry["name"] = beforeRename["connectionProfiles"]!.AsArray().Single(p => p!["id"]!.GetValue<string>() == reader)!["name"]!.GetValue<string>();
+ Check(JsonNode.DeepEquals(beforeRename, afterRename), "rename changes nothing but the label");
+ await Reject(() => service.RenameProfileAsync(reader, "FINANCE ADMIN"), "rename rejects another connection's name");
+ await Reject(() => service.RenameProfileAsync(reader, "  "), "rename rejects an empty name");
+ await Reject(() => service.RenameProfileAsync(reader, new string('x', 101)), "rename rejects a long name");
+ await Reject(() => service.RenameProfileAsync("missing", "Name"), "rename rejects a missing connection");
+ await service.RenameProfileAsync(reader, "Reader renamed");
  await Reject(async () => { await service.SaveProfileAsync(null, "Bad", "FINANCE", tns, "X", "FAKE"); }, "invalid environments rejected");
  var duplicateFile = Path.Combine(root, "duplicate.ora"); File.Copy(tns, duplicateFile); files.Add(duplicateFile);
  Check((await service.GetAliasesAsync()).Count == 2 && (await service.GetAliasesAsync()).All(p => p.Duplicate), "duplicate aliases retain selectable source paths");

@@ -59,3 +59,12 @@ export function changeConnectionOrganization(organization,payload,profiles=[]){
  for(const a of Object.values(next.assignments)){if(a.folderId&&!next.folders.some(f=>f.id===a.folderId))throw Error('Folder no longer exists.');if(a.groupIds.some(id=>!next.groups.some(g=>g.id===id)))throw Error('Group no longer exists.')}
  return next;
 }
+
+// A connection label: its identity never changes with it. The host checks again against every saved connection.
+export function validateConnectionName(profiles, name, exceptId = null) {
+  const text = String(name ?? '').trim();
+  if (!text) return { error: 'Enter a connection name.' };
+  if (text.length > 100) return { error: 'Use at most 100 characters.' };
+  if (profiles.some(profile => profile.id !== exceptId && String(profile.name || profile.id).toLowerCase() === text.toLowerCase())) return { error: 'A connection with this name already exists.' };
+  return { name: text };
+}

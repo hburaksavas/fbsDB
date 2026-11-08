@@ -23,3 +23,12 @@ test('folders form a hierarchy while group labels remain independent and multi-v
  const removed=changeConnectionOrganization(renamed,{operation:'group.delete',id:groups[1]});assert.deepEqual(removed.assignments.a.groupIds,[groups[0]]);assert.equal(removed.assignments.a.folderId,child);
  assert.equal(org.groups[1].name,'Read only','mutations do not alter the existing state on validation failure');
 });
+
+import {validateConnectionName} from '../src/connectionOrganization.js';
+test('a connection name is required, bounded and unique apart from the connection itself',()=>{
+  assert.deepEqual(validateConnectionName(profiles,'  Reporting  ','a'),{name:'Reporting'});
+  assert.deepEqual(validateConnectionName(profiles,'finance READ','a'),{name:'finance READ'},'Its own name in another case');
+  assert.match(validateConnectionName(profiles,'  ','a').error,/Enter a connection name/);
+  assert.match(validateConnectionName(profiles,'x'.repeat(101),'a').error,/at most 100/);
+  assert.match(validateConnectionName(profiles,'FINANCE ADMIN','a').error,/already exists/);
+});

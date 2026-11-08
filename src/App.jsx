@@ -623,6 +623,7 @@ export function App() {
   const tabCloseActionsRef = useRef(new Map());
   const bindPrefillRef = useRef({}), draftsConfirmedRef = useRef(new Set()), inlineBindStoreRef = useRef(null),  [pendingBindSql, setPendingBindSql] = useState(null), [copiedResults, setCopiedResults] = useState(false);
   const [tabSessions, setTabSessions] = useState({});
+  const [connectionRename, setConnectionRename] = useState(null);
   const replyOwnerRef = useRef(null);
   const tabSession = tabSessions[activeTabId] || {};
   useLayoutEffect(() => { setNativeTabId(documents.active?.metadataOriginTabId || activeTabId); }, [activeTabId, documents]);
@@ -1181,6 +1182,8 @@ export function App() {
         const organization=connectionOrganization(message.profiles??[],message.organization);
         const profiles = organizedProfiles(message.profiles??[],organization).map(profile=>({...profile,title:profile.name||profile.id,group:profile.groups[0]||'',color:profile.env==='PROD'?'rose':profile.env==='UAT'?'amber':profile.env==='TEST'?'blue':profile.env==='DEV'?'mint':'neutral',recent:recentProfiles.includes(profile.id),favorite:favorites.includes(profile.id)}));
         setConnectionOrg(organization);dbConnectionsRef.current=profiles;setDbConnections(profiles);setTnsAliases(message.aliases??[]);
+        // Every connected tab shows the current label; the session behind it is not affected.
+        setTabSessions(current=>Object.fromEntries(Object.entries(current).map(([id,session])=>{const profile=profiles.find(item=>item.id===session.activeConnection?.id);return [id,profile&&id!==owner?{...session,activeConnection:{...session.activeConnection,name:profile.name,title:profile.title}}:session]})));
         setActiveConnection((current) => {
           if (["No connection", "Disconnected"].includes(current.id)) return { id: "No connection", title: profiles.length ? "No active session" : "No TNS aliases found", host: profiles.length ? "" : "Add a tnsnames.ora file", port: "", service: "", env: "—", color: "mint" };
           return profiles.find((profile) => profile.id === current.id) ?? current;
@@ -1189,6 +1192,8 @@ export function App() {
         if (message.requestId === authTestRequestRef.current) {
           authTestRequestRef.current = null; setConnecting(false);
           setConnectionError(message.success ? "Test successful. Active session unchanged." : message.message);
+        } else if (message.operation === "connection.rename") {
+          // The field in the connection list reports this itself.
         } else if (message.operation === "connection.delete") {
           if (!message.success) setManagementError(message.message);
           else { setFavorites(current => current.filter(id => id !== message.profileId)); setRecentProfiles(current => current.filter(id => id !== message.profileId)); }
@@ -2132,6 +2137,7 @@ export function App() {
     if(action==='newSql'){newSqlFileNow();if(isNativeHost)beginConnection({...item,tabId:documents.activeId});return;}
     if(action==='connect'||action==='reconnect')switchConnection(item,action==='reconnect');
     else if(action==='disconnect')disconnectActiveConnection();
+    else if(action==='rename')setConnectionRename(item.id);
     else if(action==='edit')setProfileEditor(item);
     else if(action==='duplicate')setProfileEditor({...item,id:undefined,name:(item.name||item.id)+' copy',hasSavedCredentials:false,credentials:undefined});
     else if(action==='favorite')setFavorites(current=>current.includes(item.id)?current.filter(id=>id!==item.id):[...current,item.id]);
@@ -2401,7 +2407,7 @@ export function App() {
             <div className="explorer-search"><Search size={13} /><input aria-label="Filter connections" placeholder="Search" value={explorerQuery} onChange={(event) => setExplorerQuery(event.target.value)} />{explorerQuery.length > 0 ? <button type="button" className="explorer-search-clear" title="Clear" aria-label="Clear connection filter" onMouseDown={event => event.preventDefault()} onClick={event => { setExplorerQuery(''); event.currentTarget.closest('.explorer-search').querySelector('input')?.focus(); }}><X size={12}/></button> : <Filter size={12} />}</div>
             <div className="explorer-tabs"><button className={explorerTab === "Recent" ? "active" : ""} onClick={() => setExplorerTab("Recent")}><Clock3 size={12} /> Recent</button><button className={explorerTab === "Favorites" ? "active" : ""} onClick={() => setExplorerTab("Favorites")}><Star size={12} /> Favorites</button><button className={explorerTab === "All" ? "active" : ""} onClick={() => setExplorerTab("All")}><ListFilter size={12} /> All</button></div>
             {connectionGroupNames.length > 0 && <label className="group-filter"><span>GROUP</span><select value={groupFilter} onChange={(event) => setGroupFilter(event.target.value)}><option>All groups</option>{connectionGroupNames.map((group) => <option key={group}>{group}</option>)}</select></label>}
-            {filteredConnections.length||connectionOrg.folders.length ? <ConnectionTree contextId={connectionMenu?.item?.id} onContext={(event,kind,item)=>setConnectionMenu(connectionContext(event,kind,item))} items={filteredConnections} organization={connectionOrg} selected={activeConnection} favorites={favorites} onSelect={switchConnection} onManage={profile=>setProfileEditor(profile)} onToggleFavorite={id=>setFavorites(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])}/> : <div className="panel-empty-actions connections-empty"><button type="button" className="panel-empty-link" onClick={()=>dbConnections.length?(setExplorerQuery(""),setExplorerTab("All"),setGroupFilter("All groups")):setProfileEditor({method:"basic"})}>{dbConnections.length?"Clear filters":"New connection"}</button></div>}</div>,
+            {filteredConnections.length||connectionOrg.folders.length ? <ConnectionTree renameRequest={connectionRename} onRenameHandled={()=>setConnectionRename(null)} contextId={connectionMenu?.item?.id} onContext={(event,kind,item)=>setConnectionMenu(connectionContext(event,kind,item))} items={filteredConnections} organization={connectionOrg} selected={activeConnection} favorites={favorites} onSelect={switchConnection} onManage={profile=>setProfileEditor(profile)} onToggleFavorite={id=>setFavorites(current=>current.includes(id)?current.filter(value=>value!==id):[...current,id])}/> : <div className="panel-empty-actions connections-empty"><button type="button" className="panel-empty-link" onClick={()=>dbConnections.length?(setExplorerQuery(""),setExplorerTab("All"),setGroupFilter("All groups")):setProfileEditor({method:"basic"})}>{dbConnections.length?"Clear filters":"New connection"}</button></div>}</div>,
     objects: <div className="dock-content objects-section-content">
             <div className="schema-scope"><Database size={13} className="schema-connection-icon"/><span className="schema-scope-name">{schemaOwner || activeConnection.name || activeConnection.id}</span><span title={connecting || schemaLoading ? "Loading" : ["No connection", "Disconnected"].includes(activeConnection.id) ? "Disconnected" : "Connected"} aria-label={connecting || schemaLoading ? "Loading" : ["No connection", "Disconnected"].includes(activeConnection.id) ? "Disconnected" : "Connected"} className={schemaLoading || connecting ? "live-dot" : ["No connection", "Disconnected"].includes(activeConnection.id) ? "offline-dot" : "online-dot"} />{connecting ? "Connecting…" : schemaLoading ? "Loading…" : (schemaQuery || schemaOwnerFilter !== "All" || objectScope !== "All") ? `${visibleSchemaObjects.length} / ${schemaObjects.length} objects` : schemaObjects.length ? `${schemaObjects.length} objects` : ""}<button type="button" className="schema-refresh" title={schemaLoading ? "Cancel metadata loading" : "Refresh Oracle objects"} aria-label={schemaLoading ? "Cancel metadata loading" : "Refresh Oracle objects"} onClick={() => schemaLoading && schemaRequestRef.current ? sendNativeCommand('schema.cancel',{requestId:schemaRequestRef.current}) : refreshSchema()}>{schemaLoading?<X size={12}/>:<RefreshCw size={12}/>}</button></div>
             {definitionError&&<Feedback title="Definition unavailable">{definitionError}</Feedback>}

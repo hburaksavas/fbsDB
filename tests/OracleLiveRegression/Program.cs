@@ -253,8 +253,9 @@ try
     await new CommitFaultChecks(b, profile, user, Check, Require, gridTables).RunAsync();
     await new CommitCheckChecks(a, b, user, Check, Require, gridTables, checkRoutines).RunAsync();
     await new TimeZoneChecks(profile, user, Check, Require, gridTables).RunAsync();
-    await new PrivilegeChecks(a, user, Check, Require, gridTables).RunAsync();
-    await new ReadbackChecks(a, b, user, Check, Require, gridTables).RunAsync();
+    void Skipped(string name, string reason) { checks.Add(new { name, status = "skipped", reason }); Console.WriteLine("SKIP " + name + ": " + reason); }
+    await new PrivilegeChecks(a, user, Check, Require, gridTables, Skipped).RunAsync();
+    await new ReadbackChecks(a, b, user, Check, Require, gridTables, Skipped).RunAsync();
 }
 catch (Exception error) { failure = error; Console.Error.WriteLine(error.Message); }
 finally

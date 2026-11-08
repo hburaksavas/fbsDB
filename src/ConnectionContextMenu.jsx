@@ -54,7 +54,7 @@ export function ConnectionContextMenu({context,organization,favorites=[],activeP
    {button('New SQL',FilePlus2,()=>act('newSql'),newSqlDisabled||profile.available===false)}<hr/>
    {button(current?'Reconnect current tab':'Connect',current?RefreshCw:PlugZap,()=>act(current?'reconnect':'connect'),connectionDisabled||profile.available===false)}
    {current&&button('Disconnect current tab',Unplug,()=>act('disconnect'),connectionDisabled)}
-   <hr/>{button('Edit definition…',Pencil,()=>act('edit'))}{button('Duplicate…',Copy,()=>act('duplicate'))}
+   <hr/>{button('Rename',Pencil,()=>act('rename'))}{button('Edit definition…',Pencil,()=>act('edit'))}{button('Duplicate…',Copy,()=>act('duplicate'))}
    {button(favorites.includes(profile.id)?'Remove from favorites':'Add to favorites',Star,()=>act('favorite'))}
    <hr/>{submenu('Move to folder',FolderInput,'folders')}{submenu('Group labels',Tags,'groups')}
    <hr/>{button('Copy connection name',Copy,()=>copy(profile.name||profile.id))}{button('Copy endpoint',Copy,()=>copy([profile.host,profile.port].filter(Boolean).join(':')+(profile.service?'/'+profile.service:'')),!profile.host)}

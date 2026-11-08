@@ -60,6 +60,7 @@ public sealed partial class MainPage
                     break;
                 case "connection.save":
                 case "connection.delete":
+                case "connection.rename":
                 case "connection.test":
                     await ManageConnectionAsync(sender, id, command, payload);
                     break;
@@ -293,7 +294,8 @@ public sealed partial class MainPage
             try
             {
                 var profileId = Read("profileId");
-                if (command == "connection.delete")
+                if (command == "connection.rename") await _profiles.RenameProfileAsync(profileId, Read("name"));
+                else if (command == "connection.delete")
                 {
                     if (_sessions.Sessions.Any(tab => tab.Oracle.ProfileId == profileId)) throw new InvalidOperationException("Disconnect this profile in all tabs before deleting it.");
                     await _profiles.DeleteProfileAsync(profileId);

@@ -159,6 +159,10 @@ export interface CommandPayloads {
   "remember"?: boolean;
   "tabId"?: string;
 };
+  "connection.rename": {
+  "profileId": string;
+  "name": string;
+};
   "connection.delete": {
   "groupIds"?: Array<JsonValue>;
   "remember"?: boolean;

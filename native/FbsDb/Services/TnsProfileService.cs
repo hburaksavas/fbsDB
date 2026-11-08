@@ -166,6 +166,26 @@ public sealed class TnsProfileService
         }
         finally { _settingsGate.Release(); }
     }
+    // Changes only the label: the identity, target, user, NLS settings and saved credentials stay as they are.
+    public async Task RenameProfileAsync(string id, string name)
+    {
+        var text = name.Trim();
+        if (text.Length == 0) throw new InvalidOperationException("Enter a connection name.");
+        if (text.Length > 100) throw new InvalidOperationException("Use at most 100 characters.");
+        await GetProfilesAsync();
+        await _settingsGate.WaitAsync();
+        try
+        {
+            var settings = await ReadSettingsAsync();
+            var profiles = settings["connectionProfiles"] as JsonArray ?? [];
+            var entry = profiles.OfType<JsonObject>().FirstOrDefault(p => p["id"]?.GetValue<string>() == id) ?? throw new InvalidOperationException("Connection no longer exists.");
+            if (profiles.OfType<JsonObject>().Any(p => p != entry && string.Equals(p["name"]?.GetValue<string>(), text, StringComparison.OrdinalIgnoreCase))) throw new InvalidOperationException("A connection with this name already exists.");
+            entry["name"] = text;
+            await WriteSettingsAsync(settings);
+        }
+        finally { _settingsGate.Release(); }
+    }
+
     public async Task<ConnectionProfile> ResolveTargetAsync(string method, string alias, string source, string host, string port, string service, string targetType, string descriptor)
     {
         if (method != "tns") return BuildDirectTarget(method, host, port, service, targetType, descriptor);

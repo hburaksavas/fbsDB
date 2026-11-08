@@ -51,14 +51,14 @@ const idle=(label='Session idle',timeout=30000)=>cdp.until(`!document.querySelec
 const control=()=>cdp.evaluate(`document.querySelector('.connection-control').getAttribute('aria-label')`);
 
 // Connects through the real picker, using the credentials already saved for this profile.
-async function connect(){
+async function connect(name=PROFILE){
   await cdp.click('.connection-control');
   await cdp.until(`document.querySelector('[aria-label="Change connection"]')`,'Connection picker');
-  await set('[aria-label="Change connection"] .picker-search input',PROFILE);
+  await set('[aria-label="Change connection"] .picker-search input',name);
   await cdp.frame();
   await cdp.evaluate(`document.querySelector('[aria-label="Change connection"] .picker-search input').focus()`);
   await cdp.key('Enter');
-  await cdp.until(`document.querySelector('.connection-control').getAttribute('aria-label')==='Change connection: ${PROFILE}'&&!document.querySelector('.connection-control').dataset.working`,'Connected',40000);
+  await cdp.until(`document.querySelector('.connection-control').getAttribute('aria-label')==='Change connection: ${name}'&&!document.querySelector('.connection-control').dataset.working`,'Connected',40000);
 }
 async function submit(sql){
   await cdp.evaluate(`(()=>{const e=${editor};e.setValue(${JSON.stringify(sql)});e.setPosition({lineNumber:1,column:1})})()`);
@@ -307,6 +307,52 @@ try{
     assert.equal(await nameIn(tabB,2),'auto','The statement was expected to be saved, because the reply was what was lost.');
     await showTab(tabA);
     await connect();
+  });
+
+  await check('privileges: a table with column grants locks the other columns and applies the granted one',async()=>{
+    await showTab(tabA);
+    const present=await read(`SELECT COUNT(*) FROM all_tables WHERE owner='FBSQA_GRANTS' AND table_name='COLUMN_GRANTED'`);
+    if(present[0][0]!=='1'){console.log('SKIP column grants: run scripts/setup-fbsqa-fixtures.ps1 first');return}
+    await beginEditing(`SELECT ID, OPEN_COL, CLOSED_COL FROM FBSQA_GRANTS.COLUMN_GRANTED ORDER BY ID`);
+    await cdp.until(`document.querySelector('[aria-label="What your privileges do not allow"]')`,'Limits are named');
+    assert.match(await cdp.evaluate(`document.querySelector('[aria-label="What your privileges do not allow"]').textContent`),/You cannot delete rows: you have no DELETE privilege on FBSQA_GRANTS\.COLUMN_GRANTED/);
+    const locks=await cdp.evaluate(`[...document.querySelectorAll('[data-edit-lock="locked"]')].map(h=>h.textContent+' '+(h.dataset.appTooltip||h.title)).join(' | ')`);
+    assert.match(locks,/CLOSED_COL.*You have no UPDATE privilege on this column/,locks);
+    assert.doesNotMatch(locks,/OPEN_COL/,'The granted column stays editable.');
+    await stage(0,1,'through a column grant');
+    await apply();
+    await toolbar('Rollback');
+    await cdp.until(`!document.querySelector('.connection-control').dataset.pending`,'Rolled back');
+    await showTab(tabB);
+    assert.deepEqual((await read(`SELECT OPEN_COL FROM FBSQA_GRANTS.COLUMN_GRANTED WHERE ID=1`))[0],['open'],'A rolled back edit was stored.');
+  });
+
+  await check('rename: a connection label changes in place, connected tabs follow and saved credentials still connect',async()=>{
+    const RENAMED=`${PROFILE} renamed`,entry='.connection-tree-entry',field=`[aria-label="Rename ${PROFILE}"]`;
+    await showTab(tabA);
+    const f2=()=>cdp.evaluate(`(()=>{const row=document.querySelector('${entry}');row.focus();row.dispatchEvent(new KeyboardEvent('keydown',{key:'F2',bubbles:true,cancelable:true}))})()`);
+    const press=key=>cdp.evaluate(`document.querySelector('.connection-rename input').dispatchEvent(new KeyboardEvent('keydown',{key:'${key}',bubbles:true,cancelable:true}))`);
+    await cdp.until(`document.querySelector('${entry}')`,'Connection list');
+    await f2();
+    await cdp.until(`document.querySelector('${field.replaceAll("'","\\'")}')`,'Rename field');
+    await set('.connection-rename input','other');await press('Escape');
+    await cdp.until(`!document.querySelector('.connection-rename')&&document.querySelector('${entry}').textContent.includes('${PROFILE}')`,'Escape cancels');
+    await f2();
+    await cdp.until(`document.querySelector('.connection-rename input')`,'Rename field');
+    await set('.connection-rename input','   ');await press('Enter');
+    await cdp.until(`document.querySelector('.connection-rename [role="alert"]')?.textContent.includes('Enter a connection name')`,'A failure stays in place');
+    await set('.connection-rename input',RENAMED);await press('Enter');
+    await cdp.until(`!document.querySelector('.connection-rename')&&document.querySelector('${entry}').textContent.includes('${RENAMED}')`,'The list shows the new label',15000);
+    assert.equal(await control(),`Change connection: ${RENAMED}`,'The active tab follows.');
+    assert.deepEqual((await read('SELECT 47 FROM dual'))[0],['47'],'The session was disturbed.');
+    await showTab(tabB);
+    await cdp.until(`document.querySelector('.connection-control').getAttribute('aria-label')==='Change connection: ${RENAMED}'`,'Another connected tab follows');
+    assert.deepEqual((await read('SELECT 48 FROM dual'))[0],['48'],'The other session was disturbed.');
+    await cdp.click('[aria-label="New SQL file"]');
+    await new Promise(resolve=>setTimeout(resolve,300));
+    await connect(RENAMED);
+    assert.deepEqual((await read('SELECT 49 FROM dual'))[0],['49'],'Saved credentials no longer connect after the rename.');
+    await showTab(tabB);
   });
 }catch(error){
   failure=error;

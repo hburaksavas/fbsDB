@@ -717,6 +717,25 @@ export const bridgeContract = {
         ]
       }
     },
+    "connection.rename": {
+      "handler": "oracle",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "profileId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "profileId",
+          "name"
+        ]
+      }
+    },
     "connection.delete": {
       "handler": "oracle",
       "resumeSession": false,

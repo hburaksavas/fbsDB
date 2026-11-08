@@ -2,7 +2,7 @@ using FbsDb.Services;
 using Oracle.ManagedDataAccess.Client;
 
 // What the application says this session may change, against what real Oracle does. A refused statement uses WHERE 1=0, so no row can change even if Oracle accepted it.
-sealed class PrivilegeChecks(OracleSessionService session, string user, Func<string, Func<Task>, Task> check, Action<bool, string> require, List<string> created)
+sealed class PrivilegeChecks(OracleSessionService session, string user, Func<string, Func<Task>, Task> check, Action<bool, string> require, List<string> created, Action<string, string> skipped)
 {
     private readonly string _name = "FBSQA_PV_" + Guid.NewGuid().ToString("N")[..10].ToUpperInvariant();
 
@@ -26,6 +26,28 @@ sealed class PrivilegeChecks(OracleSessionService session, string user, Func<str
         var column = (await Rows($"SELECT column_name FROM all_tab_columns WHERE owner='{owner}' AND table_name='{table}' AND rownum=1"))[0][0];
         require(await Refused($"UPDATE {target} SET \"{column}\"=\"{column}\" WHERE 1=0") != said.Update, $"{target}: UPDATE was reported as {said.Update}.");
         require(await Refused($"DELETE FROM {target} WHERE 1=0") != said.Delete, $"{target}: DELETE was reported as {said.Delete}.");
+    }
+
+    private async Task GrantedByAnotherOwner()
+    {
+        const string columns = "\"FBSQA_GRANTS\".\"COLUMN_GRANTED\"", role = "\"FBSQA_GRANTS\".\"ROLE_GRANTED\"";
+        await check("privileges: grants on single columns are read per column and per operation, as Oracle applies them", async () => {
+            var said = (await session.GetEditPrivilegesAsync("FBSQA_GRANTS", "COLUMN_GRANTED"))!;
+            require(!said.Update && !said.Insert && !said.Delete, "Column grants were reported as table grants.");
+            require(said.UpdateColumns.SequenceEqual(["OPEN_COL"]), "UPDATE columns: " + string.Join(",", said.UpdateColumns));
+            require(said.InsertColumns.Order().SequenceEqual(["ID", "INS_COL"]), "INSERT columns: " + string.Join(",", said.InsertColumns));
+            require(!await Refused($"UPDATE {columns} SET OPEN_COL=OPEN_COL WHERE 1=0"), "Oracle refused the granted column.");
+            require(await Refused($"UPDATE {columns} SET CLOSED_COL=CLOSED_COL WHERE 1=0"), "Oracle allowed a column that was reported as locked.");
+            require(await Refused($"DELETE FROM {columns} WHERE 1=0"), "Oracle allowed DELETE, reported as missing.");
+            require(!await Refused($"INSERT INTO {columns} (ID,INS_COL) SELECT 1,'x' FROM dual WHERE 1=0"), "Oracle refused the columns granted for INSERT.");
+            require(await Refused($"INSERT INTO {columns} (ID,CLOSED_COL) SELECT 1,'x' FROM dual WHERE 1=0"), "Oracle allowed INSERT on a column that was reported as locked.");
+        });
+        await check("privileges: a grant reaching the user through an enabled role counts", async () => {
+            var said = (await session.GetEditPrivilegesAsync("FBSQA_GRANTS", "ROLE_GRANTED"))!;
+            require(said.Update && !said.Insert && !said.Delete, $"Reported update={said.Update} insert={said.Insert} delete={said.Delete}.");
+            require(!await Refused($"UPDATE {role} SET NOTE=NOTE WHERE 1=0"), "Oracle refused what the role grants.");
+            require(await Refused($"DELETE FROM {role} WHERE 1=0"), "Oracle allowed what the role does not grant.");
+        });
     }
 
     public async Task RunAsync()
@@ -69,5 +91,8 @@ sealed class PrivilegeChecks(OracleSessionService session, string user, Func<str
             }
             require(insertOnly, "No INSERT-only grant was compared.");
         });
+
+        if ((await Rows("SELECT COUNT(*) FROM all_tables WHERE owner='FBSQA_GRANTS' AND table_name='COLUMN_GRANTED'"))[0][0] == "1") await GrantedByAnotherOwner();
+        else skipped("privileges: grants from another owner", "Run scripts/setup-fbsqa-fixtures.ps1 first.");
     }
 }
