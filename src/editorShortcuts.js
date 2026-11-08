@@ -8,6 +8,7 @@ export const editorShortcutActions = [
   {id:'nextEdit',label:'Next edit location',shortcut:'Ctrl+Alt+PageDown'},
   {id:'lastExecution',label:'Return to latest executed SQL',shortcut:'Ctrl+Alt+End'},
   { id:'outline', label:'File outline', shortcut:'Ctrl+Alt+O' },
+  { id:'callHierarchy', label:'Call hierarchy', shortcut:'Alt+Shift+H' },
   { id:'format', label:'Format SQL', shortcut:'Ctrl+Shift+F' },
   { id:'deleteLine', label:'Delete line', shortcut:'Ctrl+D', command:'editor.action.deleteLines', edits:true },
   { id:'commentLine', label:'Toggle comment', shortcut:'Ctrl+/', command:'editor.action.commentLine', edits:true },

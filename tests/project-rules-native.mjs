@@ -266,6 +266,26 @@ try{
     await cdp.textClick('.workspace-search-modal button','Close');
     assert.equal(await cdp.evaluate(`${editor}.getValue()`),source);
   });
+  await check('call hierarchy: callers and calls come from workspace files, dynamic SQL is listed and a call site opens its file',async()=>{
+    const dir=path.join(files,'calls'),bodyPath=path.join(dir,'billing_calls.pkb'),callerPath=path.join(dir,'caller.sql');await mkdir(dir,{recursive:true});
+    const source='CREATE OR REPLACE PACKAGE BODY billing_calls AS\n  PROCEDURE note IS BEGIN NULL; END note;\n  PROCEDURE post IS\n  BEGIN\n    note;\n    EXECUTE IMMEDIATE \'BEGIN NULL; END;\';\n  END post;\n  PROCEDURE run IS BEGIN post; END run;\nEND billing_calls;\n/';
+    await writeFile(bodyPath,source);await writeFile(callerPath,'BEGIN\n  billing_calls.post;\nEND;\n/');
+    await cdp.evaluate(`window.__desktopRegression.post({type:'command',id:'qa-calls-open',tabId:document.querySelector('.file-tab.active').dataset.editorTab,command:'file.openPath',payload:{path:${quote(bodyPath)}}})`);
+    await cdp.until(`document.querySelector('.file-tab.active .file-tab-name')?.textContent==='billing_calls.pkb'`,'Package body opened');
+    await cdp.evaluate(`${editor}.setPosition({lineNumber:4,column:3});${editor}.focus()`);await cdp.key('H',9);
+    const dialog=`document.querySelector('[aria-label="Call hierarchy"]')`;
+    await cdp.until(`${dialog}?.querySelector('[role="tree"]')`,'Call hierarchy from workspace sources',20000);
+    assert.equal(await cdp.evaluate(`${dialog}.querySelector('.call-hierarchy-head strong').textContent`),'BILLING_CALLS.POST');
+    assert.deepEqual(await cdp.evaluate(`[...${dialog}.querySelectorAll('.call-hierarchy-name')].map(b=>b.textContent)`),['Anonymous block, line 1','BILLING_CALLS.RUN']);
+    assert.match(await cdp.evaluate(`${dialog}.querySelector('.call-hierarchy-dynamic summary').textContent`),/1 dynamic SQL site in this routine not analysed/);
+    assert.match(await cdp.evaluate(`${dialog}.querySelector('.call-hierarchy-scope').textContent`),/the database is not queried/);
+    await cdp.textClick('[aria-label="Call hierarchy"] .call-hierarchy-direction button','Calls');
+    await cdp.until(`[...${dialog}.querySelectorAll('.call-hierarchy-name')].map(b=>b.textContent).join()==='BILLING_CALLS.NOTE'`,'Outgoing calls');
+    await cdp.textClick('[aria-label="Call hierarchy"] .call-hierarchy-direction button','Callers');
+    await cdp.evaluate(`[...${dialog}.querySelectorAll('.call-hierarchy-row')].find(row=>row.textContent.includes('Anonymous block')).querySelector('.call-hierarchy-sites button').click()`);
+    await cdp.until(`!${dialog}&&document.querySelector('.file-tab.active .file-tab-name')?.textContent==='caller.sql'&&${editor}.getPosition().lineNumber===2&&${editor}.getPosition().column===3`,'Call site opened');
+    assert.equal(await cdp.evaluate(`window.__desktopRegression.commands.some(command=>command.command==='sql.execute'||command.command==='connection.connect')`),false);
+  });
   await check('large SQL file opens through the native reader with exact content and lightweight analysis defaults',async()=>{
     const largePath=path.join(files,'large-dump.sql'),content='SELECT 1 FROM dual;\n-- '+'x'.repeat(525000);
     await writeFile(largePath,content);

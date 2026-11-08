@@ -81,6 +81,18 @@ files and partial results are reported. Hidden/ignored folders and links are
 excluded. Unsaved open-editor text takes precedence over disk snapshots. Discovery
 never runs SQL or changes connection preferences.
 
+**Call hierarchy** (Alt+Shift+H, or **Show call hierarchy** in the command
+palette) lists the callers of the procedure, function, package, trigger or block
+at the caret, or the routines it calls, as an expandable tree; place the caret on
+a call to start from the called routine. It is built from the same workspace
+sources plus the current text of open editors, and never queries the database.
+Package specifications and bodies count as one routine, local subprograms and
+package initialization code are included, and variables hide routines of the
+same name. A name shared by several routines is shown under each of them as
+ambiguous, overloads are not told apart, and EXECUTE IMMEDIATE, OPEN FOR with a
+string and DBMS_SQL calls are listed as dynamic call sites that were not
+analysed. Skipped files and files that could not be read completely are listed.
+
 Open **Project rules** in the workspace background menu or **Configure project
 rules** in the command palette to edit workspace-specific extension/type
 associations, package path pairs and related test paths. Rules are versioned in

@@ -42,6 +42,7 @@ import {ExternalFileNotice} from './ExternalFileNotice';
 import {describeOracleSource, relatedPackageDocument, packageDocumentGroups} from './oracleSourceIdentity.js';
 import {OracleSourceHeader} from './OracleSourceHeader';
 import {RelatedSourcesDialog} from './RelatedSourcesDialog';
+const CallHierarchyDialog = lazy(() => import('./CallHierarchyDialog.jsx').then(module => ({ default: module.CallHierarchyDialog })));
 import {IdentifierCaseDialog} from './IdentifierCaseDialog';
 import {loadTemplateAliases,queryTemplateFingerprint,saveTemplateAlias} from './columnAliases';
 import {newQueryMainLabel,newQueryProfileItems,newQueryTemplates} from './newQueryOptions';
@@ -738,6 +739,7 @@ export function App() {
     results.measure(timing);
   }, [results]);
   const [relatedSources, setRelatedSources] = useState(null);
+  const [callHierarchy, setCallHierarchy] = useState(null);
   const [identifierCase, setIdentifierCase] = useState(null);
   const [localRename, setLocalRename] = useState(null);
   const [changeSignature,setChangeSignature]=useState(null);
@@ -1377,6 +1379,7 @@ export function App() {
       }
       if(editorRef.current?.hasTextFocus()&&!document.querySelector('.modal-backdrop')){
         const shortcuts=resolveSetting(settingsRef.current,'editor.shortcuts').value;
+        if(matchesShortcut(event,shortcuts.callHierarchy)){event.preventDefault();openCallHierarchy();return}
         if(matchesShortcut(event,shortcuts.lastEdit)){event.preventDefault();navigateEdit('last');return}
         if(matchesShortcut(event,shortcuts.previousEdit)){event.preventDefault();navigateEdit(-1);return}
         if(matchesShortcut(event,shortcuts.nextEdit)){event.preventDefault();navigateEdit(1);return}
@@ -2364,7 +2367,10 @@ export function App() {
     setCustomSqlSnippets((current) => [...current, snippet]); setSelectedSnippetTrigger(trigger); setSnippetFilter(""); setSnippetError(""); setSnippetDraft({ trigger: "", label: "", detail: "", text: "SELECT ${1:column_name}\nFROM ${2:table_name};" }); setSnippetFormOpen(false);
   }
   function deleteCustomSqlSnippet(trigger) { setCustomSqlSnippets((current) => current.filter((snippet) => snippet.trigger !== trigger)); setSelectedSnippetTrigger("sel"); }
-  function openWorkspaceSearchMatch(match) { const cached = tabs.find((tab) => tab.path?.toLowerCase() === match.path.toLowerCase()); if (cached) { activateTab(cached.id); setShowSearch(false); requestAnimationFrame(() => { editorRef.current?.setPosition({ lineNumber: match.lineNumber, column: 1 }); editorRef.current?.revealLineInCenter(match.lineNumber); editorRef.current?.focus(); }); return; } rememberEditorPosition(); pendingSearchPositionRef.current = { path: match.path, lineNumber: match.lineNumber }; setShowSearch(false); sendNativeCommand("file.openPath", { path: match.path }); }
+  // Opens the hierarchy for the routine at the caret; the index reads workspace sources plus the current text of open editors.
+  function openCallHierarchy() { const editor = editorRef.current, model = editor?.getModel(), position = editor?.getPosition(); if (!model || !position) return; setCallHierarchy({ root: isNativeHost ? workspace.root || null : null, document: { ...documents.active, content: documents.text }, offset: model.getOffsetAt(position) }); }
+  function openCallHierarchyPlace(place) { setCallHierarchy(null); if (!place.path || pathKey(place.path) === pathKey(documents.active?.path || '')) { requestAnimationFrame(() => jumpToOffset(place.start)); return; } openWorkspaceSearchMatch(place); }
+  function openWorkspaceSearchMatch(match) { const cached = tabs.find((tab) => tab.path?.toLowerCase() === match.path.toLowerCase()); if (cached) { activateTab(cached.id); setShowSearch(false); requestAnimationFrame(() => { editorRef.current?.setPosition({ lineNumber: match.lineNumber, column: match.column || 1 }); editorRef.current?.revealLineInCenter(match.lineNumber); editorRef.current?.focus(); }); return; } rememberEditorPosition(); pendingSearchPositionRef.current = { path: match.path, lineNumber: match.lineNumber, column: match.column }; setShowSearch(false); sendNativeCommand("file.openPath", { path: match.path }); }
 
 
   const { runQuery, explainQuery, executeStatement, fetchMoreResults, cancelQuery, startScript } = useQueryExecution({
@@ -2551,6 +2557,7 @@ export function App() {
         {id:'resetLayout',label:'Reset panel layout',detail:'Restores the default panel arrangement',run:resetPanelLayout},
         {id:'shortcutMap',label:'Keyboard shortcut map',detail:'?',run:()=>setShortcutMap({context:'general'})},
         {id:'outline',label:'Show file outline',run:()=>setPaletteMode('outline')},
+        {id:'callHierarchy',label:'Show call hierarchy',detail:resolveSetting(settings,'editor.shortcuts').value.callHierarchy||undefined,run:openCallHierarchy},
         {id:'density',label:'Toggle compact / comfortable workbench density',run:()=>setWorkbenchDensity(value=>value==='compact'?'comfortable':'compact')},
         {id:'focus',label:'Toggle editor focus mode',detail:'Ctrl+Alt+Z',run:()=>setFocusMode(value=>!value)},
         {id:'problems',label:'Show Problems',run:()=>setResultTab('Problems')},
@@ -2582,6 +2589,7 @@ export function App() {
     {clipboardHistoryOpen&&<Suspense fallback={null}><ClipboardHistoryDialog enabled={clipboardEnabled} onEnabled={enabled=>{setClipboardEnabled(enabled);if(!enabled)setClipboardEntries([])}} entries={clipboardEntries} onClear={()=>setClipboardEntries([])} onPaste={pasteClipboardEntry} onClose={()=>{setClipboardHistoryOpen(false);editorRef.current?.focus()}}/></Suspense>}
     {editorMacrosOpen&&<Suspense fallback={null}><EditorMacrosDialog recording={macroRecording} macros={editorMacros} onStart={()=>{setMacroRecording([]);setEditorMacrosOpen(false);editorRef.current?.focus()}} onSave={name=>{const result=createEditorMacro(name,macroRecording);if(result.error)throw Error(result.error);setEditorMacros(items=>[result.macro,...items].slice(0,9));setMacroRecording(null)}} onCancel={()=>setMacroRecording(null)} onRun={macro=>{setEditorMacrosOpen(false);return runEditorMacro(macro)}} onDelete={id=>setEditorMacros(items=>items.filter(item=>item.id!==id))} onClose={()=>{setEditorMacrosOpen(false);editorRef.current?.focus()}}/></Suspense>}
     {quickFix&&<Suspense fallback={null}><QuickFixDialog request={quickFix} onApply={applyQuickFix} onClose={()=>{setQuickFix(null);editorRef.current?.focus()}}/></Suspense>}
+    {callHierarchy&&<Suspense fallback={<div role="status">Loading…</div>}><CallHierarchyDialog {...callHierarchy} documents={tabs} onOpen={openCallHierarchyPlace} onClose={()=>setCallHierarchy(null)}/></Suspense>}
     {relatedSources&&<RelatedSourcesDialog rules={workspace.projectRules} root={relatedSources.root} document={relatedSources.document} documents={tabs} onClose={()=>setRelatedSources(null)} onOpen={file=>{if(pathKey(workspace.root)!==pathKey(relatedSources.root))return;setRelatedSources(null);openWorkspaceFile(file)}}/>}
     <input ref={openFileInputRef} type="file" accept={(workspace.projectRules||defaultProjectRules).associations.map(item=>item.extension).join(',')+',text/plain'} hidden onChange={async (event) => { const file = event.target.files?.[0]; if (file) { const content = await file.text(); rememberEditorPosition(); const id = `file:${crypto.randomUUID()}`; documents.open({ id, name: file.name, path: null, content,savedContent:content, dirty: false, connectionProfileId: null }); setNativeTabId(id); } event.target.value = ""; }} />
     <FileMenu connectionControl={<ConnectionControl key={metadataOriginTabId} context={summarySession.sessionContext} contextError={summarySession.sessionContextError} executing={summarySession.executing} fetching={summarySession.fetchingPage} rendering={summarySession.rendering} cancelling={summarySession.cancelling} stage={summarySession.sqlStage} startedAt={summarySession.operationStartedAt} transactionPending={summarySession.transactionPending} readOnlyAnalysis={summarySession.analysisReadOnly} exporting={Boolean(tabResults[metadataOriginTabId]?.streamState?.busy)} inactive={Boolean(summarySession.inactive)&&!summarySession.connectionLost} profile={summaryConnection} connected={summaryConnected} connecting={summarySession.connecting} connectingProfile={summarySession.connectingProfile} disabled={activeTabReadonly} open={showPicker} onOpen={() => setShowPicker(true)}/>} onManageWorkspaces={()=>setShowWorkspaceManager(true)} workspace={workspace} onNew={newSqlFile} onOpen={openSqlFile} onSave={() => {if(!activeTabReadonly)saveSqlFile()}} onOpenWorkspace={openWorkspace} language={language}>
