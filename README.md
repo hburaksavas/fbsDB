@@ -54,6 +54,13 @@ Create a profile in **Connections** using a host, port and service name/SID, a d
 
 User settings live at `%LOCALAPPDATA%\fbsDB\settings.json`. A workspace stores per-file connection choices in `<workspace>\.fbsdb\workspace.json`; it does not store credentials.
 
+**Toggle side editor** (command palette) opens a second editor beside the main one.
+It starts on the active document and can show any open document, the same one
+included; edits in either editor reach that document and mark it unsaved. The side
+editor is for editing only: running, results, saving and the database session
+always belong to the main editor's tab, and completion uses the main tab's
+connection.
+
 **Workspace Git** (command palette) lists the changed SQL and Oracle source files of
 the workspace as Staged and Changes; a file with both kinds of change is in both
 lists. Stage or unstage one file or all of them, review the staged and the unstaged

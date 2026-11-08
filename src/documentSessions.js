@@ -64,6 +64,8 @@ export function createDocumentSessions(initialTabs, activeTabId = initialTabs[0]
     activate(id) { store.dispatch({ type: 'activate', id }); },
     patch(id, patch) { store.dispatch({ type: 'patch', id, patch }); },
     edit(content) { store.dispatch({ type: 'edit', id: store.activeId, content }); },
+    // Edits a document that need not be the active one, as the side editor does; read-only tabs are left unchanged.
+    editTab(id, content) { store.dispatch({ type: 'edit', id, content }); },
   };
   return store;
 }

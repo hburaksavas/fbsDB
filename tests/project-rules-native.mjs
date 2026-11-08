@@ -407,6 +407,31 @@ try{
     assert.match(git('status','--porcelain','--','calls/new_change.sql'),/^\?\? calls\/new_change\.sql/);
     await cdp.textClick('[aria-label="Workspace Git"] footer button','Close');
   });
+  await check('side editor: a second document is edited beside the main editor, and edits reach the document they belong to',async()=>{
+    const side=`window.monaco.editor.getEditors().find(e=>e.getDomNode()?.closest('.side-editor-pane'))`;
+    const mainTab=await cdp.evaluate(`document.querySelector('.file-tab.active').dataset.editorTab`);
+    await cdp.evaluate(`${editor}.setValue('SELECT 1 FROM dual;')`);
+    await cdp.key('p',10);await cdp.until(`document.querySelector('[aria-label="Search workbench"]')`);await fill('[aria-label="Search workbench"]','Toggle side editor');await cdp.key('Enter');
+    await cdp.until(`${side}?.getValue()==='SELECT 1 FROM dual;'`,'Side editor shows the active document',20000);
+    assert.equal(await cdp.evaluate(`document.querySelector('[aria-label="Document in the side editor"]').value`),mainTab);
+    await cdp.evaluate(`${side}.executeEdits('qa',[{range:new monaco.Range(1,1,1,1),text:'-- from side\\n'}])`);
+    // A document keeps its own line endings, so texts are compared without them.
+    const plain=target=>`${target}.getValue().replace(/\\r\\n/g,'\\n')`;
+    await cdp.until(`${plain(editor)}==='-- from side\\nSELECT 1 FROM dual;'`,'Side edit reaches the main editor of the same document');
+    const other=await cdp.evaluate(`[...document.querySelectorAll('[aria-label="Document in the side editor"] option')].map(option=>option.value).find(value=>value!==${quote(mainTab)})`);
+    assert.ok(other,'Another open document is offered.');
+    await fill('[aria-label="Document in the side editor"]',other);
+    await cdp.until(`${side}?.getModel()?.uri.path.endsWith(${quote(other)})`,'Side editor switched document');
+    await cdp.evaluate(`${side}.executeEdits('qa',[{range:new monaco.Range(1,1,1,1),text:'-- second\\n'}])`);
+    await new Promise(resolve=>setTimeout(resolve,300));
+    assert.equal(await cdp.evaluate(plain(editor)),'-- from side\nSELECT 1 FROM dual;','Editing another document leaves the main editor alone.');
+    await cdp.click(`[data-editor-tab="${other}"] [role="tab"]`);
+    await cdp.until(`${plain(editor)}.startsWith('-- second\\n')`,'The other document holds the side edit');
+    assert.match(await cdp.evaluate(`document.querySelector('.editor-save-button').textContent`),/Unsaved/,'The edited document is marked unsaved.');
+    await cdp.click('[aria-label="Close side editor"]');
+    await cdp.until(`!document.querySelector('[aria-label="Side editor"]')&&!${side}`,'Side editor closed');
+    await cdp.click(`[data-editor-tab="${mainTab}"] [role="tab"]`);
+  });
   await check('large SQL file opens through the native reader with exact content and lightweight analysis defaults',async()=>{
     const largePath=path.join(files,'large-dump.sql'),content='SELECT 1 FROM dual;\n-- '+'x'.repeat(525000);
     await writeFile(largePath,content);
