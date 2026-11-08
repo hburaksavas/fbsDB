@@ -45,7 +45,36 @@ try {
   applied=await service.ApplyReplaceAsync(preview.Id,[source.Path],[]);
   Check(applied.Applied.Count==1&&(await File.ReadAllTextAsync(source.Path)).Contains("updated_source"),"Oracle source replace failed");
  }
- Console.WriteLine("Workspace Git / replace checks passed, including Oracle source extensions.");
+ // Staging, unstaging and committing touch only SQL files inside the workspace and report other staged files.
+ await Git("config","user.name","fbsDB Test");await Git("config","user.email","fbsdb-test@localhost");
+ await Git("add","-A");await Git("commit","-q","-m","sources");
+ var c=Path.Combine(root,"c.sql");await File.WriteAllTextAsync(c,"select 1 from dual;\n");
+ await File.WriteAllTextAsync(b,"select staged from dual;\r\n",Encoding.Unicode);
+ state=await service.GitStateAsync();
+ var cState=state.Files.Single(file=>file.Path==c);Check(cState.Status=="??"&&cState.Index==""&&cState.WorkTree=="?","untracked file is neither staged nor tracked");
+ Check(state.Files.Single(file=>file.Path==b).Index==""&&state.Files.Single(file=>file.Path==b).WorkTree=="M","modified file is unstaged");
+ diff=await service.GitDiffAsync(c);Check(diff.Staged==""&&diff.Unstaged.Contains("+select 1 from dual;"),"untracked file diff is shown as added lines");
+ state=await service.GitStageAsync([b,c],true);
+ Check(state.Files.Single(file=>file.Path==b).Index=="M"&&state.Files.Single(file=>file.Path==c).Index=="A","staged files report their index status");
+ diff=await service.GitDiffAsync(b);Check(diff.Staged.Length>0&&diff.Unstaged=="","staged and unstaged diffs are separate");
+ try{await service.GitStageAsync([outside],true);throw new Exception("staging outside the workspace accepted");}catch(InvalidOperationException){}
+ await File.WriteAllTextAsync(outside,"select other from dual;");await Git("add","outside.sql");
+ state=await service.GitStateAsync();Check(state.OtherStaged.Contains("outside.sql"),"staged files outside the SQL list are reported: "+string.Join(",",state.OtherStaged));
+ await Git("reset","-q","--","outside.sql");
+ state=await service.GitStageAsync([c],false);Check(state.Files.Single(file=>file.Path==c).Index=="","unstaged new file returns to untracked");
+ try{await service.GitCommitAsync("  ");throw new Exception("empty commit message accepted");}catch(InvalidOperationException error){Check(error.Message.Contains("commit message"),error.Message);}
+ var committed=await service.GitCommitAsync("Update b only");
+ Check(committed.Hash.Length>=7&&committed.Subject=="Update b only","commit returns its hash and subject");
+ state=await service.GitStateAsync();Check(state.Files.All(file=>file.Path!=b)&&state.Files.Any(file=>file.Path==c),"only the staged file was committed");
+ try{await service.GitCommitAsync("nothing");throw new Exception("empty commit accepted");}catch(InvalidOperationException error){Check(error.Message.Contains("Nothing is staged"),error.Message);}
+ // Before the first commit there is no HEAD; unstaging must still work.
+ var fresh=Path.Combine(temporaryRoot,"fresh");Directory.CreateDirectory(fresh);
+ var freshWorkspace=new WorkspaceService(Path.Combine(temporaryRoot,"fresh-settings.json"));await freshWorkspace.SetRootAsync(fresh);
+ var freshService=new WorkspaceDevelopmentService(freshWorkspace);var d=Path.Combine(fresh,"d.sql");await File.WriteAllTextAsync(d,"select 2 from dual;");
+ await Git("-C","fresh","init","-q");
+ state=await freshService.GitStageAsync([d],true);Check(state.Files.Single(file=>file.Path==d).Index=="A","stage before the first commit");
+ state=await freshService.GitStageAsync([d],false);Check(state.Files.Single(file=>file.Path==d).Index=="","unstage before the first commit");
+ Console.WriteLine("Workspace Git / replace checks passed, including Oracle source extensions, staging and commits.");
 } finally {
  var checkedRoot=Path.GetFullPath(temporaryRoot);
  if(checkedRoot.StartsWith(Path.GetFullPath(Path.GetTempPath()),StringComparison.OrdinalIgnoreCase)&&Path.GetFileName(checkedRoot).StartsWith("fbsdb-workspace-development-",StringComparison.Ordinal)){foreach(var file in Directory.EnumerateFiles(checkedRoot,"*",SearchOption.AllDirectories))File.SetAttributes(file,FileAttributes.Normal);Directory.Delete(checkedRoot,true);}

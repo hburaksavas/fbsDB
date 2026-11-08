@@ -10,6 +10,7 @@ public sealed class WorkspaceDevelopmentService(WorkspaceService workspace)
     private sealed record ReplacementPlan(string Root, DateTime Created, IReadOnlyList<Replacement> Files);
     private readonly Dictionary<string, ReplacementPlan> _previews = new();
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly SemaphoreSlim _gitGate = new(1, 1);
 
     private string SafeSqlPath(string path)
     {
@@ -21,9 +22,10 @@ public sealed class WorkspaceDevelopmentService(WorkspaceService workspace)
         return full;
     }
 
-    private static async Task<(int ExitCode, string Output)> GitAsync(string root, params string[] arguments)
+    private static Task<(int ExitCode, string Output)> GitAsync(string root, params string[] arguments) => GitAsync(root, TimeSpan.FromSeconds(8), arguments);
+    private static async Task<(int ExitCode, string Output)> GitAsync(string root, TimeSpan timeout, params string[] arguments)
     {
-        using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+        using var cancellation = new CancellationTokenSource(timeout);
         var start = new ProcessStartInfo("git") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8 };
         foreach (var argument in new[] { "--literal-pathspecs", "-C", root }.Concat(arguments)) start.ArgumentList.Add(argument);
         start.Environment["GIT_OPTIONAL_LOCKS"] = "0";
@@ -50,6 +52,9 @@ public sealed class WorkspaceDevelopmentService(WorkspaceService workspace)
         if (repository.ExitCode != 0) return new(false, "", [], "Workspace is not in a Git repository.");
         var status = await GitAsync(root, "-c", "core.quotepath=false", "status", "--porcelain=v1", "-z", "--untracked-files=all", "--", ".");
         if (status.ExitCode != 0) throw new InvalidOperationException(status.Output);
+        // Status lists the whole repository so staged files outside the SQL list can be reported before a commit.
+        var all = await GitAsync(root, "-c", "core.quotepath=false", "status", "--porcelain=v1", "-z", "--untracked-files=no");
+        var otherStaged = new List<string>();
         var files = new List<WorkspaceGitFile>(); var entries = status.Output.Split('\0');
         for (var index = 0; index < entries.Length; index++)
         {
@@ -60,10 +65,24 @@ public sealed class WorkspaceDevelopmentService(WorkspaceService workspace)
             if (!workspace.IsWorkspaceSourceFile(relative)) continue;
             var path = Path.GetFullPath(Path.Combine(repository.Output.Trim(), relative));
             if (!workspace.IsUnderRoot(path)) continue;
-            files.Add(new(path, Path.GetRelativePath(root,path).Replace('\\','/'), code.Trim()));
+            files.Add(new(path, Path.GetRelativePath(root,path).Replace('\\','/'), code.Trim(), code[0] is ' ' or '?' ? "" : code[0].ToString(), code[1] == ' ' ? "" : code[1].ToString()));
+        }
+        if (all.ExitCode == 0)
+        {
+            var listed = files.Where(file => file.Index.Length > 0).Select(file => file.Path).ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var repositoryEntries = all.Output.Split('\0');
+            for (var index = 0; index < repositoryEntries.Length; index++)
+            {
+                var entry = repositoryEntries[index];
+                if (entry.Length < 4 || entry[2] != ' ') continue;
+                if (entry[0] is 'R' or 'C' || entry[1] is 'R' or 'C') index++;
+                if (entry[0] is ' ' or '?') continue;
+                var path = Path.GetFullPath(Path.Combine(repository.Output.Trim(), entry[3..]));
+                if (!listed.Contains(path)) otherStaged.Add(entry[3..].Replace('\\', '/'));
+            }
         }
         var branch = await GitAsync(root, "branch", "--show-current");
-        return new(true, branch.Output.Trim(), files, null);
+        return new(true, branch.Output.Trim(), files, null) { OtherStaged = otherStaged };
     }
     public async Task<WorkspaceGitDiff> GitDiffAsync(string path)
     {
@@ -71,13 +90,65 @@ public sealed class WorkspaceDevelopmentService(WorkspaceService workspace)
         var diff = await GitAsync(root, "diff", "--no-ext-diff", "--no-textconv", "HEAD", "--", path);
         if (diff.ExitCode != 0) { var staged = await GitAsync(root,"diff","--cached","--no-ext-diff","--no-textconv","--",path); var unstaged = await GitAsync(root,"diff","--no-ext-diff","--no-textconv","--",path); diff = (0,staged.Output+unstaged.Output); }
         var commit = await GitAsync(root, "log", "-1", "--format=%h%n%an%n%aI%n%s", "--", path);
+        var stagedOnly = await GitAsync(root, "diff", "--cached", "--no-ext-diff", "--no-textconv", "--", path);
+        var unstagedOnly = await GitAsync(root, "diff", "--no-ext-diff", "--no-textconv", "--", path);
         var text = diff.Output;
         if (string.IsNullOrWhiteSpace(text) && File.Exists(path))
         {
             var tracked = await GitAsync(root, "ls-files", "--error-unmatch", "--", path);
-            if (tracked.ExitCode != 0) { var bytes = await File.ReadAllBytesAsync(path); if (bytes.Length > 2 * 1024 * 1024) throw new InvalidOperationException("SQL file exceeds the diff limit."); text = string.Join('\n', Decode(bytes).Text.Split('\n').Select((line,index)=>$"+ {index+1}: {line}")); }
+            if (tracked.ExitCode != 0) { var bytes = await File.ReadAllBytesAsync(path); if (bytes.Length > 2 * 1024 * 1024) throw new InvalidOperationException("SQL file exceeds the diff limit."); var lines = Decode(bytes).Text.Replace("\r\n", "\n").TrimEnd('\n').Split('\n'); text = string.Join('\n', lines.Select((line,index)=>$"+ {index+1}: {line}")); unstagedOnly = (0, $"@@ -0,0 +1,{lines.Length} @@ untracked file\n" + string.Join('\n', lines.Select(line => "+" + line))); }
         }
-        return new(path, text, commit.ExitCode == 0 ? commit.Output : "No commit for this SQL file.");
+        return new(path, text, commit.ExitCode == 0 ? commit.Output : "No commit for this SQL file.") { Staged = stagedOnly.ExitCode == 0 ? stagedOnly.Output : "", Unstaged = unstagedOnly.ExitCode == 0 ? unstagedOnly.Output : "" };
+    }
+
+    // Stages or unstages SQL files inside the workspace only; deletions are staged as removals.
+    public async Task<WorkspaceGitState> GitStageAsync(IReadOnlyList<string> paths, bool stage)
+    {
+        if (paths.Count == 0) throw new InvalidOperationException("Choose at least one SQL file.");
+        var root = workspace.Root ?? throw new InvalidOperationException("Open a workspace first.");
+        var safe = paths.Select(SafeSqlPath).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        await _gitGate.WaitAsync();
+        try
+        {
+            if (stage)
+            {
+                var added = await GitAsync(root, ["add", "-A", "--", .. safe]);
+                if (added.ExitCode != 0) throw new InvalidOperationException(added.Output.Trim());
+            }
+            else
+            {
+                var restored = await GitAsync(root, ["restore", "--staged", "--", .. safe]);
+                if (restored.ExitCode != 0)
+                {
+                    // Before the first commit there is no HEAD to restore from; removing from the index unstages.
+                    var head = await GitAsync(root, "rev-parse", "--verify", "-q", "HEAD");
+                    if (head.ExitCode == 0) throw new InvalidOperationException(restored.Output.Trim());
+                    var removed = await GitAsync(root, ["rm", "--cached", "-q", "--", .. safe]);
+                    if (removed.ExitCode != 0) throw new InvalidOperationException(removed.Output.Trim());
+                }
+            }
+        }
+        finally { _gitGate.Release(); }
+        return await GitStateAsync();
+    }
+
+    // Commits what is staged, as git itself would: hooks run and nothing is pushed.
+    public async Task<WorkspaceGitCommit> GitCommitAsync(string message)
+    {
+        var root = workspace.Root ?? throw new InvalidOperationException("Open a workspace first.");
+        if (string.IsNullOrWhiteSpace(message)) throw new InvalidOperationException("Enter a commit message.");
+        await _gitGate.WaitAsync();
+        try
+        {
+            var staged = await GitAsync(root, "diff", "--cached", "--quiet");
+            if (staged.ExitCode == 0) throw new InvalidOperationException("Nothing is staged to commit.");
+            var commit = await GitAsync(root, TimeSpan.FromSeconds(120), "commit", "-m", message.Trim());
+            if (commit.ExitCode != 0) throw new InvalidOperationException(string.IsNullOrWhiteSpace(commit.Output) ? "Git refused the commit." : commit.Output.Trim());
+            var head = await GitAsync(root, "log", "-1", "--format=%h%n%s");
+            var lines = head.Output.Split('\n');
+            return new(lines.ElementAtOrDefault(0)?.Trim() ?? "", lines.ElementAtOrDefault(1)?.Trim() ?? "");
+        }
+        finally { _gitGate.Release(); }
     }
 
     private static (string Text, Encoding Encoding, int Bom) Decode(byte[] bytes)
@@ -153,9 +224,11 @@ public sealed class WorkspaceDevelopmentService(WorkspaceService workspace)
         finally { _gate.Release(); }
     }
 }
-public sealed record WorkspaceGitFile(string Path,string RelativePath,string Status);
-public sealed record WorkspaceGitState(bool Repository,string Branch,IReadOnlyList<WorkspaceGitFile> Files,string? Message);
-public sealed record WorkspaceGitDiff(string Path,string Diff,string Commit);
+// Index and WorkTree are the porcelain X and Y codes; an empty Index means nothing of the file is staged.
+public sealed record WorkspaceGitFile(string Path,string RelativePath,string Status,string Index = "",string WorkTree = "");
+public sealed record WorkspaceGitState(bool Repository,string Branch,IReadOnlyList<WorkspaceGitFile> Files,string? Message) { public IReadOnlyList<string> OtherStaged { get; init; } = []; }
+public sealed record WorkspaceGitDiff(string Path,string Diff,string Commit) { public string Staged { get; init; } = ""; public string Unstaged { get; init; } = ""; }
+public sealed record WorkspaceGitCommit(string Hash,string Subject);
 public sealed record WorkspaceReplaceFile(string Path,string RelativePath,string Before,string After);
 public sealed record WorkspaceReplacePreview(string Id,IReadOnlyList<WorkspaceReplaceFile> Files,IReadOnlyList<string> Skipped);
 public sealed record WorkspaceReplacedFile(string Path,string Content,string? DiskVersion = null);

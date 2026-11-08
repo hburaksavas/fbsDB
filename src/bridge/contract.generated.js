@@ -2409,6 +2409,75 @@ export const bridgeContract = {
         ]
       }
     },
+    "workspace.gitStage": {
+      "handler": "workspace",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "root": {
+            "type": "string"
+          },
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "paths"
+        ]
+      }
+    },
+    "workspace.gitUnstage": {
+      "handler": "workspace",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "paths": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "root": {
+            "type": "string"
+          },
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "paths"
+        ]
+      }
+    },
+    "workspace.gitCommit": {
+      "handler": "workspace",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "root": {
+            "type": "string"
+          },
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ]
+      }
+    },
     "workspace.moveEntries": {
       "handler": "workspace",
       "resumeSession": false,
@@ -4606,6 +4675,67 @@ export const bridgeContract = {
           "type": "boolean"
         },
         "diff": {},
+        "error": {}
+      },
+      "required": []
+    },
+    "workspace.gitStage": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "state": {},
+        "error": {}
+      },
+      "required": []
+    },
+    "workspace.gitUnstage": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "state": {},
+        "error": {}
+      },
+      "required": []
+    },
+    "workspace.gitCommit": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "commit": {},
+        "state": {},
         "error": {}
       },
       "required": []

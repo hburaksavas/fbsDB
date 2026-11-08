@@ -54,6 +54,16 @@ Create a profile in **Connections** using a host, port and service name/SID, a d
 
 User settings live at `%LOCALAPPDATA%\fbsDB\settings.json`. A workspace stores per-file connection choices in `<workspace>\.fbsdb\workspace.json`; it does not store credentials.
 
+**Workspace Git** (command palette) lists the changed SQL and Oracle source files of
+the workspace as Staged and Changes; a file with both kinds of change is in both
+lists. Stage or unstage one file or all of them, review the staged and the unstaged
+diff of a file with line numbers, open it, and commit what is staged with a message.
+Only files inside the workspace can be staged or unstaged, also before the first
+commit. When other files of the repository are staged too, the dialog warns that the
+commit will include them. Git runs as usual: hooks run, and nothing is pushed. To
+compare a file with its definition in the database, open it and use Compare and
+compile.
+
 Workspaces also include Oracle source files: `.pks` (package specification), `.pkb`
 (package body), `.prc` (procedure), `.fnc` (function), and `.trg` (trigger). They
 participate in search, Git/replace, worksets and ordinary file operations. Use

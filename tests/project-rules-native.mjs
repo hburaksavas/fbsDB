@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {execFileSync} from 'node:child_process';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import path from 'node:path';
 import {connectNativePage} from './nativeCdp.mjs';
@@ -381,6 +382,30 @@ try{
     assert.deepEqual(rows,["1 'A' 10 3 3 ✓","2 'A' 20 1 8 ✓","3 'A' 20 4 8 ✓","4 'A' 30 1 9 ","5 'B' 5 5 5 ","6 'B' 15 9 14 "]);
     assert.match(await cdp.evaluate(`${dialog}.textContent`),/Default window frame: RANGE BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW/);    await cdp.textClick('[aria-label="Explain expression"] footer button','Close');
     assert.equal(await cdp.evaluate(`window.__desktopRegression.commands.some(command=>command.command==='sql.execute'||command.command==='sql.explain')`),false);
+  });
+  await check('workspace Git: a changed file is reviewed, staged alone and committed with real git, leaving the other change untracked',async()=>{
+    const git=(...args)=>execFileSync('git',['-C',files,...args],{encoding:'utf8'}).trim();
+    git('init','-q');git('config','user.name','fbsDB Test');git('config','user.email','fbsdb-test@localhost');git('add','-A');git('commit','-q','-m','baseline');
+    const changed=path.join(files,'calls','caller.sql'),added=path.join(files,'calls','new_change.sql');
+    await writeFile(changed,'BEGIN\n  billing_calls.post;\n  billing_calls.run;\nEND;\n/');await writeFile(added,'SELECT 1 FROM dual;');
+    await cdp.key('p',10);await cdp.until(`document.querySelector('[aria-label="Search workbench"]')`);await fill('[aria-label="Search workbench"]','Workspace Git: stage');await cdp.key('Enter');
+    const dialog=`document.querySelector('[aria-label="Workspace Git"]')`,names=group=>`[...${dialog}.querySelectorAll('nav .git-file-list')][${group}]?.textContent||''`;
+    await cdp.until(`${dialog}?.querySelector('nav')?.textContent.includes('Changes (2)')`,'Changed files listed',20000);
+    assert.match(await cdp.evaluate(names(0)),/calls\/caller\.sql/);
+    await cdp.evaluate(`[...${dialog}.querySelectorAll('.git-file-name')].find(b=>b.textContent.includes('caller.sql')).click()`);
+    await cdp.until(`${dialog}.querySelector('[aria-label="Changes not staged"]')?.textContent.includes('billing_calls.run;')`,'Unstaged diff');
+    assert.ok(await cdp.evaluate(`[...${dialog}.querySelectorAll('[aria-label="Changes not staged"] .git-diff-add')].some(row=>row.textContent.includes('billing_calls.run;'))`),'The added line is marked as added.');
+    await cdp.click('[aria-label="Stage calls/caller.sql"]');
+    await cdp.until(`${dialog}.querySelector('nav').textContent.includes('Staged (1)')&&${dialog}.querySelector('nav').textContent.includes('Changes (1)')`,'Staged one file');
+    await cdp.until(`${dialog}.querySelector('[aria-label="Staged changes"]')?.textContent.includes('billing_calls.run;')`,'Staged diff');
+    await fill('[aria-label="Workspace Git"] .git-commit-box textarea','Call run after post');
+    await cdp.textClick('[aria-label="Workspace Git"] .git-commit-box button','Commit staged changes');
+    // The confirmation goes to the notification stack; the lists and git itself show the result.
+    await cdp.until(`${dialog}.querySelector('nav').textContent.includes('Staged (0)')&&${dialog}.querySelector('nav').textContent.includes('Changes (1)')`,'Committed',20000);
+    assert.equal(git('log','-1','--format=%s'),'Call run after post');
+    assert.deepEqual(git('show','--name-only','--format=','HEAD').split('\n'),['calls/caller.sql']);
+    assert.match(git('status','--porcelain','--','calls/new_change.sql'),/^\?\? calls\/new_change\.sql/);
+    await cdp.textClick('[aria-label="Workspace Git"] footer button','Close');
   });
   await check('large SQL file opens through the native reader with exact content and lightweight analysis defaults',async()=>{
     const largePath=path.join(files,'large-dump.sql'),content='SELECT 1 FROM dual;\n-- '+'x'.repeat(525000);

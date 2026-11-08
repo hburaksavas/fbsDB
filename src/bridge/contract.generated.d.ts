@@ -525,6 +525,21 @@ export interface CommandPayloads {
   "path": string;
   "tabId"?: string;
 };
+  "workspace.gitStage": {
+  "paths": Array<string>;
+  "root"?: string;
+  "tabId"?: string;
+};
+  "workspace.gitUnstage": {
+  "paths": Array<string>;
+  "root"?: string;
+  "tabId"?: string;
+};
+  "workspace.gitCommit": {
+  "message": string;
+  "root"?: string;
+  "tabId"?: string;
+};
   "workspace.moveEntries": {
   "paths": Array<JsonValue>;
   "destination": JsonValue;
@@ -1189,6 +1204,28 @@ export interface ReplyMessages {
   "tabId"?: string;
   "autoCommit"?: boolean;
   "diff"?: JsonValue;
+  "error"?: JsonValue;
+};
+  "workspace.gitStage": { type: "workspace.gitStage" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "state"?: JsonValue;
+  "error"?: JsonValue;
+};
+  "workspace.gitUnstage": { type: "workspace.gitUnstage" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "state"?: JsonValue;
+  "error"?: JsonValue;
+};
+  "workspace.gitCommit": { type: "workspace.gitCommit" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "commit"?: JsonValue;
+  "state"?: JsonValue;
   "error"?: JsonValue;
 };
   "workspace.location": { type: "workspace.location" } & {

@@ -92,6 +92,15 @@ public sealed partial class MainPage
                     try { var state = await Task.Run(() => Development.GitStateAsync()); Send(sender,new {type="workspace.git",requestId=id,state}); }
                     catch(Exception error){ Send(sender,new {type="workspace.git",requestId=id,error=error.Message}); }
                     break;
+                case "workspace.gitStage":
+                case "workspace.gitUnstage":
+                    try { var paths = payload.GetProperty("paths").EnumerateArray().Select(item => item.GetString() ?? "").ToArray(); var state = await Task.Run(() => Development.GitStageAsync(paths, command == "workspace.gitStage")); Send(sender,new {type=command,requestId=id,state}); }
+                    catch(Exception error){ Send(sender,new {type=command,requestId=id,error=error.Message}); }
+                    break;
+                case "workspace.gitCommit":
+                    try { var commit = await Task.Run(() => Development.GitCommitAsync(payload.GetProperty("message").GetString() ?? "")); var state = await Task.Run(() => Development.GitStateAsync()); Send(sender,new {type=command,requestId=id,commit,state}); }
+                    catch(Exception error){ Send(sender,new {type=command,requestId=id,error=error.Message}); }
+                    break;
                 case "workspace.gitDiff":
                     try { var diff = await Task.Run(() => Development.GitDiffAsync(payload.GetProperty("path").GetString()!)); Send(sender,new {type="workspace.gitDiff",requestId=id,diff}); }
                     catch(Exception error){ Send(sender,new {type="workspace.gitDiff",requestId=id,error=error.Message}); }
