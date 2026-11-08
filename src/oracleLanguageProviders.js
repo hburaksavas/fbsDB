@@ -6,6 +6,7 @@ import { oracleInlineCompletion } from './oracleInlineCompletion.js';
 import { monacoCompletionItems } from './oracleCompletionClient.js';
 import {automaticCompletionAllowed, getOracleCompletionContext} from './oracleCompletionContext.js';
 import { usageExamples, usageFor, usageMarkdown } from './projectUsage.js';
+import { dynamicSqlAt, dynamicSqlMarkdown } from './dynamicSqlPreview.js';
 
 const markdown = value => String(value || '').replace(/[\\`*_{}\[\]<>]/g, '\\$&');
 const rangeAt = (monaco, model, start, end = start + 1) => {
@@ -152,6 +153,15 @@ export function installOracleLanguageProviders({ monaco, editor, client, broker,
       if (!model.getWordAtPosition(position)) return null;
       const symbol = (await prepare(model, position, token, 'symbol'))?.symbol;
       return symbol ? { range: rangeAt(monaco, model, symbol.start, symbol.end), contents: symbol.contents } : null;
+    },
+  }));
+  // Hovering EXECUTE IMMEDIATE, OPEN ... FOR or DBMS_SQL.PARSE previews the SQL text it would run; nothing is executed.
+  disposables.push(monaco.languages.registerHoverProvider('sql', {
+    provideHover(model, position) {
+      const word = model.getWordAtPosition(position)?.word || '';
+      if (!/^(EXECUTE|IMMEDIATE|OPEN|FOR|DBMS_SQL|PARSE)$/i.test(word) || snapshot().languageFeatures?.hover === false) return null;
+      const site = dynamicSqlAt(model.getValue(), model.getOffsetAt(position));
+      return site ? { range: rangeAt(monaco, model, site.start, site.end), contents: [{ value: dynamicSqlMarkdown(site) }] } : null;
     },
   }));
   // Renders /** ... */ documentation of routines declared in the same source, on the declaration and on calls by name.

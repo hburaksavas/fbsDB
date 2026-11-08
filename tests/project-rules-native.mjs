@@ -360,6 +360,16 @@ try{
     await cdp.key('Escape');
     assert.equal(await cdp.evaluate(`window.__desktopRegression.commands.some(command=>command.command==='sql.execute'||command.command==='connection.connect')`),false);
   });
+  await check('dynamic SQL: hovering EXECUTE IMMEDIATE previews the joined text and marks what cannot be resolved',async()=>{
+    const source="CREATE OR REPLACE PROCEDURE purge(p_table VARCHAR2) IS\n  v_sql VARCHAR2(400);\nBEGIN\n  v_sql := 'DELETE FROM ' || p_table || ' WHERE id = :1';\n  EXECUTE IMMEDIATE v_sql USING 5;\nEND;";
+    await cdp.evaluate(`(()=>{const editor=${editor};editor.setValue(${quote(source)});editor.setPosition({lineNumber:5,column:5});editor.focus();editor.trigger('qa','editor.action.showHover',{})})()`);
+    const hover=`[...document.querySelectorAll('.monaco-hover')].map(item=>item.textContent).join(' ')`;
+    await cdp.until(`${hover}.includes('Dynamic SQL preview')`,'Dynamic SQL hover',20000);
+    const text=await cdp.evaluate(hover);
+    assert.match(text,/DELETE FROM «p_table» WHERE id = :1/);assert.match(text,/p_table.*parameter/);assert.match(text,/USING 5/);
+    await cdp.key('Escape');
+    assert.equal(await cdp.evaluate(`window.__desktopRegression.commands.some(command=>command.command==='sql.execute')`),false);
+  });
   await check('large SQL file opens through the native reader with exact content and lightweight analysis defaults',async()=>{
     const largePath=path.join(files,'large-dump.sql'),content='SELECT 1 FROM dual;\n-- '+'x'.repeat(525000);
     await writeFile(largePath,content);

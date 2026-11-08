@@ -298,6 +298,14 @@ built from the same workspace index as the call hierarchy and refreshed at most 
 package matches standalone routines, or routines declared in the file being edited.
 Calls whose name matches several routines are not used as examples. Turn it off with
 **Project usage examples** in the editor completion settings.
+Hovering EXECUTE IMMEDIATE, OPEN … FOR with a string, or DBMS_SQL.PARSE previews
+the SQL text it would run, without running it. String literals, q-quoted strings,
+CHR(n) and variables are joined; a variable takes its last assignment written
+before the statement in the same routine, or its declared value, and the preview
+says which one it used (branches and loops are not followed). Parameters, function
+results and names without a known value are shown as «…» with the reason. The
+USING values are listed against the bind placeholders, and a count that matches
+neither the placeholders nor their occurrences is flagged.
 
 
 Project rules include relative package/migration/script/test folders, saved profile
