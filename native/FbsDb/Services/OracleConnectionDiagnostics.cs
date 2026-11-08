@@ -19,7 +19,18 @@ public sealed partial class OracleSessionService
         }
         if (string.IsNullOrWhiteSpace(user) || string.IsNullOrEmpty(password)) return new(false, [..steps, new("Authentication", "Failed", "Enter a username and password to test.", 0)]);
         var timer = Stopwatch.StartNew();
-        if (!string.IsNullOrWhiteSpace(profile.Host) && int.TryParse(profile.Port, out var port) && port is > 0 and <= 65535)
+        SshTunnelLease? lease = null;
+        if (profile.Ssh is { } ssh)
+        {
+            // The database host is resolved by the SSH server, so the local DNS and TCP probes do not apply.
+            try { lease = await SshTunnelRegistry.Shared.AcquireAsync(profile, token); }
+            catch (SshHostKeyUnknownException unknown) { return new(false, [..steps, new("SSH tunnel", "Failed", unknown.Message, timer.ElapsedMilliseconds)]) { SshHostKey = new(unknown.Host, unknown.Port, unknown.KeyType, unknown.Fingerprint) }; }
+            catch (InvalidOperationException error) { return new(false, [..steps, new("SSH tunnel", "Failed", error.Message, timer.ElapsedMilliseconds)]); }
+            steps.Add(new("SSH tunnel", "Succeeded", $"Tunnel through {ssh.Display} to {profile.Host}:{profile.Port} is open on local port {lease.LocalPort}.", timer.ElapsedMilliseconds));
+            steps.Add(new("DNS", "Skipped", "The SSH server resolves the database host.", 0)); steps.Add(new("Network", "Skipped", "The database listener is reached through the SSH tunnel.", 0));
+        }
+        await using var tunnel = lease;
+        if (lease is null && !string.IsNullOrWhiteSpace(profile.Host) && int.TryParse(profile.Port, out var port) && port is > 0 and <= 65535)
         {
             IPAddress[] addresses = [];
             try
@@ -42,11 +53,11 @@ public sealed partial class OracleSessionService
             }
             else steps.Add(new("Network", "Skipped", "No DNS probe addresses available.", 0));
         }
-        else { steps.Add(new("DNS", "Skipped", "Descriptor resolution is delegated to Oracle.", 0)); steps.Add(new("Network", "Skipped", "Descriptor may contain multiple or non-TCP endpoints.", 0)); }
+        else if (lease is null) { steps.Add(new("DNS", "Skipped", "Descriptor resolution is delegated to Oracle.", 0)); steps.Add(new("Network", "Skipped", "Descriptor may contain multiple or non-TCP endpoints.", 0)); }
         timer.Restart();
         try
         {
-            var builder = new OracleConnectionStringBuilder { DataSource = profile.Descriptor, UserID = user, Password = password, Pooling = false, ConnectionTimeout = 15 };
+            var builder = new OracleConnectionStringBuilder { DataSource = lease?.DataSource ?? profile.Descriptor, UserID = user, Password = password, Pooling = false, ConnectionTimeout = 15 };
             if (profile.Method == "tns") builder.TnsAdmin = Path.GetDirectoryName(profile.Source);
             await using var connection = new OracleConnection(builder.ConnectionString);
             await connection.OpenAsync(token);
@@ -67,4 +78,9 @@ public sealed partial class OracleSessionService
 }
 
 public sealed record ConnectionDiagnosticStep(string Stage, string Status, string Message, long ElapsedMs);
-public sealed record ConnectionDiagnosticReport(bool Success, IReadOnlyList<ConnectionDiagnosticStep> Steps);
+public sealed record ConnectionDiagnosticReport(bool Success, IReadOnlyList<ConnectionDiagnosticStep> Steps)
+{
+    // Set when the SSH server's key is not known yet; the user may confirm its fingerprint.
+    public SshHostKeyOffer? SshHostKey { get; init; }
+}
+public sealed record SshHostKeyOffer(string Host, int Port, string KeyType, string Fingerprint);

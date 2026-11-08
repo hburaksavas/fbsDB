@@ -67,6 +67,15 @@ public sealed partial class MainPage
                 case "connection.connect":
                     await ConnectAsync(sender, id, payload);
                     break;
+                case "ssh.trustHost":
+                {
+                    var host = payload.GetProperty("host").GetString() ?? "";
+                    var port = payload.GetProperty("port").GetInt32();
+                    var fingerprint = payload.GetProperty("fingerprint").GetString() ?? "";
+                    try { await SshTunnelRegistry.Shared.TrustHostAsync(host, port, fingerprint); Send(sender, new { type = "ssh.hostTrusted", requestId = id, host, port, success = true }); }
+                    catch (Exception error) when (error is InvalidOperationException or IOException or UnauthorizedAccessException) { Send(sender, new { type = "ssh.hostTrusted", requestId = id, host, port, success = false, message = error.Message }); }
+                    break;
+                }
                 case "connection.disconnect":
                     if (_oracle.HasPendingTransaction) throw new InvalidOperationException("Commit or roll back before disconnecting.");
                     await _oracle.DisconnectAsync(rollbackPending: false);
@@ -297,6 +306,7 @@ public sealed partial class MainPage
             try
             {
                 var profileId = Read("profileId");
+                var ssh = SshTunnelSettings.Parse(Read("sshHost"), Read("sshPort"), Read("sshUser"), Read("sshKeyFile"));
                 if (command == "connection.rename") await _profiles.RenameProfileAsync(profileId, Read("name"));
                 else if (command == "connection.delete")
                 {
@@ -308,7 +318,7 @@ public sealed partial class MainPage
                 {
                     if (_sessions.Sessions.Any(tab => tab.Oracle.ProfileId == profileId)) throw new InvalidOperationException("Disconnect this profile in all tabs before editing it.");
                     var old = (await _profiles.GetProfilesAsync()).FirstOrDefault(p => p.Id == profileId);
-                    profileId = await _profiles.SaveProfileAsync(string.IsNullOrEmpty(profileId) ? null : profileId, Read("name"), Read("alias"), Read("source"), Read("user"), Read("environment"), Read("method") is { Length: > 0 } method ? method : "tns", Read("host"), Read("port"), Read("service"), Read("targetType"), Read("descriptor"), Read("folderId"), payload.TryGetProperty("groupIds", out var groupIds) ? groupIds.EnumerateArray().Select(g => g.GetString()!).ToArray() : null);
+                    profileId = await _profiles.SaveProfileAsync(string.IsNullOrEmpty(profileId) ? null : profileId, Read("name"), Read("alias"), Read("source"), Read("user"), Read("environment"), Read("method") is { Length: > 0 } method ? method : "tns", Read("host"), Read("port"), Read("service"), Read("targetType"), Read("descriptor"), Read("folderId"), payload.TryGetProperty("groupIds", out var groupIds) ? groupIds.EnumerateArray().Select(g => g.GetString()!).ToArray() : null, ssh);
                     var updated = (await _profiles.GetProfilesAsync()).First(p => p.Id == profileId);
                     if (old is not null && (old.User != updated.User || old.Method != updated.Method || old.Source != updated.Source || old.Descriptor != updated.Descriptor)) await _oracle.DeleteCredentialsAsync(profileId);
                     if (!string.IsNullOrEmpty(Read("password")) && payload.TryGetProperty("remember", out var savePassword) && savePassword.ValueKind == JsonValueKind.True) await _oracle.SaveCredentialsAsync(profileId, Read("user"), Read("password"));
@@ -321,6 +331,7 @@ public sealed partial class MainPage
                     else profile = (await _profiles.GetProfilesAsync()).FirstOrDefault(p => p.Id == profileId);
                     if (profile is null) throw new InvalidOperationException("Choose an available connection profile.");
                     if (!string.IsNullOrEmpty(profileId)) profile = profile with { Id = profileId };
+                    if (!string.IsNullOrEmpty(Read("method")) || !string.IsNullOrEmpty(Read("alias"))) profile = profile with { Ssh = profile.Method == "basic" ? ssh : null };
                     diagnostics = await Task.Run(() => _credentials.DiagnoseConnectionAsync(profile, Read("user"), Read("password")));
                 }
                 if (command != "connection.test") await SendProfilesAsync(sender);
@@ -348,10 +359,16 @@ public sealed partial class MainPage
             var user = payload.TryGetProperty("user", out var userValue) ? userValue.GetString() ?? profile.User : profile.User;
             var password = payload.TryGetProperty("password", out var passwordValue) ? passwordValue.GetString() ?? string.Empty : string.Empty;
             bool? remember = payload.TryGetProperty("remember", out var rememberValue) ? rememberValue.ValueKind == JsonValueKind.True : null;
-            await Task.Run(() => _oracle.ConnectAsync(profile, user, password, remember));
+            try { await Task.Run(() => _oracle.ConnectAsync(profile, user, password, remember)); }
+            catch (SshHostKeyUnknownException unknown)
+            {
+                // The page asks the user to confirm the fingerprint; the error that follows ends this attempt.
+                Send(sender, new { type = "connection.sshHostKey", requestId, profileId = profile.Id, host = unknown.Host, port = unknown.Port, keyType = unknown.KeyType, fingerprint = unknown.Fingerprint });
+                throw;
+            }
             await SendProfilesAsync(sender);
             if (_activeFilePath is not null) await _workspace.SetFileConnectionAsync(_activeFilePath, profile.Id);
-            Send(sender, new { type = "connection.connected", requestId, serverVersion = _oracle.ServerVersion, profile = new { id = profile.Id, nls = profile.Nls, host = profile.Host, port = profile.Port, service = profile.Service, env = profile.Environment } });
+            Send(sender, new { type = "connection.connected", requestId, serverVersion = _oracle.ServerVersion, tunnel = _oracle.TunnelVia is { } via ? new { via, localPort = _oracle.TunnelPort } : null, profile = new { id = profile.Id, nls = profile.Nls, host = profile.Host, port = profile.Port, service = profile.Service, env = profile.Environment } });
             await SendWorkspaceAsync(sender);
             await SendSchemaAsync(sender);
             await SendCompletionVocabularyAsync(sender, requestId);

@@ -71,6 +71,16 @@ page, or has unapplied grid edits, stays where it is until that work ends.
 Closing such a window returns its tabs to the main window; closing the main
 window first returns them all, so their unsaved SQL is offered on the next start.
 
+**SSH tunnels.** A Basic (host, port, service) connection can go through an SSH
+server: tick *Connect through an SSH tunnel* and enter the SSH host, port, user
+and, optionally, a key file. fbsDB runs the Windows OpenSSH client
+(`ssh.exe -N -L`) with your ssh config, ssh-agent and `known_hosts`; it signs in
+with keys only and stores no SSH secrets. An SSH server that is not in
+`known_hosts` yet shows its SHA256 fingerprint and is added only after you
+confirm it; a changed host key is refused. All tabs on the same connection share
+one tunnel, which closes with the last of them, and the status bar shows `SSH`
+while a tab's session uses it.
+
 **Workspace Git** (command palette) lists the changed SQL and Oracle source files of
 the workspace as Staged and Changes; a file with both kinds of change is in both
 lists. Stage or unstage one file or all of them, review the staged and the unstaged

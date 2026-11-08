@@ -1,6 +1,7 @@
 import {useFeedbackState,Feedback} from './Feedback';
 import { ConnectionPassword } from './ConnectionPassword.jsx';
 import { ModalBackdrop } from "./ModalBackdrop";
+import { SshHostKeyDialog } from "./SshHostKeyDialog";
 import { useEffect, useRef, useState } from "react";
 import { Database, Plus, X, Settings2 } from "lucide-react";
 import { isNativeHost, sendNativeCommand, subscribeNativeMessages } from "./nativeBridge";
@@ -32,7 +33,8 @@ export function useDialogFocus(ref, onClose, enabled = true) {
 
 export function ProfileEditor({ profile, aliases, onClose, onSaved, onPreviewSave, embedded=false, organization, onDirtyChange, onBusyChange, locked=false }) {
   const dialog = useRef(null), request = useRef(null);
-  const [draft, setDraft] = useState({ method: profile?.method || (profile?.id || profile?.alias ? "tns" : "basic"), host: profile?.method === "basic" ? profile.host || "" : "", port: profile?.method === "basic" ? profile.port || "1521" : "1521", service: profile?.method === "basic" ? profile.service || "" : "", targetType: profile?.targetType || "service", descriptor: profile?.descriptor || "", name: profile?.name || "", user: profile?.user || "", alias: profile?.alias || aliases[0]?.id || "", source: profile?.source || aliases[0]?.source || "", environment: profile?.env || "UNKNOWN", password: "", remember: true });
+  const [draft, setDraft] = useState({ method: profile?.method || (profile?.id || profile?.alias ? "tns" : "basic"), host: profile?.method === "basic" ? profile.host || "" : "", port: profile?.method === "basic" ? profile.port || "1521" : "1521", service: profile?.method === "basic" ? profile.service || "" : "", targetType: profile?.targetType || "service", descriptor: profile?.descriptor || "", name: profile?.name || "", user: profile?.user || "", alias: profile?.alias || aliases[0]?.id || "", source: profile?.source || aliases[0]?.source || "", environment: profile?.env || "UNKNOWN", password: "", remember: true, sshEnabled: Boolean(profile?.ssh), sshHost: profile?.ssh?.host || "", sshPort: String(profile?.ssh?.port || 22), sshUser: profile?.ssh?.user || "", sshKeyFile: profile?.ssh?.keyFile || "" });
+  const [hostKey, setHostKey] = useState(null);
   const [busy, setBusy] = useState(false), [notice, setNotice] = useFeedbackState(null,{title:'Connection'});
   const [folderId,setFolderId]=useState(profile?.folderId||''),[groupIds,setGroupIds]=useState(profile?.groupIds||[]);
   useEffect(()=>{onBusyChange?.(busy)},[busy,onBusyChange]);
@@ -41,7 +43,7 @@ export function ProfileEditor({ profile, aliases, onClose, onSaved, onPreviewSav
   useEffect(() => subscribeNativeMessages(message => {
     if (message.type !== "connection.managed" || message.requestId !== request.current?.id) return;
     setBusy(false);
-    if (!message.success) { setNotice({ error: true, text: message.message }); return; }
+    if (!message.success) { setNotice({ error: true, text: message.message || message.diagnostics?.steps?.findLast?.(step => step.status === "Failed")?.message }); if (message.diagnostics?.sshHostKey) setHostKey({ ...message.diagnostics.sshHostKey, operation: message.operation }); return; }
     if (message.operation === "connection.test") setNotice({ text: "Connection successful. Your active session is unchanged." });
     else { setDraft(current=>({...current,password:''})); onDirtyChange?.(false); onSaved(message.profileId, request.current.connect, request.current.credentials); }
   }), [onSaved]);
@@ -53,13 +55,15 @@ export function ProfileEditor({ profile, aliases, onClose, onSaved, onPreviewSav
     if (!draft.user.trim() || operation === "connection.save" && !draft.name.trim()) { setNotice({ error: true, text: "Enter a connection name and username." }); return; }
     if (draft.method === "tns" && !selectedAlias) { setNotice({ error: true, text: "Choose an available TNS alias." }); return; }
     if (draft.method === "basic" && (!/^[a-zA-Z0-9_.:\[\]%-]+$/.test(draft.host.trim()) || !/^\d+$/.test(draft.port) || Number(draft.port) < 1 || Number(draft.port) > 65535 || !/^[a-zA-Z0-9_.$#-]+$/.test(draft.service.trim()))) { setNotice({ error: true, text: "Enter a host, a port between 1 and 65535, and a service name or SID." }); return; }
+    if (draft.method === "basic" && draft.sshEnabled && (!/^[A-Za-z0-9_][A-Za-z0-9_.:%\[\]-]*$/.test(draft.sshHost.trim()) || !/^[A-Za-z0-9_][A-Za-z0-9_.@-]*$/.test(draft.sshUser.trim()) || !/^\d+$/.test(draft.sshPort) || Number(draft.sshPort) < 1 || Number(draft.sshPort) > 65535)) { setNotice({ error: true, text: "Enter the SSH host, SSH user and an SSH port between 1 and 65535." }); return; }
     if (draft.method === "descriptor" && !/^\(\s*DESCRIPTION(?:_LIST)?\s*=/i.test(draft.descriptor.trim())) { setNotice({ error: true, text: "Enter a full Oracle connect descriptor starting with (DESCRIPTION=...)." }); return; }
     if (!isNativeHost) {
       if (operation === "connection.test") { setNotice({ error: true, text: "Use the Windows app to test an Oracle connection." }); return; }
       onPreviewSave({ ...(draft.method === "tns" ? selectedAlias : {}), ...draft, ...(draft.method === "tns" ? { host: selectedAlias.host, port: selectedAlias.port, service: selectedAlias.service } : { alias: "", source: "" }), id: profile?.id || crypto.randomUUID(), env: draft.environment, folderId:folderId||null,groupIds,password: undefined }, connect); onDirtyChange?.(false); return;
     }
     setBusy(true);
-    request.current = { id: sendNativeCommand(operation, { ...draft, profileId: profile?.id || undefined, ...(organization?{folderId:folderId||null,groupIds}:{}) }), connect, credentials: { user: draft.user, password: draft.password, remember: draft.remember } };
+    const { sshEnabled, ...fields } = draft, tunnel = draft.method === "basic" && sshEnabled;
+    request.current = { id: sendNativeCommand(operation, { ...fields, sshHost: tunnel ? draft.sshHost : "", sshPort: tunnel ? draft.sshPort : "", sshUser: tunnel ? draft.sshUser : "", sshKeyFile: tunnel ? draft.sshKeyFile : "", profileId: profile?.id || undefined, ...(organization?{folderId:folderId||null,groupIds}:{}) }), connect, credentials: { user: draft.user, password: draft.password, remember: draft.remember } };
   };
   const form=<form ref={dialog} className={`connection-modal profile-editor${embedded?' profile-editor-embedded':''}`} role={embedded?undefined:'dialog'} aria-modal={embedded?undefined:'true'} aria-labelledby="profile-editor-title" onSubmit={e => { e.preventDefault(); submit("connection.save"); }}>
     <header className="modal-header"><div><div className="eyebrow">CONNECTION PROFILE</div><h2 id="profile-editor-title">{profile?.id ? "Edit connection" : "New connection"}</h2><p>Choose how to reach Oracle. Credentials are stored separately.</p></div><button type="button" className="icon-button" aria-label="Close connection editor" disabled={busy} onClick={onClose}><X size={17} /></button></header>
@@ -68,7 +72,14 @@ export function ProfileEditor({ profile, aliases, onClose, onSaved, onPreviewSav
       <label>Connection name<input autoFocus maxLength={80} value={draft.name} onChange={e => change("name", e.target.value)} placeholder="Finance · Read only" /></label>
       {organization&&<><label>Folder<select aria-label="Connection folder" value={folderId} onChange={e=>{setFolderId(e.target.value);onDirtyChange?.(true)}}><option value="">Unfiled</option>{folderOptions(organization.folders).map(folder=><option value={folder.id} key={folder.id}>{folder.path}</option>)}</select></label><div className="connection-editor-groups"><span>Groups</span>{organization.groups.length?organization.groups.map(group=><label className="connection-tag-option" key={group.id}><input type="checkbox" checked={groupIds.includes(group.id)} onChange={e=>{setGroupIds(ids=>e.target.checked?[...ids,group.id]:ids.filter(id=>id!==group.id));onDirtyChange?.(true)}}/>{group.name}</label>):<small>Create group labels in the left panel.</small>}</div></>}
       <label>Connection method<select value={draft.method} onChange={e => change("method", e.target.value)}><option value="basic">Basic</option><option value="tns">TNS</option><option value="descriptor">Custom descriptor</option></select></label>
-      {draft.method === "basic" && <><div className="profile-field-row"><label>Host<input value={draft.host} onChange={e => change("host", e.target.value)} placeholder="db.example.com" /></label><label className="profile-port">Port<input type="number" min="1" max="65535" value={draft.port} onChange={e => change("port", e.target.value)} /></label></div><div className="profile-field-row"><label>Database identifier<select value={draft.targetType} onChange={e => change("targetType", e.target.value)}><option value="service">Service name</option><option value="sid">SID</option></select></label><label>{draft.targetType === "sid" ? "SID" : "Service name"}<input value={draft.service} onChange={e => change("service", e.target.value)} placeholder={draft.targetType === "sid" ? "ORCL" : "FREEPDB1"} /></label></div></>}
+      {draft.method === "basic" && <><div className="profile-field-row"><label>Host<input value={draft.host} onChange={e => change("host", e.target.value)} placeholder="db.example.com" /></label><label className="profile-port">Port<input type="number" min="1" max="65535" value={draft.port} onChange={e => change("port", e.target.value)} /></label></div><div className="profile-field-row"><label>Database identifier<select value={draft.targetType} onChange={e => change("targetType", e.target.value)}><option value="service">Service name</option><option value="sid">SID</option></select></label><label>{draft.targetType === "sid" ? "SID" : "Service name"}<input value={draft.service} onChange={e => change("service", e.target.value)} placeholder={draft.targetType === "sid" ? "ORCL" : "FREEPDB1"} /></label></div>
+        <label className="connection-tag-option"><input type="checkbox" checked={draft.sshEnabled} onChange={e => change("sshEnabled", e.target.checked)} />Connect through an SSH tunnel</label>
+        {draft.sshEnabled && <div className="profile-ssh" role="group" aria-label="SSH tunnel">
+          <div className="profile-field-row"><label>SSH host<input aria-label="SSH host" value={draft.sshHost} onChange={e => change("sshHost", e.target.value)} placeholder="bastion.example.com" /></label><label className="profile-port">SSH port<input aria-label="SSH port" type="number" min="1" max="65535" value={draft.sshPort} onChange={e => change("sshPort", e.target.value)} /></label></div>
+          <label>SSH user<input aria-label="SSH user" autoComplete="off" value={draft.sshUser} onChange={e => change("sshUser", e.target.value)} /></label>
+          <label>Key file<input aria-label="SSH key file" value={draft.sshKeyFile} onChange={e => change("sshKeyFile", e.target.value)} placeholder="Empty: use ssh-agent" /></label>
+          <small>The host and port above are reached from the SSH server. fbsDB runs your Windows OpenSSH client with your keys, ssh-agent and known_hosts, and stores no SSH passwords. Connections of this profile share one tunnel.</small>
+        </div>}</>}
       {draft.method === "tns" && <>
       <label>TNS alias<select value={selectedAlias ? JSON.stringify([draft.alias, draft.source]) : ""} onChange={e => { const [alias, source] = JSON.parse(e.target.value); setDraft(d => ({ ...d, alias, source })); setNotice(null); onDirtyChange?.(true); }}><option value="" disabled>Select an alias</option>{aliases.map(a => <option key={a.id + a.source} value={JSON.stringify([a.id, a.source])}>{a.id}{a.duplicate ? ` · ${a.source}` : ""}</option>)}</select></label>
       {selectedAlias ? <div className="profile-target"><Database size={14} /><span>{selectedAlias.host}:{selectedAlias.port}/{selectedAlias.service}<small>{selectedAlias.source}</small></span></div> : <p>No alias available. Configure TNS sources in Settings.</p>}
@@ -81,7 +92,8 @@ export function ProfileEditor({ profile, aliases, onClose, onSaved, onPreviewSav
     {notice && <Feedback kind={notice.error?"error":"success"} title="Connection">{notice.text}</Feedback>}
     <footer className="modal-footer"><button type="button" className="button-secondary" disabled={busy || locked || (draft.method === "tns" && !selectedAlias)} onClick={() => submit("connection.test")}>{busy ? "Working…" : "Test"}</button><div><button type="submit" className="button-secondary" disabled={busy||locked}>Save</button><button type="button" className="button-primary" disabled={busy||locked} onClick={() => submit("connection.save", true)}>Save & connect</button></div></footer>
   </form>;
-  return embedded?form:<ModalBackdrop onClose={onClose}>{form}</ModalBackdrop>;
+  const hostKeyDialog = hostKey && <SshHostKeyDialog offer={hostKey} actionLabel={hostKey.operation === "connection.test" ? "Trust and test again" : "Trust"} onClose={() => setHostKey(null)} onTrusted={() => { const operation = hostKey.operation; setHostKey(null); setNotice({ text: "SSH server trusted." }); if (operation === "connection.test") submit("connection.test"); }} />;
+  return embedded?<>{form}{hostKeyDialog}</>:<><ModalBackdrop onClose={onClose}>{form}</ModalBackdrop>{hostKeyDialog}</>;
 }
 
 export function TnsSources({ aliases, onClose }) {

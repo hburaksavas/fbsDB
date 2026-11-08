@@ -1,4 +1,4 @@
-param([int]$DesktopDebugPort = 9348, [switch]$SkipBuild, [switch]$LoadTest, [switch]$ProjectRulesTest, [switch]$DragTest, [switch]$OracleFlowTest, [string]$OracleProfile = 'FBSDB_LOCAL')
+param([int]$DesktopDebugPort = 9348, [switch]$SkipBuild, [switch]$LoadTest, [switch]$ProjectRulesTest, [switch]$DragTest, [switch]$OracleFlowTest, [switch]$SshTunnelTest, [string]$OracleProfile = 'FBSDB_LOCAL')
 $ErrorActionPreference = 'Stop'
 $regressionRepo = Split-Path -Parent $PSScriptRoot
 $regressionRoot = Join-Path $regressionRepo ('.artifacts\desktop-regression\' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -26,6 +26,22 @@ if ($ProjectRulesTest) {
     $oracleRelayProbe.Start(); $oracleRelayPort = $oracleRelayProbe.LocalEndpoint.Port; $oracleRelayProbe.Stop()
     $oracleEntry.host = '127.0.0.1'; $oracleEntry.port = [string]$oracleRelayPort
     [System.IO.File]::WriteAllText($regressionSettings, (@{connectionProfiles=@($oracleEntry)} | ConvertTo-Json -Depth 6))
+} elseif ($SshTunnelTest) {
+    # FI-069: the local test profile goes through an SSH tunnel. A stand-in ssh (tests/SessionServicesSmoke/fake-ssh.mjs)
+    # opens a real local forward to the database, so Oracle traffic crosses the tunnel; known_hosts is the test's own file.
+    $sshSource = Join-Path $env:LOCALAPPDATA 'fbsDB\settings.json'
+    $sshEntry = @((Get-Content -LiteralPath $sshSource -Raw | ConvertFrom-Json).connectionProfiles | Where-Object { $_.name -eq $OracleProfile })
+    if ($sshEntry.Count -ne 1) { throw "Connection profile '$OracleProfile' was not found." }
+    $sshEntry = $sshEntry[0]
+    if ($sshEntry.host -notin '127.0.0.1', 'localhost', '::1' -or $sshEntry.environment -eq 'PROD' -or $sshEntry.method -ne 'basic') { throw "The SSH tunnel test only runs against a local, non-production basic profile." }
+    $sshEntry | Add-Member -NotePropertyName ssh -NotePropertyValue ([pscustomobject]@{ host = 'unknown.test'; port = 2222; user = 'qa'; keyFile = '' }) -Force
+    [System.IO.File]::WriteAllText($regressionSettings, (@{connectionProfiles=@($sshEntry)} | ConvertTo-Json -Depth 6))
+    $sshKeyFile = Join-Path $regressionRoot 'ssh_host_key'
+    & (Join-Path $env:WINDIR 'System32\OpenSSH\ssh-keygen.exe') -q -t ed25519 -N '""' -f $sshKeyFile
+    if ($LASTEXITCODE -ne 0) { throw 'Could not create the test SSH host key.' }
+    $sshFake = Join-Path $regressionRepo 'tests\SessionServicesSmoke'
+    [System.IO.File]::WriteAllText((Join-Path $regressionRoot 'fake-ssh.cmd'), "@node `"$sshFake\fake-ssh.mjs`" %*`r`n")
+    [System.IO.File]::WriteAllText((Join-Path $regressionRoot 'fake-ssh-keyscan.cmd'), "@node `"$sshFake\fake-ssh-keyscan.mjs`" %*`r`n")
 } else { [System.IO.File]::WriteAllText($regressionSettings, '{}') }
 $regressionEnvironment = @{
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$DesktopDebugPort"
@@ -33,6 +49,12 @@ $regressionEnvironment = @{
     FBSDB_THEME_SETTINGS_PATH = $regressionSettings
     FBSDB_WORKSPACE_SETTINGS_PATH = $regressionSettings
     FBSDB_CONNECTION_SETTINGS_PATH = $regressionSettings
+}
+if ($SshTunnelTest) {
+    $regressionEnvironment.FBSDB_SSH_PATH = Join-Path $regressionRoot 'fake-ssh.cmd'
+    $regressionEnvironment.FBSDB_SSH_KEYSCAN_PATH = Join-Path $regressionRoot 'fake-ssh-keyscan.cmd'
+    $regressionEnvironment.FBSDB_SSH_KNOWN_HOSTS = Join-Path $regressionRoot 'known_hosts'
+    $regressionEnvironment.FAKE_HOST_KEY = (Get-Content -LiteralPath "$sshKeyFile.pub" -Raw).Split(' ')[1]
 }
 $regressionPreviousEnvironment = @{}
 $regressionProcess = $null
@@ -53,6 +75,8 @@ try {
     $regressionProcess = Start-Process -FilePath (Join-Path $regressionApp 'FbsDb.exe') -WorkingDirectory $regressionApp -WindowStyle Hidden -PassThru
     if ($OracleFlowTest) {
         node tests/oracle-flow-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot $oracleRelayPort $oracleTargetPort
+    } elseif ($SshTunnelTest) {
+        node tests/ssh-tunnel-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot $OracleProfile
     } elseif ($DragTest) {
         node tests/drag-to-sql-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
     } elseif ($ProjectRulesTest) {
@@ -69,11 +93,11 @@ try {
         node tests/desktop-regression-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
     }
     if ($LASTEXITCODE -ne 0) { throw "Desktop test failed. Artifacts: $regressionRoot" }
-    if (-not $LoadTest -and -not $ProjectRulesTest -and -not $DragTest -and -not $OracleFlowTest) {
+    if (-not $LoadTest -and -not $ProjectRulesTest -and -not $DragTest -and -not $OracleFlowTest -and -not $SshTunnelTest) {
         node tests/review-improvements-native.mjs "http://127.0.0.1:$DesktopDebugPort" $regressionRoot
         if ($LASTEXITCODE -ne 0) { throw "Review improvement UI tests failed. Artifacts: $regressionRoot" }
     }
-    $regressionReportName = if ($ProjectRulesTest) { 'project-rules-report.json' } elseif ($DragTest) { 'drag-to-sql-report.json' } elseif ($OracleFlowTest) { 'oracle-flow-report.json' } else { 'report.json' }
+    $regressionReportName = if ($ProjectRulesTest) { 'project-rules-report.json' } elseif ($DragTest) { 'drag-to-sql-report.json' } elseif ($OracleFlowTest) { 'oracle-flow-report.json' } elseif ($SshTunnelTest) { 'ssh-tunnel-report.json' } else { 'report.json' }
     Write-Output "Desktop test report: $(Join-Path $regressionRoot $regressionReportName)"
 } finally {
     foreach ($regressionKey in $regressionPreviousEnvironment.Keys) {

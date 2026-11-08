@@ -32,3 +32,13 @@ User-approved product decision. Preserve these choices in later changes.
 - Fetched rows, the open cursor and a pending transaction move with the tab. A running statement, script, export or page fetch, or unapplied grid edits, block the move with the reason.
 - Database sessions stay in one process; each session belongs to exactly one window, and another window's command for it is refused. Window titles and the status bar name the owning window.
 - Closing a secondary window returns its tabs, with their sessions, to the main window. Closing the main window returns all tabs first, so their unsaved SQL is offered on the next start.
+
+## 2026-11-09 — SSH tunnels (FI-069)
+
+User-approved product decision. Preserve these choices in later changes.
+
+- Tunnels use the Windows OpenSSH client (`ssh.exe -N -L`) as a child process, so the user's ssh config, ssh-agent and known_hosts apply. No SSH library is bundled.
+- Sign-in uses keys or ssh-agent only (`BatchMode=yes`). fbsDB stores no SSH passwords or passphrases.
+- An unknown SSH host shows its SHA256 key fingerprint; only after the user confirms it is that key added to known_hosts. A changed host key is always refused, never replaced by fbsDB.
+- One tunnel per profile is shared by every tab connected through it and closes with the last of them. The status bar shows `SSH` for a session that uses a tunnel.
+- The first version covers Basic (host, port, service) profiles; TNS aliases and custom descriptors are not rewritten for tunnels.

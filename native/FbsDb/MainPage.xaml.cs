@@ -311,6 +311,7 @@ public sealed partial class MainPage : Page
                 {
                     id = p.Id, nls = p.Nls, name = p.Name, method = p.Method, targetType = p.TargetType, descriptor = p.Method == "descriptor" ? p.Descriptor : "", alias = p.Alias, user = p.User, available = p.Available, host = p.Host, port = p.Port, service = p.Service, source = p.Source,
                     env = p.Environment, duplicate = p.Duplicate,
+                    ssh = p.Ssh is { } ssh ? new { host = ssh.Host, port = ssh.Port, user = ssh.User, keyFile = ssh.KeyFile } : null,
                     folderId = organization["assignments"]?[p.Id]?["folderId"]?.GetValue<string>(),
                     groups = organization["groups"]!.AsArray().OfType<System.Text.Json.Nodes.JsonObject>().Where(g => organization["assignments"]?[p.Id]?["groupIds"]?.AsArray().Any(id => id?.GetValue<string>() == g["id"]?.GetValue<string>()) == true).Select(g => g["name"]!.GetValue<string>()).ToArray(),
                     hasSavedCredentials = savedCredentials is not null, savedUser = savedCredentials?.User

@@ -50,3 +50,11 @@
 .connection-rename{display:flex;flex-direction:column;gap:2px;flex:1;padding:2px 6px}
 .connection-rename input{width:100%;font-size:12px}
 .connection-rename small{color:var(--danger,currentColor);font-size:10px}
+/* FI-069: SSH tunnels */
+.ssh-fingerprint{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:8px 0;font-size:12px}
+.ssh-fingerprint dt{color:var(--muted)}
+.ssh-fingerprint code{font-family:"DM Mono",Consolas,monospace;word-break:break-all;user-select:all}
+.ssh-host-key-error{color:var(--danger)}
+.profile-ssh{display:grid;gap:8px;padding:8px 10px;border:1px solid var(--line);border-radius:6px}
+.profile-ssh small{color:var(--muted)}
+.app-status .footer-ssh{flex-shrink:0;margin-left:6px;padding:0 4px;border:1px solid var(--line);border-radius:4px;font-size:10px;letter-spacing:.04em;color:var(--muted)}

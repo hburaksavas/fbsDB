@@ -71,9 +71,13 @@ public sealed partial class OracleSessionService : IDisposable
             }
             if (string.IsNullOrWhiteSpace(user) || string.IsNullOrEmpty(password))
                 throw new InvalidOperationException("Enter an Oracle username and password, or save credentials for this profile.");
+            // FI-069: an SSH profile connects to the local end of its shared tunnel.
+            var lease = await SshTunnelRegistry.Shared.AcquireAsync(profile, cancellationToken);
+            var adopted = false;
+            try {
             var builder = new OracleConnectionStringBuilder
             {
-                DataSource = profile.Descriptor,
+                DataSource = lease.DataSource,
                 UserID = user,
                 Password = password,
                 Pooling = true,
@@ -101,8 +105,11 @@ public sealed partial class OracleSessionService : IDisposable
             var previous = _connection;
             _connection = connection; _executedSqlIds.Clear(); _analysisReadOnly = false;
             IsInactive = false; Touch(); _profileId = profile.Id; _initialNls=initialNls;_configuredNls=new Dictionary<string,string>(profile.Nls);
+            var previousTunnel = _tunnel; _tunnel = lease; adopted = true;
             if (previous is not null) await previous.DisposeAsync();
+            if (previousTunnel is not null) await previousTunnel.DisposeAsync();
             await ApplyCredentialPreferenceAsync(profile.Id, user, password, remember);
+            } finally { if (!adopted) await lease.DisposeAsync(); }
         }
         finally { Touch(); _gate.Release(); }
     }
@@ -114,6 +121,11 @@ public sealed partial class OracleSessionService : IDisposable
         null => Task.CompletedTask,
     };
 
+    private SshTunnelLease? _tunnel;
+    // How this session reaches Oracle when it goes through an SSH tunnel.
+    public string? TunnelVia => _tunnel?.Via;
+    public int? TunnelPort => _tunnel?.LocalPort;
+
     public async Task TestConnectionAsync(ConnectionProfile profile, string user, string password)
     {
         if (!profile.Available) throw new InvalidOperationException("Connection target is unavailable.");
@@ -123,7 +135,8 @@ public sealed partial class OracleSessionService : IDisposable
             if (saved is not null && (string.IsNullOrWhiteSpace(user) || user.Equals(saved.Value.User, StringComparison.OrdinalIgnoreCase))) (user, password) = saved.Value;
         }
         if (string.IsNullOrWhiteSpace(user) || string.IsNullOrEmpty(password)) throw new InvalidOperationException("Enter a username and password to test.");
-        var builder = new OracleConnectionStringBuilder { DataSource = profile.Descriptor, UserID = user, Password = password, Pooling = false, ConnectionTimeout = 15 };
+        await using var lease = await SshTunnelRegistry.Shared.AcquireAsync(profile);
+        var builder = new OracleConnectionStringBuilder { DataSource = lease.DataSource, UserID = user, Password = password, Pooling = false, ConnectionTimeout = 15 };
         if (profile.Method == "tns") builder.TnsAdmin = Path.GetDirectoryName(profile.Source);
         await using var test = new OracleConnection(builder.ConnectionString);
         await test.OpenAsync();
@@ -547,6 +560,7 @@ public sealed partial class OracleSessionService : IDisposable
             await _connection.DisposeAsync();
             _connection = null;
         }
+        if (_tunnel is not null) { await _tunnel.DisposeAsync(); _tunnel = null; }
         IsInactive = false; _profileId = null; _initialNls=null;_configuredNls=new Dictionary<string,string>(); _executedSqlIds.Clear(); _analysisReadOnly = false;
     }
 
@@ -635,6 +649,7 @@ public sealed partial class OracleSessionService : IDisposable
         _results.Dispose();
         _transaction?.Dispose();
         _connection?.Dispose();
+        _tunnel?.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _gate.Dispose();
     }
 }

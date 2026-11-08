@@ -230,6 +230,10 @@ export interface CommandPayloads {
   "descriptor"?: string | null;
   "folderId"?: string | null;
   "password"?: string | null;
+  "sshHost"?: string | null;
+  "sshPort"?: string | null;
+  "sshUser"?: string | null;
+  "sshKeyFile"?: string | null;
 };
   "connection.setGroup": {
   "profileId"?: string | null;
@@ -254,6 +258,10 @@ export interface CommandPayloads {
   "descriptor"?: string | null;
   "folderId"?: string | null;
   "password"?: string | null;
+  "sshHost"?: string | null;
+  "sshPort"?: string | null;
+  "sshUser"?: string | null;
+  "sshKeyFile"?: string | null;
 };
   "file.activate": {
   "path"?: string | null;
@@ -717,6 +725,12 @@ export interface CommandPayloads {
   "window.closeCancelled": {
   "tabId"?: string;
 };
+  "ssh.trustHost": {
+  "tabId"?: string;
+  "host": string;
+  "port": number;
+  "fingerprint": string;
+};
 }
 export interface ReplyMessages {
   "analysis.state": { type: "analysis.state" } & {
@@ -750,6 +764,7 @@ export interface ReplyMessages {
   "autoCommit"?: boolean;
   "serverVersion"?: JsonValue;
   "profile"?: JsonValue;
+  "tunnel"?: JsonValue;
 };
   "connection.disconnected": { type: "connection.disconnected" } & {
   "requestId"?: string | null;
@@ -1521,6 +1536,25 @@ export interface ReplyMessages {
   "requestId"?: string | null;
   "tabId"?: string;
   "autoCommit"?: boolean;
+};
+  "connection.sshHostKey": { type: "connection.sshHostKey" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "profileId"?: string;
+  "host": string;
+  "port": number;
+  "keyType": string;
+  "fingerprint": string;
+};
+  "ssh.hostTrusted": { type: "ssh.hostTrusted" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "host": string;
+  "port": number;
+  "success": boolean;
+  "message"?: string;
 };
 }
 export type NativeCommandName = keyof CommandPayloads;

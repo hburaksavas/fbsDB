@@ -29,6 +29,7 @@ public sealed partial class OracleSessionService
         {
             Touch();
             if (!IsInactive || _connection is null) return;
+            if (_tunnel is not null) await _tunnel.EnsureRunningAsync();
             await _connection.OpenAsync();
             try
             {
