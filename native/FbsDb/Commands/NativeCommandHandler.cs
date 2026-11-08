@@ -14,7 +14,7 @@ namespace FbsDb;
 
 public sealed partial class MainPage
 {
-    private sealed record NativeCommandContext(CoreWebView2 Sender, string? RequestId, string Command, JsonElement Payload, TabSession Tab);
+    private sealed record NativeCommandContext(CoreWebView2 Sender, string? RequestId, string Command, JsonElement Payload, TabSession Tab, string WindowId);
 
     private abstract class NativeCommandHandler(MainPage host, NativeCommandContext context)
     {
@@ -38,6 +38,8 @@ public sealed partial class MainPage
         protected Task SendProfilesAsync(CoreWebView2 sender, string? id = null) => Host.SendProfilesAsync(sender, id, Context.Tab);
         protected Task SendWorkspaceAsync(CoreWebView2 sender) => Host.SendWorkspaceAsync(sender, Context.Tab);
         protected void EnsureWorkspaceRoot(JsonElement payload) => Host.EnsureWorkspaceRoot(payload);
+        // File pickers and dialogs belong to the window that asked for them.
+        protected nint OwnerWindowHandle => Host.WindowHandle(Context.WindowId);
         public abstract Task HandleAsync();
     }
 }

@@ -3177,6 +3177,94 @@ export const bridgeContract = {
           "table"
         ]
       }
+    },
+    "window.state": {
+      "handler": "ui",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": []
+      }
+    },
+    "window.moveTab": {
+      "handler": "ui",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "transfer": {
+            "type": "string"
+          },
+          "tabIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "closeWindow": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "target",
+          "transfer"
+        ]
+      }
+    },
+    "window.focus": {
+      "handler": "ui",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "target"
+        ]
+      }
+    },
+    "window.close": {
+      "handler": "ui",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": []
+      }
+    },
+    "window.closeCancelled": {
+      "handler": "ui",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": []
+      }
     }
   },
   "replies": {
@@ -5614,6 +5702,151 @@ export const bridgeContract = {
         },
         "error": {
           "type": "string"
+        }
+      },
+      "required": []
+    },
+    "window.list": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "current": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "windows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "label"
+            ]
+          }
+        }
+      },
+      "required": [
+        "current",
+        "label",
+        "windows"
+      ]
+    },
+    "window.moved": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "target": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "label"
+      ]
+    },
+    "window.moveFailed": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "message"
+      ]
+    },
+    "window.incoming": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "transfer": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "fromLabel": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "transfer",
+        "from",
+        "fromLabel"
+      ]
+    },
+    "window.closeRequested": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
         }
       },
       "required": []

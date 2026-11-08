@@ -43,6 +43,7 @@ public sealed partial class MainPage : Page
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _idleTimer;
     public MainPage()
     {
+        Current = this;
         InitializeComponent();
         WorkspaceFileService.PreviousVersionCaptured = (path, previous) => LocalHistoryService.Capture(path, previous);
         RequestedTheme = NativeTheme.RequestedTheme;
@@ -53,7 +54,7 @@ public sealed partial class MainPage : Page
             foreach (var tab in _sessions.Sessions) {
                 if (_scriptRuns.ContainsKey(tab.Id) || _resultExports.ContainsKey(tab.Id)) continue;
                 try { if (await tab.Oracle.SuspendIfIdleAsync(TimeSpan.FromMinutes(10)))
-                    EditorWebView.CoreWebView2?.PostWebMessageAsJson(JsonSerializer.Serialize(new { type="connection.inactive", tabId=tab.Id }));
+                    Post(WebViewFor(_owners.OwnerOf(tab.Id) ?? TabWindowOwnership.Main), JsonSerializer.Serialize(new { type="connection.inactive", tabId=tab.Id }));
                 } catch (Exception error) { Debug.WriteLine(error.Message); }
             }
         };
@@ -159,7 +160,8 @@ public sealed partial class MainPage : Page
         }
     }
 
-    private void OnNavigationStarting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args)
+    private void OnNavigationStarting(CoreWebView2 sender, CoreWebView2NavigationStartingEventArgs args) => GuardNavigation(args);
+    internal static void GuardNavigation(CoreWebView2NavigationStartingEventArgs args)
     {
         if (!Uri.TryCreate(args.Uri, UriKind.Absolute, out var target) || target.Scheme != Uri.UriSchemeHttps || !string.Equals(target.Host, "fbsdb.local", StringComparison.OrdinalIgnoreCase))
             args.Cancel = true;
@@ -190,7 +192,11 @@ public sealed partial class MainPage : Page
         label.Foreground = NativeTheme.Brush(isRunning ? "--foreground" : "--muted");
     }
 
-    private async void OnWebMessageReceived(CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args)
+    private void OnWebMessageReceived(CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args) => HandleWebMessage(sender, args, TabWindowOwnership.Main);
+
+    // Every window's WebView reports here, so all windows share one session
+    // registry; windowId says which window sent the message.
+    internal async void HandleWebMessage(CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args, string windowId)
     {
         string? requestId = null;
         string? receivedCommand = null;
@@ -206,8 +212,17 @@ public sealed partial class MainPage : Page
             if (type == "ui.ready")
             {
                 tab = _sessions.InitializeUiTab(tabId);
+                _owners.Claim(tabId, windowId);
+                if (windowId != TabWindowOwnership.Main)
+                {
+                    Post(sender, "{\"type\":\"host.ready\"}");
+                    await SendProfilesAsync(sender);
+                    await SendWorkspaceStateAsync(sender, null);
+                    Send(sender, WindowList(windowId));
+                    return;
+                }
                 UpdateStartupProgress(3, 3, "Preparing Oracle driver…", 88);
-                sender.PostWebMessageAsJson("{\"type\":\"host.ready\"}");
+                Post(sender, "{\"type\":\"host.ready\"}");
                 await SendProfilesAsync(sender);
                 await SendWorkspaceAsync(sender);
                 await Task.Run(() => _ = typeof(OracleConnection).Assembly.GetName());
@@ -226,7 +241,10 @@ public sealed partial class MainPage : Page
             var command = envelope.Command;
             // UI preferences and locale are process-wide and may arrive before
             // ui.ready after a WebView reload. They need no SQL tab/session.
-            tab = _sessions.Get(NativeBridgeContract.HandlerFor(command) == "ui" ? "ui-bootstrap" : tabId);
+            // Moving a tab names that tab; its ownership is checked by the move itself.
+            var sessionless = NativeBridgeContract.HandlerFor(command) == "ui" && command != "window.moveTab";
+            tab = _sessions.Get(sessionless ? "ui-bootstrap" : tabId);
+            if (!sessionless && command != "window.moveTab") _owners.Claim(tabId, windowId);
             receivedCommand = command;
             // Cancellation must reach its token without waiting for the operation's session gate.
             if (NativeBridgeContract.RequiresSessionResume(command)) {
@@ -251,7 +269,7 @@ public sealed partial class MainPage : Page
                 await _workspaceCommands.WaitAsync(); workspaceLock = true;
                 EnsureWorkspaceRoot(payload);
             }
-            var context = new NativeCommandContext(sender, id, command!, payload, tab);
+            var context = new NativeCommandContext(sender, id, command!, payload, tab, windowId);
             NativeCommandHandler handler = NativeBridgeContract.HandlerFor(command) switch
             {
                 "file" => new FileCommandHandler(this, context),
@@ -261,13 +279,18 @@ public sealed partial class MainPage : Page
                 _ => throw new InvalidOperationException($"Unsupported desktop command: {command}")
             };
             await handler.HandleAsync();
+            if (command == "tab.close" && !_sessions.Contains(tabId)) _owners.Release(tabId);
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"fbsDB WebView message failed: {ex.Message}");
-            if (receivedCommand?.StartsWith("workspace.", StringComparison.Ordinal) == true)
-                Send(sender, new { type = "workspace.error", requestId, message = ex.Message }, tab);
-            else PostError(sender, requestId, ex.Message, tab);
+            try
+            {
+                if (receivedCommand?.StartsWith("workspace.", StringComparison.Ordinal) == true)
+                    Send(sender, new { type = "workspace.error", requestId, message = ex.Message }, tab);
+                else PostError(sender, requestId, ex.Message, tab);
+            }
+            catch (Exception replyError) { Debug.WriteLine($"fbsDB error reply failed: {replyError.Message}"); }
         }
         finally { if (workspaceLock) _workspaceCommands.Release(); }
     }
@@ -306,8 +329,17 @@ public sealed partial class MainPage : Page
 
     private async Task SendWorkspaceAsync(CoreWebView2 sender, TabSession? tab = null)
     {
-        try { EnsureWorkspaceWatcher(sender); }
-        catch (Exception watcherError) { _workspaceWatcher?.Dispose(); _workspaceWatcher = null; Debug.WriteLine("Workspace watcher: " + watcherError.Message); }
+        // The file watcher reports to the main window, which owns the workspace.
+        if (ReferenceEquals(sender, EditorWebView.CoreWebView2))
+        {
+            try { EnsureWorkspaceWatcher(sender); }
+            catch (Exception watcherError) { _workspaceWatcher?.Dispose(); _workspaceWatcher = null; Debug.WriteLine("Workspace watcher: " + watcherError.Message); }
+        }
+        await SendWorkspaceStateAsync(sender, tab);
+    }
+
+    private async Task SendWorkspaceStateAsync(CoreWebView2 sender, TabSession? tab)
+    {
         var root = _workspace.Root;
         await _workspace.LoadProjectRulesAsync();
         var projectRules = _workspace.ProjectRules;
@@ -329,11 +361,20 @@ public sealed partial class MainPage : Page
         NativeBridgeContract.ValidateReply(node);
         return node.ToJsonString();
     }
-    private static void Send(CoreWebView2 sender, object value, TabSession? tab = null) => sender.PostWebMessageAsJson(SerializeReply(value, tab));
+    private static void Send(CoreWebView2 sender, object value, TabSession? tab = null) => Post(sender, SerializeReply(value, tab));
+    // A reply can outlive the window that asked: a closed WebView refuses
+    // messages with an invalid-state error, which must not end the process.
+    internal static void Post(CoreWebView2? target, string json)
+    {
+        if (target is null) return;
+        try { target.PostWebMessageAsJson(json); }
+        catch (Exception error) when (error is System.Runtime.InteropServices.COMException or ObjectDisposedException or InvalidOperationException)
+        { Debug.WriteLine($"Reply not delivered to a closed window: {error.Message}"); }
+    }
     private static async Task SendAsync(CoreWebView2 sender, object value, TabSession? tab = null)
     {
         var json = await Task.Run(() => SerializeReply(value, tab));
-        sender.PostWebMessageAsJson(json);
+        Post(sender, json);
     }
 
     private static void PostError(CoreWebView2 sender, string? requestId, string message, TabSession? tab = null)

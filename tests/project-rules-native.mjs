@@ -432,6 +432,47 @@ try{
     await cdp.until(`!document.querySelector('[aria-label="Side editor"]')&&!${side}`,'Side editor closed');
     await cdp.click(`[data-editor-tab="${mainTab}"] [role="tab"]`);
   });
+  await check('window move: a tab moves to a new window and back; its session belongs to one window at a time',async()=>{
+    const moved=await cdp.evaluate(`document.querySelector('.file-tab.active').dataset.editorTab`),sql='SELECT 42 AS answer FROM dual;';
+    await cdp.evaluate(`${editor}.setValue(${quote(sql)})`);
+    await cdp.key('p',10);await cdp.until(`document.querySelector('[aria-label="Search workbench"]')`);await fill('[aria-label="Search workbench"]','Window: Move to New Window');await cdp.key('Enter');
+    await cdp.until(`!document.querySelector('[data-editor-tab=${quote(moved)}]')`,'The tab left the main window');
+    await cdp.until(`document.querySelector('.footer-window')?.textContent==='Main Window'`,'The main window names itself while another window is open');
+    const second=await connectNativePage(endpoint,30000,url=>url.includes('window=w2'));
+    try{
+      const secondEditor=`window.monaco?.editor.getEditors().find(editor=>document.contains(editor.getDomNode()))`;
+      await second.until(`document.querySelector('.file-tab.active')?.dataset.editorTab===${quote(moved)}&&${secondEditor}?.getValue()===${quote(sql)}`,'The tab arrived in Window 2 with its text',30000);
+      assert.equal(await second.evaluate(`document.querySelector('.footer-window')?.textContent`),'Window 2');
+      assert.equal(await second.evaluate(`getComputedStyle(document.querySelector('.activity-rail')).display`),'none','Window 2 is a lightweight SQL window.');
+      assert.equal(await second.evaluate(`Boolean(document.querySelector('.getting-started-dialog,[aria-label="Recover unsaved SQL"]'))`),false);
+      // The session is Window 2's now: the main window may not drive it.
+      await cdp.evaluate(`window.__desktopRegression.post({type:'command',id:'qa-foreign-tab',tabId:${quote(moved)},command:'file.activate',payload:{tabId:${quote(moved)},path:null}})`);
+      await cdp.until(`window.__desktopRegression.replies.some(reply=>reply.type==='host.error'&&reply.requestId==='qa-foreign-tab')`,'A command for the moved tab is refused in the main window');
+      await second.key('p',10);await second.until(`document.querySelector('[aria-label="Search workbench"]')`);
+      await second.evaluate(`(()=>{const input=document.querySelector('[aria-label="Search workbench"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'Window: Move to Main Window');input.dispatchEvent(new Event('input',{bubbles:true}))})()`);await second.frame();
+      // Window 2 closes as soon as its last tab leaves, possibly before the key is released.
+      await second.key('Enter').catch(error=>{if(!/disconnected/.test(error.message))throw error});
+      await cdp.until(`document.querySelector('.file-tab.active')?.dataset.editorTab===${quote(moved)}&&${editor}?.getValue()===${quote(sql)}`,'The tab came back to the main window',30000);
+      await cdp.until(`!document.querySelector('.footer-window')`,'Window 2 closed after its last tab left');
+    }finally{second.close()}
+    const targets=await (await fetch(`${endpoint}/json/list`)).json();
+    assert.equal(targets.filter(item=>item.type==='page'&&item.url.includes('window=w2')).length,0,'The second window page is gone.');
+  });
+  await check('window close: closing a SQL window with its title-bar button hands its tabs back to the main window',async()=>{
+    const moved=await cdp.evaluate(`document.querySelector('.file-tab.active').dataset.editorTab`),sql='SELECT 7 AS kept FROM dual;';
+    await cdp.evaluate(`${editor}.setValue(${quote(sql)})`);
+    await cdp.key('p',10);await cdp.until(`document.querySelector('[aria-label="Search workbench"]')`);await fill('[aria-label="Search workbench"]','Window: Move to New Window');await cdp.key('Enter');
+    await cdp.until(`!document.querySelector('[data-editor-tab=${quote(moved)}]')`,'The tab left the main window');
+    const second=await connectNativePage(endpoint,30000,url=>url.includes('window=w3'));
+    await second.until(`document.querySelector('.file-tab.active')?.dataset.editorTab===${quote(moved)}`,'The tab arrived in Window 3',30000);
+    second.close();
+    // The same message the title-bar close button sends.
+    execFileSync('powershell',['-NoProfile','-Command',`Add-Type -Namespace Qa -Name User32 -MemberDefinition '[DllImport("user32.dll", CharSet=CharSet.Unicode)] public static extern System.IntPtr FindWindow(string c, string t); [DllImport("user32.dll")] public static extern bool PostMessage(System.IntPtr h, uint m, System.IntPtr w, System.IntPtr l);'; $h=[Qa.User32]::FindWindow([NullString]::Value, 'fbsDB ' + [char]0x00B7 + ' Window 3'); if ($h -eq [System.IntPtr]::Zero) { throw 'Window 3 not found' }; [void][Qa.User32]::PostMessage($h, 0x10, [System.IntPtr]::Zero, [System.IntPtr]::Zero)`]);
+    await cdp.until(`document.querySelector('.file-tab.active')?.dataset.editorTab===${quote(moved)}&&${editor}?.getValue()===${quote(sql)}`,'The tab came back when its window closed',30000);
+    await cdp.until(`!document.querySelector('.footer-window')`,'Window 3 closed');
+    const deadline=Date.now()+10000;
+    while((await (await fetch(`${endpoint}/json/list`)).json()).some(item=>item.type==='page'&&item.url.includes('window=w3'))){assert.ok(Date.now()<deadline,'The closed window left its page behind.');await new Promise(resolve=>setTimeout(resolve,200))}
+  });
   await check('large SQL file opens through the native reader with exact content and lightweight analysis defaults',async()=>{
     const largePath=path.join(files,'large-dump.sql'),content='SELECT 1 FROM dual;\n-- '+'x'.repeat(525000);
     await writeFile(largePath,content);

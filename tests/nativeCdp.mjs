@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 
-export async function connectNativePage(endpoint, timeoutMs = 45000) {
+// match picks one window's page when several application windows are open.
+export async function connectNativePage(endpoint, timeoutMs = 45000, match = () => true) {
   const deadline = Date.now() + timeoutMs;
   let target;
   while (Date.now() < deadline) {
     try {
       const targets = await (await fetch(`${endpoint}/json/list`, { signal: AbortSignal.timeout(2000) })).json();
-      target = targets.find(item => item.type === 'page' && item.url.startsWith('https://fbsdb.local/'));
+      target = targets.find(item => item.type === 'page' && item.url.startsWith('https://fbsdb.local/') && match(item.url));
       if (target) break;
     } catch { /* The isolated host may still be starting. */ }
     await new Promise(resolve => setTimeout(resolve, 100));

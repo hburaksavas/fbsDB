@@ -174,7 +174,7 @@ public sealed partial class MainPage
                 case "workspace.pickLocation":
                     var locationPicker = new FolderPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
                     locationPicker.FileTypeFilter.Add("*");
-                    InitializeWithWindow.Initialize(locationPicker, WindowNative.GetWindowHandle(MainWindow.Current!));
+                    InitializeWithWindow.Initialize(locationPicker, OwnerWindowHandle);
                     var location = await locationPicker.PickSingleFolderAsync();
                     Send(sender, new { type = "workspace.location", requestId = id, path = location?.Path });
                     break;
@@ -275,7 +275,7 @@ public sealed partial class MainPage
         {
             var picker = new FolderPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
             picker.FileTypeFilter.Add("*");
-            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(MainWindow.Current!));
+            InitializeWithWindow.Initialize(picker, OwnerWindowHandle);
             var folder = await picker.PickSingleFolderAsync();
             if (folder is null) return;
             await _workspace.SetRootAsync(folder.Path);
@@ -286,7 +286,7 @@ public sealed partial class MainPage
         {
             var picker = new FolderPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
             picker.FileTypeFilter.Add("*");
-            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(MainWindow.Current!));
+            InitializeWithWindow.Initialize(picker, OwnerWindowHandle);
             var parent = await picker.PickSingleFolderAsync();
             if (parent is null) return;
 

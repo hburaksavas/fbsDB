@@ -81,6 +81,11 @@ export function createResultSessions() {
       store.set({ ...tabs, [owner]: { ...tab, queryResult: release(tab.queryResult),
         resultSets: (tab.resultSets || []).map(item => ({ ...item, result: release(item.result) })) } });
     },
+    // A tab that comes back from another window may use its results again.
+    revive(owner, value) {
+      closed.delete(owner);
+      if (value) store.set({ ...tabs, [owner]: value });
+    },
     forget(owner) {
       closed.add(owner);
       const next = { ...tabs }; delete next[owner]; store.set(next);

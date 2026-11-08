@@ -61,6 +61,16 @@ editor is for editing only: running, results, saving and the database session
 always belong to the main editor's tab, and completion uses the main tab's
 connection.
 
+**Move to New Window** (tab menu or command palette, also *Move to Window N* and
+*Move to Main Window*) moves a SQL tab into a separate application window. The
+tab keeps its database session, pending transaction, fetched rows and open cursor;
+only the window that owns a session may use it, and the window title and status
+bar name that window. A moved window is a lightweight SQL window: tab strip,
+editor and results. A tab that is running a statement, script, export or next
+page, or has unapplied grid edits, stays where it is until that work ends.
+Closing such a window returns its tabs to the main window; closing the main
+window first returns them all, so their unsaved SQL is offered on the next start.
+
 **Workspace Git** (command palette) lists the changed SQL and Oracle source files of
 the workspace as Staged and Changes; a file with both kinds of change is in both
 lists. Stage or unstage one file or all of them, review the staged and the unstaged

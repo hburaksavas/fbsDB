@@ -34,7 +34,7 @@ export function desktopRegressionFixture(root, workspace = false) {
     chrome.webview.postMessage = value => {
       const message = typeof value === 'string' ? JSON.parse(value) : value;
       if (message.type === 'ui.ready') { state.ready = true; nativePost(value); return; }
-      const allowed = ['file.new', 'file.activate', 'file.open', 'file.openPath', 'file.save', 'file.poll', 'tab.close', 'system.locale', 'ui.setTheme', 'ui.setZoom', 'connection.list'];
+      const allowed = ['file.new', 'file.activate', 'file.open', 'file.openPath', 'file.save', 'file.poll', 'tab.close', 'system.locale', 'ui.setTheme', 'ui.setZoom', 'connection.list', 'window.state', 'window.moveTab', 'window.focus', 'window.close', 'window.closeCancelled'];
       if (${JSON.stringify(workspace)}) allowed.push('workspace.projectRules','workspace.projectRules.save','workspace.sources','workspace.refresh','workspace.children','workspace.git','workspace.gitDiff','workspace.gitStage','workspace.gitUnstage','workspace.gitCommit','workspace.runs.list','workspace.runs.save','workspace.search','workspace.binds.load');
       if (message.type !== 'command' || !allowed.includes(message.command)) { state.blocked.push(message.command || message.type); return; }
       const payload = message.payload || {};

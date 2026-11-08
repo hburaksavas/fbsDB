@@ -107,7 +107,7 @@ public sealed partial class MainPage
         {
             var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
             foreach (var extension in _workspace.WorkspaceSourceExtensions) picker.FileTypeFilter.Add(extension);
-            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(MainWindow.Current!));
+            InitializeWithWindow.Initialize(picker, OwnerWindowHandle);
             var file = await picker.PickSingleFileAsync();
             if (file is null) return;
 
@@ -132,7 +132,7 @@ public sealed partial class MainPage
                 var suggestedExtension = Path.GetExtension(save.FileName ?? "query.sql").ToLowerInvariant();
                 var extensions = _workspace.WorkspaceSourceExtensions.OrderBy(extension => extension == suggestedExtension ? 0 : 1).ToList();
                 picker.FileTypeChoices.Add("Oracle source file", extensions);
-                InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(MainWindow.Current!));
+                InitializeWithWindow.Initialize(picker, OwnerWindowHandle);
                 file = await picker.PickSaveFileAsync();
             }
 

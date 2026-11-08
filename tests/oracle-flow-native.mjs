@@ -153,6 +153,38 @@ try{
     await cdp.until(`!document.querySelector('.connection-control').dataset.pending`,'Committed');
   });
 
+  await check('window move: a connected tab takes its uncommitted change and open cursor to a new window, which fetches, rolls back and hands it back',async()=>{
+    await showTab(tabA);
+    await run(`INSERT INTO ${TABLE} (ID,NAME) VALUES (90,'moved')`);
+    await cdp.until(`document.querySelector('.connection-control').dataset.pending==='true'`,'The insert opened a transaction');
+    await read(`SELECT LEVEL AS N FROM dual CONNECT BY LEVEL <= 3000`);
+    await cdp.key('p',10);await cdp.until(`document.querySelector('[aria-label="Search workbench"]')`,'Search');
+    await set('[aria-label="Search workbench"]','Window: Move to New Window');await cdp.frame();await cdp.key('Enter');
+    await cdp.until(`!document.querySelector('[data-editor-tab=${JSON.stringify(tabA)}]')`,'Tab A left the main window');
+    const second=await connectNativePage(endpoint,30000,url=>url.includes('window=w'));
+    try{
+      await second.until(`document.querySelector('.file-tab.active')?.dataset.editorTab===${JSON.stringify(tabA)}&&document.querySelectorAll('[data-cell]').length>0`,'The rows arrived in the new window',30000);
+      assert.equal(await second.evaluate(`document.querySelector('.connection-control').getAttribute('aria-label')`),`Change connection: ${PROFILE}`);
+      assert.equal(await second.evaluate(`document.querySelector('.connection-control').dataset.pending`),'true','The open transaction came along.');
+      // The popover may close after a click; reopen it to read how many rows are loaded.
+      const loaded=`(()=>{if(!document.querySelector('[role="region"][aria-label="Load result rows"]'))document.querySelector('.results-toolbar [aria-label="Load result rows"]')?.click();const text=document.querySelector('[role="region"][aria-label="Load result rows"] header span')?.textContent||'';return {rows:Number(text.split(' ')[0].replace(/\D/g,'')),more:/more available/.test(text)}})()`;
+      await second.until(`${loaded}.more`,'More rows are available');
+      const before=(await second.evaluate(loaded)).rows;
+      await second.textClick('[aria-label="Load result rows"] button','Load next page');
+      await second.until(`${loaded}.rows>${before}`,'The next page came from the moved cursor',30000);
+      assert.equal(await nameIn(tabB,90),undefined,'Another session saw the uncommitted row.');
+      await second.click('.transaction-button[aria-label="Rollback"]');
+      await second.until(`!document.querySelector('.connection-control').dataset.pending`,'Rolled back in the new window',20000);
+    }finally{
+      // Also after a failure, so clean-up finds tab A in the main window.
+      await second.key('p',10).then(()=>second.until(`document.querySelector('[aria-label="Search workbench"]')`,'Search')).then(()=>second.evaluate(`(()=>{const input=document.querySelector('[aria-label="Search workbench"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'Window: Move to Main Window');input.dispatchEvent(new Event('input',{bubbles:true}))})()`)).then(()=>second.frame()).then(()=>second.key('Enter')).catch(error=>{if(!/disconnected/.test(error.message))console.error('Moving tab A back failed: '+error.message)});
+      second.close();
+    }
+    await cdp.until(`document.querySelector('.file-tab.active')?.dataset.editorTab===${JSON.stringify(tabA)}`,'Tab A came back',30000);
+    assert.equal(await control(),`Change connection: ${PROFILE}`);
+    assert.deepEqual((await read(`SELECT COUNT(*) FROM ${TABLE} WHERE ID=90`))[0],['0'],'The returned session lost the rollback.');
+  });
+
   await check('privileges: a table this user was never granted explains why it cannot be edited',async()=>{
     await read(`SELECT DUMMY FROM SYS.DUAL`);
     await cdp.until(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]')`,'Edit switch');

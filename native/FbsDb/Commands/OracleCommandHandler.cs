@@ -143,7 +143,7 @@ public sealed partial class MainPage
                 case "result.exportSql": {
                     var picker = new FileSavePicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary, SuggestedFileName = "merge-draft.sql" };
                     picker.FileTypeChoices.Add("SQL file", new List<string> { ".sql" });
-                    InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(MainWindow.Current!));
+                    InitializeWithWindow.Initialize(picker, OwnerWindowHandle);
                     var file = await picker.PickSaveFileAsync();
                     if (file is not null) await File.WriteAllTextAsync(file.Path, payload.GetProperty("sql").GetString() ?? "", new UTF8Encoding(false));
                     Send(sender, new { type = "result.sqlExported", requestId = id, cancelled = file is null });
@@ -333,7 +333,7 @@ public sealed partial class MainPage
         {
             var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary };
             picker.FileTypeFilter.Add(".ora");
-            InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(MainWindow.Current!));
+            InitializeWithWindow.Initialize(picker, OwnerWindowHandle);
             var file = await picker.PickSingleFileAsync();
             if (file is null) return;
             await _profiles.AddTnsFileAsync(file.Path);
@@ -498,7 +498,7 @@ public sealed partial class MainPage
             var timeout = payload.TryGetProperty("timeoutSeconds", out var timeoutValue) && timeoutValue.TryGetInt32(out var seconds) ? Math.Clamp(seconds, 0, 86400) : 0;
             var stageTab = Context.Tab;
             int? scriptIndex = payload.TryGetProperty("scriptIndex",out var scriptIndexValue) ? scriptIndexValue.GetInt32() : null;
-            var progress = new Progress<string>(stage => sender.PostWebMessageAsJson(SerializeReply(new { type = "sql.stage", requestId, stage, scriptIndex }, stageTab)));
+            var progress = new Progress<string>(stage => Post(sender, SerializeReply(new { type = "sql.stage", requestId, stage, scriptIndex }, stageTab)));
             var sourceReviewId = payload.TryGetProperty("sourceReviewId", out var reviewValue) && reviewValue.ValueKind == JsonValueKind.String ? reviewValue.GetString() : null;
             try { result = await Task.Run(() => _oracle.ExecuteAsync(sql, parameters, rowLimit, cancellationToken, timeoutSeconds: timeout, progress: progress, sourceReviewId: sourceReviewId, deferLobs: true)); }
             catch (TimeoutException ex)
@@ -606,7 +606,7 @@ public sealed partial class MainPage
                 var extension=format=="xlsx"?".xlsx":format=="csv.gz"?".csv.gz":".csv";
                 var picker = new FileSavePicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary, SuggestedFileName = payload.TryGetProperty("fileName", out var name) ? name.GetString() ?? "results"+extension : "results"+extension };
                 picker.FileTypeChoices.Add(format.ToUpperInvariant(), new List<string> { format=="csv.gz"?".gz":extension });
-                InitializeWithWindow.Initialize(picker, WindowNative.GetWindowHandle(MainWindow.Current!));
+                InitializeWithWindow.Initialize(picker, OwnerWindowHandle);
                 var file = await picker.PickSaveFileAsync();
                 if (file is null) { Send(sender, new { type = "result.exportComplete", requestId, resultId, consumed, cancelled = true, success = false, message = "Export cancelled." }); return; }
                 temporaryPath = file.Path + "." + Guid.NewGuid().ToString("N") + ".partial";

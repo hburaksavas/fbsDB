@@ -22,3 +22,13 @@ User-approved product decision. Preserve these choices in later changes.
 - The separate edit row above the grid appears only while editing is on (or while an applied-changes status or verification is shown). Outside edit mode no extra row takes space.
 - Inside the edit row, core actions stay visible (Set NULL, New row, Delete row, Undo/Redo, invalid-cell counter, Pending); the rest sit in a "More" menu and can be pinned to the row. A switched-on filter stays visible on the row.
 - Every grid edit action is also available in the command palette with a "Grid: " prefix.
+
+## 2026-11-08 — Moving tabs between windows (FI-106)
+
+User-approved product decision. Preserve these choices in later changes.
+
+- A tab moved out of the main window opens in a lightweight SQL window: tab strip, editor and results. Workspace explorer, Git and the other side panels stay in the main window.
+- Tabs move from the tab context menu and the command palette (`Move to New Window`, `Move to Window N`, `Move to Main Window`). There is no drag-out of tabs.
+- Fetched rows, the open cursor and a pending transaction move with the tab. A running statement, script, export or page fetch, or unapplied grid edits, block the move with the reason.
+- Database sessions stay in one process; each session belongs to exactly one window, and another window's command for it is refused. Window titles and the status bar name the owning window.
+- Closing a secondary window returns its tabs, with their sessions, to the main window. Closing the main window returns all tabs first, so their unsaved SQL is offered on the next start.

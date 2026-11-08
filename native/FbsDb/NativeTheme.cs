@@ -37,5 +37,6 @@ public static class NativeTheme
             else resources[key] = Brush(token);
         }
         MainWindow.Current?.ApplyTheme();
+        MainPage.Current?.ApplyWindowThemes();
     }
 }

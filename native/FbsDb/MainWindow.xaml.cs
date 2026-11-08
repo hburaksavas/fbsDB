@@ -48,6 +48,9 @@ public sealed partial class MainWindow : Window
 
         // Navigate the root frame to the main page on startup.
         RootFrame.Navigate(typeof(MainPage));
+
+        // Other SQL windows hand their tabs back before the application closes.
+        AppWindow.Closing += (_, args) => { if (MainPage.Current?.CloseOtherWindowsFirst() == true) args.Cancel = true; };
     }
 
     public void ShowStartupSplash()

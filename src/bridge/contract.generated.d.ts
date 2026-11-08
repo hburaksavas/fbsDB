@@ -697,6 +697,26 @@ export interface CommandPayloads {
   "schema": string;
   "table": string;
 };
+  "window.state": {
+  "tabId"?: string;
+};
+  "window.moveTab": {
+  "tabId"?: string;
+  "target": string;
+  "transfer": string;
+  "tabIds"?: Array<string>;
+  "closeWindow"?: boolean;
+};
+  "window.focus": {
+  "tabId"?: string;
+  "target": string;
+};
+  "window.close": {
+  "tabId"?: string;
+};
+  "window.closeCancelled": {
+  "tabId"?: string;
+};
 }
 export interface ReplyMessages {
   "analysis.state": { type: "analysis.state" } & {
@@ -1464,6 +1484,43 @@ export interface ReplyMessages {
   "children"?: Array<JsonValue>;
   "parents"?: Array<JsonValue>;
   "error"?: string;
+};
+  "window.list": { type: "window.list" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "current": string;
+  "label": string;
+  "windows": Array<{
+  "id": string;
+  "label": string;
+}>;
+};
+  "window.moved": { type: "window.moved" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "target": string;
+  "label": string;
+};
+  "window.moveFailed": { type: "window.moveFailed" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "message": string;
+};
+  "window.incoming": { type: "window.incoming" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "transfer": string;
+  "from": string;
+  "fromLabel": string;
+};
+  "window.closeRequested": { type: "window.closeRequested" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
 };
 }
 export type NativeCommandName = keyof CommandPayloads;

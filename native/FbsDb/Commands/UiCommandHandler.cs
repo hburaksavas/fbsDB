@@ -51,14 +51,12 @@ public sealed partial class MainPage
                     }
                     break;
                 case "ui.setTaskbarProgress":
-                    if (MainWindow.Current is { } progressWindow)
-                        TaskbarProgress.TrySet(WindowNative.GetWindowHandle(progressWindow), payload.GetProperty("state").GetString() switch { "indeterminate" => TaskbarProgress.State.Indeterminate, "error" => TaskbarProgress.State.Error, _ => TaskbarProgress.State.None });
+                    TaskbarProgress.TrySet(OwnerWindowHandle, payload.GetProperty("state").GetString() switch { "indeterminate" => TaskbarProgress.State.Indeterminate, "error" => TaskbarProgress.State.Error, _ => TaskbarProgress.State.None });
                     break;
                 case "ui.requestAttention":
                     // Flashes the taskbar button until the window is focused; it never steals focus.
-                    if (MainWindow.Current is { } window)
                     {
-                        var info = new FlashWindowInfo { Size = (uint)System.Runtime.InteropServices.Marshal.SizeOf<FlashWindowInfo>(), Window = WindowNative.GetWindowHandle(window), Flags = 0x2 | 0xC, Count = 0, Timeout = 0 };
+                        var info = new FlashWindowInfo { Size = (uint)System.Runtime.InteropServices.Marshal.SizeOf<FlashWindowInfo>(), Window = OwnerWindowHandle, Flags = 0x2 | 0xC, Count = 0, Timeout = 0 };
                         FlashWindowEx(ref info);
                     }
                     break;
@@ -87,6 +85,13 @@ public sealed partial class MainPage
                         decimalSeparator = System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberDecimalSeparator,
                         thousandSeparator = System.Globalization.CultureInfo.CurrentCulture.NumberFormat.NumberGroupSeparator
                     });
+                    break;
+                case "window.state":
+                case "window.moveTab":
+                case "window.focus":
+                case "window.close":
+                case "window.closeCancelled":
+                    Host.HandleWindowCommand(Context);
                     break;
                 default: throw new InvalidOperationException($"Unsupported command: {command}");
             }

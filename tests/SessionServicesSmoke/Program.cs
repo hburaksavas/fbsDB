@@ -22,6 +22,21 @@ using (var reloadRegistry = new TabSessionRegistry())
     try { reloadRegistry.Get("tab-1"); throw new Exception("Closing the fresh starter lost tombstone protection."); } catch(InvalidOperationException) { }
 }
 
+var owners = new TabWindowOwnership();
+owners.Claim("tab-1", TabWindowOwnership.Main);
+owners.Claim("tab-1", TabWindowOwnership.Main);
+var second = owners.NextWindowId();
+if (second != "w2" || TabWindowOwnership.Label(second) != "Window 2" || !TabWindowOwnership.IsWindowId(second) || TabWindowOwnership.IsWindowId("w1")) throw new Exception("Window identities are not numbered from 2.");
+owners.Move("tab-1", TabWindowOwnership.Main, second);
+try { owners.Claim("tab-1", TabWindowOwnership.Main); throw new Exception("The old window kept using a moved session."); }
+catch (InvalidOperationException error) when (error.Message.Contains("Window 2")) { }
+try { owners.Move("tab-1", TabWindowOwnership.Main, "w3"); throw new Exception("A window moved a session it does not own."); } catch (InvalidOperationException) { }
+owners.Claim("tab-2", second);
+if (owners.TabsOf(second).Count != 2 || owners.TabsOf(TabWindowOwnership.Main).Count != 0) throw new Exception("Window ownership lists are wrong.");
+if (owners.ReturnToMain(second).Count != 2 || owners.OwnerOf("tab-2") != TabWindowOwnership.Main) throw new Exception("Closing a window lost its sessions.");
+owners.Release("tab-2");
+if (owners.OwnerOf("tab-2") is not null) throw new Exception("A closed tab kept its owner.");
+
 async Task Reject<T>(Func<Task> operation) where T : Exception
 {
     try { await operation().WaitAsync(TimeSpan.FromSeconds(5)); }

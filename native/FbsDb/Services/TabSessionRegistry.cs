@@ -13,6 +13,7 @@ public sealed class TabSessionRegistry : IDisposable
     private readonly ConcurrentDictionary<string, TabSession> _tabs = new();
     private readonly ConcurrentDictionary<string, byte> _closed = new();
     public IEnumerable<TabSession> Sessions => _tabs.Values;
+    public bool Contains(string id) => _tabs.ContainsKey(id);
     public TabSession Get(string id)
     {
         if (string.IsNullOrWhiteSpace(id) || id.Length > 250) throw new InvalidOperationException("Invalid SQL tab identity.");
