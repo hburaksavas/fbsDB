@@ -93,6 +93,18 @@ ambiguous, overloads are not told apart, and EXECUTE IMMEDIATE, OPEN FOR with a
 string and DBMS_SQL calls are listed as dynamic call sites that were not
 analysed. Skipped files and files that could not be read completely are listed.
 
+**Structural search** (command palette) uses the same index to find routines
+that write to a table (INSERT, UPDATE, DELETE, MERGE), read a table (FROM, JOIN,
+MERGE USING), reference a column, or handle an exception, optionally only the
+handlers that do not raise again. It starts with the selected text or the word
+at the caret. Column names written with their table or alias, in INSERT column
+lists and in SET clauses are tied to that table; a column written without one
+is shown as a possible match for the tables of its statement, and PL/SQL
+variables are not columns. SQL statements and EXEC lines in scripts are indexed
+as statements of their own, and SQL*Plus commands are skipped. Synonyms, views
+and SQL inside strings are not followed; routines that run dynamic SQL are
+listed with the results.
+
 Open **Project rules** in the workspace background menu or **Configure project
 rules** in the command palette to edit workspace-specific extension/type
 associations, package path pairs and related test paths. Rules are versioned in

@@ -286,6 +286,28 @@ try{
     await cdp.until(`!${dialog}&&document.querySelector('.file-tab.active .file-tab-name')?.textContent==='caller.sql'&&${editor}.getPosition().lineNumber===2&&${editor}.getPosition().column===3`,'Call site opened');
     assert.equal(await cdp.evaluate(`window.__desktopRegression.commands.some(command=>command.command==='sql.execute'||command.command==='connection.connect')`),false);
   });
+  await check('structural search: table writes, column uses and swallowed OTHERS handlers come from workspace files and open their lines',async()=>{
+    const opsPath=path.join(files,'calls','order_ops.pkb');
+    const source='CREATE OR REPLACE PACKAGE BODY order_ops AS\n  PROCEDURE close_order(p_id NUMBER) IS\n  BEGIN\n    UPDATE orders_t o SET o.status = \'CLOSED\' WHERE o.id = p_id;\n  EXCEPTION\n    WHEN OTHERS THEN\n      NULL;\n  END close_order;\n  PROCEDURE add_order(p_id NUMBER) IS\n  BEGIN\n    INSERT INTO orders_t (id, status) VALUES (p_id, \'OPEN\');\n  EXCEPTION\n    WHEN OTHERS THEN\n      RAISE;\n  END add_order;\nEND order_ops;\n/';
+    await writeFile(opsPath,source);
+    await cdp.evaluate(`window.__desktopRegression.post({type:'command',id:'qa-ops-open',tabId:document.querySelector('.file-tab.active').dataset.editorTab,command:'file.openPath',payload:{path:${quote(opsPath)}}})`);
+    await cdp.until(`document.querySelector('.file-tab.active .file-tab-name')?.textContent==='order_ops.pkb'`,'Package body opened');
+    await cdp.evaluate(`${editor}.setPosition({lineNumber:4,column:13});${editor}.focus()`);
+    await cdp.key('p',10);await cdp.until(`document.querySelector('[aria-label="Search workbench"]')`);await fill('[aria-label="Search workbench"]','Structural search');await cdp.key('Enter');
+    const dialog=`document.querySelector('[aria-label="Structural search"]')`,routines=`[...${dialog}.querySelectorAll('.structural-search-results .call-hierarchy-name')].map(b=>b.textContent)`;
+    await cdp.until(`${dialog}&&!${dialog}.querySelector('.structural-search-form button[type="submit"]').disabled`,'Structural search ready',20000);
+    assert.equal(await cdp.evaluate(`${dialog}.querySelector('[aria-label="Name to search"]').value`),'orders_t','The word at the caret is the initial name.');
+    await cdp.textClick('[aria-label="Structural search"] button','Search');
+    await cdp.until(`${routines}.join()==='ORDER_OPS.ADD_ORDER,ORDER_OPS.CLOSE_ORDER'`,'Routines that write to the table');
+    await fill('[aria-label="Search for"]','column');await fill('[aria-label="Name to search"]','orders_t.status');await cdp.textClick('[aria-label="Structural search"] button','Search');
+    await cdp.until(`${dialog}.querySelector('.structural-search-summary')?.textContent.startsWith('2 matches in 2 routines')`,'Column uses');
+    await fill('[aria-label="Search for"]','handles');await fill('[aria-label="Name to search"]','others');
+    await cdp.evaluate(`${dialog}.querySelector('.structural-search-form input[type="checkbox"]').click()`);await cdp.textClick('[aria-label="Structural search"] button','Search');
+    await cdp.until(`${routines}.join()==='ORDER_OPS.CLOSE_ORDER'`,'Only the handler that swallows the error');
+    await cdp.evaluate(`${dialog}.querySelector('.structural-search-site').click()`);
+    await cdp.until(`!${dialog}&&${editor}.getPosition().lineNumber===6&&${editor}.getPosition().column===5`,'Handler line opened');
+    assert.equal(await cdp.evaluate(`window.__desktopRegression.commands.some(command=>command.command==='sql.execute'||command.command==='connection.connect')`),false);
+  });
   await check('large SQL file opens through the native reader with exact content and lightweight analysis defaults',async()=>{
     const largePath=path.join(files,'large-dump.sql'),content='SELECT 1 FROM dual;\n-- '+'x'.repeat(525000);
     await writeFile(largePath,content);

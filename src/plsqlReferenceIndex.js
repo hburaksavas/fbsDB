@@ -1,5 +1,7 @@
 import { parsePlsql } from './plsqlStructure.js';
+import { lexOracle } from './oracleLexer.js';
 import { pathKey } from './workspaceTree.js';
+import { exceptionHandlers, sqlReferences } from './plsqlSqlReferences.js';
 
 // A project-wide index of PL/SQL routines and the calls between them, built from source files only; it never asks the database.
 // What it cannot decide is reported, not guessed:
@@ -35,11 +37,58 @@ function unitHeader(tokens, start) {
 
 export const routineLabel = routine => routine?.label || '';
 
+const SQLPLUS = new Set(['SET', 'PROMPT', 'SPOOL', 'SPO', 'REM', 'REMARK', 'DEFINE', 'DEF', 'UNDEFINE', 'WHENEVER', 'SHOW', 'COLUMN', 'COL', 'TTITLE', 'BTITLE', 'BREAK', 'COMPUTE', 'CLEAR', 'EXIT', 'QUIT', 'CONNECT', 'CONN', 'DISCONNECT', 'DESC', 'DESCRIBE', 'VARIABLE', 'VAR', 'PRINT', 'ACCEPT', 'PAUSE', 'HOST', 'TIMING', 'START']);
+const lineEnd = (source, offset) => { const at = source.indexOf('\n', offset); return at < 0 ? source.length : at; };
+const delimiterLine = (source, token) => token?.value === '/' && source.slice(source.lastIndexOf('\n', token.start - 1) + 1, lineEnd(source, token.end)).trim() === '/';
+
+// Script files mix SQL statements, SQL*Plus commands and PL/SQL units. Only PL/SQL units go to the PL/SQL parser: everything else
+// is blanked with spaces so offsets stay the same. SQL statements and EXEC lines become statements of their own, so their table
+// references and calls are indexed too; SQL*Plus commands are skipped.
+export function splitScript(source) {
+  const tokens = lexOracle(source).filter(token => token.kind !== 'comment'), statements = [], blank = [];
+  let i = 0;
+  const skipTo = offset => { while (i < tokens.length && tokens[i].start < offset) i++; };
+  while (i < tokens.length) {
+    const token = tokens[i], first = plainWord(token);
+    const lineStart = source.lastIndexOf('\n', token.start - 1) + 1, atLineStart = !source.slice(lineStart, token.start).trim();
+    let create = i;
+    if (first === 'CREATE') { create++; if (word(tokens[create], 'OR') && word(tokens[create + 1], 'REPLACE')) create += 2; while (['EDITIONABLE', 'NONEDITIONABLE', 'EDITIONING'].includes(plainWord(tokens[create]))) create++; }
+    if (first === 'DECLARE' || first === 'BEGIN' || first === 'CREATE' && UNIT_KINDS.has(plainWord(tokens[create])) || UNIT_KINDS.has(first) && first !== 'TYPE') {
+      // A PL/SQL unit runs to its "/" line, or to the end of the file.
+      let k = i + 1; while (k < tokens.length && !delimiterLine(source, tokens[k])) k++;
+      i = k + 1; continue;
+    }
+    if (delimiterLine(source, token)) { i++; continue; }
+    if (atLineStart && (SQLPLUS.has(first) || token.value === '@')) { const end = lineEnd(source, token.start); blank.push([token.start, end]); skipTo(end); continue; }
+    if (atLineStart && (first === 'EXEC' || first === 'EXECUTE' && !word(tokens[i + 1], 'IMMEDIATE'))) {
+      const end = lineEnd(source, token.start); statements.push({ start: token.start, end, kind: 'EXEC' }); blank.push([token.start, end]); skipTo(end); continue;
+    }
+    // A SQL statement runs to ";" outside parentheses, or to a "/" line.
+    let depth = 0, k = i;
+    for (; k < tokens.length; k++) {
+      if (tokens[k].value === '(') depth++; else if (tokens[k].value === ')') depth = Math.max(0, depth - 1);
+      else if (tokens[k].value === ';' && !depth || k > i && delimiterLine(source, tokens[k])) break;
+    }
+    const end = tokens[k] && tokens[k].value === ';' ? tokens[k].end : tokens[k - 1]?.end ?? token.end;
+    statements.push({ start: token.start, end, kind: 'SQL' }); blank.push([token.start, end]);
+    i = tokens[k]?.value === ';' ? k + 1 : k;
+  }
+  if (!blank.length) return { parseSource: source, statements };
+  const chars = source.split('');
+  for (const [start, end] of blank) for (let at = start; at < end; at++) if (chars[at] !== '\n' && chars[at] !== '\r') chars[at] = ' ';
+  return { parseSource: chars.join(''), statements };
+}
+
 // Indexes one file: its routines with their body ranges, and the call candidates inside each body.
 export function indexPlsqlFile(path, source) {
-  const model = parsePlsql(source), tokens = model.tokens.filter(token => token.kind !== 'comment'), lineAt = lineIndex(source);
+  const { parseSource, statements } = splitScript(source);
+  const model = parsePlsql(parseSource), tokens = lexOracle(source).filter(token => token.kind !== 'comment'), lineAt = lineIndex(source);
   const routines = [], bodies = [];
   const record = (routine, bodyStart, end) => { routines.push(routine); if (bodyStart != null) bodies.push({ routine, start: bodyStart, end }); };
+  for (const statement of statements) {
+    const label = `${statement.kind === 'EXEC' ? 'EXEC' : 'SQL statement'}, line ${lineAt(statement.start)}`;
+    record({ id: `${path}#${statement.start}`, label, path, kind: 'STATEMENT', part: 'body', owner: null, package: null, name: label, start: statement.start, end: statement.end, nameStart: statement.start, parent: null, anonymous: true }, statement.start, statement.end);
+  }
   const visit = (node, context) => {
     if (node.kind === 'block' && !context.parent) {
       const label = `Anonymous block, line ${lineAt(node.start)}`, end = node.end ?? source.length;
@@ -71,13 +120,17 @@ export function indexPlsqlFile(path, source) {
   for (const child of model.children || []) visit(child, {});
 
   // The innermost body around a token is its caller. Bodies nest or are disjoint, and tokens are visited in order, so a stack suffices.
-  const ordered = bodies.sort((a, b) => a.start - b.start || b.end - a.end), stack = [];
-  let next = 0;
-  const callerAt = offset => {
-    while (next < ordered.length && ordered[next].start <= offset) { const body = ordered[next++]; while (stack.length && stack.at(-1).end <= body.start) stack.pop(); stack.push(body); }
-    while (stack.length && stack.at(-1).end <= offset) stack.pop();
-    return stack.at(-1)?.routine || null;
+  const ordered = bodies.sort((a, b) => a.start - b.start || b.end - a.end);
+  // Each pass over increasing offsets gets its own sweep.
+  const sweep = () => {
+    const stack = []; let next = 0;
+    return offset => {
+      while (next < ordered.length && ordered[next].start <= offset) { const body = ordered[next++]; while (stack.length && stack.at(-1).end <= body.start) stack.pop(); stack.push(body); }
+      while (stack.length && stack.at(-1).end <= offset) stack.pop();
+      return stack.at(-1)?.routine || null;
+    };
   };
+  const callerAt = sweep();
   // Variables, parameters and cursors hide routines of the same name where they are visible.
   const locals = new Map();
   for (const scope of model.scopes || []) for (const symbol of scope.symbols || []) if (['variable', 'constant', 'parameter', 'cursor', 'iterator', 'type'].includes(symbol.kind)) {
@@ -102,7 +155,9 @@ export function indexPlsqlFile(path, source) {
     candidates.push({ caller: caller.id, path, names: chain.map(keyOf), start: token.start, end: chain.at(-1).end, line: lineAt(token.start) });
     i = j;
   }
-  return { path, routines, candidates, dynamic, errors: model.errors || [], complete: model.complete !== false };
+  const references = sqlReferences(tokens, { callerAt: sweep(), shadowed, lineAt, path });
+  const handlers = exceptionHandlers(model, tokens, { callerAt: sweep(), lineAt, path });
+  return { path, routines, candidates, dynamic, references, handlers, errors: model.errors || [], complete: model.complete !== false };
 }
 
 // Resolves call candidates against every indexed routine. files: [{path, content}].
@@ -138,6 +193,7 @@ export function buildReferenceIndex(files, { skipped = [], truncated = false } =
   }
   return {
     routines, calls, dynamic: indexed.flatMap(file => file.dynamic),
+    references: indexed.flatMap(file => file.references), handlers: indexed.flatMap(file => file.handlers),
     problems: indexed.filter(file => !file.complete).map(file => ({ path: file.path, errors: file.errors })),
     fileCount: files.length, skipped, truncated,
   };
