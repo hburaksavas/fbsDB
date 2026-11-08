@@ -42,6 +42,7 @@ import {ExternalFileNotice} from './ExternalFileNotice';
 import {describeOracleSource, relatedPackageDocument, packageDocumentGroups} from './oracleSourceIdentity.js';
 import {OracleSourceHeader} from './OracleSourceHeader';
 import {RelatedSourcesDialog} from './RelatedSourcesDialog';
+import { projectUsage as loadProjectUsage } from './projectUsageCache.js';
 const CallHierarchyDialog = lazy(() => import('./CallHierarchyDialog.jsx').then(module => ({ default: module.CallHierarchyDialog })));
 const DependencyGraphDialog = lazy(() => import('./DependencyGraphDialog.jsx').then(module => ({ default: module.DependencyGraphDialog })));
 const StructuralSearchDialog = lazy(() => import('./StructuralSearchDialog.jsx').then(module => ({ default: module.StructuralSearchDialog })));
@@ -1468,6 +1469,9 @@ export function App() {
     return () => { client.dispose(); completionClientRef.current = null; for (const source of definitionModelsRef.current.values()) source.model.dispose(); definitionModelsRef.current.clear(); };
   }, [monaco]);
 
+  // What project usage examples in completion details are built from: the workspace and the current text of open editors.
+  const usageSourcesRef = useRef(null);
+  usageSourcesRef.current = () => ({ root: isNativeHost ? workspace.root || null : null, activePath: documents.active?.path || null, documents: [...documents.tabs.filter(tab => tab.id !== documents.activeId), { ...documents.active, content: documents.text }].map(tab => ({ path: tab?.path, content: tab?.content, dirty: tab?.dirty })) });
   useEffect(() => {
     if (!monaco || !completionClientRef.current) return;
     const client = completionClientRef.current;
@@ -1493,6 +1497,7 @@ export function App() {
       },
       onError: setCompletionError,
       onPlscope: setPlscopeReport,
+      projectUsage: () => { const sources = usageSourcesRef.current?.(); return sources ? { activePath: sources.activePath, usage: loadProjectUsage(sources) } : null; },
     });
   }, [monaco, completionSettings, completionObjects, completionSchema, completionSession.oracleVocabulary, allSqlSnippets, activeTabId, metadataOriginTabId,largeFileOverrides,settings.user['editor.semanticHighlighting']]);
 

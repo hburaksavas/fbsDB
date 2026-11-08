@@ -1,6 +1,6 @@
 export const defaultCompletionSettings = Object.freeze({
   learning: true, popup: true, inline: true, delay: 200, keywordCase: 'auto', acceptEnter: true,
-  acceptTab: true, snippets: true, functionParentheses: true, signatureHelp: true, parameterNames: true,
+  acceptTab: true, snippets: true, functionParentheses: true, signatureHelp: true, parameterNames: true, usageExamples: true,
   schemaScope: 'accessible', qualification: 'collision', generateAlias: false, fkJoins: true,
   matchMode: 'prefix', recentFirst: true, systemPackages: false, oracleVersion: 'auto', plscope: false,
   minCharacters: 0, maxSuggestions: 300, showKeywords: true, showFunctions: true, showColumns: true,
@@ -8,7 +8,7 @@ export const defaultCompletionSettings = Object.freeze({
 
 export function normalizeCompletionSettings(value = {}, legacyPopup = true) {
   const settings = { ...defaultCompletionSettings, popup: legacyPopup };
-  for (const key of ['learning', 'popup', 'inline', 'acceptEnter', 'acceptTab', 'snippets', 'functionParentheses', 'signatureHelp', 'parameterNames', 'generateAlias', 'fkJoins', 'recentFirst', 'systemPackages', 'plscope','showKeywords','showFunctions','showColumns']) {
+  for (const key of ['learning', 'popup', 'inline', 'acceptEnter', 'acceptTab', 'snippets', 'functionParentheses', 'signatureHelp', 'parameterNames', 'usageExamples', 'generateAlias', 'fkJoins', 'recentFirst', 'systemPackages', 'plscope','showKeywords','showFunctions','showColumns']) {
     if (typeof value[key] === 'boolean') settings[key] = value[key];
   }
   if (Number.isFinite(value.delay)) settings.delay = Math.max(0, Math.min(1000, value.delay));

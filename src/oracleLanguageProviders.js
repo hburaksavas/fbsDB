@@ -5,6 +5,7 @@ import {outlineDocumentSymbols} from './outlineModel.js';
 import { oracleInlineCompletion } from './oracleInlineCompletion.js';
 import { monacoCompletionItems } from './oracleCompletionClient.js';
 import {automaticCompletionAllowed, getOracleCompletionContext} from './oracleCompletionContext.js';
+import { usageExamples, usageFor, usageMarkdown } from './projectUsage.js';
 
 const markdown = value => String(value || '').replace(/[\\`*_{}\[\]<>]/g, '\\$&');
 const rangeAt = (monaco, model, start, end = start + 1) => {
@@ -12,7 +13,7 @@ const rangeAt = (monaco, model, start, end = start + 1) => {
   return new monaco.Range(a.lineNumber, a.column, b.lineNumber, b.column);
 };
 
-export function installOracleLanguageProviders({ monaco, editor, client, broker, snapshot, onDefinition, onReveal, onError, onPlscope, definitionModels, acceptanceCommand, onBeforeNavigate }) {
+export function installOracleLanguageProviders({ monaco, editor, client, broker, snapshot, onDefinition, onReveal, onError, onPlscope, definitionModels, acceptanceCommand, onBeforeNavigate, projectUsage }) {
   const disposables = [];
   let disposed = false, lastRefresh = '';
   const prepare = async (model, position, token, mode, manual = false) => {
@@ -91,13 +92,27 @@ export function installOracleLanguageProviders({ monaco, editor, client, broker,
     },
     async resolveCompletionItem(item, token) {
       const target = item._oracle?.target, state = snapshot();
-      if (!target || !state.connected) return item;
-      const metadata = await broker.load(state.originTabId, target, token);
-      if (!metadata || token?.isCancellationRequested || snapshot().tabId !== state.tabId) return item;
-      const column = item._oracle.column;
-      const contents = [column ? `${column.name} · ${column.type}${column.nullable === false ? ' · NOT NULL' : ''}` : `${metadata.owner}.${metadata.name} · ${metadata.type}`, column?.comment || metadata.comment];
-      for (const member of metadata.members?.filter(member => member.name === (item._oracle.member || target.name)) || []) contents.push(`${member.name}(${member.parameters.map(parameter => `${parameter.name} ${parameter.mode} ${parameter.type}${parameter.optional ? ' DEFAULT …' : ''}`).join(', ')})${member.returnType ? ' RETURN ' + member.returnType : ''}`);
-      return { ...item, documentation: { value: contents.filter(Boolean).map(markdown).join('\n\n') } };
+      let documentation = item.documentation;
+      if (target && state.connected) {
+        const metadata = await broker.load(state.originTabId, target, token);
+        if (token?.isCancellationRequested || snapshot().tabId !== state.tabId) return item;
+        if (metadata) {
+          const column = item._oracle.column;
+          const contents = [column ? `${column.name} · ${column.type}${column.nullable === false ? ' · NOT NULL' : ''}` : `${metadata.owner}.${metadata.name} · ${metadata.type}`, column?.comment || metadata.comment];
+          for (const member of metadata.members?.filter(member => member.name === (item._oracle.member || target.name)) || []) contents.push(`${member.name}(${member.parameters.map(parameter => `${parameter.name} ${parameter.mode} ${parameter.type}${parameter.optional ? ' DEFAULT …' : ''}`).join(', ')})${member.returnType ? ' RETURN ' + member.returnType : ''}`);
+          documentation = { value: contents.filter(Boolean).map(markdown).join('\n\n') };
+        }
+      }
+      // Real calls of the routine in workspace files and open editors; read once and reused for 30 seconds.
+      const query = item._oracle?.usage;
+      // projectUsage() returns { activePath, usage: Promise<Map> } from the host; this module never reads files itself.
+      const project = query && state.settings.usageExamples !== false ? projectUsage?.() : null;
+      if (project) {
+        const found = usageFor(await project.usage, { ...query, declaredIn: query.local ? project.activePath : null });
+        if (token?.isCancellationRequested || snapshot().tabId !== state.tabId) return item;
+        if (found) documentation = { value: [documentation?.value, usageMarkdown(found, usageExamples(found, { excludePath: project.activePath }))].filter(Boolean).join('\n\n---\n\n') };
+      }
+      return documentation === item.documentation ? item : { ...item, documentation };
     },
   }));
   disposables.push(monaco.languages.registerInlineCompletionsProvider('sql', {

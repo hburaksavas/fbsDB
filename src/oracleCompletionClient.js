@@ -54,7 +54,7 @@ export function monacoCompletionItems(monaco, model, result, acceptanceCommand) 
       insertTextRules: candidate.snippet ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet : undefined,
       documentation: candidate.documentation ? { value: `[Oracle documentation](${candidate.documentation})` } : undefined,
       command: acceptanceCommand ? { id: acceptanceCommand, title: 'Remember completion', arguments: [candidate.key, result.context.learningContext] } : undefined,
-      _oracle: { target: candidate.object, column: candidate.column, member: candidate.member },
+      _oracle: { target: candidate.object, column: candidate.column, member: candidate.member, usage: candidate.kind === 'function' ? { name: candidate.member || candidate.functionName || candidate.label, container: candidate.member ? candidate.object?.name : null, local: !candidate.object } : null },
     };
   });
 }

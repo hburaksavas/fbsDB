@@ -347,6 +347,19 @@ try{
     assert.ok(shown.indexOf('v_count')>1&&shown.indexOf('v_name')>1,shown.join(', '));
     await cdp.key('Escape');
   });
+  await check('usage examples: a routine suggestion shows its real calls from workspace files in the details',async()=>{
+    await writeFile(path.join(files,'calls','uses_log.sql'),'BEGIN\n  log_line(\'nightly run\');\n  log_line(\n    \'second\'\n  );\nEND;\n/');
+    const source='CREATE OR REPLACE PROCEDURE log_line(p VARCHAR2) IS BEGIN NULL; END;\n/\nBEGIN\n  log_\nEND;';
+    await cdp.evaluate(`(()=>{const editor=${editor};editor.setValue(${quote(source)});editor.setPosition({lineNumber:4,column:7});editor.focus();editor.trigger('qa','editor.action.triggerSuggest',{})})()`);
+    await cdp.until(`[...document.querySelectorAll('.suggest-widget.visible .monaco-list-row.focused .label-name')].some(label=>label.textContent==='log_line')`,'log_line suggested and focused',20000);
+    if(!await cdp.evaluate(`Boolean(document.querySelector('.suggest-details-container .suggest-details')?.offsetParent)`))await cdp.evaluate(`${editor}.trigger('qa','toggleSuggestionDetails',{})`);
+    const details=`document.querySelector('.suggest-details')?.textContent||''`;
+    await cdp.until(`${details}.includes('Used in the project: 2 calls in 1 file')`,'Usage examples in the details',20000);
+    const text=await cdp.evaluate(details);
+    assert.match(text,/log_line\('nightly run'\)/);assert.match(text,/uses_log\.sql, line 2/);assert.match(text,/log_line\( 'second' \)/);
+    await cdp.key('Escape');
+    assert.equal(await cdp.evaluate(`window.__desktopRegression.commands.some(command=>command.command==='sql.execute'||command.command==='connection.connect')`),false);
+  });
   await check('large SQL file opens through the native reader with exact content and lightweight analysis defaults',async()=>{
     const largePath=path.join(files,'large-dump.sql'),content='SELECT 1 FROM dual;\n-- '+'x'.repeat(525000);
     await writeFile(largePath,content);

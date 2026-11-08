@@ -30,6 +30,7 @@ export function EditorCompletionSettings({ value, onChange, error, disabled }) {
         {toggle('systemPackages', 'System packages')}
         {toggle('signatureHelp', 'Parameter hints')}
         {toggle('parameterNames', 'Parameter names on arguments')}
+        {toggle('usageExamples', 'Project usage examples')}
       </div>
       <div className="editor-settings-fields">
         {select('oracleVersion', 'Oracle vocabulary', [['auto', 'Detect from connection'], ['19', 'Oracle 19c'], ['21', 'Oracle 21c'], ['23', 'Oracle 23ai'], ['26', 'Oracle 26ai']])}

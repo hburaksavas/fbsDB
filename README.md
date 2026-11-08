@@ -291,6 +291,13 @@ class (date and timestamp, number, text, boolean, binary, interval, cursor) and
 followed through `%TYPE` anchors and local subtypes; common built-in functions
 such as SYSDATE and TO_CHAR are classified by their return type. Nothing is
 removed from the list, and an unknown type changes nothing.
+The details of a routine suggestion also show how the project calls it: the number
+of calls and files, and up to three real calls from different files with their line,
+built from the same workspace index as the call hierarchy and refreshed at most every
+30 seconds. A package member matches by package and name; a routine without a
+package matches standalone routines, or routines declared in the file being edited.
+Calls whose name matches several routines are not used as examples. Turn it off with
+**Project usage examples** in the editor completion settings.
 
 
 Project rules include relative package/migration/script/test folders, saved profile
