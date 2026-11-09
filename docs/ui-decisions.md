@@ -42,3 +42,12 @@ User-approved product decision. Preserve these choices in later changes.
 - An unknown SSH host shows its SHA256 key fingerprint; only after the user confirms it is that key added to known_hosts. A changed host key is always refused, never replaced by fbsDB.
 - One tunnel per profile is shared by every tab connected through it and closes with the last of them. The status bar shows `SSH` for a session that uses a tunnel.
 - The first version covers Basic (host, port, service) profiles; TNS aliases and custom descriptors are not rewritten for tunnels.
+
+## 2026-11-10 — PL/SQL debugging (FI-007)
+
+User-approved product decision. Preserve these choices in later changes.
+
+- The debugger uses `DBMS_DEBUG` with two sessions: the tab's own session runs the statement, a second unpooled connection of the same profile drives it. No JDWP listener or network ACL is needed.
+- First version: line breakpoints (F9 or gutter click in stored PL/SQL source), Continue, Step over/into/out, Stop, call stack and read-only values. No variable editing, conditional breakpoints or watches yet.
+- Debug runs the statement at the caret of a SQL tab, in that tab's own session, like Run: the same NLS settings, package state and transaction; changes wait for Commit or Rollback as after a normal run. It is refused from a unit's own source, which would compile it.
+- Units without debug information are listed and recompiled with `ALTER … COMPILE DEBUG` only after the user confirms; never on a PROD connection.

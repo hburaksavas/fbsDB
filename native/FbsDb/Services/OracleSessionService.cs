@@ -106,6 +106,7 @@ public sealed partial class OracleSessionService : IDisposable
             _connection = connection; _executedSqlIds.Clear(); _analysisReadOnly = false;
             IsInactive = false; Touch(); _profileId = profile.Id; _initialNls=initialNls;_configuredNls=new Dictionary<string,string>(profile.Nls);
             var previousTunnel = _tunnel; _tunnel = lease; adopted = true;
+            _debugConnectionString = new OracleConnectionStringBuilder(builder.ConnectionString) { Pooling = false }.ConnectionString;
             if (previous is not null) await previous.DisposeAsync();
             if (previousTunnel is not null) await previousTunnel.DisposeAsync();
             await ApplyCredentialPreferenceAsync(profile.Id, user, password, remember);
@@ -561,6 +562,7 @@ public sealed partial class OracleSessionService : IDisposable
             _connection = null;
         }
         if (_tunnel is not null) { await _tunnel.DisposeAsync(); _tunnel = null; }
+        _debugConnectionString = null;
         IsInactive = false; _profileId = null; _initialNls=null;_configuredNls=new Dictionary<string,string>(); _executedSqlIds.Clear(); _analysisReadOnly = false;
     }
 

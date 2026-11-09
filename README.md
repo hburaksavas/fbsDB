@@ -81,6 +81,20 @@ confirm it; a changed host key is refused. All tabs on the same connection share
 one tunnel, which closes with the last of them, and the status bar shows `SSH`
 while a tab's session uses it.
 
+**PL/SQL debugging.** Put breakpoints in a package, procedure, function,
+trigger or type source with F9 or a click in the gutter, then use **Debug
+statement** (Run menu or command palette) in a SQL tab whose statement calls
+that code, for example `BEGIN billing.run; END;`. The statement runs in the
+tab's own session, as Run does, under Oracle's `DBMS_DEBUG`; a second
+connection of the same profile drives it. The debugger panel shows where the
+run is paused, the call stack and the values of the parameters, variables and
+loop indexes in scope (read only). Continue (F8), Step over (F10), Step into
+(F11), Step out (Shift+F11) and Stop are on the panel. Without breakpoints the
+run pauses where the first PL/SQL unit is entered. Units that were not compiled
+with debug information are listed and recompiled with `ALTER … COMPILE DEBUG`
+only after you confirm, never on a PROD connection. The account needs
+`DEBUG CONNECT SESSION`, and `DEBUG` on units of other schemas.
+
 **Workspace Git** (command palette) lists the changed SQL and Oracle source files of
 the workspace as Staged and Changes; a file with both kinds of change is in both
 lists. Stage or unstage one file or all of them, review the staged and the unstaged

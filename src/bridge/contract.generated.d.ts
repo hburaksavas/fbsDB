@@ -731,6 +731,49 @@ export interface CommandPayloads {
   "port": number;
   "fingerprint": string;
 };
+  "debug.objects": {
+  "tabId"?: string;
+  "objects": Array<{
+  "owner"?: string | null;
+  "name": string;
+  "type": string;
+}>;
+};
+  "debug.compile": {
+  "tabId"?: string;
+  "objects": Array<{
+  "owner"?: string | null;
+  "name": string;
+  "type": string;
+}>;
+};
+  "debug.start": {
+  "tabId"?: string;
+  "breakpoints": Array<{
+  "owner": string;
+  "name": string;
+  "type": string;
+  "line": number;
+}>;
+};
+  "debug.continue": {
+  "tabId"?: string;
+  "mode": string;
+};
+  "debug.values": {
+  "tabId"?: string;
+  "frame": number;
+  "names": Array<string>;
+};
+  "debug.source": {
+  "tabId"?: string;
+  "owner": string;
+  "name": string;
+  "unitType": string;
+};
+  "debug.stop": {
+  "tabId"?: string;
+};
 }
 export interface ReplyMessages {
   "analysis.state": { type: "analysis.state" } & {
@@ -1555,6 +1598,70 @@ export interface ReplyMessages {
   "port": number;
   "success": boolean;
   "message"?: string;
+};
+  "debug.objects": { type: "debug.objects" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "production"?: boolean;
+  "objects": Array<JsonValue>;
+};
+  "debug.compiled": { type: "debug.compiled" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "success": boolean;
+  "message"?: string;
+};
+  "debug.ready": { type: "debug.ready" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+};
+  "debug.breakpoints": { type: "debug.breakpoints" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "breakpoints": Array<JsonValue>;
+};
+  "debug.running": { type: "debug.running" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+};
+  "debug.paused": { type: "debug.paused" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "owner"?: string | null;
+  "name"?: string | null;
+  "unitType"?: string | null;
+  "line": number;
+  "depth"?: number;
+  "reason"?: number;
+  "frames": Array<JsonValue>;
+};
+  "debug.ended": { type: "debug.ended" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "message"?: string | null;
+};
+  "debug.values": { type: "debug.values" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "frame": number;
+  "values": Array<JsonValue>;
+};
+  "debug.source": { type: "debug.source" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "owner": string;
+  "name": string;
+  "unitType": string;
+  "text": string;
 };
 }
 export type NativeCommandName = keyof CommandPayloads;

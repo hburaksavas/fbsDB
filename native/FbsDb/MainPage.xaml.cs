@@ -260,6 +260,8 @@ public sealed partial class MainPage : Page
             if (_scriptRuns.ContainsKey(tabId) && command is "sql.execute" or "script.execute" or "sql.fetchNext" or "sql.explain" or "connection.connect" or "connection.disconnect" or "tab.close" or "transaction.commit" or "transaction.rollback" or "result.export" or "analysis.begin" or "analysis.end") throw new InvalidOperationException("Finish or cancel this tab's script first.");
             if (_resultExports.ContainsKey(tabId) && command is "script.execute" or "sql.execute" or "sql.fetchNext" or "sql.explain" or "connection.connect" or "analysis.begin" or "analysis.end") throw new InvalidOperationException("Finish or cancel the streaming export first.");
             if (command is "tab.close" or "connection.disconnect" && _resultExports.TryGetValue(tabId, out var closingExport)) closingExport.Cancel();
+            if (command is "tab.close" or "connection.disconnect" or "connection.connect") StopDebug(tabId);
+            if (_debugRuns.ContainsKey(tabId) && command is "script.execute" or "sql.explain" or "connection.connect" or "transaction.commit" or "transaction.rollback" or "analysis.begin") throw new InvalidOperationException("Stop debugging first.");
             if (command is "tab.close" or "connection.disconnect" or "connection.connect")
                 foreach (var request in _completionRequests.Where(item => item.Key.StartsWith(tabId + ":", StringComparison.Ordinal))) { try { request.Value.Cancel(); } catch (ObjectDisposedException) { } }
             if (command is "tab.close" or "connection.disconnect" or "connection.connect")

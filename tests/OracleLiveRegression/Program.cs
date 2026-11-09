@@ -257,6 +257,7 @@ try
     await new PrivilegeChecks(a, user, Check, Require, gridTables, Skipped).RunAsync();
     await new ReadbackChecks(a, b, user, Check, Require, gridTables, Skipped).RunAsync();
     await new LobChecks(a, b, user, Check, Require, gridTables).RunAsync();
+    await new DebugChecks(a, user, Check, Require, Skipped).RunAsync();
 }
 catch (Exception error) { failure = error; Console.Error.WriteLine(error.Message); }
 finally

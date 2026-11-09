@@ -67,6 +67,9 @@ public sealed partial class MainPage
                 case "connection.connect":
                     await ConnectAsync(sender, id, payload);
                     break;
+                case "debug.objects": case "debug.compile": case "debug.start": case "debug.continue": case "debug.values": case "debug.source": case "debug.stop":
+                    await Host.HandleDebugCommandAsync(Context);
+                    break;
                 case "ssh.trustHost":
                 {
                     var host = payload.GetProperty("host").GetString() ?? "";

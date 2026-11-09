@@ -1,4 +1,4 @@
-# Sets up, or with -Remove undoes, what the live regression needs beyond the FBSQA user's own schema: grants from another owner, and rights to create identity columns, triggers and views.
+# Sets up, or with -Remove undoes, what the live regression needs beyond the FBSQA user's own schema: grants from another owner, rights to create identity columns, triggers and views, and to debug its own PL/SQL.
 # Changes the local BANKING_DB test database through operating system authentication; never run it elsewhere.
 param([switch]$Remove)
 $ErrorActionPreference = 'Stop'

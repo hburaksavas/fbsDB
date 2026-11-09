@@ -3338,6 +3338,213 @@
           "fingerprint"
         ]
       }
+    },
+    "debug.objects": {
+      "handler": "oracle",
+      "resumeSession": true,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          },
+          "objects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "owner": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "type"
+              ]
+            }
+          }
+        },
+        "required": [
+          "objects"
+        ]
+      }
+    },
+    "debug.compile": {
+      "handler": "oracle",
+      "resumeSession": true,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          },
+          "objects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "owner": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "type"
+              ]
+            }
+          }
+        },
+        "required": [
+          "objects"
+        ]
+      }
+    },
+    "debug.start": {
+      "handler": "oracle",
+      "resumeSession": true,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          },
+          "breakpoints": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "owner": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string"
+                },
+                "line": {
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "owner",
+                "name",
+                "type",
+                "line"
+              ]
+            }
+          }
+        },
+        "required": [
+          "breakpoints"
+        ]
+      }
+    },
+    "debug.continue": {
+      "handler": "oracle",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "continue",
+              "over",
+              "into",
+              "out"
+            ]
+          }
+        },
+        "required": [
+          "mode"
+        ]
+      }
+    },
+    "debug.values": {
+      "handler": "oracle",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          },
+          "frame": {
+            "type": "integer"
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "frame",
+          "names"
+        ]
+      }
+    },
+    "debug.source": {
+      "handler": "oracle",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unitType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "owner",
+          "name",
+          "unitType"
+        ]
+      }
+    },
+    "debug.stop": {
+      "handler": "oracle",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": []
+      }
     }
   },
   "replies": {
@@ -5995,6 +6202,254 @@
         "host",
         "port",
         "success"
+      ]
+    },
+    "debug.objects": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "production": {
+          "type": "boolean"
+        },
+        "objects": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "objects"
+      ]
+    },
+    "debug.compiled": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "success": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "success"
+      ]
+    },
+    "debug.ready": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "debug.breakpoints": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "breakpoints": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "breakpoints"
+      ]
+    },
+    "debug.running": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        }
+      },
+      "required": []
+    },
+    "debug.paused": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "owner": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "unitType": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "line": {
+          "type": "integer"
+        },
+        "depth": {
+          "type": "integer"
+        },
+        "reason": {
+          "type": "integer"
+        },
+        "frames": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "line",
+        "frames"
+      ]
+    },
+    "debug.ended": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": []
+    },
+    "debug.values": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "frame": {
+          "type": "integer"
+        },
+        "values": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "frame",
+        "values"
+      ]
+    },
+    "debug.source": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "unitType": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "name",
+        "unitType",
+        "text"
       ]
     }
   }

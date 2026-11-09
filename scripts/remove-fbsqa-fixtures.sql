@@ -11,7 +11,7 @@ BEGIN
   IF found > 0 THEN EXECUTE IMMEDIATE 'DROP ROLE FBSQA_TEST_ROLE'; END IF;
   SELECT COUNT(*) INTO found FROM dba_users WHERE username = 'FBSQA';
   IF found > 0 THEN
-    FOR item IN (SELECT privilege FROM dba_sys_privs WHERE grantee = 'FBSQA' AND privilege IN ('CREATE SEQUENCE', 'CREATE TRIGGER', 'CREATE VIEW')) LOOP
+    FOR item IN (SELECT privilege FROM dba_sys_privs WHERE grantee = 'FBSQA' AND privilege IN ('CREATE SEQUENCE', 'CREATE TRIGGER', 'CREATE VIEW', 'DEBUG CONNECT SESSION')) LOOP
       EXECUTE IMMEDIATE 'REVOKE ' || item.privilege || ' FROM FBSQA';
     END LOOP;
   END IF;

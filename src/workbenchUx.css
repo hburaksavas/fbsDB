@@ -51,3 +51,21 @@
 /* FI-106: a window opened by moving a tab is a lightweight SQL window. */
 .desktop-shell[data-window=secondary] .activity-rail{display:none}
 .app-status .footer-window{flex-shrink:0;white-space:nowrap;padding:0 8px;margin-left:8px;border-left:1px solid var(--line);color:var(--muted)}
+/* FI-007: PL/SQL debugger */
+.monaco-editor .debug-breakpoint-glyph::before{content:"";display:block;width:10px;height:10px;margin:4px 0 0 4px;border-radius:50%;background:var(--danger)}
+.monaco-editor .debug-current-glyph::before{content:"";display:block;width:0;height:0;margin:4px 0 0 6px;border-top:6px solid transparent;border-bottom:6px solid transparent;border-left:8px solid var(--warning)}
+.monaco-editor .debug-current-line{background:color-mix(in srgb,var(--warning) 18%,transparent)}
+.debug-panel{position:fixed;right:16px;bottom:40px;z-index:40;width:min(520px,calc(100vw - 32px));max-height:min(420px,60vh);display:flex;flex-direction:column;background:var(--surface-raised);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 18px var(--shadow-color);overflow:hidden;font-size:12px}
+.debug-panel header{display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--line)}
+.debug-panel header strong{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.debug-panel-actions{display:flex;gap:2px}
+.debug-panel-body{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,3fr);gap:8px;padding:8px;overflow:auto}
+.debug-panel h3{margin:0 0 4px;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+.debug-stack ol{margin:0;padding:0;list-style:none}
+.debug-stack button{display:flex;flex-direction:column;width:100%;padding:4px 6px;border:0;border-radius:4px;background:none;color:inherit;text-align:left;cursor:pointer}
+.debug-stack button[aria-current]{background:color-mix(in srgb,var(--accent) 18%,transparent)}
+.debug-stack small{color:var(--muted)}
+.debug-values table{width:100%;border-collapse:collapse}
+.debug-values th,.debug-values td{padding:2px 6px;text-align:left;vertical-align:top;font-family:"DM Mono",Consolas,monospace;word-break:break-all}
+.debug-values th{color:var(--muted);font-weight:400;white-space:nowrap}
+.debug-values .muted,.debug-panel .muted{color:var(--muted)}

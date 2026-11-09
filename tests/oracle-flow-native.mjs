@@ -7,7 +7,7 @@ import path from 'node:path';
 import {connectNativePage} from './nativeCdp.mjs';
 
 const [endpoint,root,relayPort,oraclePort]=process.argv.slice(2);
-const PROFILE='FBSDB_LOCAL',suffix=Math.random().toString(16).slice(2,12).toUpperCase(),TABLE=`FBSQA_E2E_${suffix}`,PARENT=`FBSQA_E2E_P${suffix}`,CHILD=`FBSQA_E2E_C${suffix}`;
+const DEBUG_PROC=`FBSQA_E2E_DBG_${Math.random().toString(16).slice(2,10).toUpperCase()}`,PROFILE='FBSDB_LOCAL',suffix=Math.random().toString(16).slice(2,12).toUpperCase(),TABLE=`FBSQA_E2E_${suffix}`,PARENT=`FBSQA_E2E_P${suffix}`,CHILD=`FBSQA_E2E_C${suffix}`;
 const editor=`window.monaco?.editor.getEditors().find(e=>document.contains(e.getDomNode()))`;
 
 // Loses the connection at a chosen moment. `before` drops the next request; `after` delivers it and drops the reply. `holdMs` delays requests so a test can arm a cut at an exact stage.
@@ -183,6 +183,50 @@ try{
     await cdp.until(`document.querySelector('.file-tab.active')?.dataset.editorTab===${JSON.stringify(tabA)}`,'Tab A came back',30000);
     assert.equal(await control(),`Change connection: ${PROFILE}`);
     assert.deepEqual((await read(`SELECT COUNT(*) FROM ${TABLE} WHERE ID=90`))[0],['0'],'The returned session lost the rollback.');
+  });
+
+  await check('debugger: F9 breakpoint in a procedure source, Debug from a SQL tab, compile prompt, pause, values, step and finish',async()=>{
+    await showTab(tabA);
+    const source=`CREATE OR REPLACE PROCEDURE ${DEBUG_PROC}(p_n IN NUMBER) IS\n  v_total NUMBER := 0;\nBEGIN\n  FOR i IN 1..p_n LOOP\n    v_total := v_total + i;\n  END LOOP;\n  v_total := v_total * 10;\nEND;`;
+    // Running a unit's source goes through the app's review-and-compile dialog.
+    await submit(source);
+    await cdp.until(`document.querySelector('[aria-label="Review and compile source"] input[type="checkbox"]')`,'Compile review',30000);
+    await cdp.click('[aria-label="Review and compile source"] input[type="checkbox"]');
+    await cdp.until(`[...document.querySelectorAll('[aria-label="Review and compile source"] button.button-primary')].some(b=>!b.disabled)`,'Compile enabled',20000);
+    await cdp.textClick('[aria-label="Review and compile source"] button','Compile reviewed source');
+    await cdp.until(`!document.querySelector('[aria-label="Review and compile source"]')`,'Compiled',30000);await idle();
+    await cdp.evaluate(`(()=>{const e=${editor};e.setPosition({lineNumber:7,column:3});e.focus()})()`);
+    await cdp.key('F9');
+    await cdp.until(`document.querySelector('.debug-breakpoint-glyph')`,'Breakpoint drawn');
+    await showTab(tabB);
+    await cdp.evaluate(`(()=>{const e=${editor};e.setValue(${JSON.stringify(`BEGIN ${DEBUG_PROC}(3); END;`)});e.setPosition({lineNumber:1,column:1});e.focus()})()`);
+    await cdp.evaluate(`window.__qaDebug=[];chrome.webview.addEventListener('message',e=>{const m=typeof e.data==='string'?JSON.parse(e.data):e.data;if(String(m.type).startsWith('debug.')||m.type==='host.error'||m.type==='sql.result'||m.type==='sql.error')window.__qaDebug.push(JSON.stringify(m).slice(0,400))})`);
+    await cdp.key('p',10);await cdp.until(`document.querySelector('[aria-label="Search workbench"]')`,'Search');
+    await set('[aria-label="Search workbench"]','Debug: Debug statement at the caret');await cdp.frame();await cdp.key('Enter');
+    await cdp.until(`document.querySelector('[aria-label="Compile for debugging"]')`,'Compile prompt',30000);
+    assert.match(await cdp.evaluate(`document.querySelector('[aria-label="Compile for debugging"]').textContent`),new RegExp(DEBUG_PROC));
+    await cdp.textClick('[aria-label="Compile for debugging"] button','Compile and debug');
+    try{await cdp.until(`document.querySelector('[aria-label="Debugger"] [role="status"]')?.textContent==='Paused at ${DEBUG_PROC} line 7'`,'Paused at the breakpoint',60000);}
+    catch(error){throw new Error(error.message+' | Debug messages: '+JSON.stringify(await cdp.evaluate('window.__qaDebug'))+' | Panel: '+await cdp.evaluate(`document.querySelector('.debug-panel')?.textContent||'none'`));}
+    await cdp.until(`document.querySelector('.file-tab.active')?.dataset.editorTab===${JSON.stringify(tabA)}&&document.querySelector('.debug-current-line')`,'The source tab shows the paused line',20000);
+    const values=`Object.fromEntries([...document.querySelectorAll('[aria-label="Variable values"] tr')].map(row=>[row.querySelector('th').textContent,row.querySelector('td').textContent]))`;
+    await cdp.until(`${values}.v_total==='6'`,'Values at the breakpoint',20000);
+    assert.equal((await cdp.evaluate(values)).p_n,'3');
+    assert.match(await cdp.evaluate(`[...document.querySelectorAll('[aria-label="Call stack"] button')].map(b=>b.textContent).join('|')`),new RegExp(`${DEBUG_PROC}.*line 7.*anonymous block`));
+    await cdp.click('[aria-label="Debugger"] [aria-label="Step over (F10)"]');
+    await cdp.until(`document.querySelector('[aria-label="Debugger"] [role="status"]')?.textContent==='Paused at ${DEBUG_PROC} line 8'`,'Stepped over',30000);
+    await cdp.until(`${values}.v_total==='60'`,'Value after the step',20000);
+    await cdp.click('[aria-label="Debugger"] [aria-label="Continue (F8)"]');
+    await cdp.until(`!document.querySelector('[aria-label="Debugger"]')`,'Debugging finished',30000);
+    await showTab(tabB);await idle();
+    assert.deepEqual((await read('SELECT 51 FROM dual'))[0],['51'],'The debugged session did not work normally afterwards.');
+    await cdp.key('p',10);await cdp.until(`document.querySelector('[aria-label="Search workbench"]')`,'Search');
+    await set('[aria-label="Search workbench"]','Debug: Remove all breakpoints');await cdp.frame();await cdp.key('Enter');
+    await showTab(tabB);
+    await run(`BEGIN EXECUTE IMMEDIATE 'DROP PROCEDURE ${DEBUG_PROC}'; END;`);
+    assert.ok(!/ORA-\d+/.test(await failureText()),await failureText());
+    // The checks that follow start in tab A.
+    await showTab(tabA);
   });
 
   await check('privileges: a table this user was never granted explains why it cannot be edited',async()=>{
@@ -409,7 +453,7 @@ try{
   // Taken before cleanup, while the screen still shows the failure.
   try{
     const shot=await cdp.call('Page.captureScreenshot',{format:'png'});await writeFile(path.join(root,'oracle-flow-failure.png'),Buffer.from(shot.data,'base64'));
-    failure.message+=`\nScreen: ${await cdp.evaluate(`[...document.querySelectorAll('.pending-drawer,.grid-edit-bar,.result-notice,[role="alertdialog"],[role="dialog"]')].map(e=>e.textContent).join(' | ').slice(0,1500)`)}`;
+    failure.message+=`\nScreen: ${await cdp.evaluate(`[...document.querySelectorAll('.pending-drawer,.grid-edit-bar,.result-notice,[role="alertdialog"],[role="dialog"],.debug-panel,.feedback-stack,.result-status')].map(e=>e.textContent).join(' | ').slice(0,1500)`)}`;
   }catch{}
 }
 finally{

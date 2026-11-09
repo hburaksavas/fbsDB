@@ -38,4 +38,7 @@ COMMIT;
 
 -- Lets the suite create identity columns, triggers and views in its own schema.
 GRANT CREATE SEQUENCE, CREATE TRIGGER, CREATE VIEW TO FBSQA;
+
+-- FI-007: lets the suite debug its own PL/SQL with DBMS_DEBUG.
+GRANT DEBUG CONNECT SESSION TO FBSQA;
 EXIT
