@@ -3545,6 +3545,84 @@
         },
         "required": []
       }
+    },
+    "profile.state": {
+      "handler": "oracle",
+      "resumeSession": true,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": []
+      }
+    },
+    "profile.createTables": {
+      "handler": "oracle",
+      "resumeSession": true,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": []
+      }
+    },
+    "profile.start": {
+      "handler": "oracle",
+      "resumeSession": true,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": []
+      }
+    },
+    "profile.finish": {
+      "handler": "oracle",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": []
+      }
+    },
+    "profile.source": {
+      "handler": "oracle",
+      "resumeSession": true,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          },
+          "owner": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "unitType": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "owner",
+          "name",
+          "unitType"
+        ]
+      }
     }
   },
   "replies": {
@@ -6418,6 +6496,149 @@
       ]
     },
     "debug.source": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "owner": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "unitType": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "owner",
+        "name",
+        "unitType",
+        "text"
+      ]
+    },
+    "profile.state": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "tablesReady": {
+          "type": "boolean"
+        },
+        "missing": {
+          "type": "array"
+        },
+        "transactionPending": {
+          "type": "boolean"
+        },
+        "production": {
+          "type": "boolean"
+        },
+        "ddl": {
+          "type": "array"
+        }
+      },
+      "required": [
+        "tablesReady"
+      ]
+    },
+    "profile.tablesCreated": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "success": {
+          "type": "boolean"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "success"
+      ]
+    },
+    "profile.started": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "runId": {
+          "type": "integer"
+        }
+      },
+      "required": [
+        "runId"
+      ]
+    },
+    "profile.report": {
+      "type": "object",
+      "properties": {
+        "requestId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tabId": {
+          "type": "string"
+        },
+        "autoCommit": {
+          "type": "boolean"
+        },
+        "report": {},
+        "transactionPending": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "report"
+      ]
+    },
+    "profile.source": {
       "type": "object",
       "properties": {
         "requestId": {

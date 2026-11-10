@@ -774,6 +774,24 @@ export interface CommandPayloads {
   "debug.stop": {
   "tabId"?: string;
 };
+  "profile.state": {
+  "tabId"?: string;
+};
+  "profile.createTables": {
+  "tabId"?: string;
+};
+  "profile.start": {
+  "tabId"?: string;
+};
+  "profile.finish": {
+  "tabId"?: string;
+};
+  "profile.source": {
+  "tabId"?: string;
+  "owner": string;
+  "name": string;
+  "unitType": string;
+};
 }
 export interface ReplyMessages {
   "analysis.state": { type: "analysis.state" } & {
@@ -1655,6 +1673,45 @@ export interface ReplyMessages {
   "values": Array<JsonValue>;
 };
   "debug.source": { type: "debug.source" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "owner": string;
+  "name": string;
+  "unitType": string;
+  "text": string;
+};
+  "profile.state": { type: "profile.state" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "tablesReady": boolean;
+  "missing"?: Array<JsonValue>;
+  "transactionPending"?: boolean;
+  "production"?: boolean;
+  "ddl"?: Array<JsonValue>;
+};
+  "profile.tablesCreated": { type: "profile.tablesCreated" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "success": boolean;
+  "message"?: string;
+};
+  "profile.started": { type: "profile.started" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "runId": number;
+};
+  "profile.report": { type: "profile.report" } & {
+  "requestId"?: string | null;
+  "tabId"?: string;
+  "autoCommit"?: boolean;
+  "report": JsonValue;
+  "transactionPending"?: boolean;
+};
+  "profile.source": { type: "profile.source" } & {
   "requestId"?: string | null;
   "tabId"?: string;
   "autoCommit"?: boolean;

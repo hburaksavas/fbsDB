@@ -562,7 +562,7 @@ public sealed partial class OracleSessionService : IDisposable
             _connection = null;
         }
         if (_tunnel is not null) { await _tunnel.DisposeAsync(); _tunnel = null; }
-        _debugConnectionString = null;
+        _debugConnectionString = null; _profileRunId = null;
         IsInactive = false; _profileId = null; _initialNls=null;_configuredNls=new Dictionary<string,string>(); _executedSqlIds.Clear(); _analysisReadOnly = false;
     }
 

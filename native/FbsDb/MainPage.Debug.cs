@@ -70,6 +70,7 @@ public sealed partial class MainPage
             case "debug.start":
             {
                 if (_debugRuns.ContainsKey(tab.Id)) throw new InvalidOperationException("This tab is already debugging.");
+                if (tab.Oracle.ProfileRunId is not null) throw new InvalidOperationException("Finish profiling before debugging.");
                 if (_scriptRuns.ContainsKey(tab.Id) || _resultExports.ContainsKey(tab.Id)) throw new InvalidOperationException("Finish the running script or export before debugging.");
                 var breakpoints = payload.TryGetProperty("breakpoints", out var list) && list.ValueKind == JsonValueKind.Array
                     ? list.EnumerateArray().Take(500).Select(item => new DebugBreakpoint(

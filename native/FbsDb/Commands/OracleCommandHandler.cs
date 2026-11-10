@@ -67,6 +67,9 @@ public sealed partial class MainPage
                 case "connection.connect":
                     await ConnectAsync(sender, id, payload);
                     break;
+                case "profile.state": case "profile.createTables": case "profile.start": case "profile.finish": case "profile.source":
+                    await Host.HandleProfileCommandAsync(Context);
+                    break;
                 case "debug.objects": case "debug.compile": case "debug.start": case "debug.continue": case "debug.values": case "debug.source": case "debug.stop":
                     await Host.HandleDebugCommandAsync(Context);
                     break;

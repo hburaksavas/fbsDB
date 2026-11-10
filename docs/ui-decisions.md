@@ -51,3 +51,13 @@ User-approved product decision. Preserve these choices in later changes.
 - First version: line breakpoints (F9 or gutter click in stored PL/SQL source), Continue, Step over/into/out, Stop, call stack and read-only values. No variable editing, conditional breakpoints or watches yet.
 - Debug runs the statement at the caret of a SQL tab, in that tab's own session, like Run: the same NLS settings, package state and transaction; changes wait for Commit or Rollback as after a normal run. It is refused from a unit's own source, which would compile it.
 - Units without debug information are listed and recompiled with `ALTER … COMPILE DEBUG` only after the user confirms; never on a PROD connection.
+
+## 2026-11-10 — PL/SQL profiling (FI-031)
+
+User-approved product decision. Preserve these choices in later changes.
+
+- Profiling uses `DBMS_PROFILER` for line-level times and run counts.
+- Profile runs the statement at the caret of a SQL tab in that tab's own session, like Run. The profiler writes its rows in autonomous transactions, so the session's open work and the profiled code's changes still wait for Commit or Rollback (verified on Oracle 26ai with an explicit transaction).
+- Missing `PLSQL_PROFILER_*` tables are listed with their DDL and created in the user's schema only after the user confirms; never on a PROD connection. Profiling itself is allowed on PROD when the tables already exist.
+- Each run is read and then deleted from the tables; the panel offers Copy as CSV.
+- Results: a panel with unit times and the slowest lines, and line time/count marks beside open sources of profiled units, with hot (≥10% of the unit) and warm (≥2%) lines highlighted.

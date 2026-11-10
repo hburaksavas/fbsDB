@@ -95,6 +95,17 @@ with debug information are listed and recompiled with `ALTER … COMPILE DEBUG`
 only after you confirm, never on a PROD connection. The account needs
 `DEBUG CONNECT SESSION`, and `DEBUG` on units of other schemas.
 
+**PL/SQL profiling.** **Profile statement** (Run menu or command palette) runs
+the statement at the caret of a SQL tab in its own session, like Run, under
+Oracle's `DBMS_PROFILER`. When it ends, a panel lists each unit's time and the
+slowest lines with their run counts; a line opens its source, and open sources
+of profiled units show each line's time and count beside it, slow lines
+marked. The profiler writes in its own transactions: the tab's changes still
+wait for Commit or Rollback. It needs the `PLSQL_PROFILER_*` tables in the
+schema; when they are missing, fbsDB shows their DDL and creates them after you
+confirm (never on a PROD connection). Each run's rows are deleted once read;
+**Copy as CSV** keeps them.
+
 **Workspace Git** (command palette) lists the changed SQL and Oracle source files of
 the workspace as Staged and Changes; a file with both kinds of change is in both
 lists. Stage or unstage one file or all of them, review the staged and the unstaged

@@ -69,3 +69,22 @@
 .debug-values th,.debug-values td{padding:2px 6px;text-align:left;vertical-align:top;font-family:"DM Mono",Consolas,monospace;word-break:break-all}
 .debug-values th{color:var(--muted);font-weight:400;white-space:nowrap}
 .debug-values .muted,.debug-panel .muted{color:var(--muted)}
+/* FI-031: PL/SQL profiler */
+.profile-panel{position:fixed;right:16px;bottom:40px;z-index:39;width:min(560px,calc(100vw - 32px));max-height:min(440px,60vh);display:flex;flex-direction:column;background:var(--surface-raised);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 18px var(--shadow-color);overflow:hidden;font-size:12px}
+.profile-panel header{display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--line)}
+.profile-panel header strong{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.profile-panel-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;padding:8px;overflow:auto}
+.profile-panel table{width:100%;border-collapse:collapse}
+.profile-panel th{color:var(--muted);font-weight:400;text-align:left;padding:2px 6px}
+.profile-panel td{padding:2px 6px;font-family:"DM Mono",Consolas,monospace;white-space:nowrap}
+.profile-panel td button{border:0;background:none;color:inherit;font:inherit;cursor:pointer;padding:0;text-align:left}
+.profile-panel td button:disabled{cursor:default;color:var(--muted)}
+.profile-panel td small{color:var(--muted)}
+.profile-panel tr[aria-selected=true] td{background:color-mix(in srgb,var(--accent) 14%,transparent)}
+.profile-panel tr[data-level=hot] td:nth-child(2){color:var(--danger)}
+.profile-panel tr[data-level=warm] td:nth-child(2){color:var(--warning)}
+.profile-ddl{max-height:160px;overflow:auto;font-size:11px;white-space:pre-wrap}
+.monaco-editor .profile-line-time{font-size:11px;opacity:.85;color:var(--muted)}
+.monaco-editor .profile-line-time.profile-warm{color:var(--warning)}
+.monaco-editor .profile-line-time.profile-hot{color:var(--danger);opacity:1}
+.monaco-editor .profile-hot-line{background:color-mix(in srgb,var(--danger) 8%,transparent)}

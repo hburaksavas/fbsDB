@@ -7,7 +7,7 @@ import path from 'node:path';
 import {connectNativePage} from './nativeCdp.mjs';
 
 const [endpoint,root,relayPort,oraclePort]=process.argv.slice(2);
-const DEBUG_PROC=`FBSQA_E2E_DBG_${Math.random().toString(16).slice(2,10).toUpperCase()}`,PROFILE='FBSDB_LOCAL',suffix=Math.random().toString(16).slice(2,12).toUpperCase(),TABLE=`FBSQA_E2E_${suffix}`,PARENT=`FBSQA_E2E_P${suffix}`,CHILD=`FBSQA_E2E_C${suffix}`;
+const PROFILE_PROC=`FBSQA_E2E_PRF_${Math.random().toString(16).slice(2,10).toUpperCase()}`,DEBUG_PROC=`FBSQA_E2E_DBG_${Math.random().toString(16).slice(2,10).toUpperCase()}`,PROFILE='FBSDB_LOCAL',suffix=Math.random().toString(16).slice(2,12).toUpperCase(),TABLE=`FBSQA_E2E_${suffix}`,PARENT=`FBSQA_E2E_P${suffix}`,CHILD=`FBSQA_E2E_C${suffix}`;
 const editor=`window.monaco?.editor.getEditors().find(e=>document.contains(e.getDomNode()))`;
 
 // Loses the connection at a chosen moment. `before` drops the next request; `after` delivers it and drops the reply. `holdMs` delays requests so a test can arm a cut at an exact stage.
@@ -226,6 +226,41 @@ try{
     await run(`BEGIN EXECUTE IMMEDIATE 'DROP PROCEDURE ${DEBUG_PROC}'; END;`);
     assert.ok(!/ORA-\d+/.test(await failureText()),await failureText());
     // The checks that follow start in tab A.
+    await showTab(tabA);
+  });
+
+  await check('profiler: Profile from a SQL tab, table prompt, slowest lines in the panel and line times beside the source',async()=>{
+    await showTab(tabA);
+    const source=`CREATE OR REPLACE PROCEDURE ${PROFILE_PROC}(p_n IN NUMBER) IS\n  v NUMBER := 0;\nBEGIN\n  FOR i IN 1..p_n LOOP\n    v := v + SQRT(i);\n  END LOOP;\nEND;`;
+    await submit(source);
+    await cdp.until(`document.querySelector('[aria-label="Review and compile source"] input[type="checkbox"]')`,'Compile review',30000);
+    await cdp.click('[aria-label="Review and compile source"] input[type="checkbox"]');
+    await cdp.until(`[...document.querySelectorAll('[aria-label="Review and compile source"] button.button-primary')].some(b=>!b.disabled)`,'Compile enabled',20000);
+    await cdp.textClick('[aria-label="Review and compile source"] button','Compile reviewed source');
+    await cdp.until(`!document.querySelector('[aria-label="Review and compile source"]')`,'Compiled',30000);await idle();
+    await showTab(tabB);
+    await cdp.evaluate(`(()=>{const e=${editor};e.setValue(${JSON.stringify(`BEGIN ${PROFILE_PROC}(20000); END;`)});e.setPosition({lineNumber:1,column:1});e.focus()})()`);
+    await cdp.key('p',10);await cdp.until(`document.querySelector('[aria-label="Search workbench"]')`,'Search');
+    await set('[aria-label="Search workbench"]','Profile: Profile statement at the caret');await cdp.frame();await cdp.key('Enter');
+    // The local test schema has no profiler tables until this prompt creates them.
+    await cdp.until(`document.querySelector('[aria-label="Create profiler tables"]')||document.querySelector('[aria-label="Profiler"]')`,'Table prompt or profiler',30000);
+    if(await cdp.evaluate(`Boolean(document.querySelector('[aria-label="Create profiler tables"]'))`)){
+      assert.match(await cdp.evaluate(`document.querySelector('[aria-label="Create profiler tables"]').textContent`),/CREATE TABLE plsql_profiler_runs/);
+      await cdp.textClick('[aria-label="Create profiler tables"] button','Create tables and profile');
+    }
+    await cdp.until(`/^Profile · /.test(document.querySelector('[aria-label="Profiler"] [role="status"]')?.textContent||'')`,'Profile report',60000);
+    const slowest=await cdp.evaluate(`[...document.querySelectorAll('[aria-label="Slowest lines"] tbody tr')].map(row=>[...row.cells].map(cell=>cell.textContent))`);
+    const loop=slowest.find(row=>row[0]===`${PROFILE_PROC}:5`);
+    assert.ok(loop,`The loop body is missing: ${JSON.stringify(slowest.slice(0,5))}`);
+    assert.equal(loop[2].replace(/\D/g,''),'20000','The loop body ran 20000 times.');
+    await cdp.textClick('[aria-label="Slowest lines"] button',`${PROFILE_PROC}:5`);
+    await cdp.until(`document.querySelector('.file-tab.active')?.dataset.editorTab===${JSON.stringify(tabA)}&&document.querySelector('.profile-line-time')`,'Line times beside the source',20000);
+    assert.match(await cdp.evaluate(`[...document.querySelectorAll('.profile-line-time')].map(e=>e.textContent).join('|')`),/20[,.]000×/);
+    await cdp.click('[aria-label="Close profile"]');
+    await cdp.until(`!document.querySelector('[aria-label="Profiler"]')&&!document.querySelector('.profile-line-time')`,'Profile closed',10000);
+    await showTab(tabB);
+    await run(`BEGIN EXECUTE IMMEDIATE 'DROP PROCEDURE ${PROFILE_PROC}'; END;`);
+    assert.ok(!/ORA-\d+/.test(await failureText()),await failureText());
     await showTab(tabA);
   });
 
@@ -461,7 +496,7 @@ finally{
     relay.reset();
     // A failed step can leave tab A's transaction open, and its locks would refuse the DROP. Discarding it through the app also ends the row locks.
     if(tabA&&tabB){await showTab(tabA);await run('ROLLBACK')}
-    if(tabB){await showTab(tabB);for(const table of [CHILD,PARENT])await run(`DROP TABLE ${table} CASCADE CONSTRAINTS`,{ddl:true}).catch(()=>{});await run(`DROP TABLE ${TABLE}`,{ddl:true});assert.ok(!/ORA-\d+/.test(await failureText()),await failureText());console.log('PASS fixture table removed')}
+    if(tabB){await showTab(tabB);for(const table of [CHILD,PARENT])await run(`DROP TABLE ${table} CASCADE CONSTRAINTS`,{ddl:true}).catch(()=>{});await run(`DROP TABLE ${TABLE}`,{ddl:true});assert.ok(!/ORA-\d+/.test(await failureText()),await failureText());console.log('PASS fixture table removed');await run(`BEGIN FOR o IN (SELECT object_type, object_name FROM user_objects WHERE object_name IN ('PLSQL_PROFILER_DATA','PLSQL_PROFILER_UNITS','PLSQL_PROFILER_RUNS','PLSQL_PROFILER_RUNNUMBER') ORDER BY DECODE(object_name,'PLSQL_PROFILER_DATA',1,'PLSQL_PROFILER_UNITS',2,'PLSQL_PROFILER_RUNS',3,4)) LOOP EXECUTE IMMEDIATE 'DROP '||o.object_type||' '||o.object_name; END LOOP; END;`).catch(()=>{})}
   }catch(error){failure??=error;console.error(`Could not remove ${TABLE}: ${error.message}`)}
   await writeFile(path.join(root,'oracle-flow-report.json'),JSON.stringify({status:failure?'failed':'passed',checks,error:failure?.message,table:TABLE},null,2));
   if(failure)console.error(failure.message);
