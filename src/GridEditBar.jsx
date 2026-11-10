@@ -1,15 +1,17 @@
-import {useEffect,useRef} from 'react';
+import {useEffect,useLayoutEffect,useRef,useState} from 'react';
+import {createPortal} from 'react-dom';
 import {Check,Plus,Trash2,Undo2} from 'lucide-react';
 import {fromCalendarValue,toCalendarValue} from './gridEditability';
 import {registerGridActions} from './gridActionBridge';
 
 // The whole edit workflow: change cells in the table, then Apply sends every change at once. Discard drops them.
+// The four buttons sit in the result toolbar's own row, at its right end; only a reason why editing is not possible takes a line below it.
 export function GridEditBar({editability,loading,editMode,onToggle,summary,applying=false,onApply,onDiscard,onNewRow,onDeleteRow,hasSelection,onDescriptions}) {
   const editable=!!editability?.editable,blocked=editability&&!editable;
   const canInsert=editable&&editability.canInsert!==false,canDelete=editable&&editability.canDelete!==false;
   const dirty=summary.total>0;
   // The command palette offers the same actions; it reads this list when it opens.
-  const rootRef=useRef(null),paletteActions=useRef(null);
+  const rootRef=useRef(null),paletteActions=useRef(null),[slot,setSlot]=useState(null);
   paletteActions.current=()=>[
     {id:'toggleEdit',label:editMode?'Leave edit mode (unapplied changes stay)':'Edit rows of this result',run:onToggle},
     {id:'descriptions',label:'Show descriptions beside key values…',run:onDescriptions},
@@ -21,18 +23,24 @@ export function GridEditBar({editability,loading,editMode,onToggle,summary,apply
     ]:[])
   ];
   useEffect(()=>registerGridActions({element:rootRef.current,get:()=>paletteActions.current()}),[]);
-  // Outside edit mode the bar takes no room; the pencil switch lives in the result toolbar. It stays mounted for the palette.
-  if(!editMode)return <div ref={rootRef} className="grid-edit-anchor" aria-hidden="true"/>;
-  const parts=[summary.updates&&`${summary.updates} changed`,summary.inserts&&`${summary.inserts} new`,summary.deletes&&`${summary.deletes} deleted`].filter(Boolean).join(', ');
-  return <div ref={rootRef} className="grid-edit-bar" role="toolbar" aria-label="Edit result rows">
-    <button type="button" className="button-primary grid-edit-apply" disabled={!dirty||applying} title="Send every change below to Oracle" onClick={onApply}><Check size={13}/>{applying?'Applying…':dirty?`Apply (${summary.total})`:'Apply'}</button>
+  // The toolbar of this result is the nearest one above the grid.
+  useLayoutEffect(()=>{
+    let node=rootRef.current?.parentElement,found=null;
+    while(node&&!found){found=node.querySelector?.('[data-grid-edit-slot]')||null;node=node.parentElement}
+    setSlot(found);
+  },[editMode]);
+  const buttons=editMode&&<div className="grid-edit-bar" role="toolbar" aria-label="Edit result rows">
+    {loading&&<span role="status" className="grid-edit-note">Preparing…</span>}
+    <button type="button" className="button-primary grid-edit-apply" disabled={!dirty||applying} title="Send every change to Oracle" onClick={onApply}><Check size={13}/>{applying?'Applying…':dirty?`Apply (${summary.total})`:'Apply'}</button>
     <button type="button" disabled={!dirty||applying} title="Drop every unapplied change" onClick={onDiscard}><Undo2 size={13}/>Discard</button>
     <button type="button" disabled={!canInsert||applying} title={editable&&!canInsert?'You have no INSERT privilege on this table':'Add a new row'} onClick={onNewRow}><Plus size={13}/>Row</button>
     <button type="button" disabled={!canDelete||!hasSelection||applying} title={editable&&!canDelete?'You have no DELETE privilege on this table':'Mark the selected row for deletion; press again to keep it'} onClick={onDeleteRow}><Trash2 size={13}/>Delete row</button>
-    {loading?<span role="status" className="grid-edit-note">Checking the primary key…</span>
-      :editable&&<span role="status" className="grid-edit-note">{dirty?`${parts} — not sent yet. Apply sends them.`:'Double-click a cell, or select it and type. Empty text stores NULL.'}</span>}
-    {editable&&editability.limits?.length>0&&<ul className="grid-edit-reasons" role="status" aria-label="What your privileges do not allow">{editability.limits.map(limit=><li key={limit}>{limit}</li>)}</ul>}
-    {blocked&&!loading&&<ul className="grid-edit-reasons" role="status" aria-label="Why this result cannot be edited">{editability.reasons.map(reason=><li key={reason}>{reason}</li>)}</ul>}
+  </div>;
+  const limits=editMode&&editable&&editability.limits?.length>0,reasons=editMode&&blocked&&!loading&&editability.reasons.length>0;
+  return <div ref={rootRef} className={limits||reasons||(buttons&&!slot)?'grid-edit-notes':'grid-edit-anchor'} aria-hidden={editMode?undefined:'true'}>
+    {buttons&&(slot?createPortal(buttons,slot):buttons)}
+    {limits&&<ul className="grid-edit-reasons" role="status" aria-label="What your privileges do not allow">{editability.limits.map(limit=><li key={limit}>{limit}</li>)}</ul>}
+    {reasons&&<ul className="grid-edit-reasons" role="status" aria-label="Why this result cannot be edited">{editability.reasons.map(reason=><li key={reason}>{reason}</li>)}</ul>}
   </div>;
 }
 

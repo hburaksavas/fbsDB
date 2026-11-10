@@ -249,6 +249,7 @@ try
         Require(Convert.ToInt32((await b.ExecuteAsync("SELECT 45 FROM dual")).Rows[0][0]) == 45, "Resumed session cannot execute queries.");
     });
     await new GridApplyChecks(a, b, user, Check, Require, gridTables).RunAsync();
+    await new RowIdChecks(a, user, Check, Require, gridTables).RunAsync();
     await new CommitFaultChecks(b, profile, user, Check, Require, gridTables).RunAsync();
     await new TimeZoneChecks(profile, user, Check, Require, gridTables).RunAsync();
     void Skipped(string name, string reason) { checks.Add(new { name, status = "skipped", reason }); Console.WriteLine("SKIP " + name + ": " + reason); }

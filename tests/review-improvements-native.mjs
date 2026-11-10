@@ -1478,14 +1478,54 @@ try {
   };
   const cell = (r, c) => `document.querySelector('[data-cell="${r}:${c}"]')`;
   const feedback = `[...document.querySelectorAll('.feedback-stack > *')].map(e=>e.textContent).join(' | ')`;
-  // 1. A table without a primary key is explained, never guessed.
-  await run('SELECT id, name FROM orders', 'ORDERS', [['1', 'Ada'], ['2', 'Bob']]);
+  // 1. A table without a primary key is edited by ROWID: no question is asked, the executed query is read again with each row's ROWID.
+  await run('SELECT id, name FROM orders', 'ORDERS', [['1', 'Ada'], ['2', 'Bob'], ['2', 'Bob']]);
   await cdp.until(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]:not(:disabled)')`, 'Edit switch offered for a result with a source table');
-  assert.equal(await cdp.evaluate(`!!document.querySelector('.grid-edit-bar')`), false, 'No edit row outside edit mode');
+  assert.equal(await cdp.evaluate(`!!document.querySelector('.grid-edit-bar')`), false, 'No edit buttons outside edit mode');
+  const rowIdRequests = () => cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.evaluate'&&m.payload.withRowIds).length`);
+  const asked = await rowIdRequests();
   await toggle(); await identity('ORDERS', []);
-  await cdp.until(`document.querySelector('.grid-edit-reasons')?.textContent.includes('no primary key')`, 'No-primary-key reason shown');
-  await pick(0, 1); await gridKey('F2'); await new Promise(resolve => setTimeout(resolve, 200));
+  await cdp.until(`__uxFixture.commands.filter(m=>m.command==='sql.evaluate'&&m.payload.withRowIds).length===${asked + 1}`, 'ROWIDs requested');
+  const refused = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.evaluate'&&m.payload.withRowIds).at(-1)`);
+  assert.equal(refused.payload.sql, 'SELECT id, name FROM orders'); assert.equal(refused.payload.rowLimit, 3);
+  assert.equal(await cdp.evaluate(`!!document.querySelector('.key-picker')`), false, 'No key is asked for');
+  assert.equal(await cdp.evaluate(`!!document.querySelector('.results-toolbar [data-grid-edit-slot] .grid-edit-bar')&&document.querySelectorAll('.grid-edit-bar').length===1`), true, 'The edit buttons sit in the result toolbar row');
+  // Oracle cannot give ROWIDs for every query; then the reason is shown and nothing can be edited.
+  await cdp.evaluate(`__uxFixture.emit({type:'sql.evaluated',requestId:${JSON.stringify(refused.id)},tabId:'tab-1',error:'ORA-01446: cannot select ROWID from, or sample, a view with DISTINCT, GROUP BY, etc.',transactionPending:false})`);
+  await cdp.until(`document.querySelector('.grid-edit-reasons')?.textContent.includes('This query cannot be edited')`, 'The refusal is explained');
+  await pick(0, 1); await gridKey('F2');
+  // F2 on a result that cannot be edited inspects the value instead (the viewer loads on demand); no cell editor opens.
+  await cdp.until(`document.querySelector('[aria-label="Close cell value"]')`, 'A blocked result is inspected, not edited');
   assert.equal(await cdp.evaluate(`!!document.querySelector('.cell-editor')`), false, 'A blocked result cannot be edited');
+  await cdp.evaluate(`document.querySelector('[aria-label="Close cell value"]').click()`); await cdp.until(`!document.querySelector('.modal-backdrop')`, 'Value viewer closed');
+  // Read again with ROWIDs (returned in another order): identical rows are told apart and the statement finds its row by ROWID.
+  await toggle(); await cdp.until(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').getAttribute('aria-pressed')==='false'`, 'Edit mode off'); await toggle(); await cdp.until(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').getAttribute('aria-pressed')==='true'`, 'Edit mode on');
+  await cdp.until(`__uxFixture.commands.filter(m=>m.command==='sql.evaluate'&&m.payload.withRowIds).length===${asked + 2}`, 'ROWIDs requested again');
+  const answered = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.evaluate'&&m.payload.withRowIds).at(-1)`);
+  await cdp.evaluate(`__uxFixture.emit({type:'sql.evaluated',requestId:${JSON.stringify(answered.id)},tabId:'tab-1',columns:[{name:'FBSDB_ROWID',type:'VARCHAR2'},{name:'ID',type:'NUMBER'},{name:'NAME',type:'VARCHAR2'}],rows:[['RID_B','2','Bob'],['RID_C','2','Bob'],['RID_A','1','Ada']],truncated:false,elapsedMs:1,transactionPending:false})`);
+  await cdp.until(`!document.querySelector('.grid-edit-reasons')&&!document.querySelector('.grid-edit-bar .grid-edit-note')&&${bar('Apply')}?.disabled===true`, 'Editing available by ROWID (' + await rowIdRequests() + ' requests, expected ' + (asked + 2) + ')');
+  assert.equal(await rowIdRequests(), asked + 2, 'The query is read again once per edit session, not repeatedly');
+  await pick(0, 1); await gridKey('F2'); await new Promise(resolve => setTimeout(resolve, 400));
+  assert.equal(await cdp.evaluate(`!!document.querySelector('.cell-editor')`), true, 'A row identified by ROWID can be edited: ' + await cdp.evaluate(`JSON.stringify({feedback:${feedback},dialog:document.querySelector('.modal-backdrop')?.textContent.slice(0,80),active:document.querySelector('.result-active-cell')?.dataset.cell,focus:document.activeElement?.className})`));
+  await type('Ada L'); await editorKey('Enter');
+  await pick(2, 0); await cdp.evaluate(`${bar('Delete row')}.click()`);
+  await cdp.until(`${bar('Apply (2)')}`, 'Two changes'); await cdp.evaluate(`${bar('Apply (2)')}.click()`);
+  await cdp.until(`__uxFixture.commands.some(m=>m.command==='sql.applyDml'&&m.payload.statements.some(s=>s.sql.includes('ROWID')))`, 'Apply by ROWID');
+  const byRowId = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.applyDml').at(-1)`);
+  assert.deepEqual(byRowId.payload.statements.map(item => item.sql), ['DELETE FROM "APP"."ORDERS" WHERE ROWID = :dk1', 'UPDATE "APP"."ORDERS" SET "NAME" = :c1 WHERE ROWID = :uk1 AND "NAME" = :ok1']);
+  assert.ok(['RID_B', 'RID_C'].includes(byRowId.payload.statements[0].binds[0].value), 'The deleted twin has its own ROWID');
+  assert.deepEqual(byRowId.payload.statements[1].binds.map(bind => bind.value), ['Ada L', 'RID_A', 'Ada']);
+  await cdp.evaluate(`__uxFixture.emit({type:'sql.dmlApplied',requestId:${JSON.stringify(byRowId.id)},tabId:'tab-1',outcomes:[{index:0,status:'applied',rowsAffected:1},{index:1,status:'applied',rowsAffected:1}],transactionPending:true,autoCommit:false})`);
+  await cdp.until(`${bar('Apply')}?.disabled===true`, 'Applied');
+  // A cell applied a moment ago is edited from its new value, so the next Apply still finds the row.
+  await pick(0, 1); await gridKey('F2'); await cdp.until(`document.querySelector('.cell-editor')?.value==='Ada L'`, 'The editor starts from the applied value'); await type('Ada M'); await editorKey('Enter');
+  await cdp.until(`${bar('Apply (1)')}`); await cdp.evaluate(`${bar('Apply (1)')}.click()`);
+  await cdp.until(`__uxFixture.commands.filter(m=>m.command==='sql.applyDml').at(-1).id!==${JSON.stringify(byRowId.id)}`, 'Second Apply');
+  const again = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.applyDml').at(-1)`);
+  assert.deepEqual(again.payload.statements[0].binds.map(bind => bind.value), ['Ada M', 'RID_A', 'Ada L'], 'The check uses the value Oracle holds now');
+  await cdp.evaluate(`__uxFixture.emit({type:'sql.dmlApplied',requestId:${JSON.stringify(again.id)},tabId:'tab-1',outcomes:[{index:0,status:'applied',rowsAffected:1}],transactionPending:true,autoCommit:false})`);
+  await cdp.until(`${bar('Apply')}?.disabled===true`, 'Applied again');
+  await cdp.evaluate(`__uxFixture.emit({type:'transaction.state',tabId:'tab-1',state:'rolled back',pending:false})`);
   // 2. A keyed table: the edit row has only Apply, Discard, Row and Delete row.
   await run('SELECT id, name FROM customers', 'CUSTOMERS', [['1', 'Ada'], ['2', 'Bob'], ['3', 'Cem']]);
   const before = await executes(), appliedBefore = await applies();

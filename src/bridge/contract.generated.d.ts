@@ -677,6 +677,7 @@ export interface CommandPayloads {
   "tnsSource"?: string;
 };
   "sql.evaluate": {
+  "withRowIds"?: boolean;
   "sql": string;
   "parameters"?: Array<JsonValue>;
   "timeoutSeconds"?: number;

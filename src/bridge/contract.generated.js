@@ -3100,6 +3100,9 @@ export const bridgeContract = {
       "payload": {
         "type": "object",
         "properties": {
+          "withRowIds": {
+            "type": "boolean"
+          },
           "sql": {
             "type": "string"
           },

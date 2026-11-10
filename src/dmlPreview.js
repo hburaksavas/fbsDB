@@ -9,13 +9,19 @@ const tableSql = table => `${table.schema ? `${quote(table.schema)}.` : ''}${quo
 // Parameterized INSERT/UPDATE/DELETE statements for the staged changes. Values are always binds, never literals in the text.
 // An UPDATE finds its row by the ORIGINAL key values (so editing a key column still targets the row that was read) and also requires the
 // edited columns to still hold the values that were read, so a change made by another session is reported instead of overwritten.
-export function buildDml({ table, columns, identity, rowAt, drafts }) {
+// With `rowIds` (row index -> ROWID) a row is found by its ROWID instead of key columns.
+export function buildDml({ table, columns, identity, rowAt, drafts, rowIds = null }) {
   const statements = [], problems = [];
   // Columns of the source table to read back after a change, in result order. Large and structured values are left out.
   const readable = columns.map((column, index) => ({ column, index })).filter(({ column }) => column.sourceColumn && !notReadable.test(column.type || ''));
   const readPlan = readable.length ? { readColumns: readable.map(({ column }) => quote(column.sourceColumn)), readIndexes: readable.map(({ index }) => index), readNames: readable.map(({ column }) => column.name) } : {};
   const keyWhere = (row, prefix) => {
     const binds = [], conditions = [];
+    if (rowIds) {
+      const id = rowIds.get(row);
+      if (!id) { problems.push(`Row ${row + 1}: it changed in the database since it was read, so it cannot be identified. Run the query again.`); return { conditions, binds, ok: false }; }
+      return { conditions: [`ROWID = :${prefix}k1`], binds: [{ name: `${prefix}k1`, type: 'VARCHAR2', value: id }], ok: true };
+    }
     identity.forEach((index, at) => {
       const original = rowAt(row)?.[index];
       if (original == null) { problems.push(`Row ${row + 1}: key column ${columns[index].name} is NULL, so the row cannot be identified.`); return; }
@@ -24,19 +30,19 @@ export function buildDml({ table, columns, identity, rowAt, drafts }) {
       conditions.push(`${quote(columns[index].sourceColumn || columns[index].name)} = :${name}`);
       binds.push({ name, type: bindType(columns[index].type), value: String(original) });
     });
-    return { conditions, binds };
+    return { conditions, binds, ok: conditions.length === identity.length };
   };
   for (const change of pendingChanges(drafts)) {
     if (change.kind === 'delete') {
       const where = keyWhere(change.row, 'd');
-      if (where.conditions.length === identity.length) statements.push({ kind: 'delete', table: tableSql(table), row: change.row, expectRows: 1, sql: `DELETE FROM ${tableSql(table)} WHERE ${where.conditions.join(' AND ')}`, binds: where.binds });
+      if (where.ok) statements.push({ kind: 'delete', table: tableSql(table), row: change.row, expectRows: 1, sql: `DELETE FROM ${tableSql(table)} WHERE ${where.conditions.join(' AND ')}`, binds: where.binds });
     }
   }
   const updates = new Map();
   for (const change of pendingChanges(drafts)) if (change.kind === 'update') updates.set(change.row, [...(updates.get(change.row) || []), change]);
   for (const [row, cells] of updates) {
     const where = keyWhere(row, 'u');
-    if (where.conditions.length !== identity.length) continue;
+    if (!where.ok) continue;
     const binds = [], guards = [], guardBinds = [], sets = cells.map((cell, at) => {
       const name = `c${at + 1}`, column = quote(columns[cell.col].sourceColumn || columns[cell.col].name);
       binds.push({ name, type: bindType(columns[cell.col].type), value: cell.isNull ? null : cell.value });

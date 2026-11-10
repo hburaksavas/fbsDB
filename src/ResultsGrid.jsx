@@ -11,7 +11,7 @@ import {DescriptionsPanel} from './DescriptionsPanel';
 import {announce,gridAnnouncement} from './announcer';
 import {descriptionMap,loadLookupDescriptions,lookupColumnKey,prepareDescriptionQuery,saveLookupDescription} from './lookupDescriptions';
 import {numberSeparators,parseLocaleNumber} from './localeNumber';
-import {KeyPicker} from './KeyPicker';
+import {matchRowIds,rowIdRefusal} from './gridRowIds';
 import {mapApplyErrors} from './oracleErrorMap';
 import {reconcileDrafts,resolveConflict} from './draftReconcile';
 import {cellDraft,editCell,editInserted,emptyDrafts,insertRow,removeInserted,isDeleted,isDirty,pendingSummary,redo as redoDraft,settleApplied,toggleDeleted,undo as undoDraft} from './gridDrafts';
@@ -48,7 +48,7 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
   const storeKey=useMemo(()=>draftStoreKey(getNativeTabId(),columns),[columns]),columnLayout=useMemo(()=>columnsSignature(columns),[columns]);
   const restored=useRef(undefined);
   if(restored.current===undefined)restored.current=loadStoredDrafts(storeKey,columnLayout);
-  const [editMode,setEditMode]=useState(()=>restored.current?.editMode??false),[drafts,setDrafts]=useState(()=>restored.current?.drafts??emptyDrafts()),[editing,setEditing]=useState(null),[identity,setIdentity]=useState(()=>restored.current?.identity??null),editRef=useRef(null),[applied,setApplied]=useState({cells:{},deleted:[],base:null}),[applyState,setApplyState]=useState(null),[manualKey,setManualKey]=useState(()=>restored.current?.manualKey??null),[applyErrors,setApplyErrors]=useState([]),[descOpen,setDescOpen]=useState(false),[descQueries,setDescQueries]=useState(()=>loadLookupDescriptions(globalThis.localStorage)),[descMaps,setDescMaps]=useState({}),[descStatus,setDescStatus]=useState(''),evalWaiters=useRef(new Map()),draftsRef=useRef(null),previousOriginals=useRef(null),lastSourceRows=useRef(restored.current?.rows??null);
+  const [editMode,setEditMode]=useState(()=>restored.current?.editMode??false),[drafts,setDrafts]=useState(()=>restored.current?.drafts??emptyDrafts()),[editing,setEditing]=useState(null),[identity,setIdentity]=useState(()=>restored.current?.identity??null),editRef=useRef(null),[applied,setApplied]=useState({cells:{},deleted:[],base:null}),[applyState,setApplyState]=useState(null),[rowIds,setRowIds]=useState(null),[applyErrors,setApplyErrors]=useState([]),[descOpen,setDescOpen]=useState(false),[descQueries,setDescQueries]=useState(()=>loadLookupDescriptions(globalThis.localStorage)),[descMaps,setDescMaps]=useState({}),[descStatus,setDescStatus]=useState(''),evalWaiters=useRef(new Map()),draftsRef=useRef(null),previousOriginals=useRef(null),lastSourceRows=useRef(restored.current?.rows??null);
   const originalRows=useMemo(()=>new Map(sourceRows.map(item=>[item.index,item.row])),[sourceRows]);
   const rows=useMemo(()=>{
     const base=sourceRows.filter(item=>!(options.frozenRows||[]).includes(item.index));
@@ -68,7 +68,7 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
   const columnsKey=columns.map(item=>`${item.name}|${item.sourceTable||''}`).join(',');
   draftsRef.current=drafts;
   const firstLayout=useRef(columnLayout);
-  useEffect(()=>{if(firstLayout.current===columnLayout)return;firstLayout.current=columnLayout;if(isDirty(draftsRef.current))notifyFeedback({kind:'warning',title:'Edits discarded',message:`${pendingSummary(draftsRef.current).total} unapplied edit${pendingSummary(draftsRef.current).total===1?'':'s'} were discarded because a different result replaced this one.`});setDrafts(emptyDrafts());setEditing(null);editRef.current=null;setIdentity(null);setEditMode(false);setApplied({cells:{},deleted:[],base:null});setApplyState(null);setApplyErrors([]);setManualKey(null)},[columnsKey])
+  useEffect(()=>{if(firstLayout.current===columnLayout)return;firstLayout.current=columnLayout;if(isDirty(draftsRef.current))notifyFeedback({kind:'warning',title:'Edits discarded',message:`${pendingSummary(draftsRef.current).total} unapplied edit${pendingSummary(draftsRef.current).total===1?'':'s'} were discarded because a different result replaced this one.`});setDrafts(emptyDrafts());setEditing(null);editRef.current=null;setIdentity(null);setEditMode(false);setApplied({cells:{},deleted:[],base:null});setApplyState(null);setApplyErrors([]);setRowIds(null)},[columnsKey])
   useEffect(()=>{if(applied.base&&sourceRows[0]!==applied.base)setApplied({cells:{},deleted:[],base:null})},[sourceRows]);
   useEffect(()=>{
     if(!applyState)return undefined;
@@ -100,18 +100,52 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
   },[editMode,sourceTable?.schema,sourceTable?.table,identity===null]);
   // Unapplied edits outlive the view (a tab switch remounts the grid); they are kept in memory per tab and table.
   useEffect(()=>{
-    if(storeKey)saveStoredDrafts(storeKey,isDirty(drafts)?{signature:columnLayout,drafts,editMode,identity,manualKey,rows:originalRows}:null);
-  },[storeKey,columnLayout,drafts,editMode,identity,manualKey,originalRows]);
+    if(storeKey)saveStoredDrafts(storeKey,isDirty(drafts)?{signature:columnLayout,drafts,editMode,identity,rows:originalRows}:null);
+  },[storeKey,columnLayout,drafts,editMode,identity,originalRows]);
   useEffect(()=>subscribeNativeMessages(message=>{
     if(message.type==='sql.evaluated'&&evalWaiters.current.has(message.requestId)){evalWaiters.current.get(message.requestId)(message);evalWaiters.current.delete(message.requestId);return}
     if(message.type==='transaction.state'&&!message.pending&&message.state==='rolled back')setApplied({cells:{},deleted:[],base:null});
   }),[]);
   useEffect(()=>{
-    const reset=event=>{if(!storeKey||!storeKey.startsWith(`${event.detail?.tabId}|`))return;setDrafts(emptyDrafts());setEditMode(false);setEditing(null);editRef.current=null;setManualKey(null);setApplyErrors([]);setApplied({cells:{},deleted:[],base:null})};
+    const reset=event=>{if(!storeKey||!storeKey.startsWith(`${event.detail?.tabId}|`))return;setDrafts(emptyDrafts());setEditMode(false);setEditing(null);editRef.current=null;setRowIds(null);setApplyErrors([]);setApplied({cells:{},deleted:[],base:null})};
     window.addEventListener('fbsdb.draftsCleared',reset);return()=>window.removeEventListener('fbsdb.draftsCleared',reset);
   },[storeKey]);
   const editabilityRef=useRef(null);
-  const editability=useMemo(()=>editMode||isDirty(drafts)?explainEditability(columns,{primaryKey:identity?.columns?.length?identity.columns:manualKey?manualKey.map(index=>columns[index].sourceColumn||columns[index].name):identity?.columns??null,privileges:identity?.privileges??null}):null,[editMode,isDirty(drafts),columns,identity,manualKey]);
+  // With a usable primary key rows are found by it; otherwise by ROWID, which is read once editing starts.
+  const keyed=useMemo(()=>identity&&(editMode||isDirty(drafts))?explainEditability(columns,{primaryKey:identity.columns??null,privileges:identity.privileges??null,rowId:true}):null,[editMode,isDirty(drafts),columns,identity]);
+  const byRowId=Boolean(keyed?.byRowId&&keyed.editable);
+  const editability=useMemo(()=>{
+    if(!(editMode||isDirty(drafts)))return null;
+    if(!keyed)return explainEditability(columns,{});
+    if(!byRowId)return keyed;
+    if(rowIds?.error)return {...keyed,editable:false,reasons:[rowIds.error]};
+    return rowIds?.ids?keyed:{...keyed,editable:false,reasons:[],preparing:true};
+  },[editMode,isDirty(drafts),columns,keyed,byRowId,rowIds]);
+  const loadedCount=sourceRowCount??allRows.length;
+  useEffect(()=>{
+    if(!byRowId||!editMode||!isNativeHost)return undefined;
+    const sql=executionDetails?.executedSql;
+    if(!sql){setRowIds({error:'The statement that produced this result is not known, so its rows cannot be identified. Run the query again.'});return undefined}
+    let live=true;
+    const requestId=sendNativeCommand('sql.evaluate',{sql,parameters:executionDetails.executedParameters||[],withRowIds:true,rowLimit:Math.max(1,loadedCount),timeoutSeconds:60});
+    evalWaiters.current.set(requestId,message=>{
+      if(!live)return;
+      if(message.error){setRowIds({error:rowIdRefusal(message.error)});return}
+      const matched=matchRowIds({columns,rows:sourceRows,reply:message});
+      setRowIds(matched.error?{error:matched.error}:matched);
+    });
+    return()=>{live=false;evalWaiters.current.delete(requestId)};
+  },[byRowId,editMode,sourceRows,executionDetails?.executedSql]);
+  // A row applied earlier holds its new values in Oracle: later edits start from those, not from what the query first read.
+  const baseRow=index=>{
+    const row=originalRows.get(index);
+    if(!row||!(applied.base&&sourceRows[0]===applied.base))return row;
+    const done=Object.entries(applied.cells).filter(([name])=>name.startsWith(`${index}:`));
+    if(!done.length)return row;
+    const next=[...row];for(const [name,value] of done)next[Number(name.split(':')[1])]=value;return next;
+  };
+  const unidentified=index=>byRowId&&!rowIds?.ids?.has(index);
+  const changedSinceRead='This row changed in the database since it was read. Run the query again to edit it.';
   editabilityRef.current=editability;
   useEffect(()=>{
     const old=lastSourceRows.current;lastSourceRows.current=originalRows;
@@ -304,7 +338,8 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
     if(!item||col==null||applyState)return;
     const info=editability?.columns[col];
     if(!info?.editable){notifyFeedback({kind:'info',title:'Edit rows',message:info?.reason||'This cell cannot be edited.'});return}
-    const original=scalarText(originalRows.get(item.index)?.[col]);
+    if(unidentified(item.index)){notifyFeedback({kind:'info',title:'Edit rows',message:changedSinceRead});return}
+    const original=scalarText(baseRow(item.index)?.[col]);
     if(original===undefined){notifyFeedback({kind:'info',title:'Edit rows',message:'Dates, binary and structured values are not edited as text.'});return}
     const draft=cellDraft(drafts,item.index,col),kind=cellEditorKind(columns[col],draft?draft.value:original);
     const next={r,c,col,rowIndex:item.index,original,initial:draft?(draft.isNull?'':draft.value):original??'',typed:kind==='datetime'?undefined:typed,kind};
@@ -328,7 +363,7 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
     // Values Oracle would reject, or store differently than typed (a zoned date without its offset), stop here and are marked in the grid.
     const invalid=invalidDraftCells(current.cells,columns);
     if(invalid.length){setApplyErrors(invalid);notifyFeedback({kind:'error',title:'Apply',message:`Row ${invalid[0].row+1}: ${invalid[0].message}${invalid.length>1?` (${invalid.length-1} more marked in the grid)`:''}\nNothing was sent.`});return}
-    const built=buildDml({table:editability.table,columns,identity:editability.identity,rowAt:index=>originalRows.get(index),drafts:current});
+    const built=buildDml({table:editability.table,columns,identity:editability.identity,rowAt:baseRow,drafts:current,rowIds:byRowId?rowIds.ids:null});
     if(built.problems.length||!built.statements.length){notifyFeedback({kind:'error',title:'Apply',message:built.problems.join('\n')||'There is nothing to apply.'});return}
     setApplyErrors([]);
     // One batch: if any statement fails, Oracle returns to the point before Apply and the changes stay in the grid.
@@ -341,7 +376,7 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
     cancelEdit();setDrafts(emptyDrafts());setApplyErrors([]);
   }
   function focusedCell(){const focus=selection?.focus;if(!focus)return null;const item=rows[focus.r],col=visible[focus.c];return item&&col!=null?{r:focus.r,c:focus.c,rowIndex:item.index,col}:null}
-  function setFocusedNull(){const cell=focusedCell();if(!cell)return;const info=editability?.columns[cell.col];if(!info?.editable){notifyFeedback({kind:'info',title:'Edit rows',message:info?.reason||'This cell cannot be edited.'});return}const original=scalarText(originalRows.get(cell.rowIndex)?.[cell.col]);if(original===undefined)return;setDrafts(current=>editCell(current,cell.rowIndex,cell.col,original,{isNull:true}))}
+  function setFocusedNull(){const cell=focusedCell();if(!cell)return;const info=editability?.columns[cell.col];if(!info?.editable){notifyFeedback({kind:'info',title:'Edit rows',message:info?.reason||'This cell cannot be edited.'});return}if(unidentified(cell.rowIndex)){notifyFeedback({kind:'info',title:'Edit rows',message:changedSinceRead});return}const original=scalarText(baseRow(cell.rowIndex)?.[cell.col]);if(original===undefined)return;setDrafts(current=>editCell(current,cell.rowIndex,cell.col,original,{isNull:true}))}
   function tabFrom(r,c,direction){
     const step=nextEditableCell({rowCount:rows.length,visible,isEditable:col=>Boolean(editability?.columns[col]?.editable)},{r,c},direction);
     if(step.end||step.none||step.start)return;
@@ -358,7 +393,7 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
     setDescMaps(current=>({...current,[col]:map}));
     setDescStatus(`${map.size} description${map.size===1?'':'s'} for ${plan.covered} of ${plan.total} distinct value${plan.total===1?'':'s'}${plan.covered<plan.total?` (the first ${plan.covered} were read)`:''}. The stored values are unchanged.`);
   }
-  function deleteFocusedRow(){const cell=focusedCell();if(cell)setDrafts(current=>toggleDeleted(current,cell.rowIndex))}
+  function deleteFocusedRow(){const cell=focusedCell();if(!cell)return;if(unidentified(cell.rowIndex)){notifyFeedback({kind:'info',title:'Edit rows',message:changedSinceRead});return}setDrafts(current=>toggleDeleted(current,cell.rowIndex))}
   function keyDown(event) {
     if((event.ctrlKey||event.metaKey)&&event.shiftKey&&event.key.toLowerCase()==='p'){event.preventDefault();onTools?.('Commands');return;}
     if((event.ctrlKey||event.metaKey)&&event.altKey&&['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();jumpToMark(event.key==='ArrowDown'?1:-1);return;}
@@ -554,7 +589,7 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
   useEffect(()=>{const next={editMode,pending:draftSummary.total,invalid:0},text=gridAnnouncement(announced.current,next);announced.current=next;if(text)announce(text)},[editMode,draftSummary.total]);
   useEffect(()=>{onEditState?.({available:Boolean(sourceTable),on:editMode,descriptions:descOpen})},[sourceTable,editMode,descOpen,onEditState]);
   useEffect(()=>()=>onEditState?.({available:false,on:false,descriptions:false}),[onEditState]);
-  return <><Feedback kind={/unavailable/i.test(copyState)?"error":layoutMessage?"warning":"success"} title="Results">{copyState||layoutMessage}</Feedback>{(sourceTable||editMode)&&<GridEditBar editability={editability} loading={editMode&&Boolean(sourceTable)&&isNativeHost&&!identity} editMode={editMode} onToggle={()=>{setEditMode(on=>!on);cancelEdit()}} summary={draftSummary} applying={Boolean(applyState)} onApply={applyChanges} onDiscard={discardChanges} onNewRow={()=>setDrafts(current=>insertRow(current,{}))} onDeleteRow={deleteFocusedRow} hasSelection={Boolean(selection)} onDescriptions={()=>setDescOpen(open=>!open)}/>}{editMode&&editability?.keyProblem==='absent'&&identity&&<KeyPicker columns={columns} rows={sourceRows} onUse={setManualKey}/>}{editMode&&editability?.editable&&manualKey&&!identity?.columns?.length&&<p className="grid-edit-note key-note" role="status">Using {manualKey.map(index=>columns[index].name).join(', ')} as the row identity (chosen by you; Oracle checks that each statement changes exactly one row).</p>}{descOpen&&<DescriptionsPanel columns={columns} queries={descQueries} status={descStatus} onSave={(key,text)=>setDescQueries(saveLookupDescription(globalThis.localStorage,key,text))} onLoad={loadDescriptions} onClear={(col,key)=>{setDescQueries(saveLookupDescription(globalThis.localStorage,key,''));setDescMaps(current=>{const next={...current};delete next[col];return next});setDescStatus('')}} onClose={()=>setDescOpen(false)}/>}{editMode&&editability?.editable&&drafts.inserted.length>0&&<NewRowsPanel rows={drafts.inserted} columns={columns} editability={editability} onChange={(id,col,input)=>setDrafts(current=>editInserted(current,id,col,input))} onRemove={id=>setDrafts(current=>removeInserted(current,id))}/>}{findOpen&&<div className="result-find"><input autoFocus aria-label="Find in result cells" placeholder="Find in this page" value={find} onChange={e=>{setFind(e.target.value);setFindIndex(-1)}} onKeyDown={e=>{if(e.key==='Enter')nextMatch();if(e.key==='Escape')setFindOpen(false)}}/><span>{matches.length} matches</span><button className="results-tool" title="Next match" aria-label="Next match" onClick={nextMatch}><ArrowDown size={14}/></button><button aria-label="Close result find" onClick={()=>setFindOpen(false)}><X size={14}/></button></div>}{rowJump&&<div className="result-find result-row-jump"><input autoFocus inputMode="numeric" aria-label="Go to result row" placeholder="Row number" value={rowJump.value} onChange={e=>setRowJump({value:e.target.value,message:''})} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();setRowJump(null);root.current?.focus();return}if(e.key!=='Enter')return;e.preventDefault();const message=jumpToRow(rowJump.value);if(message){setRowJump({...rowJump,message});return}setRowJump(null);root.current?.focus()}}/><span role="status" title="Numbers follow the loaded result order shown in the # column; filters and sorts do not renumber rows.">{rowJump.message||`Loaded order · ${(sourceRowCount??allRows.length).toLocaleString('en-US')} rows`}</span><button aria-label="Close go to row" onClick={()=>{setRowJump(null);root.current?.focus()}}><X size={14}/></button></div>}{expanded&&createPortal(<div ref={overlayRoot} tabIndex={-1} className="result-cell-overlay theme-scope" data-theme={expanded.theme} role="dialog" aria-label={`Cell text: ${expanded.column}, row ${expanded.row}`} style={{left:expanded.placement.left,top:expanded.placement.top,bottom:expanded.placement.bottom,width:expanded.placement.width,maxHeight:expanded.placement.maxHeight}}><header><strong>{expanded.column}</strong><span>Row {expanded.row}{expanded.clipped?'':' · not clipped'}</span><button aria-label="Close cell text" onClick={()=>{setExpanded(null);root.current?.focus()}}><X size={13}/></button></header><pre>{expanded.text}</pre>{expanded.truncated&&<p>Showing the first {expanded.text.length.toLocaleString('en-US')} of {expanded.length.toLocaleString('en-US')} characters. Use Inspect value for the full value.</p>}</div>,document.body)}{warnings.length>0&&<Feedback kind="warning" title="Result warnings">{warnings.join("\n")}</Feedback>}{frozen.length>0&&<div className="result-frozen-rows"><table className="result-grid"><tbody>{frozen.map(item=><tr key={item.index}><th><button title="Unfreeze row" onClick={()=>settings({frozenRows:options.frozenRows.filter(i=>i!==item.index)})}>× {item.index+1}</button></th>{visible.map(i=><td key={i} className={loadedColumn===i?"selected-cell":""} style={{width:sizes[i]||autoWidths[i],...(options.columnFormats?.[i]?.wrap!=null?{whiteSpace:options.columnFormats[i].wrap?'pre-wrap':'pre'}:{}),...(options.columnFormats?.[i]?.alignment&&options.columnFormats[i].alignment!=='auto'?{textAlign:options.columnFormats[i].alignment}:{})}} onDoubleClick={()=>{if(isExpandableResultValue(columns[i],item.row[i]))onInspect({column:columns[i],row:item.index+1,value:item.row[i]})}}>{cellFormat(item.row[i],i)}</td>)}</tr>)}</tbody></table></div>}<div className="result-grid-body"><div className="result-grid-scroll">
+  return <><Feedback kind={/unavailable/i.test(copyState)?"error":layoutMessage?"warning":"success"} title="Results">{copyState||layoutMessage}</Feedback>{(sourceTable||editMode)&&<GridEditBar editability={editability} loading={editMode&&Boolean(sourceTable)&&isNativeHost&&(!identity||Boolean(editability?.preparing))} editMode={editMode} onToggle={()=>{setEditMode(on=>!on);cancelEdit()}} summary={draftSummary} applying={Boolean(applyState)} onApply={applyChanges} onDiscard={discardChanges} onNewRow={()=>setDrafts(current=>insertRow(current,{}))} onDeleteRow={deleteFocusedRow} hasSelection={Boolean(selection)} onDescriptions={()=>setDescOpen(open=>!open)}/>}{descOpen&&<DescriptionsPanel columns={columns} queries={descQueries} status={descStatus} onSave={(key,text)=>setDescQueries(saveLookupDescription(globalThis.localStorage,key,text))} onLoad={loadDescriptions} onClear={(col,key)=>{setDescQueries(saveLookupDescription(globalThis.localStorage,key,''));setDescMaps(current=>{const next={...current};delete next[col];return next});setDescStatus('')}} onClose={()=>setDescOpen(false)}/>}{editMode&&editability?.editable&&drafts.inserted.length>0&&<NewRowsPanel rows={drafts.inserted} columns={columns} editability={editability} onChange={(id,col,input)=>setDrafts(current=>editInserted(current,id,col,input))} onRemove={id=>setDrafts(current=>removeInserted(current,id))}/>}{findOpen&&<div className="result-find"><input autoFocus aria-label="Find in result cells" placeholder="Find in this page" value={find} onChange={e=>{setFind(e.target.value);setFindIndex(-1)}} onKeyDown={e=>{if(e.key==='Enter')nextMatch();if(e.key==='Escape')setFindOpen(false)}}/><span>{matches.length} matches</span><button className="results-tool" title="Next match" aria-label="Next match" onClick={nextMatch}><ArrowDown size={14}/></button><button aria-label="Close result find" onClick={()=>setFindOpen(false)}><X size={14}/></button></div>}{rowJump&&<div className="result-find result-row-jump"><input autoFocus inputMode="numeric" aria-label="Go to result row" placeholder="Row number" value={rowJump.value} onChange={e=>setRowJump({value:e.target.value,message:''})} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();setRowJump(null);root.current?.focus();return}if(e.key!=='Enter')return;e.preventDefault();const message=jumpToRow(rowJump.value);if(message){setRowJump({...rowJump,message});return}setRowJump(null);root.current?.focus()}}/><span role="status" title="Numbers follow the loaded result order shown in the # column; filters and sorts do not renumber rows.">{rowJump.message||`Loaded order · ${(sourceRowCount??allRows.length).toLocaleString('en-US')} rows`}</span><button aria-label="Close go to row" onClick={()=>{setRowJump(null);root.current?.focus()}}><X size={14}/></button></div>}{expanded&&createPortal(<div ref={overlayRoot} tabIndex={-1} className="result-cell-overlay theme-scope" data-theme={expanded.theme} role="dialog" aria-label={`Cell text: ${expanded.column}, row ${expanded.row}`} style={{left:expanded.placement.left,top:expanded.placement.top,bottom:expanded.placement.bottom,width:expanded.placement.width,maxHeight:expanded.placement.maxHeight}}><header><strong>{expanded.column}</strong><span>Row {expanded.row}{expanded.clipped?'':' · not clipped'}</span><button aria-label="Close cell text" onClick={()=>{setExpanded(null);root.current?.focus()}}><X size={13}/></button></header><pre>{expanded.text}</pre>{expanded.truncated&&<p>Showing the first {expanded.text.length.toLocaleString('en-US')} of {expanded.length.toLocaleString('en-US')} characters. Use Inspect value for the full value.</p>}</div>,document.body)}{warnings.length>0&&<Feedback kind="warning" title="Result warnings">{warnings.join("\n")}</Feedback>}{frozen.length>0&&<div className="result-frozen-rows"><table className="result-grid"><tbody>{frozen.map(item=><tr key={item.index}><th><button title="Unfreeze row" onClick={()=>settings({frozenRows:options.frozenRows.filter(i=>i!==item.index)})}>× {item.index+1}</button></th>{visible.map(i=><td key={i} className={loadedColumn===i?"selected-cell":""} style={{width:sizes[i]||autoWidths[i],...(options.columnFormats?.[i]?.wrap!=null?{whiteSpace:options.columnFormats[i].wrap?'pre-wrap':'pre'}:{}),...(options.columnFormats?.[i]?.alignment&&options.columnFormats[i].alignment!=='auto'?{textAlign:options.columnFormats[i].alignment}:{})}} onDoubleClick={()=>{if(isExpandableResultValue(columns[i],item.row[i]))onInspect({column:columns[i],row:item.index+1,value:item.row[i]})}}>{cellFormat(item.row[i],i)}</td>)}</tr>)}</tbody></table></div>}<div className="result-grid-body"><div className="result-grid-scroll">
   <div className="grid-wrap" ref={root} tabIndex={0} aria-label="Query result grid. Arrow keys navigate; Shift extends selection; Control C copies; Enter inspects." onKeyDown={event => { if (event.target === root.current) keyDown(event); }} onContextMenu={e=>{e.preventDefault();const cell=e.target.closest('[data-cell]');if(cell){const [r,c]=cell.dataset.cell.split(':').map(Number);if(!selected(r,c))select(r,c);setMenu({x:Math.min(e.clientX,document.documentElement.clientWidth-265),y:Math.max(5,Math.min(e.clientY,document.documentElement.clientHeight-450)),column:visible[c],row:r});}}} onCopy={copy} onPointerDown={startSelectionDrag}><table className={`result-grid virtual-result-grid ${options.wrap ? "result-wrap" : ""}`} role="grid" aria-multiselectable="true" aria-rowcount={rows.length + 1} style={{ "--result-row-height": `${rowHeight}px`, minWidth: 37 + widths.reduce((a, b) => a + b, 0), width: 37 + widths.reduce((a, b) => a + b, 0) }}>
     <colgroup><col style={{ width: 37 }} />{visible.map((i, c) => <col key={i} style={{ width: widths[c] }} />)}</colgroup>
     <thead><tr><th className="rownum-head"><button type="button" aria-label="Select all result cells" title="Select all cells on this page. Right-click or Ctrl+G: go to row number" onClick={selectAllCells} onContextMenu={event=>{event.preventDefault();event.stopPropagation();setRowJump({value:'',message:''})}}>#</button></th>{visible.map((i,c)=>{

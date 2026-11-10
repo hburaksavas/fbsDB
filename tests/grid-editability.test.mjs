@@ -52,17 +52,13 @@ test('calendar values round-trip to bind text',()=>{
  assert.equal(toCalendarValue('2026-11-02 10:30:00'),'2026-11-02T10:30:00');assert.equal(fromCalendarValue('2026-11-02T10:30'),'2026-11-02 10:30:00');
  assert.equal(fromCalendarValue('2026-11-02'),'2026-11-02 00:00:00');assert.equal(fromCalendarValue(''),'');assert.equal(fromCalendarValue('garbage'),'garbage');
 });
-import {candidateKeyColumns,validateManualKey} from '../src/gridEditability.js';
-test('a missing primary key is flagged so a key can be nominated',()=>{
+test('without a usable primary key rows are identified by ROWID when that is offered',()=>{
  assert.equal(explainEditability(columns,{primaryKey:[]}).keyProblem,'absent');assert.equal(explainEditability(columns,{primaryKey:['ID']}).keyProblem,null);
- assert.deepEqual(candidateKeyColumns(columns).map(item=>item.index),[0,1]);
-});
-test('a nominated key must be non-NULL and unique in the loaded rows and is never called proof',()=>{
- const loaded=[{index:0,row:['1','a']},{index:1,row:['2','a']}];
- assert.equal(validateManualKey(columns,loaded,[0]).ok,true);assert.match(validateManualKey(columns,loaded,[0]).note,/does not prove/);
- assert.match(validateManualKey(columns,loaded,[1]).error,/Rows 1 and 2 have the same values in NAME/);
- assert.match(validateManualKey(columns,[...loaded,{index:2,row:[null,'z']}],[0]).error,/NULL/);assert.match(validateManualKey(columns,loaded,[]).error,/at least one/);
- assert.equal(validateManualKey(columns,loaded,[0,1]).ok,true);
+ const absent=explainEditability(columns,{primaryKey:[],rowId:true});
+ assert.equal(absent.editable,true);assert.equal(absent.byRowId,true);assert.deepEqual(absent.identity,[]);assert.deepEqual(absent.reasons,[]);
+ assert.equal(explainEditability(columns,{primaryKey:['MISSING'],rowId:true}).byRowId,true);
+ const keyed=explainEditability(columns,{primaryKey:['ID'],rowId:true});
+ assert.equal(keyed.byRowId,false);assert.deepEqual(keyed.identity,[0]);
 });
 
 test('zoned columns bind with their zone and a session-relative key is refused',()=>{

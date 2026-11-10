@@ -592,6 +592,9 @@ public sealed partial class MainPage
             try
             {
                 MiniToolService.AssertSelect(sql);
+                // Grid editing by ROWID reads the executed query again with each row's ROWID in front (see GridRowIds).
+                var withRowIds = payload.TryGetProperty("withRowIds", out var rowIdsValue) && rowIdsValue.ValueKind == JsonValueKind.True;
+                if (withRowIds) sql = GridRowIds.Wrap(sql);
                 var parameters = new List<SqlBindParameter>();
                 if (payload.TryGetProperty("parameters", out var values) && values.ValueKind == JsonValueKind.Array)
                 {
@@ -604,7 +607,7 @@ public sealed partial class MainPage
                     }
                 }
                 var timeout = payload.TryGetProperty("timeoutSeconds", out var timeoutValue) && timeoutValue.TryGetInt32(out var seconds) ? Math.Clamp(seconds, 1, 300) : 30;
-                var limit = payload.TryGetProperty("rowLimit", out var limitValue) && limitValue.TryGetInt32(out var requestedLimit) ? Math.Clamp(requestedLimit, 1, 50) : 1;
+                var limit = payload.TryGetProperty("rowLimit", out var limitValue) && limitValue.TryGetInt32(out var requestedLimit) ? Math.Clamp(requestedLimit, 1, withRowIds ? GridRowIds.MaxRows : 50) : 1;
                 var result = await Task.Run(() => _oracle.ExecuteAsync(sql, parameters, limit, default, timeoutSeconds: timeout));
                 if (result.ResultId is { } resultId) await _oracle.CloseResultAsync(resultId);
                 Send(sender, new { type = "sql.evaluated", requestId, tabId, columns = result.Columns, rows = result.Rows, elapsedMs = result.ElapsedMs, transactionPending = result.TransactionPending, truncated = result.Truncated || result.HasMore });
