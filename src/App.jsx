@@ -148,7 +148,7 @@ import { prepareEvaluation, evaluationParameters } from "./quickEval.js";
 import { cellDragType, planBindDrop } from "./resultBindDrop.js";
 import { exportProgressText } from "./exportProgress.js";
 import { loadIconPacks, resolveIconTheme, setIconTheme } from "./iconTheme.js";
-import { clearTabDrafts, countTabDrafts, draftStoreKey, settleStoredTransactions } from "./draftStore.js";
+import { clearTabDrafts, countTabDrafts, draftStoreKey } from "./draftStore.js";
 import { HeldDraftsNotice } from './HeldDraftsNotice';
 import { ShortcutMapDialog } from './ShortcutMapDialog';
 import { LiveAnnouncer } from './LiveAnnouncer';
@@ -1081,8 +1081,6 @@ export function App() {
       if(typeof message?.autoCommit==='boolean')updateTabSession('autoCommit',message.autoCommit,owner);
       // Grid Apply and its undo change the session's transaction outside any query result; Commit and Rollback depend on this state.
       if(['sql.dmlApplied','sql.gridBatchRolledBack'].includes(message?.type)&&typeof message.transactionPending==='boolean')setTransactionPending(message.transactionPending,owner);
-      if(message?.type==='transaction.state')settleStoredTransactions(owner,message.unconfirmed?'unconfirmed':message.state);
-      if(message?.type==='connection.connected')settleStoredTransactions(owner,'reconnected');
       if(message?.type==='transaction.autoCommit'){updateTabSession('autoCommitPending',false,owner);return;}
       if(['workspace.git','workspace.gitDiff','workspace.gitStage','workspace.gitUnstage','workspace.gitCommit','workspace.replacePreview','workspace.replaceApply'].includes(message?.type)) {
         if(workspaceDevRequestsRef.current.get(message.type)!==message.requestId)return;

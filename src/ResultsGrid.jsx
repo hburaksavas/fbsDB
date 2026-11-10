@@ -4,38 +4,20 @@ import { useInspectorWidth } from './useInspectorWidth';
 import {sendNativeCommand,isNativeHost,subscribeNativeMessages,getNativeTabId} from './nativeBridge';
 import {columnsSignature,draftStoreKey,loadStoredDrafts,saveStoredDrafts} from './draftStore';
 import {GridEditBar,CellEditor} from './GridEditBar';
-import {PendingChangesDrawer} from './PendingChangesDrawer';
 import {NewRowsPanel} from './NewRowsPanel';
-import {BulkEditPanel} from './BulkEditPanel';
-import {PastePanel} from './PastePanel';
-import {BooleanColumnsPanel,BooleanCell} from './BooleanColumnsPanel';
-import {CommitChecksPanel} from './CommitChecksPanel';
-import {outsideFilterNote,rowLeavesFilters} from './draftFilterFit';
 import {appliedReadbackCells} from './gridReadback';
-import {RelatedRecordPicker} from './RelatedRecordPicker';
-import {foreignKeyTargets,pickedCells} from './relatedPicker';
-import {VerticalRecordPanel} from './VerticalRecordPanel';
-import {newRowFieldOrder,nextEditableCell} from './tabEntry';
+import {nextEditableCell} from './tabEntry';
 import {DescriptionsPanel} from './DescriptionsPanel';
 import {announce,gridAnnouncement} from './announcer';
-import {childCountQuery,interpretCount,normalizeRelations,relationLabel} from './relatedChecks';
 import {descriptionMap,loadLookupDescriptions,lookupColumnKey,prepareDescriptionQuery,saveLookupDescription} from './lookupDescriptions';
-import {loadRowTemplates,saveRowTemplate,removeRowTemplate,templateFromRow,templateTableKey,valuesFromTemplate} from './rowTemplates';
-import {checkRowLimit,evaluateCheck,loadCommitChecks,saveCommitChecks} from './commitChecks';
-import {booleanColumnKey,booleanState,loadBooleanColumns,presetFor,saveBooleanColumn,toggledValue} from './booleanColumns';
 import {numberSeparators,parseLocaleNumber} from './localeNumber';
-import {columnSuggestions,suggestionScope} from './valueSuggestions';
-import {looksLikeHeader,parseTsv,planInsertPaste,planPaste} from './pasteGrid';
 import {KeyPicker} from './KeyPicker';
-import {mapApplyErrors,splitConstraint} from './oracleErrorMap';
-import {settleTransaction,startApplied,transactionText} from './appliedTransaction';
-import {mergeAppliedEntries,reconcileApplied,reconciliationNote,reconciliationQuery,appliedEntries,commitReceipt,compareVerification,duplicateValues,verificationQuery} from './postCommit';
+import {mapApplyErrors} from './oracleErrorMap';
 import {reconcileDrafts,resolveConflict} from './draftReconcile';
-import {adjacentEdit,cellDraft,editCell,editCells,editInserted,emptyDrafts,insertRow,insertRows,removeInserted,isDeleted,isDirty,pendingChanges,pendingSummary,redo as redoDraft,revertCell,revertRow,settleApplied,toggleDeleted,undo as undoDraft} from './gridDrafts';
+import {cellDraft,editCell,editInserted,emptyDrafts,insertRow,removeInserted,isDeleted,isDirty,pendingSummary,redo as redoDraft,settleApplied,toggleDeleted,undo as undoDraft} from './gridDrafts';
 import {cellEditorKind,explainEditability} from './gridEditability';
-import {buildDml,statementKey} from './dmlPreview';
+import {buildDml} from './dmlPreview';
 import {invalidDraftCells} from './cellValidation';
-import {findDuplicateKeys} from './uniqueKeyChecks';
 import { formatResultValue, matchesCondition, copyResultData, selectionStatistics, sqlIdentifier, sqlLiteral, isExpandableResultValue } from "./resultFeatures";
 import { isResultCellSelected, selectResultRange, resultSelectionTsv } from "./resultSelection";
 import { ExactDecimal, formatExact } from "./exactDecimal";
@@ -66,158 +48,88 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
   const storeKey=useMemo(()=>draftStoreKey(getNativeTabId(),columns),[columns]),columnLayout=useMemo(()=>columnsSignature(columns),[columns]);
   const restored=useRef(undefined);
   if(restored.current===undefined)restored.current=loadStoredDrafts(storeKey,columnLayout);
-  const [relatedPick,setRelatedPick]=useState(null);
-  const [editMode,setEditMode]=useState(()=>restored.current?.editMode??false),[drafts,setDrafts]=useState(()=>restored.current?.drafts??emptyDrafts()),[editing,setEditing]=useState(null),[identity,setIdentity]=useState(()=>restored.current?.identity??null),[drawerOpen,setDrawerOpen]=useState(false),editRef=useRef(null),[applied,setApplied]=useState({cells:{},deleted:[],base:null}),[applyState,setApplyState]=useState(null),[changesOnly,setChangesOnly]=useState(false),[manualKey,setManualKey]=useState(()=>restored.current?.manualKey??null),[conflicts,setConflicts]=useState(()=>restored.current?.conflicts??[]),[tx,setTx]=useState(()=>restored.current?.tx??null),[bulkCells,setBulkCells]=useState(null),[recordOpen,setRecordOpen]=useState(false),[descOpen,setDescOpen]=useState(false),[related,setRelated]=useState(null),[descQueries,setDescQueries]=useState(()=>loadLookupDescriptions(globalThis.localStorage)),[descMaps,setDescMaps]=useState({}),[descStatus,setDescStatus]=useState(''),[tabAddsRow,setTabAddsRow]=useState(()=>{try{return globalThis.localStorage?.getItem('fbsdb.tabAddsRow')==='1'}catch{return false}}),[focusNewRow,setFocusNewRow]=useState(null),[templates,setTemplates]=useState(()=>loadRowTemplates(globalThis.localStorage)),[txLabel,setTxLabel]=useState(()=>restored.current?.txLabel??''),[checks,setChecks]=useState(()=>loadCommitChecks(globalThis.localStorage)),[checksOpen,setChecksOpen]=useState(false),[checkResults,setCheckResults]=useState(null),[batchSavepoint,setBatchSavepoint]=useState(null),evalWaiters=useRef(new Map()),[booleanMap,setBooleanMap]=useState(()=>loadBooleanColumns(globalThis.localStorage)),[booleanOpen,setBooleanOpen]=useState(false),[pasteData,setPasteData]=useState(null),[appliedLog,setAppliedLog]=useState(()=>restored.current?.appliedLog??[]),[verification,setVerification]=useState(null),verifyRef=useRef(null),txRef=useRef(null),[excluded,setExcluded]=useState(()=>new Set()),[deletionsOnly,setDeletionsOnly]=useState(false),[applyErrors,setApplyErrors]=useState([]),[constraintInfo,setConstraintInfo]=useState({}),[tick,setTick]=useState(0),draftsRef=useRef(null),previousOriginals=useRef(null),lastSourceRows=useRef(restored.current?.rows??null);
+  const [editMode,setEditMode]=useState(()=>restored.current?.editMode??false),[drafts,setDrafts]=useState(()=>restored.current?.drafts??emptyDrafts()),[editing,setEditing]=useState(null),[identity,setIdentity]=useState(()=>restored.current?.identity??null),editRef=useRef(null),[applied,setApplied]=useState({cells:{},deleted:[],base:null}),[applyState,setApplyState]=useState(null),[manualKey,setManualKey]=useState(()=>restored.current?.manualKey??null),[applyErrors,setApplyErrors]=useState([]),[descOpen,setDescOpen]=useState(false),[descQueries,setDescQueries]=useState(()=>loadLookupDescriptions(globalThis.localStorage)),[descMaps,setDescMaps]=useState({}),[descStatus,setDescStatus]=useState(''),evalWaiters=useRef(new Map()),draftsRef=useRef(null),previousOriginals=useRef(null),lastSourceRows=useRef(restored.current?.rows??null);
   const originalRows=useMemo(()=>new Map(sourceRows.map(item=>[item.index,item.row])),[sourceRows]);
   const rows=useMemo(()=>{
     const base=sourceRows.filter(item=>!(options.frozenRows||[]).includes(item.index));
     const settled=applied.base&&sourceRows[0]===applied.base;
-    if(deletionsOnly&&editMode)return base.filter(item=>drafts.deleted.includes(item.index)||(settled&&applied.deleted.includes(item.index)));
-    const touched=new Set([...Object.keys(drafts.cells).map(name=>Number(name.split(':')[0])),...drafts.deleted,...(settled?[...Object.keys(applied.cells).map(name=>Number(name.split(':')[0])),...applied.deleted]:[])]);
-    if(!isDirty(drafts)&&!(settled&&Object.keys(applied.cells).length))return changesOnly&&editMode?base.filter(item=>touched.has(item.index)):base;
-    return base.filter(item=>!(changesOnly&&editMode)||touched.has(item.index)).map(item=>{
+    if(!Object.keys(drafts.cells).length&&!(settled&&Object.keys(applied.cells).length))return base;
+    return base.map(item=>{
       const edits=Object.entries(drafts.cells).filter(([name])=>name.startsWith(`${item.index}:`)),done=settled?Object.entries(applied.cells).filter(([name])=>name.startsWith(`${item.index}:`)):[];
       if(!edits.length&&!done.length)return item;
       const row=[...item.row];
       for(const [name,value] of done)row[Number(name.split(':')[1])]=value;
       for(const [name,draft] of edits)row[Number(name.split(':')[1])]=draft.isNull?null:draft.value;
-      return {...item,row,outsideFilter:!drafts.deleted.includes(item.index)&&rowLeavesFilters(row,textFilter,options)};
+      return {...item,row};
     });
-  },[sourceRows,options,textFilter,drafts,applied,changesOnly,deletionsOnly,editMode]);
-  const outsideFilterCount=useMemo(()=>rows.filter(item=>item.outsideFilter).length,[rows]);
+  },[sourceRows,options,drafts,applied]);
   const appliedLive=applied.base&&sourceRows[0]===applied.base;
   const sourceTable=useMemo(()=>{const column=columns.find(item=>item.sourceTable);return column?{schema:column.sourceSchema||'',table:column.sourceTable}:null},[columns]);
   const columnsKey=columns.map(item=>`${item.name}|${item.sourceTable||''}`).join(',');
   draftsRef.current=drafts;
   const firstLayout=useRef(columnLayout);
-  useEffect(()=>{if(firstLayout.current===columnLayout)return;firstLayout.current=columnLayout;if(isDirty(draftsRef.current))notifyFeedback({kind:'warning',title:'Edits discarded',message:`${pendingSummary(draftsRef.current).total} unapplied edit${pendingSummary(draftsRef.current).total===1?'':'s'} were discarded because a different result replaced this one.`});setConflicts([]);setDrafts(emptyDrafts());setEditing(null);editRef.current=null;setIdentity(null);setDrawerOpen(false);setEditMode(false);setApplied({cells:{},deleted:[],base:null});setApplyState(null);setChangesOnly(false);setDeletionsOnly(false);setExcluded(new Set());setManualKey(null)},[columnsKey])
+  useEffect(()=>{if(firstLayout.current===columnLayout)return;firstLayout.current=columnLayout;if(isDirty(draftsRef.current))notifyFeedback({kind:'warning',title:'Edits discarded',message:`${pendingSummary(draftsRef.current).total} unapplied edit${pendingSummary(draftsRef.current).total===1?'':'s'} were discarded because a different result replaced this one.`});setDrafts(emptyDrafts());setEditing(null);editRef.current=null;setIdentity(null);setEditMode(false);setApplied({cells:{},deleted:[],base:null});setApplyState(null);setApplyErrors([]);setManualKey(null)},[columnsKey])
   useEffect(()=>{if(applied.base&&sourceRows[0]!==applied.base)setApplied({cells:{},deleted:[],base:null})},[sourceRows]);
   useEffect(()=>{
-    if(applyState?.phase!=='running')return undefined;
+    if(!applyState)return undefined;
     return subscribeNativeMessages(message=>{
       if(message.type!=='sql.dmlApplied'||message.requestId!==applyState.requestId)return;
-      if(message.error){setApplyState({phase:'done',error:message.error,outcomes:[],statements:applyState.statements});return}
-      const settled=settleApplied(drafts,applyState.statements,message.outcomes||[]);
+      const outcomes=message.outcomes||[],statements=applyState.statements;
+      setApplyState(null);
+      if(message.error){notifyFeedback({kind:'error',title:'Apply',message:message.error});return}
+      const settled=settleApplied(draftsRef.current,statements,outcomes);
       setDrafts(settled.drafts);
-      setApplied(current=>({base:sourceRows[0]??null,cells:{...(current.base===sourceRows[0]?current.cells:{}),...settled.appliedCells,...appliedReadbackCells(applyState.statements,message.outcomes||[])},deleted:[...(current.base===sourceRows[0]?current.deleted:[]),...settled.appliedDeleted]}));
-      const mapped=mapApplyErrors(applyState.statements,message.outcomes||[],columns);
+      setApplied(current=>({base:sourceRows[0]??null,cells:{...(current.base===sourceRows[0]?current.cells:{}),...settled.appliedCells,...appliedReadbackCells(statements,outcomes)},deleted:[...(current.base===sourceRows[0]?current.deleted:[]),...settled.appliedDeleted]}));
+      const mapped=mapApplyErrors(statements,outcomes,columns);
       setApplyErrors(mapped);
-      for(const error of mapped.filter(item=>item.constraint)){const target=splitConstraint(error.constraint,sourceTable?.schema||'');const requestId=sendNativeCommand('result.constraintInfo',target);setConstraintInfo(current=>({...current,[error.constraint]:{requestId}}))}
-      const appliedCount=(message.outcomes||[]).filter(item=>item.status==='applied').length;
-      if(appliedCount){
-        const cellsByRow={};for(const [name,draft] of Object.entries(drafts.cells)){const [row,col]=name.split(':').map(Number);(cellsByRow[row]??={})[col]=draft}
-        const logged=appliedEntries(applyState.statements,message.outcomes||[],cellsByRow);
-        setAppliedLog(current=>txRef.current?.state==='pending'?[...current,...logged]:logged);setVerification(null);
-        setBatchSavepoint(message.recovery?null:{entries:logged,count:appliedCount,done:false});
-        setTx(current=>startApplied(current,appliedCount));
+      const stopped=outcomes.find(item=>item.status==='failed'||item.status==='mismatch');
+      if(stopped){
+        const statement=statements[stopped.index],where=statement?.kind==='insert'?`New row ${statement.id}`:`Row ${(statement?.row??0)+1}`;
+        const why=stopped.status==='failed'?(mapped[0]?.message||stopped.error):stopped.rowsAffected===0?'the row was changed or deleted by someone else since it was read. Run the query again.':`it would change ${stopped.rowsAffected} rows instead of ${stopped.expected}.`;
+        notifyFeedback({kind:'error',title:'Apply failed',message:`${where}: ${why}\nNothing was changed; your edits are still in the grid.`});
+        return;
       }
-      setApplyState({phase:'done',outcomes:message.outcomes||[],statements:applyState.statements,transactionPending:message.transactionPending,recovery:message.recovery,stoppedByUser:message.stoppedByUser});
+      const count=outcomes.filter(item=>item.status==='applied').length;
+      notifyFeedback({kind:'success',title:'Changes applied',message:`${count} change${count===1?'':'s'} sent to Oracle. Commit makes them permanent; Rollback undoes them.`});
     });
-  },[applyState?.phase,applyState?.requestId]);
+  },[applyState?.requestId]);
   useEffect(()=>{
     if(!editMode||!sourceTable||!isNativeHost||identity)return undefined;
     const requestId=sendNativeCommand('result.editIdentity',{schema:sourceTable.schema,table:sourceTable.table});
     return subscribeNativeMessages(message=>{if(message.type==='result.editIdentity'&&message.requestId===requestId)setIdentity({columns:message.error?[]:message.columns||[],error:message.error,privileges:message.privileges??null})});
   },[editMode,sourceTable?.schema,sourceTable?.table,identity===null]);
+  // Unapplied edits outlive the view (a tab switch remounts the grid); they are kept in memory per tab and table.
   useEffect(()=>{
-    if(!storeKey)return;
-    // Work still open or unconfirmed in Oracle must outlive the view too, or leaving the tab would lose what can be checked afterwards.
-    const openWork=tx?.state==='pending'||tx?.state==='unconfirmed';
-    saveStoredDrafts(storeKey,isDirty(drafts)||conflicts.length||openWork?{signature:columnLayout,drafts,editMode,identity,manualKey,conflicts,rows:originalRows,tx:openWork?tx:null,appliedLog:openWork?appliedLog:[],txLabel:openWork?txLabel:''}:null);
-  },[storeKey,columnLayout,drafts,editMode,identity,manualKey,conflicts,originalRows,tx,appliedLog,txLabel]);
-  useEffect(()=>{
-    if(restored.current&&isDirty(restored.current.drafts))notifyFeedback({kind:'info',title:'Unapplied edits restored',message:'Your unapplied edits for this table were restored; they are matched to the rows by key.'});
-  },[]);
-  txRef.current=tx;
+    if(storeKey)saveStoredDrafts(storeKey,isDirty(drafts)?{signature:columnLayout,drafts,editMode,identity,manualKey,rows:originalRows}:null);
+  },[storeKey,columnLayout,drafts,editMode,identity,manualKey,originalRows]);
   useEffect(()=>subscribeNativeMessages(message=>{
-    if((message.type==='sql.evaluated'||message.type==='result.relations')&&evalWaiters.current.has(message.requestId)){evalWaiters.current.get(message.requestId)(message);evalWaiters.current.delete(message.requestId);return}
-    if(message.type==='sql.gridBatchRolledBack'){setBatchSavepoint(current=>{if(!current)return current;if(!message.ok){notifyFeedback({kind:'error',title:'Undo batch',message:message.error||'The batch could not be rolled back.'});return current}return {...current,done:true}});return}
-    if(message.type==='sql.evaluated'&&message.requestId&&message.requestId===verifyRef.current?.requestId){
-      const query=verifyRef.current;verifyRef.current=null;
-      if(message.error){setVerification({error:message.error});return}
-      if(query.reconcile){const results=reconcileApplied({identity:query.identity,entries:query.entries,selected:query.selected,rows:message.rows||[]});setVerification({reconcile:true,results,note:reconciliationNote(results,Math.max(0,(txRef.current?.count||0)-query.entries.length)),unsaved:results.filter(item=>item.status==='notSaved').map(item=>item.row)});return}
-      setVerification({results:compareVerification({identity:query.identity,entries:query.entries,selected:query.selected,rows:message.rows||[]})});return}
-    if(message.type==='result.constraintInfo'){setConstraintInfo(current=>{const key=Object.keys(current).find(name=>current[name].requestId===message.requestId);return key?{...current,[key]:{requestId:message.requestId,info:message}}:current});return}
-    if(message.type!=='transaction.state')return;
-    if(message.unconfirmed){setTx(current=>current&&current.state==='pending'?settleTransaction(current,'unconfirmed'):current);return}
-    if(message.pending)return;
-    setBatchSavepoint(null);
-    setTx(current=>settleTransaction(current,message.state));
-    if(message.state==='rolled back')setApplied({cells:{},deleted:[],base:null});
+    if(message.type==='sql.evaluated'&&evalWaiters.current.has(message.requestId)){evalWaiters.current.get(message.requestId)(message);evalWaiters.current.delete(message.requestId);return}
+    if(message.type==='transaction.state'&&!message.pending&&message.state==='rolled back')setApplied({cells:{},deleted:[],base:null});
   }),[]);
-  useEffect(()=>{if(tx?.state!=='pending')return undefined;const timer=setInterval(()=>setTick(count=>count+1),15000);return()=>clearInterval(timer)},[tx?.state]);
   useEffect(()=>{
-    const reset=event=>{if(!storeKey||!storeKey.startsWith(`${event.detail?.tabId}|`))return;setDrafts(emptyDrafts());setConflicts([]);setEditMode(false);setEditing(null);editRef.current=null;setDrawerOpen(false);setManualKey(null);setApplied({cells:{},deleted:[],base:null})};
+    const reset=event=>{if(!storeKey||!storeKey.startsWith(`${event.detail?.tabId}|`))return;setDrafts(emptyDrafts());setEditMode(false);setEditing(null);editRef.current=null;setManualKey(null);setApplyErrors([]);setApplied({cells:{},deleted:[],base:null})};
     window.addEventListener('fbsdb.draftsCleared',reset);return()=>window.removeEventListener('fbsdb.draftsCleared',reset);
   },[storeKey]);
-  useEffect(()=>{
-    if(!batchSavepoint?.done)return;
-    const batch=batchSavepoint;
-    setDrafts(current=>{let next=current;for(const entry of batch.entries){if(entry.kind==='delete'){if(!next.deleted.includes(entry.row))next=toggleDeleted(next,entry.row)}else for(const [col,draft] of Object.entries(entry.cells))next=editCell(next,entry.row,Number(col),draft.original,draft.isNull?{isNull:true}:{value:draft.value})}return next});
-    const gone=new Set(batch.entries.map(entry=>entry.row));
-    setApplied(current=>({...current,cells:Object.fromEntries(Object.entries(current.cells).filter(([name])=>!gone.has(Number(name.split(':')[0])))),deleted:current.deleted.filter(row=>!gone.has(row))}));
-    setAppliedLog(current=>current.filter(entry=>!batch.entries.includes(entry)));
-    setTx(current=>current&&current.count-batch.count>0?{...current,count:current.count-batch.count}:null);
-    setBatchSavepoint(null);
-    notifyFeedback({kind:'info',title:'Batch undone',message:`The last Apply was rolled back in Oracle (and anything the session did after it). Your ${batch.count} change${batch.count===1?'':'s'} are drafts again.`});
-  },[batchSavepoint?.done]);
-  // After an unknown Commit outcome: only rows the database shows still holding their old values become drafts. The rows that were saved are never sent again.
-  const keepUnsavedAsDrafts=()=>{
-    const unsaved=new Set(verification?.unsaved||[]);
-    if(!unsaved.size)return;
-    const entries=mergeAppliedEntries(appliedLog).filter(entry=>unsaved.has(entry.row));
-    setDrafts(current=>{let next=current;for(const entry of entries){if(entry.kind==='delete'){if(!next.deleted.includes(entry.row))next=toggleDeleted(next,entry.row)}else for(const [col,draft] of Object.entries(entry.cells))next=editCell(next,entry.row,Number(col),draft.original,draft.isNull?{isNull:true}:{value:draft.value})}return next});
-    setApplied(current=>({...current,cells:Object.fromEntries(Object.entries(current.cells).filter(([name])=>!unsaved.has(Number(name.split(':')[0])))),deleted:current.deleted.filter(row=>!unsaved.has(row))}));
-    setAppliedLog(current=>current.filter(entry=>!unsaved.has(entry.row)));setVerification(null);setTx(null);
-    notifyFeedback({kind:'info',title:'Edits kept as drafts',message:`${entries.length} change${entries.length===1?' is a draft':'s are drafts'} again. Applying still checks that each row holds the old value, so nothing already saved is overwritten.`});
-  };
-  const askHost=(command,payload)=>new Promise(resolve=>{const requestId=sendNativeCommand(command,payload);evalWaiters.current.set(requestId,resolve);setTimeout(()=>{if(evalWaiters.current.delete(requestId))resolve({error:'No answer from Oracle within 30 seconds.'})},31000)});
-  async function openRelatedPicker(){
-    const cell=focusedCell();
-    if(!cell||!sourceTable||!editability?.editable)return;
-    const reply=await askHost('result.relations',{schema:sourceTable.schema,table:sourceTable.table});
-    if(reply.error){notifyFeedback({kind:'error',title:'Related record',message:reply.error});return}
-    const target=foreignKeyTargets(columns,normalizeRelations(reply).parents,editability.columns).get(cell.col);
-    if(!target){notifyFeedback({kind:'info',title:'Related record',message:`${columns[cell.col]?.name} has no foreign key that can be edited here. Every column of the key must be in this result and unlocked.`});return}
-    setRelatedPick({target,rowIndex:cell.rowIndex});
-  }
-  function stagePicked(parentColumns,row){
-    const picked=pickedCells(relatedPick.target,parentColumns,row);
-    if(picked.error){notifyFeedback({kind:'error',title:'Related record',message:picked.error});return}
-    const changes=picked.cells.map(({col,value})=>({row:relatedPick.rowIndex,col,original:scalarText(originalRows.get(relatedPick.rowIndex)?.[col]),value:value??undefined,isNull:value==null}));
-    if(changes.some(change=>change.original===undefined)){notifyFeedback({kind:'info',title:'Related record',message:'The current value cannot be edited as text.'});return}
-    setDrafts(current=>editCells(current,changes));
-    setRelatedPick(null);root.current?.focus();
-  }
-  const runChecks=async()=>{
-    setCheckResults(null);
-    const results=[];
-    for(const check of checks){
-      setCheckResults([...results,{name:check.name,status:'info',message:'Running…',rows:[]}]);
-      const requestId=sendNativeCommand('sql.evaluate',{sql:check.sql,parameters:[],rowLimit:checkRowLimit,timeoutSeconds:30});
-      const reply=await new Promise(resolve=>{evalWaiters.current.set(requestId,resolve);setTimeout(()=>{if(evalWaiters.current.delete(requestId))resolve({error:'No answer from Oracle within 30 seconds.'})},31000)});
-      results.push(evaluateCheck(check,reply.error?{error:reply.error}:{rows:reply.rows||[],columns:reply.columns,truncated:reply.truncated}));
-    }
-    setCheckResults(results);
-  };
   const editabilityRef=useRef(null);
-  const editability=useMemo(()=>editMode?explainEditability(columns,{primaryKey:identity?.columns?.length?identity.columns:manualKey?manualKey.map(index=>columns[index].sourceColumn||columns[index].name):identity?.columns??null,privileges:identity?.privileges??null}):null,[editMode,columns,identity,manualKey]);
+  const editability=useMemo(()=>editMode||isDirty(drafts)?explainEditability(columns,{primaryKey:identity?.columns?.length?identity.columns:manualKey?manualKey.map(index=>columns[index].sourceColumn||columns[index].name):identity?.columns??null,privileges:identity?.privileges??null}):null,[editMode,isDirty(drafts),columns,identity,manualKey]);
   editabilityRef.current=editability;
   useEffect(()=>{
     const old=lastSourceRows.current;lastSourceRows.current=originalRows;
-    const live=editabilityRef.current;
-    if(!old||old===originalRows||!isDirty(draftsRef.current)||!live?.editable||!live.identity.length)return;
+    if(!old||old===originalRows||!isDirty(draftsRef.current))return;
     const first=sourceRows[0];
     if(first&&old.get(first.index)===first.row)return;
+    const live=editabilityRef.current;
+    setApplyErrors([]);
+    if(!live?.editable||!live.identity.length){setDrafts(emptyDrafts());notifyFeedback({kind:'warning',title:'Edits discarded',message:'The result was read again and the unapplied edits could not be matched to its rows.'});return}
+    // Edits follow their rows by key. One whose row is gone is dropped; one whose stored value changed meanwhile stays and replaces the new value.
     const result=reconcileDrafts({drafts:draftsRef.current,oldRows:old,newRows:sourceRows,identity:live.identity});
-    setDrafts(result.drafts);setConflicts(result.conflicts);
-    if(result.conflicts.length){setDrawerOpen(true);notifyFeedback({kind:'warning',title:'Refreshed result',message:`${result.conflicts.length} edit${result.conflicts.length===1?'':'s'} need your decision; nothing was overwritten.`})}
-    else notifyFeedback({kind:'info',title:'Refreshed result',message:'Your unapplied edits were kept and matched to their rows by key.'});
+    let next=result.drafts;
+    for(const conflict of result.conflicts)if(conflict.kind==='changed')next=resolveConflict(next,conflict,'mine');
+    const lost=result.conflicts.filter(conflict=>conflict.kind==='missing').length;
+    setDrafts(next);
+    if(lost)notifyFeedback({kind:'warning',title:'Refreshed result',message:`${lost} unapplied edit${lost===1?' was':'s were'} dropped because the row is no longer in the result. The others were kept.`});
   },[originalRows]);
   const draftSummary=useMemo(()=>pendingSummary(drafts),[drafts]);
-  const invalidCells=useMemo(()=>editMode?invalidDraftCells(drafts.cells,columns):[],[editMode,drafts.cells,columns]);
-  const draftPreview=useMemo(()=>{if(!(editMode&&editability?.editable))return {statements:[],problems:[]};const built=buildDml({table:editability.table,columns,identity:editability.identity,rowAt:index=>originalRows.get(index),drafts});return {...built,problems:[...(conflicts.length?[`Resolve ${conflicts.length} conflict${conflicts.length===1?'':'s'} first.`]:[]),...invalidCells.map(item=>`Row ${item.row+1}: ${item.message}`),...findDuplicateKeys({columns,identity:editability.identity,rows:sourceRows,drafts}).map(item=>item.message),...built.problems]}},[editMode,editability,columns,originalRows,sourceRows,drafts,invalidCells,conflicts]);
-  const selectedPreview=useMemo(()=>({...draftPreview,statements:draftPreview.statements.filter(item=>!excluded.has(statementKey(item)))}),[draftPreview,excluded]);
   useEffect(()=>{if(pendingRow==null)return;const position=rows.findIndex(item=>item.index===pendingRow);if(position<0)return;setPendingRow(null);reveal(position,0);root.current?.focus()},[rows,pendingRow]);
   const frozen=useMemo(()=>allRows.filter(item=>(options.frozenRows||[]).includes(item.index)),[allRows,options.frozenRows]);
   const root = useRef(null), frame = useRef(null), menuRoot=useRef(null);
@@ -233,12 +145,6 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
   const [loadedColumn,setLoadedColumn]=useState(null),[columnMenu,setColumnMenu]=useState(null);
   const [selection, setSelection] = useState(null), [sizes, setSizes] = useState({}), [hidden, setHidden] = useState([]), [pinned, setPinned] = useState(null), [order, setOrder] = useState([]), [copyState, setCopyState] = useState(""), [formatMenu,setFormatMenu]=useState(null), [dropColumn,setDropColumn]=useState(null);
   const {width:inspectorWidth,onPointerDown:resizeInspector,onKeyDown:resizeInspectorKey,locked:inspectorLocked}=useInspectorWidth();
-  const autoPinned=useRef(false);
-  useEffect(()=>{
-    const key=editMode&&editability?.editable&&editability.identity.length===1?editability.identity[0]:null;
-    if(key!=null&&pinned==null){setPinned(key);autoPinned.current=true}
-    else if(key==null&&autoPinned.current){setPinned(null);autoPinned.current=false}
-  },[editMode,editability]);
   const formatTrigger=useRef(null);
   const [dropRow, setDropRow] = useState(null);
 
@@ -265,8 +171,7 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
   useEffect(() => { try { localStorage.setItem(`fbsdb.result-layout.auto.${signature}`, JSON.stringify({sizes,hidden,pinned,order})); } catch {} }, [sizes,hidden,pinned,order,onLayoutChange]);
   useEffect(() => { const dismiss = e => { if(e.key === "Escape") {setMenu(null);setFindOpen(false);} }; const outside = e => {if(!e.target.closest('.result-context-menu'))setMenu(null)};document.addEventListener('keydown',dismiss);document.addEventListener('pointerdown',outside);return()=>{document.removeEventListener('keydown',dismiss);document.removeEventListener('pointerdown',outside)} }, []);
   const autoWidths = useMemo(() => columns.map(column => options.columnWidth>0?Math.max(60,options.columnWidth):Math.max(110, Math.min(360, column.name.length * 7 + 30))), [columns,options.columnWidth]);
-  const keepForReview=useMemo(()=>{if(deletionsOnly&&editMode)return new Set(editability?.identity||[0]);if(!(changesOnly&&editMode))return null;const keep=new Set(Object.keys(drafts.cells).map(name=>Number(name.split(':')[1])));for(const index of editability?.identity||[])keep.add(index);for(const name of Object.keys(applied.cells))keep.add(Number(name.split(':')[1]));return keep},[changesOnly,deletionsOnly,editMode,drafts.cells,applied.cells,editability]);
-  const visible = [...order.filter(i => i < columns.length), ...columns.map((_, i) => i).filter(i => !order.includes(i))].filter(i => !hidden.includes(i)&&(!keepForReview||keepForReview.has(i)));
+  const visible = [...order.filter(i => i < columns.length), ...columns.map((_, i) => i).filter(i => !order.includes(i))].filter(i => !hidden.includes(i));
   const selectedColumn=selection?.focus?visible[selection.focus.c]:null;
   const sourceColumn=selectedColumn==null?null:columns[selectedColumn];
   const matchingSourceDefinition=sourceDefinitionMatches(sourceColumn,sourceDefinition);
@@ -394,141 +299,53 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
     event.preventDefault(); event.clipboardData.setData("text/plain", values); setCopyState("Selection copied");notifyFeedback({kind:"success",title:"Results",message:"Selection copied"});
   }
   const scalarText=value=>value==null?null:typeof value==='string'||typeof value==='number'||typeof value==='bigint'?String(value):value instanceof ExactDecimal?formatExact(value):value?.kind==='temporal'&&/^(DATE|TIMESTAMP(\(\d+\))?)$/i.test(value.oracleType||'')&&!value.offset&&!value.region?String(value.value):undefined;
-  function beginEdit(r,c){
+  function beginEdit(r,c,typed){
     const item=rows[r],col=visible[c];
-    if(!item||col==null)return;
+    if(!item||col==null||applyState)return;
     const info=editability?.columns[col];
     if(!info?.editable){notifyFeedback({kind:'info',title:'Edit rows',message:info?.reason||'This cell cannot be edited.'});return}
     const original=scalarText(originalRows.get(item.index)?.[col]);
     if(original===undefined){notifyFeedback({kind:'info',title:'Edit rows',message:'Dates, binary and structured values are not edited as text.'});return}
-    const draft=cellDraft(drafts,item.index,col);
-    const next={r,c,col,rowIndex:item.index,original,initial:draft?draft.value:original??'',isNull:Boolean(draft?.isNull),kind:cellEditorKind(columns[col],draft?draft.value:original)};
+    const draft=cellDraft(drafts,item.index,col),kind=cellEditorKind(columns[col],draft?draft.value:original);
+    const next={r,c,col,rowIndex:item.index,original,initial:draft?(draft.isNull?'':draft.value):original??'',typed:kind==='datetime'?undefined:typed,kind};
     editRef.current=next;setEditing(next);
   }
   function stageEdit(text){
     const active=editRef.current;
     if(!active)return;
     editRef.current=null;setEditing(null);
-    if(/NUMBER|INTEGER|INT|DECIMAL|NUMERIC|FLOAT|DOUBLE|REAL/i.test(columns[active.col]?.type||'')&&text.trim()!==''){const parsed=parseLocaleNumber(text,numberSeparators(options.locale));if(parsed.value!==undefined){if(parsed.converted)notifyFeedback({kind:'info',title:'Number read',message:parsed.note});text=parsed.value}}
+    if(/NUMBER|INTEGER|INT|DECIMAL|NUMERIC|FLOAT|DOUBLE|REAL/i.test(columns[active.col]?.type||'')&&text.trim()!==''){const parsed=parseLocaleNumber(text,numberSeparators(options.locale));if(parsed.value!==undefined)text=parsed.value}
     setApplyErrors(current=>current.filter(item=>!(item.row===active.rowIndex&&(item.col===active.col||item.col==null))));
-    setDrafts(current=>editCell(current,active.rowIndex,active.col,active.original,active.isNull&&text===''?{isNull:true}:{value:text}));
+    // Oracle stores empty text as NULL, so clearing a cell means NULL.
+    setDrafts(current=>editCell(current,active.rowIndex,active.col,active.original,text===''?{isNull:true}:{value:text}));
     root.current?.focus();
   }
   function cancelEdit(){editRef.current=null;setEditing(null);root.current?.focus()}
+  function applyChanges(){
+    const current=draftsRef.current;
+    if(applyState||!isDirty(current))return;
+    if(!editability?.editable||!isNativeHost){notifyFeedback({kind:'info',title:'Apply',message:editability?.reasons?.[0]||'This result cannot be edited.'});return}
+    // Values Oracle would reject, or store differently than typed (a zoned date without its offset), stop here and are marked in the grid.
+    const invalid=invalidDraftCells(current.cells,columns);
+    if(invalid.length){setApplyErrors(invalid);notifyFeedback({kind:'error',title:'Apply',message:`Row ${invalid[0].row+1}: ${invalid[0].message}${invalid.length>1?` (${invalid.length-1} more marked in the grid)`:''}\nNothing was sent.`});return}
+    const built=buildDml({table:editability.table,columns,identity:editability.identity,rowAt:index=>originalRows.get(index),drafts:current});
+    if(built.problems.length||!built.statements.length){notifyFeedback({kind:'error',title:'Apply',message:built.problems.join('\n')||'There is nothing to apply.'});return}
+    setApplyErrors([]);
+    // One batch: if any statement fails, Oracle returns to the point before Apply and the changes stay in the grid.
+    const requestId=sendNativeCommand('sql.applyDml',{statements:built.statements.map(item=>({kind:item.kind,sql:item.sql,binds:item.binds,expectRows:item.expectRows,readColumns:item.readColumns})),timeoutSeconds:60,onFailure:'rollback'});
+    setApplyState({requestId,statements:built.statements});
+  }
+  function discardChanges(){
+    const total=pendingSummary(draftsRef.current).total;
+    if(!total||!globalThis.confirm?.(`Discard ${total} unapplied change${total===1?'':'s'}?`))return;
+    cancelEdit();setDrafts(emptyDrafts());setApplyErrors([]);
+  }
   function focusedCell(){const focus=selection?.focus;if(!focus)return null;const item=rows[focus.r],col=visible[focus.c];return item&&col!=null?{r:focus.r,c:focus.c,rowIndex:item.index,col}:null}
   function setFocusedNull(){const cell=focusedCell();if(!cell)return;const info=editability?.columns[cell.col];if(!info?.editable){notifyFeedback({kind:'info',title:'Edit rows',message:info?.reason||'This cell cannot be edited.'});return}const original=scalarText(originalRows.get(cell.rowIndex)?.[cell.col]);if(original===undefined)return;setDrafts(current=>editCell(current,cell.rowIndex,cell.col,original,{isNull:true}))}
-  function openBulkEdit(){
-    const cells=[];
-    rows.forEach((item,r)=>visible.forEach((col,c)=>{
-      if(!selected(r,c))return;
-      const info=editability?.columns[col],text=scalarText(item.row[col]);
-      cells.push({rowIndex:item.index,col,name:columns[col].name,text:text===undefined?null:text,editable:Boolean(info?.editable)&&text!==undefined,reason:text===undefined?'Dates, binary and structured values are not edited as text.':info?.reason});
-    }));
-    if(!cells.length){notifyFeedback({kind:'info',title:'Bulk edit',message:'Select the cells to change first.'});return}
-    setBulkCells(cells);
-  }
-  function stageBulk(changes){
-    setDrafts(current=>editCells(current,changes.map(change=>({row:change.rowIndex,col:change.col,original:scalarText(originalRows.get(change.rowIndex)?.[change.col]),value:change.to,isNull:change.isNull}))));
-    notifyFeedback({kind:'success',title:'Bulk edit',message:`${changes.length} edit${changes.length===1?'':'s'} staged as drafts; one Undo takes them all back.`});
-  }
-  async function pasteFromClipboard(){
-    let text='';
-    try{text=await navigator.clipboard.readText()}catch{notifyFeedback({kind:'warning',title:'Paste',message:'The clipboard could not be read.'});return}
-    const pasted=parseTsv(text);
-    if(!pasted.length){notifyFeedback({kind:'info',title:'Paste',message:'The clipboard is empty.'});return}
-    // Without a selected cell (an empty table, for instance) the paste can only add new rows.
-    if(!selection&&!editability?.canInsert){notifyFeedback({kind:'info',title:'Paste',message:'Select the cell to paste into first.'});return}
-    setPasteData(pasted);
-  }
-  const planPasteFor=useCallback(({pasted,header,mode})=>{
-    const focus=selection?.focus||{r:0,c:0},keyCol=editability?.identity?.length===1?editability.identity[0]:null;
-    const targets=visible.slice(focus.c).map(col=>({col,name:columns[col].name,editable:Boolean(editability?.columns[col]?.editable),reason:editability?.columns[col]?.reason,text:item=>{const value=scalarText(item.row[col]);return value===undefined?null:value}}));
-    return planPaste({pasted,header,mode,startRow:focus.r,targets,rowAt:position=>rows[position],keyCol,findByKey:key=>rows.find(item=>String(item.row[keyCol]).trim()===String(key).trim())});
-  },[selection,rows,visible,columns,editability]);
-  const planInsertFor=useCallback(({pasted,header,mapping})=>planInsertPaste({pasted,header,columns,insertable:editability?.insertColumns||[],mapping}),[columns,editability]);
-  function stagePastedRows(list){
-    setDrafts(current=>insertRows(current,list));
-    notifyFeedback({kind:'success',title:'Paste',message:`${list.length} new row${list.length===1?'':'s'} staged as drafts; one Undo takes them all back.`});
-  }
-  const booleanPreset=col=>editMode&&editability?.columns[col]?.editable?presetFor(booleanMap[booleanColumnKey(columns[col])]):null;
-  function toggleBoolean(rowIndex,col){
-    const preset=booleanPreset(col);
-    if(!preset)return;
-    const original=scalarText(originalRows.get(rowIndex)?.[col]);
-    if(original===undefined)return;
-    const shown=rows.find(item=>item.index===rowIndex)?.row[col];
-    setDrafts(current=>editCell(current,rowIndex,col,original,{value:toggledValue(preset,scalarText(shown)??null)}));
-  }
-  const recordFields=()=>{
-    const focus=selection?.focus||{r:0,c:0},item=rows[focus.r];
-    if(!item)return null;
-    return visible.map(col=>{
-      const info=editability?.columns[col],raw=scalarText(item.row[col]),draft=cellDraft(drafts,item.index,col);
-      return {col,name:columns[col].name,key:editability?.identity?.includes(col),editable:Boolean(info?.editable)&&raw!==undefined,reason:info?.reason,text:raw===undefined?null:raw,isNull:Boolean(draft?.isNull),edited:Boolean(draft)};
-    });
-  };
-  function moveRecord(delta){
-    const focus=selection?.focus||{r:0,c:0},next=Math.max(0,Math.min(rows.length-1,focus.r+delta));
-    if(next!==focus.r)select(next,focus.c);
-  }
-  function stageRecordField(col,input){
-    const focus=selection?.focus||{r:0,c:0},item=rows[focus.r];
-    if(!item)return;
-    const original=scalarText(originalRows.get(item.index)?.[col]);
-    if(original===undefined)return;
-    setDrafts(current=>editCell(current,item.index,col,original,input));
-  }
-  const tableTemplates=templates[templateTableKey(columns.find(item=>item.sourceTable))]||[];
-  function newRowFromTemplate(name){
-    const template=tableTemplates.find(item=>item.name===name);
-    if(!template)return;
-    const {values,missing}=valuesFromTemplate(template,columns,editability.insertColumns);
-    setDrafts(current=>insertRow(current,values));
-    notifyFeedback({kind:missing.length?'warning':'info',title:'New row from template',message:`Template “${template.name}” filled ${Object.keys(values).length} field${Object.keys(values).length===1?'':'s'}.${missing.length?` Not available in this result: ${missing.join(', ')}.`:''}`});
-  }
-  function saveTemplate(rowId,name){
-    const row=drafts.inserted.find(item=>item.id===rowId),key=templateTableKey(columns.find(item=>item.sourceTable));
-    if(!row||!key)return;
-    const {template,left}=templateFromRow(row.values,columns,editability.insertColumns,editability.identity,name);
-    if(!template.name){notifyFeedback({kind:'warning',title:'Row template',message:'Give the template a name.'});return}
-    setTemplates(saveRowTemplate(globalThis.localStorage,key,template));
-    notifyFeedback({kind:'success',title:'Row template saved',message:`“${template.name}” stores ${Object.keys(template.values).length} field preset${Object.keys(template.values).length===1?'':'s'}.${left.length?` Left out (key, locked or secret-looking): ${left.join(', ')}.`:''}`});
-  }
   function tabFrom(r,c,direction){
     const step=nextEditableCell({rowCount:rows.length,visible,isEditable:col=>Boolean(editability?.columns[col]?.editable)},{r,c},direction);
-    if(step.end){
-      if(tabAddsRow&&editability?.canInsert!==false){
-        setDrafts(current=>insertRow(current,{}));
-        setFocusNewRow({ticket:Date.now()});
-      }else notifyFeedback({kind:'info',title:'End of the result',message:'That was the last editable cell. Turn on “Tab adds a row” to start a new row here.'});
-      return;
-    }
-    if(step.none||step.start)return;
+    if(step.end||step.none||step.start)return;
     select(step.r,step.c);setTimeout(()=>beginEdit(step.r,step.c),0);
-  }
-  useEffect(()=>{
-    if(!focusNewRow||!editability?.editable||!drafts.inserted.length)return;
-    const last=drafts.inserted.at(-1),first=newRowFieldOrder(columns,editability.insertColumns)[0];
-    if(first==null)return;
-    const id=requestAnimationFrame(()=>{document.querySelector(`[aria-label="New row ${last.id} ${columns[first].name}"]`)?.focus();setFocusNewRow(null)});
-    return()=>cancelAnimationFrame(id);
-  },[focusNewRow,drafts.inserted.length]);
-  async function checkRelated(){
-    if(!sourceTable||!drafts.deleted.length)return;
-    setRelated({running:true,relations:null,results:[]});
-    const ask=(command,payload)=>new Promise(resolve=>{const requestId=sendNativeCommand(command,payload);evalWaiters.current.set(requestId,resolve);setTimeout(()=>{if(evalWaiters.current.delete(requestId))resolve({error:'No answer from Oracle within 30 seconds.'})},31000)});
-    const reply=await ask('result.relations',{schema:sourceTable.schema,table:sourceTable.table});
-    if(reply.error){setRelated({running:false,relations:null,results:[],error:reply.error});return}
-    const relations=normalizeRelations(reply),results=[];
-    const deletedRows=drafts.deleted.map(index=>originalRows.get(index)||[]);
-    for(const relation of relations.children){
-      const query=childCountQuery(relation,deletedRows,columns);
-      if(query.error){results.push({status:'unchecked',message:`${relation.owner}.${relation.table}: ${query.error}`});continue}
-      const answer=await ask('sql.evaluate',{sql:query.sql,parameters:query.parameters,rowLimit:1,timeoutSeconds:30});
-      results.push(answer.error?{status:'unchecked',message:`${relation.owner}.${relation.table}: ${answer.error}`}:interpretCount(relation,answer.rows?.[0]?.[0],query));
-      setRelated({running:true,relations,results:[...results]});
-    }
-    setRelated({running:false,relations,results});
   }
   async function loadDescriptions(col,template){
     const plan=prepareDescriptionQuery(template,sourceRows.map(item=>scalarText(item.row[col])));
@@ -541,27 +358,7 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
     setDescMaps(current=>({...current,[col]:map}));
     setDescStatus(`${map.size} description${map.size===1?'':'s'} for ${plan.covered} of ${plan.total} distinct value${plan.total===1?'':'s'}${plan.covered<plan.total?` (the first ${plan.covered} were read)`:''}. The stored values are unchanged.`);
   }
-  function fillFromAbove(){
-    const cell=focusedCell();
-    if(!cell||cell.r===0){notifyFeedback({kind:'info',title:'Fill from above',message:'There is no row above the active cell.'});return}
-    const info=editability?.columns[cell.col];
-    if(!info?.editable){notifyFeedback({kind:'info',title:'Fill from above',message:info?.reason||'This cell cannot be edited.'});return}
-    const above=rows[cell.r-1],original=scalarText(originalRows.get(cell.rowIndex)?.[cell.col]);
-    if(original===undefined)return;
-    const shown=above.row[cell.col];
-    if(shown==null)setDrafts(current=>editCell(current,cell.rowIndex,cell.col,original,{isNull:true}));
-    else{const text=scalarText(shown);if(text===undefined){notifyFeedback({kind:'info',title:'Fill from above',message:'That value cannot be copied as text.'});return}setDrafts(current=>editCell(current,cell.rowIndex,cell.col,original,{value:text}))}
-  }
-  function duplicateFocusedRow(){
-    const cell=focusedCell();
-    if(!cell)return;
-    const values=duplicateValues(columns,editability.insertColumns,editability.identity,originalRows.get(cell.rowIndex)||[]);
-    setDrafts(current=>insertRow(current,values));
-    notifyFeedback({kind:'info',title:'Row duplicated',message:'A new row draft was created. Key, identity and locked columns are left for the database to fill in.'});
-  }
   function deleteFocusedRow(){const cell=focusedCell();if(cell)setDrafts(current=>toggleDeleted(current,cell.rowIndex))}
-  function goToEdit(rowIndex,col,startEditing=false){const position=rows.findIndex(item=>item.index===rowIndex),column=Math.max(0,visible.indexOf(col));if(position>=0){reveal(position,column);root.current?.focus();if(startEditing)requestAnimationFrame(()=>beginEdit(position,column))}else notifyFeedback({kind:'info',title:'Pending changes',message:`Row ${rowIndex+1} is not in the current view (hidden by a filter, frozen or not loaded).`})}
-  function stepEdit(direction){const focus=focusedCell(),target=adjacentEdit(drafts,focus?{row:focus.rowIndex,col:focus.col}:null,direction);if(target)goToEdit(target.row,target.col)}
   function keyDown(event) {
     if((event.ctrlKey||event.metaKey)&&event.shiftKey&&event.key.toLowerCase()==='p'){event.preventDefault();onTools?.('Commands');return;}
     if((event.ctrlKey||event.metaKey)&&event.altKey&&['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();jumpToMark(event.key==='ArrowDown'?1:-1);return;}
@@ -572,10 +369,12 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") { event.preventDefault(); setLoadedColumn(null);setSelection(selectResultRange(selectResultRange(null, 0, 0), rows.length - 1, visible.length - 1, { extend: true })); return; }
     const current = selection?.focus || { r: 0, c: 0 };
     if(editMode&&(event.ctrlKey||event.metaKey)&&!event.shiftKey&&!event.altKey&&['z','y'].includes(event.key.toLowerCase())){event.preventDefault();setDrafts(state=>event.key.toLowerCase()==='z'?undoDraft(state):redoDraft(state));return}
-    if(editMode&&editability?.editable&&(event.ctrlKey||event.metaKey)&&!event.altKey&&!event.shiftKey&&event.key.toLowerCase()==='v'){event.preventDefault();pasteFromClipboard();return}
-    if(editMode&&editability?.editable&&(event.ctrlKey||event.metaKey)&&!event.altKey&&!event.shiftKey&&event.key.toLowerCase()==='d'){event.preventDefault();fillFromAbove();return}
-    if(editMode&&editability?.editable&&!event.altKey&&!event.shiftKey&&!event.ctrlKey&&!event.metaKey&&event.key==='F4'){event.preventDefault();openRelatedPicker();return}
-    if(editMode&&editability?.editable&&!event.altKey&&!event.shiftKey&&!event.ctrlKey&&!event.metaKey&&(event.key==='F2'||event.key==='Enter')){event.preventDefault();beginEdit(current.r,current.c);return}
+    if(editMode&&editability?.editable&&selection&&!event.altKey&&!event.ctrlKey&&!event.metaKey){
+      if(!event.shiftKey&&(event.key==='F2'||event.key==='Enter')){event.preventDefault();beginEdit(current.r,current.c);return}
+      if(event.key==='Delete'||event.key==='Backspace'){event.preventDefault();setFocusedNull();return}
+      // Typing on a selected cell starts editing it with that character, as in a spreadsheet.
+      if(event.key.length===1){event.preventDefault();beginEdit(current.r,current.c,event.key);return}
+    }
     if (event.altKey && event.key === "Enter") { event.preventDefault(); expandCell(current.r, current.c); return; }
     if (event.shiftKey && event.key === "Enter") { event.preventDefault(); openCellDrawer(current.r, current.c); return; }
     if (event.key === "Enter" || event.key === "F2") { event.preventDefault(); inspect(current.r, current.c); return; }
@@ -655,7 +454,7 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
   function performCommand(command) {
     if(!command) return;
     if(command.type==='batch'){command.actions.forEach(performCommand);return;}
-    if(command.type==='toggleEdit'){setEditMode(on=>!on);setDrawerOpen(false);cancelEdit();return;}
+    if(command.type==='toggleEdit'){setEditMode(on=>!on);cancelEdit();return;}
     if(command.type==='toggleDescriptions'){setDescOpen(open=>!open);return;}
     if(command.type==='resetView'){setLoadedColumn(null);setColumnMenu(null);setSelection(null);setSizes({});setHidden([]);setPinned(null);setOrder([]);setMenu(null);setFormatMenu(null);setDropColumn(null);setDetailsRow(null);setExecutionOpen(false);setInspectorVisible(false);setInspectorMode('row');setFind('');setFindOpen(false);setFindIndex(-1);setCopyState('');setLayoutMessage('');selectionDragCleanup.current?.();onCloseSourceDefinition?.();return;}
     if(command.type==='layoutApply'){setHidden(command.layout.hidden||[]);setPinned(command.layout.pinned??null);setOrder(command.layout.order||[]);setSizes(command.layout.sizes||{});return;}
@@ -752,12 +551,10 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
   const resultWindow = getResultWindow(rows.length, viewport.top, viewport.height, rowHeight);
   const spacer = height => height > 0 && <tr aria-hidden="true" className="result-spacer"><td colSpan={visible.length + 1} style={{ height }} /></tr>;
   const announced=useRef({editMode,pending:draftSummary.total,invalid:0});
-  useEffect(()=>{const next={editMode,pending:draftSummary.total,invalid:invalidCells.length},text=gridAnnouncement(announced.current,next);announced.current=next;if(text)announce(text)},[editMode,draftSummary.total,invalidCells.length]);
+  useEffect(()=>{const next={editMode,pending:draftSummary.total,invalid:0},text=gridAnnouncement(announced.current,next);announced.current=next;if(text)announce(text)},[editMode,draftSummary.total]);
   useEffect(()=>{onEditState?.({available:Boolean(sourceTable),on:editMode,descriptions:descOpen})},[sourceTable,editMode,descOpen,onEditState]);
   useEffect(()=>()=>onEditState?.({available:false,on:false,descriptions:false}),[onEditState]);
-  return <><Feedback kind={/unavailable/i.test(copyState)?"error":layoutMessage?"warning":"success"} title="Results">{copyState||layoutMessage}</Feedback>{(sourceTable||editMode)&&<GridEditBar editability={editability} loading={editMode&&Boolean(sourceTable)&&isNativeHost&&!identity} editMode={editMode} onToggle={()=>{setEditMode(on=>!on);setDrawerOpen(false);cancelEdit()}} summary={draftSummary} canUndo={drafts.past.length>0} canRedo={drafts.future.length>0} onUndo={()=>setDrafts(undoDraft)} onRedo={()=>setDrafts(redoDraft)} onSetNull={setFocusedNull} onDeleteRow={deleteFocusedRow} tabAddsRow={tabAddsRow} onTabAddsRow={()=>{const next=!tabAddsRow;setTabAddsRow(next);try{globalThis.localStorage?.setItem('fbsdb.tabAddsRow',next?'1':'0')}catch{}}} onNewRow={()=>setDrafts(current=>insertRow(current,{}))} templates={tableTemplates} onTemplate={newRowFromTemplate} onDuplicate={duplicateFocusedRow} onBulk={openBulkEdit} onRecord={()=>{if(!selection)select(0,0);setRecordOpen(open=>!open)}} onPaste={pasteFromClipboard} onCheckboxes={()=>setBooleanOpen(open=>!open)} onDrawer={()=>setDrawerOpen(open=>!open)} drawerOpen={drawerOpen} onStep={stepEdit} onDescriptions={()=>setDescOpen(open=>!open)} selectedCells={selection?selectionData.stats.count:0} selectedRows={selection?selectionData.selectedRowCount:0} txText={tx?transactionText(tx,Date.now(),txLabel):''} txLabel={txLabel} onTxLabel={setTxLabel} onChecks={()=>setChecksOpen(open=>!open)} canUndoBatch={tx?.state==='pending'&&Boolean(batchSavepoint)&&!batchSavepoint.done} onUndoBatch={()=>{if(globalThis.confirm?.('Undo the last Apply? Oracle returns the session to just before it, which also undoes anything the session did after that point, including work outside this grid. Rows cannot be undone one by one.'))sendNativeCommand('sql.rollbackGridBatch',{})}} txState={tx?.state} onDismissTx={()=>{setTx(null);setVerification(null);setAppliedLog([])}} verification={verification} canVerify={(tx?.state==='committed'||tx?.state==='unconfirmed')&&appliedLog.length>0&&Boolean(editability?.editable)} canRestore={tx?.state==='rolledBack'&&appliedLog.length>0} canReceipt={tx?.state==='committed'&&appliedLog.length>0&&Boolean(editability?.table)} onReceipt={()=>{const text=commitReceipt({label:txLabel,entries:appliedLog,table:`${editability.table.schema?`${editability.table.schema}.`:''}${editability.table.name}`,columns,identity:editability.identity,tab:getNativeTabId()});navigator.clipboard?.writeText(text).then(()=>notifyFeedback({kind:'success',title:'Commit receipt',message:'Copied to the clipboard.'}),()=>notifyFeedback({kind:'error',title:'Commit receipt',message:'Could not copy the receipt.'}))}}
-      onVerify={()=>{const reconcile=tx?.state==='unconfirmed',query=(reconcile?reconciliationQuery:verificationQuery)({columns,identity:editability.identity,entries:appliedLog});if(query.error){setVerification({error:query.error});return}const requestId=sendNativeCommand('sql.evaluate',{sql:query.sql,parameters:query.parameters,rowLimit:50,timeoutSeconds:30});verifyRef.current={requestId,reconcile,identity:editability.identity,entries:appliedLog,selected:query.selected};setVerification({running:true})}} onKeepUnsaved={keepUnsavedAsDrafts} onRelatedPick={openRelatedPicker}
-      onRestore={()=>{setDrafts(current=>{let next=current;for(const entry of appliedLog){if(entry.kind==='delete'){if(!next.deleted.includes(entry.row))next=toggleDeleted(next,entry.row)}else for(const [col,draft] of Object.entries(entry.cells))next=editCell(next,entry.row,Number(col),draft.original,draft.isNull?{isNull:true}:{value:draft.value})}return next});setAppliedLog([]);setTx(null)}} changesOnly={changesOnly} onChangesOnly={()=>{setDeletionsOnly(false);setChangesOnly(on=>!on)}} deletionsOnly={deletionsOnly} onDeletionsOnly={()=>{setChangesOnly(false);setDeletionsOnly(on=>!on)}} hasSelection={Boolean(selection)} invalidCount={invalidCells.length} onInvalid={()=>{const focus=focusedCell(),here=focus?focus.rowIndex*100000+focus.col:-1,next=invalidCells.find(item=>item.row*100000+item.col>here)||invalidCells[0];if(next){goToEdit(next.row,next.col);notifyFeedback({kind:'warning',title:'Invalid value',message:next.message})}}}/>}{editMode&&editability?.keyProblem==='absent'&&identity&&<KeyPicker columns={columns} rows={sourceRows} onUse={setManualKey}/>}{editMode&&editability?.editable&&manualKey&&!identity?.columns?.length&&<p className="grid-edit-note key-note" role="status">Using {manualKey.map(index=>columns[index].name).join(', ')} as the row identity (chosen by you; Oracle checks that each statement changes exactly one row).</p>}{outsideFilterCount>0&&<p className="grid-edit-note outside-filter-note" role="status">{outsideFilterNote(outsideFilterCount)}</p>}{editMode&&checksOpen&&<CommitChecksPanel checks={checks} onChange={next=>{setChecks(next);saveCommitChecks(globalThis.localStorage,next)}} results={checkResults} running={Boolean(checkResults?.some(item=>item.message==='Running…'))} onRun={runChecks} onClose={()=>setChecksOpen(false)}/>}{descOpen&&<DescriptionsPanel columns={columns} queries={descQueries} status={descStatus} onSave={(key,text)=>setDescQueries(saveLookupDescription(globalThis.localStorage,key,text))} onLoad={loadDescriptions} onClear={(col,key)=>{setDescQueries(saveLookupDescription(globalThis.localStorage,key,''));setDescMaps(current=>{const next={...current};delete next[col];return next});setDescStatus('')}} onClose={()=>setDescOpen(false)}/>}{editMode&&editability?.editable&&recordOpen&&rows.length>0&&<VerticalRecordPanel fields={recordFields()||[]} rowNumber={(selection?.focus?.r??0)+1} total={rows.length} onStage={stageRecordField} onMove={moveRecord} onClose={()=>{setRecordOpen(false);root.current?.focus()}}/>}{editMode&&editability?.editable&&booleanOpen&&<BooleanColumnsPanel columns={columns} editable={editability.columns} mapping={booleanMap} onChange={(key,presetId)=>setBooleanMap(saveBooleanColumn(globalThis.localStorage,key,presetId))} onClose={()=>setBooleanOpen(false)}/>}{editMode&&editability?.editable&&pasteData&&<PastePanel pasted={pasteData} canKey={editability.identity.length===1} keyName={columns[editability.identity[0]]?.name} planFor={planPasteFor} onStage={stageBulk} onClose={()=>setPasteData(null)} canInsert={Boolean(editability.canInsert)} insertReason={editability.limits?.find(limit=>/add rows/.test(limit))} planInsert={planInsertFor} onInsert={stagePastedRows} initialMode={selection?'position':'insert'} initialHeader={looksLikeHeader(pasteData,columns)} columnNames={columns.map(column=>column.name)}/>}{editMode&&editability?.editable&&relatedPick&&<RelatedRecordPicker target={relatedPick.target} columnNames={relatedPick.target.pairs.map(pair=>columns[pair.col].name)} onQuery={(sql,parameters)=>askHost('sql.evaluate',{sql,parameters,rowLimit:50,timeoutSeconds:30})} onPick={stagePicked} onClose={()=>{setRelatedPick(null);root.current?.focus()}}/>}{editMode&&editability?.editable&&bulkCells&&<BulkEditPanel cells={bulkCells} onStage={stageBulk} onClose={()=>setBulkCells(null)}/>}{editMode&&editability?.editable&&drafts.inserted.length>0&&<NewRowsPanel onSaveTemplate={saveTemplate} rows={drafts.inserted} columns={columns} editability={editability} onChange={(id,col,input)=>setDrafts(current=>editInserted(current,id,col,input))} onRemove={id=>setDrafts(current=>removeInserted(current,id))}/>}{editMode&&drawerOpen&&<PendingChangesDrawer changes={pendingChanges(drafts)} columns={columns} preview={selectedPreview} excluded={excluded} onToggle={key=>setExcluded(current=>{const next=new Set(current);if(next.has(key))next.delete(key);else next.add(key);return next})} onEditCell={(row,col,value)=>setDrafts(current=>editCell(current,row,col,cellDraft(current,row,col)?.original??null,{value}))} onGo={goToEdit} onRevertCell={(row,col)=>setDrafts(current=>revertCell(current,row,col))} onRevertRow={row=>setDrafts(current=>revertRow(current,row))} onClose={()=>setDrawerOpen(false)} related={related} onCheckRelated={sourceTable&&editMode?checkRelated:null} errors={applyErrors} constraintInfo={constraintInfo} conflicts={conflicts} onResolve={(conflict,choice)=>{if(conflict.kind==='changed')setDrafts(current=>resolveConflict(current,conflict,choice));setConflicts(current=>current.filter(item=>item!==conflict))}} apply={applyState} onAskApply={()=>setApplyState({phase:'confirm',onFailure:'rollback'})} onCancelApply={()=>setApplyState(null)} onStop={()=>sendNativeCommand('sql.stopApplyDml',{})} onPolicy={onFailure=>setApplyState(current=>({...current,onFailure}))} onApply={()=>{const statements=selectedPreview.statements;setApplyErrors([]);const requestId=sendNativeCommand('sql.applyDml',{statements:statements.map(item=>({kind:item.kind,sql:item.sql,binds:item.binds,expectRows:item.expectRows,readColumns:item.readColumns})),timeoutSeconds:60,onFailure:applyState?.onFailure||'rollback'});setApplyState({phase:'running',startedAt:Date.now(),requestId,statements})}}/>}{findOpen&&<div className="result-find"><input autoFocus aria-label="Find in result cells" placeholder="Find in this page" value={find} onChange={e=>{setFind(e.target.value);setFindIndex(-1)}} onKeyDown={e=>{if(e.key==='Enter')nextMatch();if(e.key==='Escape')setFindOpen(false)}}/><span>{matches.length} matches</span><button className="results-tool" title="Next match" aria-label="Next match" onClick={nextMatch}><ArrowDown size={14}/></button><button aria-label="Close result find" onClick={()=>setFindOpen(false)}><X size={14}/></button></div>}{rowJump&&<div className="result-find result-row-jump"><input autoFocus inputMode="numeric" aria-label="Go to result row" placeholder="Row number" value={rowJump.value} onChange={e=>setRowJump({value:e.target.value,message:''})} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();setRowJump(null);root.current?.focus();return}if(e.key!=='Enter')return;e.preventDefault();const message=jumpToRow(rowJump.value);if(message){setRowJump({...rowJump,message});return}setRowJump(null);root.current?.focus()}}/><span role="status" title="Numbers follow the loaded result order shown in the # column; filters and sorts do not renumber rows.">{rowJump.message||`Loaded order · ${(sourceRowCount??allRows.length).toLocaleString('en-US')} rows`}</span><button aria-label="Close go to row" onClick={()=>{setRowJump(null);root.current?.focus()}}><X size={14}/></button></div>}{expanded&&createPortal(<div ref={overlayRoot} tabIndex={-1} className="result-cell-overlay theme-scope" data-theme={expanded.theme} role="dialog" aria-label={`Cell text: ${expanded.column}, row ${expanded.row}`} style={{left:expanded.placement.left,top:expanded.placement.top,bottom:expanded.placement.bottom,width:expanded.placement.width,maxHeight:expanded.placement.maxHeight}}><header><strong>{expanded.column}</strong><span>Row {expanded.row}{expanded.clipped?'':' · not clipped'}</span><button aria-label="Close cell text" onClick={()=>{setExpanded(null);root.current?.focus()}}><X size={13}/></button></header><pre>{expanded.text}</pre>{expanded.truncated&&<p>Showing the first {expanded.text.length.toLocaleString('en-US')} of {expanded.length.toLocaleString('en-US')} characters. Use Inspect value for the full value.</p>}</div>,document.body)}{warnings.length>0&&<Feedback kind="warning" title="Result warnings">{warnings.join("\n")}</Feedback>}{frozen.length>0&&<div className="result-frozen-rows"><table className="result-grid"><tbody>{frozen.map(item=><tr key={item.index}><th><button title="Unfreeze row" onClick={()=>settings({frozenRows:options.frozenRows.filter(i=>i!==item.index)})}>× {item.index+1}</button></th>{visible.map(i=><td key={i} className={loadedColumn===i?"selected-cell":""} style={{width:sizes[i]||autoWidths[i],...(options.columnFormats?.[i]?.wrap!=null?{whiteSpace:options.columnFormats[i].wrap?'pre-wrap':'pre'}:{}),...(options.columnFormats?.[i]?.alignment&&options.columnFormats[i].alignment!=='auto'?{textAlign:options.columnFormats[i].alignment}:{})}} onDoubleClick={()=>{if(isExpandableResultValue(columns[i],item.row[i]))onInspect({column:columns[i],row:item.index+1,value:item.row[i]})}}>{cellFormat(item.row[i],i)}</td>)}</tr>)}</tbody></table></div>}<div className="result-grid-body"><div className="result-grid-scroll">
+  return <><Feedback kind={/unavailable/i.test(copyState)?"error":layoutMessage?"warning":"success"} title="Results">{copyState||layoutMessage}</Feedback>{(sourceTable||editMode)&&<GridEditBar editability={editability} loading={editMode&&Boolean(sourceTable)&&isNativeHost&&!identity} editMode={editMode} onToggle={()=>{setEditMode(on=>!on);cancelEdit()}} summary={draftSummary} applying={Boolean(applyState)} onApply={applyChanges} onDiscard={discardChanges} onNewRow={()=>setDrafts(current=>insertRow(current,{}))} onDeleteRow={deleteFocusedRow} hasSelection={Boolean(selection)} onDescriptions={()=>setDescOpen(open=>!open)}/>}{editMode&&editability?.keyProblem==='absent'&&identity&&<KeyPicker columns={columns} rows={sourceRows} onUse={setManualKey}/>}{editMode&&editability?.editable&&manualKey&&!identity?.columns?.length&&<p className="grid-edit-note key-note" role="status">Using {manualKey.map(index=>columns[index].name).join(', ')} as the row identity (chosen by you; Oracle checks that each statement changes exactly one row).</p>}{descOpen&&<DescriptionsPanel columns={columns} queries={descQueries} status={descStatus} onSave={(key,text)=>setDescQueries(saveLookupDescription(globalThis.localStorage,key,text))} onLoad={loadDescriptions} onClear={(col,key)=>{setDescQueries(saveLookupDescription(globalThis.localStorage,key,''));setDescMaps(current=>{const next={...current};delete next[col];return next});setDescStatus('')}} onClose={()=>setDescOpen(false)}/>}{editMode&&editability?.editable&&drafts.inserted.length>0&&<NewRowsPanel rows={drafts.inserted} columns={columns} editability={editability} onChange={(id,col,input)=>setDrafts(current=>editInserted(current,id,col,input))} onRemove={id=>setDrafts(current=>removeInserted(current,id))}/>}{findOpen&&<div className="result-find"><input autoFocus aria-label="Find in result cells" placeholder="Find in this page" value={find} onChange={e=>{setFind(e.target.value);setFindIndex(-1)}} onKeyDown={e=>{if(e.key==='Enter')nextMatch();if(e.key==='Escape')setFindOpen(false)}}/><span>{matches.length} matches</span><button className="results-tool" title="Next match" aria-label="Next match" onClick={nextMatch}><ArrowDown size={14}/></button><button aria-label="Close result find" onClick={()=>setFindOpen(false)}><X size={14}/></button></div>}{rowJump&&<div className="result-find result-row-jump"><input autoFocus inputMode="numeric" aria-label="Go to result row" placeholder="Row number" value={rowJump.value} onChange={e=>setRowJump({value:e.target.value,message:''})} onKeyDown={e=>{if(e.key==='Escape'){e.preventDefault();setRowJump(null);root.current?.focus();return}if(e.key!=='Enter')return;e.preventDefault();const message=jumpToRow(rowJump.value);if(message){setRowJump({...rowJump,message});return}setRowJump(null);root.current?.focus()}}/><span role="status" title="Numbers follow the loaded result order shown in the # column; filters and sorts do not renumber rows.">{rowJump.message||`Loaded order · ${(sourceRowCount??allRows.length).toLocaleString('en-US')} rows`}</span><button aria-label="Close go to row" onClick={()=>{setRowJump(null);root.current?.focus()}}><X size={14}/></button></div>}{expanded&&createPortal(<div ref={overlayRoot} tabIndex={-1} className="result-cell-overlay theme-scope" data-theme={expanded.theme} role="dialog" aria-label={`Cell text: ${expanded.column}, row ${expanded.row}`} style={{left:expanded.placement.left,top:expanded.placement.top,bottom:expanded.placement.bottom,width:expanded.placement.width,maxHeight:expanded.placement.maxHeight}}><header><strong>{expanded.column}</strong><span>Row {expanded.row}{expanded.clipped?'':' · not clipped'}</span><button aria-label="Close cell text" onClick={()=>{setExpanded(null);root.current?.focus()}}><X size={13}/></button></header><pre>{expanded.text}</pre>{expanded.truncated&&<p>Showing the first {expanded.text.length.toLocaleString('en-US')} of {expanded.length.toLocaleString('en-US')} characters. Use Inspect value for the full value.</p>}</div>,document.body)}{warnings.length>0&&<Feedback kind="warning" title="Result warnings">{warnings.join("\n")}</Feedback>}{frozen.length>0&&<div className="result-frozen-rows"><table className="result-grid"><tbody>{frozen.map(item=><tr key={item.index}><th><button title="Unfreeze row" onClick={()=>settings({frozenRows:options.frozenRows.filter(i=>i!==item.index)})}>× {item.index+1}</button></th>{visible.map(i=><td key={i} className={loadedColumn===i?"selected-cell":""} style={{width:sizes[i]||autoWidths[i],...(options.columnFormats?.[i]?.wrap!=null?{whiteSpace:options.columnFormats[i].wrap?'pre-wrap':'pre'}:{}),...(options.columnFormats?.[i]?.alignment&&options.columnFormats[i].alignment!=='auto'?{textAlign:options.columnFormats[i].alignment}:{})}} onDoubleClick={()=>{if(isExpandableResultValue(columns[i],item.row[i]))onInspect({column:columns[i],row:item.index+1,value:item.row[i]})}}>{cellFormat(item.row[i],i)}</td>)}</tr>)}</tbody></table></div>}<div className="result-grid-body"><div className="result-grid-scroll">
   <div className="grid-wrap" ref={root} tabIndex={0} aria-label="Query result grid. Arrow keys navigate; Shift extends selection; Control C copies; Enter inspects." onKeyDown={event => { if (event.target === root.current) keyDown(event); }} onContextMenu={e=>{e.preventDefault();const cell=e.target.closest('[data-cell]');if(cell){const [r,c]=cell.dataset.cell.split(':').map(Number);if(!selected(r,c))select(r,c);setMenu({x:Math.min(e.clientX,document.documentElement.clientWidth-265),y:Math.max(5,Math.min(e.clientY,document.documentElement.clientHeight-450)),column:visible[c],row:r});}}} onCopy={copy} onPointerDown={startSelectionDrag}><table className={`result-grid virtual-result-grid ${options.wrap ? "result-wrap" : ""}`} role="grid" aria-multiselectable="true" aria-rowcount={rows.length + 1} style={{ "--result-row-height": `${rowHeight}px`, minWidth: 37 + widths.reduce((a, b) => a + b, 0), width: 37 + widths.reduce((a, b) => a + b, 0) }}>
     <colgroup><col style={{ width: 37 }} />{visible.map((i, c) => <col key={i} style={{ width: widths[c] }} />)}</colgroup>
     <thead><tr><th className="rownum-head"><button type="button" aria-label="Select all result cells" title="Select all cells on this page. Right-click or Ctrl+G: go to row number" onClick={selectAllCells} onContextMenu={event=>{event.preventDefault();event.stopPropagation();setRowJump({value:'',message:''})}}>#</button></th>{visible.map((i,c)=>{
@@ -767,7 +564,7 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
         <span className="column-resizer" role="separator" aria-label={`Resize ${columns[i].name}`} aria-orientation="vertical" tabIndex={0} onKeyDown={event=>{if(['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();setSizes(current=>({...current,[i]:Math.max(70,(current[i]||autoWidths[i])+(event.key==='ArrowLeft'?-10:10))}))}}} onPointerDown={event=>resize(event,i)} onDoubleClick={()=>fit(i)}/>
       </th>;
     })}</tr></thead>
-    <tbody>{spacer(resultWindow.top)}{rows.slice(resultWindow.start, resultWindow.end).map(({ row, index }, offset) => { const r = resultWindow.start + offset; return <tr key={index} data-result-row={index} data-row-outside-filter={rows[r].outsideFilter||undefined} aria-rowindex={r + 2} aria-selected={rowSelected(r)} data-row-error={applyErrors.some(item=>item.row===index)||undefined} data-row-draft={isDeleted(drafts,index)?'deleted':appliedLive&&applied.deleted.includes(index)?'applied-deleted':undefined} className={`result-data-row ${isDeleted(drafts,index)||(appliedLive&&applied.deleted.includes(index))?'result-deleted-row':''} ${options.crosshair!==false&&hover?.r===r?"result-hover-row":""} ${rows[r].duplicate?"result-duplicate-row":""} ${(options.marks||[]).includes(index)?"result-marked-row":""} ${dropRow?.index === index ? dropRow.after ? "row-drop-after" : "row-drop-before" : ""}`}><td data-row-select={r} onDoubleClick={()=>settings({marks:(options.marks||[]).includes(index)?options.marks.filter(x=>x!==index):[...(options.marks||[]),index]})} className={`rownum ${rowSelected(r) ? "selected-cell" : ""}`}><button className="row-move-handle" onPointerDown={e => startRowMove(e, index)} aria-label={`Move row ${index + 1}`} title="Drag to move row | Alt+Up/Down to move with keyboard" onKeyDown={e => { if (e.altKey && ["ArrowUp", "ArrowDown"].includes(e.key)) { e.preventDefault(); const next = r + (e.key === "ArrowUp" ? -1 : 1); if (rows[next]) onReorder?.(index, rows[next].index, next > r); } }}>⋮</button>{rows[r].outsideFilter&&<span className="row-outside-filter" role="img" aria-label="Edited values no longer match the filter" title="Kept visible: its edited values no longer match the current filter">≠</span>}<button className="row-select-button" tabIndex={-1} aria-label={`Select row ${index + 1}`} title="Drag row numbers to select; double-click to mark row" onClick={e => { if (e.detail === 0) select(r, 0, e.shiftKey, "row", e.ctrlKey || e.metaKey); }}>{index + 1}</button></td>{visible.map((i, c) => <td key={i} data-cell={`${r}:${c}`} data-error={applyErrors.some(item=>item.row===index&&item.col===i)||undefined} data-invalid={invalidCells.some(item=>item.row===index&&item.col===i)||undefined} data-draft={cellDraft(drafts,index,i)?(cellDraft(drafts,index,i).isNull?'null':'edited'):appliedLive&&`${index}:${i}` in applied.cells?'applied':undefined} title={applyErrors.find(item=>item.row===index&&item.col===i)?`Oracle rejected this value: ${applyErrors.find(item=>item.row===index&&item.col===i).message}`:cellDraft(drafts,index,i)?`Original: ${cellDraft(drafts,index,i).original==null?'NULL':cellDraft(drafts,index,i).original}`:undefined} draggable={Boolean(selection&&selection.anchor?.r===r&&selection.anchor?.c===c&&selection.focus?.r===r&&selection.focus?.c===c)||undefined} onDragStart={event=>{event.dataTransfer.setData(cellDragType,cellDragData(columns[i],row[i]));event.dataTransfer.setData('text/plain',`:${bindNameFor(columns[i]?.name)}`);event.dataTransfer.effectAllowed='copy'}} onPointerEnter={()=>setHover({r,c})} style={{...(rightPins.includes(i)?{right:rightOffset(i)}:{}),...(options.rules?.find(rule=>rule.column===i&&matchesCondition(row[i],rule))?{"--rule-color":({teal:'var(--highlight-teal-bg)',amber:'var(--highlight-amber-bg)',rose:'var(--highlight-rose-bg)'})[options.rules.find(rule=>rule.column===i&&matchesCondition(row[i],rule)).color]}:{})}} aria-selected={selected(r, c)} className={`${options.crosshair!==false&&hover?.c===c?"result-hover-column":""} ${find&&matches.some(match=>match.r===r&&match.c===c)?"result-find-match":""} ${selection?.focus.r === r && selection?.focus.c === c ? "result-active-cell" : ""} ${selected(r, c) ? "selected-cell" : ""} ${pinned === i ? "pinned-column" : rightPins.includes(i)?"pinned-right":""} ${/NUMBER|INTEGER|INT|DECIMAL|NUMERIC|FLOAT|DOUBLE|REAL/i.test(columns[i].type || "") ? "numeric" : /DATE|TIMESTAMP/i.test(columns[i].type || "") ? "date-cell" : ""}`}>{editing&&editing.r===r&&editing.c===c?<CellEditor suggestions={editing.kind==='text'&&!/NUMBER|INT|DECIMAL|NUMERIC|FLOAT|DOUBLE|REAL|DATE|TIMESTAMP/i.test(columns[editing.col]?.type||'')?(()=>{const found=columnSuggestions(sourceRows,editing.col,value=>{const text=scalarText(value);return text===undefined?null:text});return {values:found.values,scope:suggestionScope(found)}})():undefined} column={columns[editing.col]} kind={editing.kind} initial={editing.initial} isNull={editing.isNull} onCommit={stageEdit} onCancel={cancelEdit} onTab={direction=>tabFrom(r,c,direction)}/>:booleanPreset(i)?<BooleanCell preset={booleanPreset(i)} state={booleanState(booleanPreset(i),scalarText(row[i])??null)} value={row[i]} name={columns[i].name} onToggle={()=>toggleBoolean(index,i)}/>:<button tabIndex={-1} type="button" data-description={descMaps[i]?.get(String(scalarText(row[i])??'').trim())||undefined} className={`result-cell-value ${options.columnFormats?.[i]?.linkify&&detectSmartLink(row[i])?'result-url':''}`} style={options.columnFormats?.[i]?.alignment&&options.columnFormats[i].alignment!=='auto'?{textAlign:options.columnFormats[i].alignment}:undefined} onClick={e => { if (e.detail === 0) select(r, c, e.shiftKey, "cell", e.ctrlKey || e.metaKey); }} onDoubleClick={() => editMode&&editability?.editable ? beginEdit(r, c) : inspectExpandable(r, c)}>{row[i] == null || row[i] === "" ? <em>{cellFormat(row[i],i)}</em> : cellFormat(row[i],i)}{descMaps[i]?.get(String(scalarText(row[i])??'').trim())&&<small className="cell-description"> · {descMaps[i].get(String(scalarText(row[i])??'').trim())}</small>}</button>}</td>)}</tr>; })}{spacer(resultWindow.bottom)}</tbody>
+    <tbody>{spacer(resultWindow.top)}{rows.slice(resultWindow.start, resultWindow.end).map(({ row, index }, offset) => { const r = resultWindow.start + offset; return <tr key={index} data-result-row={index} aria-rowindex={r + 2} aria-selected={rowSelected(r)} data-row-error={applyErrors.some(item=>item.row===index)||undefined} data-row-draft={isDeleted(drafts,index)?'deleted':appliedLive&&applied.deleted.includes(index)?'applied-deleted':undefined} className={`result-data-row ${isDeleted(drafts,index)||(appliedLive&&applied.deleted.includes(index))?'result-deleted-row':''} ${options.crosshair!==false&&hover?.r===r?"result-hover-row":""} ${rows[r].duplicate?"result-duplicate-row":""} ${(options.marks||[]).includes(index)?"result-marked-row":""} ${dropRow?.index === index ? dropRow.after ? "row-drop-after" : "row-drop-before" : ""}`}><td data-row-select={r} onDoubleClick={()=>settings({marks:(options.marks||[]).includes(index)?options.marks.filter(x=>x!==index):[...(options.marks||[]),index]})} className={`rownum ${rowSelected(r) ? "selected-cell" : ""}`}><button className="row-move-handle" onPointerDown={e => startRowMove(e, index)} aria-label={`Move row ${index + 1}`} title="Drag to move row | Alt+Up/Down to move with keyboard" onKeyDown={e => { if (e.altKey && ["ArrowUp", "ArrowDown"].includes(e.key)) { e.preventDefault(); const next = r + (e.key === "ArrowUp" ? -1 : 1); if (rows[next]) onReorder?.(index, rows[next].index, next > r); } }}>⋮</button><button className="row-select-button" tabIndex={-1} aria-label={`Select row ${index + 1}`} title="Drag row numbers to select; double-click to mark row" onClick={e => { if (e.detail === 0) select(r, 0, e.shiftKey, "row", e.ctrlKey || e.metaKey); }}>{index + 1}</button></td>{visible.map((i, c) => <td key={i} data-cell={`${r}:${c}`} data-error={applyErrors.some(item=>item.row===index&&item.col===i)||undefined} data-draft={cellDraft(drafts,index,i)?(cellDraft(drafts,index,i).isNull?'null':'edited'):appliedLive&&`${index}:${i}` in applied.cells?'applied':undefined} title={applyErrors.find(item=>item.row===index&&item.col===i)?`Cannot be saved: ${applyErrors.find(item=>item.row===index&&item.col===i).message}`:cellDraft(drafts,index,i)?`Original: ${cellDraft(drafts,index,i).original==null?'NULL':cellDraft(drafts,index,i).original}`:undefined} draggable={Boolean(selection&&selection.anchor?.r===r&&selection.anchor?.c===c&&selection.focus?.r===r&&selection.focus?.c===c)||undefined} onDragStart={event=>{event.dataTransfer.setData(cellDragType,cellDragData(columns[i],row[i]));event.dataTransfer.setData('text/plain',`:${bindNameFor(columns[i]?.name)}`);event.dataTransfer.effectAllowed='copy'}} onPointerEnter={()=>setHover({r,c})} style={{...(rightPins.includes(i)?{right:rightOffset(i)}:{}),...(options.rules?.find(rule=>rule.column===i&&matchesCondition(row[i],rule))?{"--rule-color":({teal:'var(--highlight-teal-bg)',amber:'var(--highlight-amber-bg)',rose:'var(--highlight-rose-bg)'})[options.rules.find(rule=>rule.column===i&&matchesCondition(row[i],rule)).color]}:{})}} aria-selected={selected(r, c)} className={`${options.crosshair!==false&&hover?.c===c?"result-hover-column":""} ${find&&matches.some(match=>match.r===r&&match.c===c)?"result-find-match":""} ${selection?.focus.r === r && selection?.focus.c === c ? "result-active-cell" : ""} ${selected(r, c) ? "selected-cell" : ""} ${pinned === i ? "pinned-column" : rightPins.includes(i)?"pinned-right":""} ${/NUMBER|INTEGER|INT|DECIMAL|NUMERIC|FLOAT|DOUBLE|REAL/i.test(columns[i].type || "") ? "numeric" : /DATE|TIMESTAMP/i.test(columns[i].type || "") ? "date-cell" : ""}`}>{editing&&editing.r===r&&editing.c===c?<CellEditor kind={editing.kind} initial={editing.initial} typed={editing.typed} onCommit={stageEdit} onCancel={cancelEdit} onTab={direction=>tabFrom(r,c,direction)} onEnter={()=>{if(r+1<rows.length)select(r+1,c)}}/>:<button tabIndex={-1} type="button" data-description={descMaps[i]?.get(String(scalarText(row[i])??'').trim())||undefined} className={`result-cell-value ${options.columnFormats?.[i]?.linkify&&detectSmartLink(row[i])?'result-url':''}`} style={options.columnFormats?.[i]?.alignment&&options.columnFormats[i].alignment!=='auto'?{textAlign:options.columnFormats[i].alignment}:undefined} onClick={e => { if (e.detail === 0) select(r, c, e.shiftKey, "cell", e.ctrlKey || e.metaKey); }} onDoubleClick={() => editMode&&editability?.editable ? beginEdit(r, c) : inspectExpandable(r, c)}>{row[i] == null || row[i] === "" ? <em>{cellFormat(row[i],i)}</em> : cellFormat(row[i],i)}{descMaps[i]?.get(String(scalarText(row[i])??'').trim())&&<small className="cell-description"> · {descMaps[i].get(String(scalarText(row[i])??'').trim())}</small>}</button>}</td>)}</tr>; })}{spacer(resultWindow.bottom)}</tbody>
   </table></div>{rowMarkers.markers.length>0&&<div className="result-row-markers" style={{right:Math.max(0,(root.current?.offsetWidth||0)-(root.current?.clientWidth||0))}} title={`${(options.marks||[]).length} marked rows${rowMarkers.outside?` · ${rowMarkers.outside} outside this filtered page`:''}. Ctrl+Alt+Down/Up moves between them.`}>{rowMarkers.markers.map(marker=><button key={marker.index} type="button" tabIndex={-1} style={{top:marker.top}} aria-label={`Go to marked row ${marker.index+1}`} title={`Row ${marker.index+1}${marker.count>1?` and ${marker.count-1} nearby`:''}`} onClick={()=>reveal(marker.r,selection?.focus?.c||0)}/>)}</div>}{toolbarPosition&&<div ref={floatingToolbar} className="result-floating-toolbar" role="toolbar" aria-label="Selection actions" style={{left:toolbarPosition.left,top:toolbarPosition.top}} onPointerDown={event=>event.stopPropagation()}><span>{selectionData.selectedRowCount} × {selectionData.selectedColumnCount}</span><button type="button" title="Copy as TSV (Ctrl+C)" onClick={()=>copyFormat('tsv')}><ClipboardCopy size={13}/>Copy</button><button type="button" title="Copy formats with header and scope preview" onClick={()=>onTools?.('Copy')}>Formats…</button><button type="button" title="Export loaded results" onClick={()=>onTools?.('Export')}>Export…</button><button type="button" title="Row details (Enter inspects a cell)" onClick={()=>{setDetailsRow(selection?.focus?.r??null);setInspectorMode('row');setInspectorVisible(true)}}><List size={13}/>Details</button><button type="button" aria-label="Hide selection toolbar" title="Hide for this selection" onClick={()=>{setToolbarDismissed(toolbarKey);root.current?.focus()}}><X size={13}/></button><button type="button" className="result-floating-off" title="Turn off the floating selection toolbar on this device" onClick={()=>{setFloatingToolbarEnabled(globalThis.localStorage,false);setToolbarOn(false);root.current?.focus()}}>Don't show</button></div>}</div><aside hidden={!inspectorEnabled} className={`result-row-details result-inspector ${inspectorVisible?'open':''}`} style={{"--inspector-width":`${inspectorWidth}px`}}>{inspectorVisible&&<span className="result-inspector-resizer" role="separator" aria-disabled={inspectorLocked||undefined} aria-label="Resize result details panel" aria-orientation="vertical" tabIndex={0} onPointerDown={resizeInspector} onKeyDown={resizeInspectorKey}/>}{inspectorVisible&&(inspectorMode==='pivot'?pivotPanel:<div className="result-inspector-content"><header><strong>{inspectorMode==='source'?'Source definition':inspectorMode==='execution'?'Execution & parameters':inspectorMode==='cell'?(cellDetail?`${cellDetail.column?.name} · Row ${cellDetail.row}`:'Cell details'):`Row ${(rows[detailsRow]?.index??0)+1}`}</strong><button aria-label="Close inspector" title="Close inspector" onClick={()=>setInspectorVisible(false)}><X size={14}/></button></header>{inspectorMode==='cell'?(cellDetail?<Suspense fallback={<p role="status">Loading…</p>}><ResultValueDialog key={`${cellDetail.row}:${cellDetail.column?.name}`} embedded cell={cellDetail} onClose={()=>setInspectorVisible(false)}/></Suspense>:<p>Select a cell to show its value.</p>):inspectorMode==='execution'&&executionDetails?.executedSql?<div className="result-execution-inspector"><dl><div><dt>Connection</dt><dd>{executionDetails.executedProfile||'—'}</dd></div><div><dt>Executed</dt><dd>{executionDetails.executedAt?new Date(executionDetails.executedAt).toLocaleString(options.locale||undefined):'—'}</dd></div><div><dt>Elapsed</dt><dd>{executionDetails.elapsedMs!=null?`${executionDetails.elapsedMs} ms`:'—'}</dd></div><div><dt>Page size</dt><dd>{executionDetails.executionPageSize||executionDetails.pageSize||'—'}</dd></div></dl><h4>SQL</h4><pre>{executionDetails.executedSql}</pre><h4>Parameters <span>{executionDetails.executedParameters?.length||0}</span></h4>{executionDetails.executedParameters?.length?<div className="result-execution-parameters">{executionDetails.executedParameters.map((parameter,index)=><div key={`${parameter.name||parameter.key||index}-${index}`}><b>:{parameter.name||parameter.key||`P${index+1}`}</b><small>{parameter.type||parameter.dataType||'VARCHAR2'}</small><code>{parameter.value==null?'NULL':String(parameter.value)}</code></div>)}</div>:<p>No bind parameters.</p>}<h4>Fetch performance</h4>{executionDetails.fetchMetrics?.length?<div className="result-execution-metrics"><table><thead><tr><th>Offset</th><th>Rows</th><th>ms</th><th>Bytes</th><th>Rows/s</th></tr></thead><tbody>{executionDetails.fetchMetrics.map((metric,index)=><tr key={index}><td>{metric.offset}</td><td>{metric.rows}</td><td>{metric.elapsedMs}</td><td>{metric.bytes}</td><td>{metric.elapsedMs>0?Math.round(metric.rows*1000/metric.elapsedMs):'—'}</td></tr>)}</tbody></table></div>:<p>No fetch metrics available.</p>}</div>:inspectorMode==='source'?(matchingSourceDefinition?<div className="result-source-details"><h3>{sourceDefinition.name?`${sourceDefinition.schema||'Current schema'}.${sourceDefinition.table}.${sourceDefinition.name}`:'Source definition'}</h3><dl>{Object.entries(sourceDefinition).filter(([key])=>!['constraints','tabId'].includes(key)).map(([key,value])=><div key={key}><dt>{({schema:'Schema',table:'Table',name:'Column',type:'Data type',size:'Length',precision:'Precision',scale:'Scale',nullable:'Nullable',defaultValue:'Default value',message:'Status'})[key]||key}</dt><dd>{typeof value==='boolean'?value?'Yes':'No':String(value??'—')}</dd></div>)}</dl><h4>Constraints</h4>{(sourceDefinition.constraints||[]).length?(sourceDefinition.constraints||[]).map((constraint,i)=><div className="result-source-constraint" key={i}><strong>{constraint.name}</strong><span>{({P:'Primary key',R:'Foreign key',U:'Unique',C:'Check'})[constraint.type]||constraint.type}{constraint.status?' | '+constraint.status:''}</span>{constraint.condition&&<code>{constraint.condition}</code>}</div>):<p>No constraints found.</p>}</div>:<Feedback kind={sourceDefinition?.message?"error":sourceColumn?.sourceTable?"progress":"info"} title="Column source">{sourceDefinition?.message|| (sourceColumn?.sourceTable?"Loading source definition…":"No source metadata for this column.")}</Feedback>):detailsRow!=null&&rows[detailsRow]&&<><div className="result-form-row"><button disabled={detailsRow===0} aria-label="Previous row" title="Previous row" onClick={()=>setDetailsRow(x=>x-1)}><ArrowUp size={14}/></button><button disabled={detailsRow>=rows.length-1} aria-label="Next row" title="Next row" onClick={()=>setDetailsRow(x=>x+1)}><ArrowDown size={14}/></button><button onClick={()=>{navigator.clipboard.writeText(copyResultData([rows[detailsRow].row],columns,'vertical')).catch(()=>setCopyState('Clipboard unavailable'));}} aria-label="Copy row" title="Copy row"><ClipboardCopy size={14}/></button></div>{columns.map((column,i)=><button key={i} className={selection?.focus.r===detailsRow&&selection?.focus.c===visible.indexOf(i)?"active":""} onClick={()=>{const c=visible.indexOf(i);if(c>=0)reveal(detailsRow,c)}} onDoubleClick={()=>{const c=visible.indexOf(i);if(c>=0)inspectExpandable(detailsRow,c)}}><b>{column.name}</b><span>{cellFormat(rows[detailsRow].row[i],i)}</span></button>)}</>}</div>)}<nav className="result-inspector-switcher" aria-label="Inspector views"><button disabled={!rows.length||(!selection?.focus&&detailsRow==null)} className={inspectorMode==='row'&&inspectorVisible?'active':''} aria-label="Show row details" title="Row details" onClick={()=>{setDetailsRow(current=>selection?.focus.r??current??0);setInspectorMode('row');setInspectorVisible(true)}}><List size={14}/></button><button disabled={!sourceColumn?.sourceTable&&!matchingSourceDefinition} className={inspectorMode==='source'&&inspectorVisible?'active':''} aria-label="Show source definition" title="Source definition" onClick={()=>{setInspectorMode('source');setInspectorVisible(true)}}><Database size={14}/></button><button disabled={!executionDetails?.executedSql} className={inspectorMode==='execution'&&inspectorVisible?'active':''} aria-label="Show execution and parameters" title="Execution & parameters" onClick={()=>{setExecutionOpen(true);setInspectorMode('execution');setInspectorVisible(true)}}><ListFilter size={14}/></button></nav></aside></div>
   {selectionData.stats.count>0&&<div className="result-selection-stats"><span>Selection: {selectionData.stats.count} cells | {selectionData.selectedRowCount} rows | {selectionData.selectedColumnCount} columns | {loadedColumn!=null?"loaded rows in current view":"current page"}</span>{selectionData.stats.numericCount>0&&(selection?.mode==="row"||selectionData.selectedColumnCount!==1?<span>Aggregates require a selection from one column.</span>:<><span>{selectionData.stats.numericCount} numeric values in {selectionData.columns[0]?.name}</span><span>Sum: {formatAggregate(selectionData.stats.sum)}</span><span>Avg: {formatAggregate(selectionData.stats.average)}</span><span>Min: {formatAggregate(selectionData.stats.min)}</span><span>Max: {formatAggregate(selectionData.stats.max)}</span></>)}</div>}
   {menu&&<div ref={menuRoot} onKeyDown={event=>{if(event.key==='Escape'){event.preventDefault();setMenu(null);root.current?.focus();return;}if(!['ArrowUp','ArrowDown','Home','End'].includes(event.key))return;event.preventDefault();const buttons=Array.from(event.currentTarget.querySelectorAll('button:not(:disabled)'));const index=buttons.indexOf(document.activeElement);buttons[event.key==='Home'?0:event.key==='End'?buttons.length-1:(index+(event.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus()}} className="result-context-menu result-quick-menu" style={{left:menu.x,top:menu.y}} role="menu"><div className="result-menu-label">Selection · {selectionData.selectedRowCount} × {selectionData.selectedColumnCount}{loadedColumn!=null?' · loaded rows':' · current page'}</div><button role="menuitem" onClick={()=>copyFormat('tsv')}>Copy<span>Ctrl+C</span></button><button role="menuitem" onClick={()=>{setMenu(null);onTools?.('Copy')}}>Copy formats…</button>{(()=>{const link=rows[menu.row]&&detectSmartLink(rows[menu.row].row[menu.column]);if(!link)return null;const disabled=link.kind==='path'?!link.openable||!isNativeHost:link.kind==='object'?!onSmartObject:false;return <><div className="result-menu-label">Link · {link.kind==='object'?'Oracle object':link.kind}</div><button role="menuitem" disabled={disabled} title={link.kind==='path'&&!link.openable?'Only Oracle source files (.sql, .pks, .pkb, .prc, .fnc, .trg) open in the editor':link.text} onClick={()=>followSmartLink(link)}>{smartLinkActionLabel[link.kind]}</button><button role="menuitem" onClick={()=>{navigator.clipboard.writeText(link.text).then(()=>setCopyState('Link copied'),()=>setCopyState('Clipboard unavailable'));setMenu(null)}}>Copy {link.kind==='email'?'email address':link.kind==='path'?'path':link.kind==='object'?'object name':'URL'}</button><hr/></>})()}{!toolbarOn&&<button role="menuitem" onClick={()=>{setFloatingToolbarEnabled(globalThis.localStorage,true);setToolbarOn(true);setMenu(null)}}>Show floating selection toolbar</button>}<button role="menuitem" onClick={()=>{inspect(menu.row,visible.indexOf(menu.column));setMenu(null)}}>Inspect value<span>Enter</span></button><button role="menuitem" onClick={()=>{openCellDrawer(menu.row,visible.indexOf(menu.column));setMenu(null)}}>Inspect in side panel<span>Shift+Enter</span></button><button role="menuitem" disabled={!rows[menu.row]||Boolean(codeCellText(rows[menu.row].row[menu.column]).error)} onClick={()=>{const item=rows[menu.row],cell=codeCellText(item.row[menu.column]);setMenu(null);if(cell.text!=null)window.dispatchEvent(new CustomEvent('fbsdb.result.openCode',{detail:{column:columns[menu.column].name,row:item.index+1,text:cell.text}}))}}>Open in code editor</button><button role="menuitem" onClick={()=>{expandCell(menu.row,visible.indexOf(menu.column));setMenu(null)}}>Expand cell text<span>Alt+Enter</span></button><hr/>{(()=>{const count=selectedColumnIndices().length;return <><div className="result-menu-label">Column widths · {count} selected</div><button role="menuitem" disabled={count<2} onClick={()=>applyColumnWidths('equalize')}>Equalize selected widths</button><button role="menuitem" disabled={!count} onClick={()=>applyColumnWidths('fit')}>Fit selected to content</button><button role="menuitem" disabled={!count} onClick={()=>applyColumnWidths('distribute')}>Distribute remaining space</button><hr/></>})()}<div className="result-menu-label">Filter</div><button role="menuitem" onClick={()=>{const value=rows[menu.row].row[menu.column];settings({filters:[...(options.filters||[]),{column:menu.column,op:value==null?'null':'equals',kind:/NUMBER|DECIMAL|INT/i.test(columns[menu.column].type)?'number':'text',value:String(value??'')}]});setMenu(null)}}>Keep this value</button><button role="menuitem" onClick={()=>{const value=rows[menu.row].row[menu.column];settings({filters:[...(options.filters||[]),{column:menu.column,op:value==null?'notNull':'notEquals',kind:/NUMBER|DECIMAL|INT/i.test(columns[menu.column].type)?'number':'text',value:String(value??'')}]});setMenu(null)}}>Exclude this value</button><hr/><button role="menuitem" onClick={()=>{setDetailsRow(menu.row);setInspectorMode('row');setInspectorVisible(true);setMenu(null)}}>Row details</button><button role="menuitem" onClick={()=>{setMenu(null);onTools?.('Sql')}}>SQL generation…</button><button role="menuitem" disabled={!columns[menu.column].sourceTable} onClick={()=>{onSourceDefinition?.(columns[menu.column]);setMenu(null)}}>Source definition…</button></div>}

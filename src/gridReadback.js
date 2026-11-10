@@ -1,5 +1,9 @@
-import { sameCell } from './postCommit.js';
-import { oracleTemporalText, reviveOracleTemporal } from './oracleTemporal.js';
+import { compareOracleTemporal, oracleTemporalText, reviveOracleTemporal } from './oracleTemporal.js';
+
+// Whether a stored cell holds the value that was sent. Dates are compared as dates and numbers as numbers, not as text.
+const text = value => value == null ? null : value?.kind === 'temporal' ? oracleTemporalText(value) : typeof value === 'object' ? String(value.value ?? value) : String(value).trim();
+const same = (a, b) => a === b || (a != null && b != null && a !== '' && b !== '' && Number.isFinite(Number(a)) && Number.isFinite(Number(b)) && Number(a) === Number(b));
+export const sameCell = (expected, cell) => { const temporal = expected != null && cell?.kind === 'temporal' ? compareOracleTemporal(cell, String(expected)) : null; return temporal !== null ? temporal === 0 : same(expected == null ? null : String(expected), text(cell)); };
 
 const shown = value => value == null ? 'NULL' : value?.kind === 'temporal' ? oracleTemporalText(value) : String(value);
 

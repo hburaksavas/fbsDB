@@ -16,12 +16,22 @@ Scope: title/preview presentation. Normal file opening continues to activate an 
 
 ## 2026-11-04 — Grid edit controls
 
-User-approved product decision. Preserve these choices in later changes.
+User-approved product decision. The third point was replaced on 2026-11-11 (see below); the others still hold.
 
 - The switch that turns row editing on lives in the result toolbar (pencil icon, `aria-pressed`), next to the other view controls. Descriptions has a toolbar icon as well.
 - The separate edit row above the grid appears only while editing is on (or while an applied-changes status or verification is shown). Outside edit mode no extra row takes space.
 - Inside the edit row, core actions stay visible (Set NULL, New row, Delete row, Undo/Redo, invalid-cell counter, Pending); the rest sit in a "More" menu and can be pinned to the row. A switched-on filter stays visible on the row.
 - Every grid edit action is also available in the command palette with a "Grid: " prefix.
+
+## 2026-11-11 — Grid editing is cell edits plus Apply
+
+User-approved product decision. It replaces the edit-row contents described under 2026-11-04; preserve it in later changes.
+
+- The pencil in the result toolbar turns editing on. Cells are then changed directly in the table: double-click, Enter, F2 or simply typing on the selected cell. Enter keeps the value, Tab keeps it and moves on, Escape cancels, Delete clears the cell. Empty text stores NULL.
+- The edit row has four buttons only: Apply (with the number of changes), Discard, new row and delete row. Apply is enabled as soon as there is a change and sends every change in one batch, without a review drawer or a confirmation step. If a statement fails, the whole batch is rolled back and the edits stay in the grid.
+- Apply does not commit. The tab's Commit and Rollback finish the work as for any other DML.
+- Removed on purpose, do not bring back without asking: the More menu and pinning, the pending-changes drawer and SQL preview, bulk edit, the paste panel, record view, checkbox columns, row templates, the related-record picker and checks, pre-commit checks, changes-only and deletions-only views, edit tips, client-side value validation, the transaction label, receipts, verification and "Undo last Apply".
+- The command palette keeps the remaining grid actions with the "Grid: " prefix.
 
 ## 2026-11-08 — Moving tabs between windows (FI-106)
 

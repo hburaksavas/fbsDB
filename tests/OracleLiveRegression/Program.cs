@@ -19,7 +19,6 @@ string? sourcePackage = null;
 string? sourcePackageName = null;
 Exception? failure = null;
 var gridTables = new List<string>();
-var checkRoutines = new List<string>();
 void Require(bool condition, string message) { if (!condition) throw new InvalidOperationException(message); }
 async Task Check(string name, Func<Task> action)
 {
@@ -251,7 +250,6 @@ try
     });
     await new GridApplyChecks(a, b, user, Check, Require, gridTables).RunAsync();
     await new CommitFaultChecks(b, profile, user, Check, Require, gridTables).RunAsync();
-    await new CommitCheckChecks(a, b, user, Check, Require, gridTables, checkRoutines).RunAsync();
     await new TimeZoneChecks(profile, user, Check, Require, gridTables).RunAsync();
     void Skipped(string name, string reason) { checks.Add(new { name, status = "skipped", reason }); Console.WriteLine("SKIP " + name + ": " + reason); }
     await new PrivilegeChecks(a, user, Check, Require, gridTables, Skipped).RunAsync();
@@ -278,11 +276,6 @@ finally
     {
         try { await a.ExecuteAsync($"DROP TABLE {gridTable}"); }
         catch (Exception error) { failure ??= error; checks.Add(new { name = "grid fixture table removed", status = "failed", error = error.Message }); }
-    }
-    foreach (var routine in checkRoutines)
-    {
-        try { await a.ExecuteAsync($"DROP FUNCTION {routine}"); }
-        catch (Exception error) { failure ??= error; checks.Add(new { name = "pre-commit check function removed", status = "failed", error = error.Message }); }
     }
     if (sourceProcedure is not null && a.IsConnected)
     {

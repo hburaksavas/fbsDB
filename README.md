@@ -14,7 +14,7 @@ Get `fbsDB-win-x64.zip` from the [latest release](https://github.com/hburaksavas
 - **SQL tools in the editor:** Oracle-aware completion, schema suggestions, snippets, formatting, diagnostics, bind prompts, and execution-plan viewing.
 - **Workspace-first workflow:** browse and search SQL files, keep multiple files and drafts open, and remember a file's connection profile without running its SQL on open.
 - **Results built for investigation:** fetch paged rows from the original cursor; inspect, select, sort, filter, group, pivot, and format loaded data. Export to formats including CSV, JSON, SQL INSERT, and XLSX, with streaming options for larger CSV exports.
-- **Editable results:** turn on row editing for a single-table result with a primary key, stage changes locally, review the exact SQL, and Apply without committing.
+- **Editable results:** turn on row editing for a single-table result with a primary key, change cells directly in the table, then press Apply to send every change at once. Commit or Rollback stays a separate step.
 - **Control over database changes:** DML uses explicit Commit/Rollback; query cancellation, `DBMS_OUTPUT`, and per-tab execution context remain visible.
 - **Adjustable workbench:** dockable panels, resizable areas, themes, editor preferences, keyboard shortcuts, and result defaults.
 

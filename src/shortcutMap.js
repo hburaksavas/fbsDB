@@ -7,8 +7,8 @@ const general = [
   ['Show keys on controls (tap, then press the letter)', 'Alt'], ['This shortcut map', '?']
 ];
 const grid = [
-  ['Edit the selected cell', 'F2'], ['Pick a foreign key value from its parent table (edit mode)', 'F4'], ['Stage the edit / cancel it', 'Enter / Escape'], ['Stage and move to the next cell', 'Tab / Shift+Tab'],
-  ['Undo / redo a draft change (edit mode)', 'Ctrl+Z / Ctrl+Y'], ['Paste spreadsheet data (edit mode)', 'Ctrl+V'], ['Go to row', 'Ctrl+G'],
+  ['Edit the selected cell', 'F2'], ['Start editing by typing (edit mode)', 'Any character'], ['Keep the edit / cancel it', 'Enter / Escape'], ['Keep the edit and move to the next cell', 'Tab / Shift+Tab'], ['Clear the selected cell to NULL (edit mode)', 'Delete'],
+  ['Undo / redo an unapplied change (edit mode)', 'Ctrl+Z / Ctrl+Y'], ['Go to row', 'Ctrl+G'],
   ['Next / previous marked row', 'Ctrl+Alt+ArrowDown / Ctrl+Alt+ArrowUp'], ['Result commands', 'Ctrl+Shift+P'], ['Next / previous record (record view)', 'Alt+PageDown / Alt+PageUp']
 ];
 

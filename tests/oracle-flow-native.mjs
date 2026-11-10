@@ -86,7 +86,7 @@ async function beginEditing(sql){
   await read(sql);
   await cdp.until(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]')`,'Edit switch');
   if(await cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Edit rows of this result"]').getAttribute('aria-pressed')==='false'`))await cdp.click('.results-toolbar [aria-label="Edit rows of this result"]');
-  await cdp.until(`[...document.querySelectorAll('.grid-edit-bar button')].some(b=>b.textContent==='New row'&&!b.disabled)`,'Editing available from the real primary key',20000);
+  await cdp.until(`[...document.querySelectorAll('.grid-edit-bar button')].some(b=>b.textContent==='Row'&&!b.disabled)`,'Editing available from the real primary key',20000);
 }
 // Editing queries select ID, NAME, TS in this order.
 const NAME=1,TS=2;
@@ -99,14 +99,11 @@ async function stage(row,col,text){
   await cdp.evaluate(`document.querySelector('.cell-editor').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}))`);
   await cdp.frame();
 }
-const openPending=()=>cdp.evaluate(`void(document.querySelector('.pending-drawer')||[...document.querySelectorAll('.grid-edit-bar button')].find(b=>(b.getAttribute('aria-label')||'').startsWith('Pending changes')).click())`);
+// One button sends every change; the work then waits in the tab's transaction.
 async function apply(){
-  await openPending();
-  await cdp.until(`[...document.querySelectorAll('.pending-drawer button')].some(b=>b.textContent.startsWith('Apply to Oracle')&&!b.disabled)`,'Apply offered');
-  await cdp.evaluate(`[...document.querySelectorAll('.pending-drawer button')].find(b=>b.textContent.startsWith('Apply to Oracle')).click()`);
-  await cdp.until(`[...document.querySelectorAll('.pending-drawer .pending-confirm button.button-primary')].some(b=>b.textContent.startsWith('Apply '))`,'Apply confirmation');
-  await cdp.evaluate(`[...document.querySelectorAll('.pending-drawer .pending-confirm button.button-primary')].find(b=>b.textContent.startsWith('Apply ')).click()`);
-  await cdp.until(`document.querySelector('.grid-edit-tx')?.textContent.includes('applied, not committed')`,'Applied in the open transaction',20000);
+  await cdp.until(`(()=>{const b=document.querySelector('.grid-edit-apply');return b&&!b.disabled&&b.textContent.startsWith('Apply (')})()`,'Apply offered');
+  await cdp.click('.grid-edit-apply');
+  await cdp.until(`document.querySelector('.grid-edit-apply')?.textContent==='Apply'&&document.querySelector('.connection-control').dataset.pending==='true'`,'Applied in the open transaction',20000);
 }
 const toolbar=label=>cdp.click(`.transaction-button[aria-label="${label}"]`);
 // Applies an edit that is ready to be committed, for the failure scenarios.
@@ -281,54 +278,19 @@ try{
     assert.equal(await nameIn(tabB,1),'Çağrı İĞÜŞÖ','The edit was not stored exactly.');
   });
 
-  await check('read back: a new row shows what Oracle filled in, and the change stays uncommitted',async()=>{
+  await check('new row: an added row is applied and stays uncommitted',async()=>{
     await showTab(tabA);
     await beginEditing(`SELECT ID, NAME, NOTE FROM ${TABLE} ORDER BY ID`);
-    await cdp.textClick('.grid-edit-bar button','New row');
+    await cdp.textClick('.grid-edit-bar button','Row');
     await cdp.until(`document.querySelector('.new-row input[aria-label$=" ID"]')`,'New row form');
     await set('.new-row input[aria-label$=" ID"]','90');
     await set('.new-row input[aria-label$=" NAME"]','added');
     await cdp.frame();
     await apply();
-    await cdp.until(`document.querySelector('[aria-label="Apply results"]')`,'Apply results');
-    assert.match(await cdp.evaluate(`document.querySelector('[aria-label="Apply results"]').textContent`),/Oracle set NOTE = filled by default\./);
     assert.equal(await cdp.evaluate(`document.querySelector('.connection-control').dataset.pending`),'true','The change is still open.');
     await toolbar('Rollback');
     await cdp.until(`!document.querySelector('.connection-control').dataset.pending`,'Rolled back');
     assert.deepEqual(await (async()=>{await showTab(tabB);return read(`SELECT ID FROM ${TABLE} WHERE ID=90`)})(),[],'A rolled back row was stored.');
-  });
-
-  await check('related record: a foreign key value is searched in its parent table, chosen and saved',async()=>{
-    await showTab(tabA);
-    await run(`CREATE TABLE ${PARENT} (ID NUMBER(10) PRIMARY KEY, LABEL VARCHAR2(40))`,{ddl:true});
-    await run(`CREATE TABLE ${CHILD} (ID NUMBER(10) PRIMARY KEY, PARENT_ID NUMBER(10) REFERENCES ${PARENT}(ID))`,{ddl:true});
-    for(const [id,label] of [[1,'alpha'],[2,'beta'],[3,'Betamax']])await run(`INSERT INTO ${PARENT} VALUES (${id},'${label}')`);
-    await run(`INSERT INTO ${CHILD} VALUES (1,1)`);
-    await toolbar('Commit');
-    await cdp.until(`!document.querySelector('.connection-control').dataset.pending`,'Committed');
-    await beginEditing(`SELECT ID, PARENT_ID FROM ${CHILD} ORDER BY ID`);
-    const pick=(row,col)=>cdp.evaluate(`(()=>{document.querySelector('[data-cell="${row}:${col}"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));document.querySelector('.grid-wrap').focus()})()`);
-    const f4=()=>cdp.evaluate(`document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'F4',bubbles:true,cancelable:true}))`);
-    await pick(0,0);await cdp.frame();await f4();
-    await cdp.until(`document.body.textContent.includes('has no foreign key that can be edited here')&&!document.querySelector('[aria-label="Related record"]')`,'A column without a key is refused');
-    await pick(0,1);await cdp.frame();await f4();
-    await cdp.until(`document.querySelectorAll('[aria-label="Related record"] tbody tr').length===3`,'Parent rows are listed',20000);
-    await set('[aria-label="Search related records"]','BETA');
-    await cdp.textClick('[aria-label="Related record"] button','Search');
-    await cdp.until(`document.querySelectorAll('[aria-label="Related record"] tbody tr').length===2`,'The search narrows the rows, ignoring case',20000);
-    await set('[aria-label="Search related records"]','%');
-    await cdp.textClick('[aria-label="Related record"] button','Search');
-    await cdp.until(`document.querySelector('[aria-label="Related record"]').textContent.includes('No rows found')`,'A wildcard is searched as text',20000);
-    await set('[aria-label="Search related records"]','max');
-    await cdp.textClick('[aria-label="Related record"] button','Search');
-    await cdp.until(`document.querySelectorAll('[aria-label="Related record"] tbody tr').length===1`,'One row found',20000);
-    await cdp.click('[aria-label="Use row 1"]');
-    await cdp.until(`!document.querySelector('[aria-label="Related record"]')&&document.querySelector('.grid-edit-pending')?.textContent.includes('Pending: 1')`,'The value is a draft');
-    await apply();
-    await toolbar('Commit');
-    await cdp.until(`!document.querySelector('.connection-control').dataset.pending`,'Committed');
-    await showTab(tabB);
-    assert.deepEqual((await read(`SELECT PARENT_ID FROM ${CHILD} WHERE ID=1`))[0],['3'],'The chosen key was not stored.');
   });
 
   await check('grid: Rollback discards an applied edit',async()=>{
@@ -343,9 +305,9 @@ try{
     await showTab(tabA);
     await beginEditing(`SELECT ID, NAME, TS FROM ${TABLE} ORDER BY ID`);
         await stage(2,TS,'2026-03-04 05:06:07');
-    await openPending();
-    await cdp.until(`document.querySelector('.pending-drawer')?.textContent.includes('needs a date with its offset')`,'The missing offset is explained');
-    assert.ok(await cdp.evaluate(`[...document.querySelectorAll('.pending-drawer button')].find(b=>b.textContent.startsWith('Apply to Oracle')).disabled`),'Apply was not blocked.');
+    await cdp.click('.grid-edit-apply');
+    await cdp.until(`[...document.querySelectorAll('.feedback-stack > *')].some(e=>e.textContent.includes('needs a date with its offset'))`,'The missing offset is explained');
+    assert.equal(await cdp.evaluate(`document.querySelector('.grid-edit-apply').textContent`),'Apply (1)','The edit was sent without its offset.');
     await stage(2,TS,'2026-03-04 05:06:07+03:00');
     await apply();
     await toolbar('Commit');
@@ -366,24 +328,10 @@ try{
     assert.match(text,/may or may not have saved/);assert.doesNotMatch(text,/was committed successfully/);
     assert.match(await control(),/Connect to Oracle/,'The tab still claims to be connected.');
     assert.ok(!await cdp.evaluate(`document.querySelector('.connection-control').dataset.pending`),'The lost transaction still shows as pending.');
-    assert.equal(await cdp.evaluate(`document.querySelector('.grid-edit-tx')?.textContent.includes('not confirmed')`),true,'The grid does not say the outcome is unconfirmed.');
     await cdp.textClick('[aria-label="Commit not confirmed"] button','Close');
     assert.equal(await nameIn(tabB,id),saved?'lost commit':`n${id}`,'Oracle holds a different result than this failure produces.');
     await showTab(tabA);
     await connect();
-    await cdp.textClick('.grid-edit-tx button','Check what Oracle stored');
-    await cdp.until(`document.querySelector('.grid-edit-verification li')`,'Stored values were read',20000);
-    assert.match(await cdp.evaluate(`document.querySelector('.grid-edit-verification').textContent`),saved?/saved, it holds the new values/:/not saved, it still holds the old values/);
-    if(saved)assert.equal(await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-verification button')].length`),0,'Nothing saved is offered for a retry.');
-    else{
-      await cdp.evaluate(`document.querySelector('.grid-edit-verification button').click()`);
-      await cdp.until(`document.querySelector('.grid-edit-pending')?.textContent.includes('Pending: 1')`,'The edit is a draft again');
-      await apply();
-      await toolbar('Commit');
-      await cdp.until(`!document.querySelector('.connection-control').dataset.pending`,'Committed');
-      assert.equal(await nameIn(tabB,id),'lost commit','The retried edit was not stored.');
-      await showTab(tabA);
-    }
     assert.equal(await read(`SELECT 46 FROM dual`).then(rows=>rows[0].includes('46')),true,'The reconnected tab cannot run queries.');
   });
 
@@ -488,7 +436,7 @@ try{
   // Taken before cleanup, while the screen still shows the failure.
   try{
     const shot=await cdp.call('Page.captureScreenshot',{format:'png'});await writeFile(path.join(root,'oracle-flow-failure.png'),Buffer.from(shot.data,'base64'));
-    failure.message+=`\nScreen: ${await cdp.evaluate(`[...document.querySelectorAll('.pending-drawer,.grid-edit-bar,.result-notice,[role="alertdialog"],[role="dialog"],.debug-panel,.feedback-stack,.result-status')].map(e=>e.textContent).join(' | ').slice(0,1500)`)}`;
+    failure.message+=`\nScreen: ${await cdp.evaluate(`[...document.querySelectorAll('.grid-edit-bar,.result-notice,[role="alertdialog"],[role="dialog"],.debug-panel,.feedback-stack,.result-status')].map(e=>e.textContent).join(' | ').slice(0,1500)`)}`;
   }catch{}
 }
 finally{
@@ -496,7 +444,7 @@ finally{
     relay.reset();
     // A failed step can leave tab A's transaction open, and its locks would refuse the DROP. Discarding it through the app also ends the row locks.
     if(tabA&&tabB){await showTab(tabA);await run('ROLLBACK')}
-    if(tabB){await showTab(tabB);for(const table of [CHILD,PARENT])await run(`DROP TABLE ${table} CASCADE CONSTRAINTS`,{ddl:true}).catch(()=>{});await run(`DROP TABLE ${TABLE}`,{ddl:true});assert.ok(!/ORA-\d+/.test(await failureText()),await failureText());console.log('PASS fixture table removed');await run(`BEGIN FOR o IN (SELECT object_type, object_name FROM user_objects WHERE object_name IN ('PLSQL_PROFILER_DATA','PLSQL_PROFILER_UNITS','PLSQL_PROFILER_RUNS','PLSQL_PROFILER_RUNNUMBER') ORDER BY DECODE(object_name,'PLSQL_PROFILER_DATA',1,'PLSQL_PROFILER_UNITS',2,'PLSQL_PROFILER_RUNS',3,4)) LOOP EXECUTE IMMEDIATE 'DROP '||o.object_type||' '||o.object_name; END LOOP; END;`).catch(()=>{})}
+    if(tabB){await showTab(tabB);await run(`DROP TABLE ${TABLE}`,{ddl:true});assert.ok(!/ORA-\d+/.test(await failureText()),await failureText());console.log('PASS fixture table removed');await run(`BEGIN FOR o IN (SELECT object_type, object_name FROM user_objects WHERE object_name IN ('PLSQL_PROFILER_DATA','PLSQL_PROFILER_UNITS','PLSQL_PROFILER_RUNS','PLSQL_PROFILER_RUNNUMBER') ORDER BY DECODE(object_name,'PLSQL_PROFILER_DATA',1,'PLSQL_PROFILER_UNITS',2,'PLSQL_PROFILER_RUNS',3,4)) LOOP EXECUTE IMMEDIATE 'DROP '||o.object_type||' '||o.object_name; END LOOP; END;`).catch(()=>{})}
   }catch(error){failure??=error;console.error(`Could not remove ${TABLE}: ${error.message}`)}
   await writeFile(path.join(root,'oracle-flow-report.json'),JSON.stringify({status:failure?'failed':'passed',checks,error:failure?.message,table:TABLE},null,2));
   if(failure)console.error(failure.message);
