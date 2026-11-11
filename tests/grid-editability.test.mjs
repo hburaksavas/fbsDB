@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {explainEditability} from '../src/gridEditability.js';
-import {buildDml,dmlPreviewText} from '../src/dmlPreview.js';
+import {buildDml} from '../src/dmlPreview.js';
 import {editCell,editInserted,emptyDrafts,insertRow,toggleDeleted} from '../src/gridDrafts.js';
 const column=(name,type,extra={})=>({name,type,sourceSchema:'APP',sourceTable:'CUSTOMERS',sourceColumn:name,...extra});
 const columns=[column('ID','NUMBER'),column('NAME','VARCHAR2'),column('NOTE','CLOB'),{name:'TOTAL',type:'NUMBER'}];
@@ -36,11 +36,9 @@ test('deletes and inserts are parameterized and omitted columns keep their defau
  assert.equal(statements[1].sql,'INSERT INTO "APP"."CUSTOMERS" ("ID", "NAME") VALUES (:i1, :i2)');assert.equal(statements[1].binds[0].value,null);assert.equal(statements[1].binds[1].value,'Cy');
  assert.equal(buildDml(context(insertRow(emptyDrafts(),{}))).problems.length,1);
 });
-test('a NULL key value cannot identify a row and the preview shows binds explicitly',()=>{
+test('a NULL key value cannot identify a row',()=>{
  const nullKey={...context(editCell(emptyDrafts(),0,1,'Ada',{value:'x'})),rowAt:()=>[null,'Ada']};
  const {statements,problems}=buildDml(nullKey);assert.equal(statements.length,0);assert.match(problems[0],/key column ID is NULL/);
- const text=dmlPreviewText(buildDml(context(editCell(emptyDrafts(),0,1,'Ada',{isNull:true}))).statements);
- assert.match(text,/-- :c1 VARCHAR2 = NULL/);assert.match(text,/-- :uk1 NUMBER = "1"/);
 });
 import {cellEditorKind,fromCalendarValue,toCalendarValue} from '../src/gridEditability.js';
 test('editor kinds follow the column type and the value shape',()=>{

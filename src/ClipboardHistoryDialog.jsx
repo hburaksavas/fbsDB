@@ -6,7 +6,7 @@ export function ClipboardHistoryDialog({enabled,onEnabled,entries,onClear,onPast
   const ref=useRef(null),[query,setQuery]=useState(''),[distribute,setDistribute]=useState(false),[error,setError]=useState('');useDialogFocus(ref,onClose);
   const shown=entries.filter(item=>item.text.toLowerCase().includes(query.toLowerCase()));
   return <ModalBackdrop onClose={onClose}><section ref={ref} className="appearance-modal local-rename-dialog" role="dialog" aria-modal="true" aria-label="Clipboard history">
-    <header className="appearance-header"><h2>Clipboard history</h2></header><div className="mini-tool-content"><label><input type="checkbox" checked={enabled} onChange={event=>onEnabled(event.target.checked)}/> Remember copies from this SQL editor for this app session</label>
+    <header className="appearance-header"><h2>Clipboard history</h2></header><div className="dialog-content"><label><input type="checkbox" checked={enabled} onChange={event=>onEnabled(event.target.checked)}/> Remember copies from this SQL editor for this app session</label>
       <p>Off by default. Up to 20 fragments stay in memory until cleared or the app closes. Copies from other apps are never collected.</p>
       <label>Search copied code<input aria-label="Search clipboard history" value={query} onChange={event=>setQuery(event.target.value)}/></label>
       <label><input type="checkbox" checked={distribute} onChange={event=>setDistribute(event.target.checked)}/> Distribute lines across multiple selections when counts match</label>

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {filterTreeMatches,groupedResultSummary,buildServerFilter,visibleWhitespace,textLengths,bytesToHex,binaryMime} from '../src/resultAdvanced.js';
+import {filterTreeMatches,groupedResultSummary,buildServerFilter,visibleWhitespace,textLengths,binaryMime} from '../src/resultAdvanced.js';
 import {matchesCondition,applyResultFeatures} from '../src/resultFeatures.js';
 import {getVisibleResultRows} from '../src/resultRows.js';
 const columns=[{name:'ID',type:'NUMBER'},{name:'NAME',type:'VARCHAR2'}];
@@ -26,5 +26,5 @@ test('grouped summaries skip NULLs in numeric calculations',()=>{
  assert.deepEqual(summary.rows.map(x=>x.row),[['A',3,4,2,1,3],['B',1,5,5,5,5]]);
 });
 test('whitespace, text lengths and binary inspection preserve content',()=>{
- assert.equal(visibleWhitespace('a b\t\n'),'a·b→\t↵\n');assert.deepEqual(textLengths('A😀'),{characters:2,utf16:3,utf8:5});assert.ok(bytesToHex(new Uint8Array([65,0,255])).includes('41 00 ff'));assert.equal(binaryMime(new Uint8Array([137,80])),'image/png');
+ assert.equal(visibleWhitespace('a b\t\n'),'a·b→\t↵\n');assert.deepEqual(textLengths('A😀'),{characters:2,utf16:3,utf8:5});assert.equal(binaryMime(new Uint8Array([137,80])),'image/png');
 });

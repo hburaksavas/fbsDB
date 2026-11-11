@@ -32,5 +32,3 @@ export function projectUsage({ root, documents }) {
   cache = { root: root || null, at: Date.now(), promise };
   return promise;
 }
-
-export function forgetProjectUsage() { cache = null; }

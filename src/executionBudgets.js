@@ -1,4 +1,3 @@
-export const budgetActions = ['stop', 'warn'];
 
 // Samples rows instead of measuring all of them: an estimate of what the grid holds in browser memory (UTF-16 text plus overhead).
 export function estimateResultBytes(rows, columnCount = 0, sample = 200) {

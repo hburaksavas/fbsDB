@@ -1,5 +1,4 @@
 import { docAtWord } from './docComments.js';
-import { colorPresentation, findColors } from './colorLiterals.js';
 import {semanticTokenTypes} from './semanticTokensLegend.js';
 import {outlineDocumentSymbols} from './outlineModel.js';
 import { oracleInlineCompletion } from './oracleInlineCompletion.js';
@@ -171,15 +170,6 @@ export function installOracleLanguageProviders({ monaco, editor, client, broker,
       if (!word || snapshot().languageFeatures?.hover === false) return null;
       const markdown = docAtWord(model.getValue(), word.word, model.getOffsetAt(position));
       return markdown ? { range: new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn), contents: [{ value: markdown }] } : null;
-    },
-  }));
-  // Colors written as text in string literals and comments get a swatch and a picker that writes back the same notation.
-  if (typeof monaco.languages.registerColorProvider === 'function') disposables.push(monaco.languages.registerColorProvider('sql', {
-    provideDocumentColors(model) {
-      return findColors(model.getValue()).map(item => ({ color: { red: item.red, green: item.green, blue: item.blue, alpha: item.alpha }, range: rangeAt(monaco, model, item.start, item.end) }));
-    },
-    provideColorPresentations(model, info) {
-      return [{ label: colorPresentation(info.color, /^rgb/i.test(model.getValueInRange(info.range)) ? 'rgb' : 'hex') }];
     },
   }));
   const definition = async (model, position, token, body = false) => {

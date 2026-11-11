@@ -50,7 +50,6 @@ export function addToGroup(groups, groupId, tabIds) {
 export const removeFromGroups = (groups, tabIds) => withoutMembers(groups, tabIds);
 export const ungroup = (groups, groupId) => groups.filter(group => group.id !== groupId);
 export const toggleCollapsed = (groups, groupId) => groups.map(group => group.id === groupId ? { ...group, collapsed: !group.collapsed } : group);
-export const setGroupColor = (groups, groupId, color) => groupColors.includes(color) ? groups.map(group => group.id === groupId ? { ...group, color } : group) : groups;
 
 export function renameGroup(groups, groupId, name) {
   const checked = validateGroupName(groups, name, groupId);

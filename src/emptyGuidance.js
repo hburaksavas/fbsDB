@@ -10,5 +10,3 @@ export const noRowsGuidance = () => ({
   title: 'No rows returned',
   detail: 'The statement ran successfully and matched no rows. Check its WHERE conditions, or whether the connection points at the schema you expect.'
 });
-
-export const pendingEmptyGuidance = () => 'No pending changes. Select a cell and press F2 to edit it, add a New row, or mark a row for deletion. Drafts stay here until you apply or discard them.';

@@ -1,6 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { getTableCompletionContext as context } from '../src/sqlCompletionContext.js';
+import { getOracleCompletionContext } from '../src/oracleCompletionContext.js';
+// The relation-completion view of the context: owner and typed fragment, or null outside FROM/JOIN.
+function context(before) {
+ const found = getOracleCompletionContext(before, before.length);
+ if (found.blocked || !found.relation) return null;
+ return { owner: found.qualifier || null, fragment: found.fragment, ...(found.needsLeadingSpace ? { needsLeadingSpace: true } : {}) };
+}
 test('FROM and JOIN retain context over newline and indentation', () => {
  for (const text of ['select * from\n', 'select * from\r\n    ', 'select * from t inner join\n  ']) assert.deepEqual(context(text), {owner:null, fragment:''});
  assert.deepEqual(context('select * from\n  inv'), {owner:null, fragment:'inv'});

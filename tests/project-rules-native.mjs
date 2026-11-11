@@ -249,7 +249,7 @@ try{
     const source='SELECT custmer_id FROM customer';
     await cdp.evaluate(`${editor}.setValue(${quote(source)});${editor}.setSelection(${editor}.getModel().getFullModelRange());${editor}.focus()`);
     await cdp.key('F10',8);await cdp.until(`document.querySelector('[aria-label="SQL editor actions"]')`,'Editor actions');
-    await cdp.textClick('[aria-label="SQL editor actions"] button','Convert identifier case…');await cdp.until(`document.querySelector('.identifier-case-dialog')`,'Identifier preview');
+    await cdp.key('Escape');await cdp.paletteCommand('Convert identifier case (snake_case, camelCase, UPPER_CASE)');await cdp.until(`document.querySelector('.identifier-case-dialog')`,'Identifier preview');
     await cdp.evaluate(`(()=>{const input=[...document.querySelectorAll('.identifier-case-styles label')].find(label=>label.textContent.includes('Project full terms'))?.querySelector('input');if(!input)throw Error('Missing project style');input.click()})()`);
     await cdp.until(`document.querySelector('.identifier-case-dialog')?.textContent.includes('known alternative spelling')`,'Dictionary inspection');
     assert.match(await cdp.evaluate(`document.querySelector('[aria-label="Identifier changes"]')?.textContent||''`),/CUSTOMER_ID/);
@@ -259,7 +259,7 @@ try{
     const source='CREATE OR REPLACE PROCEDURE p_run(p_id IN NUMBER) IS\nBEGIN\n  DBMS_OUTPUT.PUT_LINE(p_id);\nEND;';
     await cdp.evaluate(`${editor}.setValue(${quote(source)});${editor}.setPosition({lineNumber:1,column:37});${editor}.focus()`);
     await cdp.key('F10',8);await cdp.until(`document.querySelector('[aria-label="SQL editor actions"]')`,'Editor actions');
-    await cdp.textClick('[aria-label="SQL editor actions"] button','Review references before delete…');
+    await cdp.key('Escape');await cdp.paletteCommand('Review references before deleting local procedure or parameter');
     await cdp.until(`document.querySelector('.workspace-delete-review')`,'Delete review');
     assert.match(await cdp.evaluate(`document.querySelector('.workspace-delete-review').textContent`),/1 resolved current-document reference/);
     assert.match(await cdp.evaluate(`document.querySelector('.workspace-delete-review').textContent`),/does not delete code or prove deletion is safe/);

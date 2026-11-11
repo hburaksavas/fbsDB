@@ -55,11 +55,6 @@ export function applyResultFeatures(indexedRows, columns, options = {}) {
   }
   return rows;
 }
-export function uniqueResultValues(rows, column) {
-  const values = new Map();
-  for (const { row } of rows) { const key = JSON.stringify(row[column] ?? null); const existing = values.get(key); if (existing) existing.count++; else values.set(key, { value: row[column] ?? null, count: 1 }); }
-  return [...values.values()].sort((a, b) => b.count - a.count);
-}
 export function formatResultValue(value, type, options = {}) {
   if(isLobPreview(value))return lobDisplayText(value);
   if(value?.kind==='binary')return `BLOB · ${value.byteLength} bytes`;

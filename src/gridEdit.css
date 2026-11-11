@@ -65,11 +65,6 @@ tr[data-row-error] td.rownum::after{content:'✖';margin-left:2px}
 @keyframes skeleton-pulse{50%{opacity:.45}}
 @media(prefers-reduced-motion:reduce){.loading-skeleton i{animation:none}}
 tr[data-row-outside-filter]{box-shadow:inset 3px 0 0 var(--accent)}
-.row-outside-filter{color:var(--accent);font-weight:700;margin-right:2px}
-.outside-filter-note{padding:2px 8px}
-.related-record-rows{flex-basis:100%;max-height:180px;overflow:auto}
-.related-record-rows table{border-collapse:collapse;font-size:11px}
-.related-record-rows th,.related-record-rows td{padding:1px 8px;text-align:left;white-space:nowrap;border-bottom:1px solid var(--line)}
 .bulk-edit-panel{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--line);background:var(--panel2);font-size:11px;color:var(--text)}
 .bulk-edit-panel header{flex-basis:100%;display:flex;justify-content:space-between}
 .bulk-edit-panel label{display:inline-flex;gap:4px;align-items:center}

@@ -63,20 +63,4 @@ export function buildDml({ table, columns, identity, rowAt, drafts, rowIds = nul
   return { statements, problems };
 }
 
-// Reviewable text: the statement and each bind with its type and value (NULL shown explicitly).
-export function dmlPreviewText(statements) {
-  return statements.map(statement => `${statement.sql};\n${statement.binds.map(bind => `  -- :${bind.name} ${bind.type} = ${bind.value === null ? 'NULL' : JSON.stringify(bind.value)}`).join('\n')}`).join('\n\n');
-}
-
 export const statementKey = statement => statement.kind === 'insert' ? `i:${statement.id}` : `${statement.kind[0]}:${statement.row}`;
-
-// "APP"."T": 2 updates, 1 delete - what an Apply would do, grouped by the table it touches.
-export function impactSummary(statements) {
-  const byTable = new Map();
-  for (const statement of statements) {
-    const counts = byTable.get(statement.table) || { update: 0, insert: 0, delete: 0 };
-    counts[statement.kind]++;
-    byTable.set(statement.table, counts);
-  }
-  return [...byTable].map(([table, counts]) => ({ table, counts, text: `${table}: ${[counts.update && `${counts.update} update${counts.update === 1 ? '' : 's'}`, counts.insert && `${counts.insert} insert${counts.insert === 1 ? '' : 's'}`, counts.delete && `${counts.delete} delete${counts.delete === 1 ? '' : 's'}`].filter(Boolean).join(', ')}` }));
-}

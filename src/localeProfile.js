@@ -1,11 +1,4 @@
-export const supportedLanguages=['en','tr'];
-export const supportedRegions=['en-US','tr-TR','de-DE','en-GB'];
-const languageNames={en:'English',tr:'Türkçe'};
 const regionNames={'en-US':'English (United States)','tr-TR':'Türkçe (Türkiye)','de-DE':'Deutsch (Deutschland)','en-GB':'English (United Kingdom)'};
-export function detectedLanguage(locale='en-US'){
-  const tag=String(locale||'').toLowerCase();
-  return tag.startsWith('tr')?'tr':'en';
-}
 export function detectedRegion(locale='en-US'){
   try{const parsed=new Intl.Locale(Intl.getCanonicalLocales(locale)[0]||'en-US');return parsed.region?parsed.baseName:[parsed.language,parsed.script,parsed.maximize().region].filter(Boolean).join('-')}catch{return 'en-US'}
 }
@@ -14,7 +7,6 @@ export function usesCommaDecimal(locale='en-US'){
 }
 export function effectiveLanguage(){return 'en'}
 export function effectiveRegion(preference,systemLocale){return preference==='system'?detectedRegion(systemLocale?.region||globalThis.navigator?.language||'en-US'):preference||'en-US'}
-export function languageLabel(value){return value==='system'?'Use system settings':languageNames[value]||languageNames.en}
 export function regionLabel(value){return value==='system'?'Use system settings':regionNames[value]||value}
 const tr={
   'Appearance':'Görünüm','Results Table View':'Sonuç Tablosu Görünümü','Export':'Dışa Aktarma',

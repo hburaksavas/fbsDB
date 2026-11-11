@@ -1,3 +1,4 @@
+import {registerResultActions} from './resultActionBridge.js';
 import { resultToolbarLayout } from './resultToolbarLayout';
 import {useContext,useEffect,useLayoutEffect,useRef,useState} from 'react';
 import {ToolbarPrefsContext} from './toolbarPrefs';
@@ -28,7 +29,11 @@ export function ResultToolbar({onAction,onCommand,hasData=false,hasExecution=fal
   [['load',Download,'Load result rows',!hasMore||busy],['export',FileOutput,'Export results',!hasData||columns.every((_,index)=>(columnLayout.hidden||[]).includes(index))],['sql',FileCode2,'SQL generation',!hasData||viewKind!=='source'],['pin',Pin,'Pin result',!hasData],['memory',Database,'Result memory',!memoryItems.length],['explain',Activity,'Generate execution plan',busy],['commands',Command,'Result commands',!hasData],['clear',RotateCcw,'Reset result view',!hasData]]
  ];
  const {visibleIds,overflow:overflowActions}=resultToolbarLayout(groups,capacity,useContext(ToolbarPrefsContext).result),hasOverflow=overflowActions.length>0;
+ const invokeRef=useRef(null),groupsRef=useRef(groups);groupsRef.current=groups;
+ // Palette entries act like the button: a popover opens under the action's own button, or under the overflow button when it has none.
+ useEffect(()=>registerResultActions({element:toolbarRef.current,get:()=>groupsRef.current.flat().map(([id,,label,disabled])=>({id,label,disabled,run:()=>invokeRef.current?.(id,{currentTarget:[...toolbarRef.current.querySelectorAll('button.results-tool')].find(button=>button.getAttribute('aria-label')===label)||overflowTrigger.current||toolbarRef.current})}))}),[]);
  const invoke=(id,event)=>{const nested=['view','filter','sort','marks','highlights','copy','load','export','sql','lookup','memory','commands','navigation','calculated'].includes(id);if(nested){if(id==='calculated')calculatedTrigger.current=event.currentTarget;showPopover(id,event)}else{setOpen('');if(id==='pivot')onTogglePivotPanel?.();else if(id==='edit')onToggleEdit?.();else if(id==='descriptions')onToggleDescriptions?.();else onAction(id)}};
+ invokeRef.current=invoke;
  const update=patch=>onOptionsChange?.({...options,...patch});
  const updateLayout=patch=>onLayoutChange?.({...columnLayout,...patch});
  const filterAdd=()=>{const column=columns[filterColumn];if(!column)return;update({filters:[...(options.filters||[]),{column:filterColumn,op:filterOp,kind:/NUMBER|DECIMAL|INT/i.test(column.type)?'number':'text',value:filterValue,group:'root'}]});setFilterValue('')};

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { applyResultFeatures, matchesCondition, uniqueResultValues, formatResultValue, selectionStatistics, copyResultData } from '../src/resultFeatures.js';
+import { applyResultFeatures, matchesCondition, formatResultValue, selectionStatistics, copyResultData } from '../src/resultFeatures.js';
 const columns=[{name:'ID',type:'NUMBER'},{name:'NAME',type:'VARCHAR2'},{name:'DATE',type:'DATE'}];
 const rows=[[2,'B','2026-02-01'],[1,'B','2026-01-01'],[3,'A','2025-01-01'],[null,null,null]].map((row,index)=>({row,index}));
 test('typed filters combine null, range, date and text rules',()=>{
@@ -15,7 +15,6 @@ test('multi sort has priority, stable ties and nulls last',()=>{
 test('duplicate keys preserve type and marks filter source identity',()=>{
  assert.deepEqual(applyResultFeatures(rows,columns,{duplicateColumns:[1],duplicatesOnly:true}).map(x=>x.index),[0,1]);
  assert.deepEqual(applyResultFeatures(rows,columns,{marks:[2],markedOnly:true}).map(x=>x.index),[2]);
- assert.deepEqual(uniqueResultValues(rows,1)[0],{value:'B',count:2});
 });
 test('display formatting leaves raw values intact',()=>{
  assert.equal(formatResultValue(1234.5,'NUMBER',{locale:'en-US',grouping:true,decimals:2}),'1,234.50');

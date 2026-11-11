@@ -4,7 +4,6 @@
 // - a name that matches several objects links to each of them and the edge is marked ambiguous;
 // - synonyms are shown with their target but references are not redirected through them; grants and dynamic SQL are not followed.
 
-export const EDGE_KINDS = ['calls', 'reads', 'writes', 'on', 'references', 'uses', 'aliases'];
 export const edgeLabel = { calls: 'calls', reads: 'reads', writes: 'writes', on: 'fires on', references: 'foreign key to', uses: 'uses sequence', aliases: 'synonym for' };
 
 const objectKey = (owner, name) => `${owner || ''}.${name}`;

@@ -1941,9 +1941,6 @@ export const bridgeContract = {
           "sql": {
             "type": "string"
           },
-          "miniTool": {
-            "type": "boolean"
-          },
           "pageSize": {
             "type": "integer",
             "minimum": -2147483648,
@@ -2904,49 +2901,6 @@ export const bridgeContract = {
           }
         },
         "required": [
-          "root"
-        ]
-      }
-    },
-    "workspace.tools.list": {
-      "handler": "workspace",
-      "resumeSession": false,
-      "payload": {
-        "type": "object",
-        "properties": {
-          "root": {
-            "type": "string"
-          },
-          "tool": {
-            "type": "object"
-          },
-          "tabId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "root"
-        ]
-      }
-    },
-    "workspace.tools.save": {
-      "handler": "workspace",
-      "resumeSession": false,
-      "payload": {
-        "type": "object",
-        "properties": {
-          "root": {
-            "type": "string"
-          },
-          "tool": {
-            "type": "object"
-          },
-          "tabId": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "tool",
           "root"
         ]
       }
@@ -5318,96 +5272,6 @@ export const bridgeContract = {
           "$ref": "ProjectRules"
         },
         "fileConnections": {
-          "type": "object"
-        }
-      },
-      "required": []
-    },
-    "workspace.tools.list": {
-      "type": "object",
-      "properties": {
-        "requestId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "tabId": {
-          "type": "string"
-        },
-        "autoCommit": {
-          "type": "boolean"
-        },
-        "root": {
-          "type": "string"
-        },
-        "catalog": {
-          "type": "object",
-          "properties": {
-            "tools": {
-              "type": "array",
-              "items": {
-                "type": "object"
-              }
-            },
-            "errors": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          "required": [
-            "tools",
-            "errors"
-          ]
-        },
-        "tool": {
-          "type": "object"
-        }
-      },
-      "required": []
-    },
-    "workspace.tools.save": {
-      "type": "object",
-      "properties": {
-        "requestId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "tabId": {
-          "type": "string"
-        },
-        "autoCommit": {
-          "type": "boolean"
-        },
-        "root": {
-          "type": "string"
-        },
-        "catalog": {
-          "type": "object",
-          "properties": {
-            "tools": {
-              "type": "array",
-              "items": {
-                "type": "object"
-              }
-            },
-            "errors": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          "required": [
-            "tools",
-            "errors"
-          ]
-        },
-        "tool": {
           "type": "object"
         }
       },

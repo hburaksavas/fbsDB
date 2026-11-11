@@ -18,7 +18,6 @@ export function groupedResultSummary(rows,columns,groupColumns=[],valueColumn=0)
 export function visibleWhitespace(text){return String(text).replace(/ /g,'·').replace(/\t/g,'→\t').replace(/\r\n|\r|\n/g,'↵\n')}
 export function textLengths(value){const text=String(value??'');return {characters:Array.from(text).length,utf16:text.length,utf8:new TextEncoder().encode(text).length}}
 export function blobBytes(value){if(value?.kind==='binary')return Uint8Array.from(atob(value.base64),x=>x.charCodeAt(0));return null}
-export function bytesToHex(bytes,offset=0,limit=4096){return Array.from({length:Math.ceil(Math.min(limit,bytes.length-offset)/16)},(_,line)=>{const start=offset+line*16,part=bytes.slice(start,start+16);return start.toString(16).padStart(8,'0')+'  '+Array.from(part,b=>b.toString(16).padStart(2,'0')).join(' ').padEnd(47)+'  '+Array.from(part,b=>b>=32&&b<127?String.fromCharCode(b):'.').join('')}).join('\n')}
 export function binaryMime(bytes){if(bytes[0]===137&&bytes[1]===80)return'image/png';if(bytes[0]===255&&bytes[1]===216)return'image/jpeg';if(String.fromCharCode(...bytes.slice(0,3))==='GIF')return'image/gif';if(String.fromCharCode(...bytes.slice(0,4))==='%PDF')return'application/pdf';return'application/octet-stream'}
 export function buildServerFilter(sql, columns, options={}, existingParameters=[]) {
  const text=String(sql||'').trim().replace(/;\s*$/,'');

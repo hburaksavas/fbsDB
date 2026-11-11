@@ -1,5 +1,4 @@
 import { detectCodeLanguage } from './codeCellModel.js';
-import { looksGeographic } from './geoCoordinates.js';
 
 export const jsonTreeNodeLimit = 5000;
 
@@ -10,7 +9,6 @@ export function defaultValueViewer(column, value) {
   if (/JSON/.test(type)) return 'jsonTree';
   if (/XML/.test(type)) return 'xml';
   if (!/CHAR|CLOB|TEXT|LONG/.test(type) && type) return 'raw';
-  if (looksGeographic(column, value)) return 'map';
   const language = detectCodeLanguage(String(value).slice(0, 200000));
   return language === 'json' ? 'jsonTree' : language === 'xml' ? 'xml' : 'raw';
 }

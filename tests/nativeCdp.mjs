@@ -54,6 +54,13 @@ export async function connectNativePage(endpoint, timeoutMs = 45000, match = () 
       assert.ok(await api.evaluate(`(() => { const element = document.querySelector(${JSON.stringify(selector)}); if (!element || element.disabled) return false; element.focus(); element.click(); return true; })()`), `Missing/enabled control: ${selector}`);
       await api.frame();
     },
+    // Runs a command by its palette label: Ctrl+P, type the label, Enter.
+    async paletteCommand(label) {
+      await api.key('p', 2); await api.until(`document.querySelector('.ide-command-palette')`, 'Command palette');
+      await api.evaluate(`(()=>{const input=document.querySelector('.ide-command-palette input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(label)});input.dispatchEvent(new Event('input',{bubbles:true}));input.focus()})()`);
+      await api.until(`document.querySelector('.ide-palette-results [role="option"] b')?.textContent===${JSON.stringify(label)}`, `Palette command: ${label}`);
+      await api.key('Enter');
+    },
     async textClick(selector, text) {
       assert.ok(await api.evaluate(`(() => { const element = [...document.querySelectorAll(${JSON.stringify(selector)})].find(element => element.textContent.trim() === ${JSON.stringify(text)}); if (!element || element.disabled) return false; element.focus(); element.click(); return true; })()`), `Missing/enabled control: ${text}`);
       await api.frame();

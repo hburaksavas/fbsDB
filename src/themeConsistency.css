@@ -5,7 +5,6 @@
   font-family: var(--ui-font-family, 'DM Sans', 'Segoe UI', sans-serif);
 }
 
-.desktop-shell .active-connection-label,
 .desktop-shell .connection-control-name,
 .desktop-shell .connection-name,
 .desktop-shell .schema-scope,
@@ -14,10 +13,7 @@
 .desktop-shell .result-tab-count,
 .desktop-shell .result-page-number,
 .desktop-shell .detail-title strong,
-.desktop-shell .explorer-disclosure > summary,
-.desktop-shell .column-tree em,
 .desktop-shell .detail-fields .source-path,
-.desktop-shell .explorer-disclosure > summary::before,
 .desktop-shell .snippet-form-panel input,
 .desktop-shell .snippet-form-panel textarea {
   font-family: var(--ui-font-family, 'DM Sans', 'Segoe UI', sans-serif);
@@ -39,7 +35,6 @@
 }
 
 /* Monokai Grey uses neutral surfaces throughout the workbench. */
-.desktop-shell[data-theme="dark"] .titlebar,
 .desktop-shell[data-theme="dark"] .activity-rail { background: var(--chrome); border-color: var(--line); }
 .desktop-shell[data-theme="dark"] .commandbar,
 .desktop-shell[data-theme="dark"] .app-status,
@@ -59,8 +54,7 @@
 .desktop-shell[data-theme="dark"] .result-grid td.selected-cell { color: var(--text); }
 .desktop-shell[data-theme="dark"] .appearance-modal,
 .desktop-shell[data-theme="dark"] .connection-modal,
-.desktop-shell[data-theme="dark"] .connection-detail,
-.desktop-shell[data-theme="dark"] .completion-card { background: var(--surface); color: var(--text); border-color: var(--line); }
+.desktop-shell[data-theme="dark"] .connection-detail { background: var(--surface); color: var(--text); border-color: var(--line); }
 .desktop-shell[data-theme="dark"] .appearance-header,
 .desktop-shell[data-theme="dark"] .appearance-footer,
 .desktop-shell[data-theme="dark"] .modal-footer,
@@ -74,16 +68,12 @@
 .desktop-shell[data-theme="dark"] .button-secondary:hover,
 .desktop-shell[data-theme="dark"] .transaction-button:hover,
 .desktop-shell[data-theme="dark"] .pager-button:hover { background: var(--surface-raised); }
-.desktop-shell[data-theme="dark"] .completion-head,
-.desktop-shell[data-theme="dark"] .completion-foot { background: var(--surface-raised); border-color: var(--line); }
 .desktop-shell[data-theme="dark"] .connection-row:hover,
-.desktop-shell[data-theme="dark"] .schema-type-filter button:hover,
 .desktop-shell[data-theme="dark"] .oracle-object-row:hover,
 .desktop-shell[data-theme="dark"] .oracle-object-row.active { background: var(--surface-raised); color: var(--text); }
 .desktop-shell[data-theme="dark"] .picker-list .connection-row.selected { background: var(--selection-bg); border-color: var(--success-border); box-shadow: inset 2px 0 var(--accent); }
 .desktop-shell[data-theme="dark"] .explorer-search,
-.desktop-shell[data-theme="dark"] .picker-search,
-.desktop-shell[data-theme="dark"] .objects-section-content .schema-type-filter select { background: var(--input); color: var(--text); border-color: var(--line); }
+.desktop-shell[data-theme="dark"] .picker-search { background: var(--input); color: var(--text); border-color: var(--line); }
 .desktop-shell[data-theme="dark"] .explorer-search input,
 .desktop-shell[data-theme="dark"] .picker-search input { color: var(--text); }
 .desktop-shell[data-theme="dark"] .connection-row.selected,
@@ -91,7 +81,6 @@
 .desktop-shell[data-theme="dark"] .rail-button.selected { background: var(--selection-bg); color: var(--accent-text); border-color: var(--success-border); }
 .desktop-shell[data-theme="dark"] .rail-button:hover,
 .desktop-shell[data-theme="dark"] .icon-button:hover,
-.desktop-shell[data-theme="dark"] .menu-bar button:hover,
 .desktop-shell[data-theme="dark"] .section-heading button:hover,
 .desktop-shell[data-theme="dark"] .oracle-schema-node > summary:hover,
 .desktop-shell[data-theme="dark"] .oracle-category-node > summary:hover { background: var(--surface-raised); color: var(--text); }
@@ -100,8 +89,7 @@
 .desktop-shell[data-theme="dark"] .snippet-preview,
 .desktop-shell[data-theme="dark"] .snippet-option:hover { background: var(--surface-raised); border-color: var(--line); color: var(--text); }
 .desktop-shell[data-theme="dark"] .query-history-item pre,
-.desktop-shell[data-theme="dark"] .snippet-preview pre,
-.desktop-shell[data-theme="dark"] .cell-preview-value { background: var(--input); color: var(--text); border-color: var(--line); }
+.desktop-shell[data-theme="dark"] .snippet-preview pre { background: var(--input); color: var(--text); border-color: var(--line); }
 .desktop-shell[data-theme="dark"] .workspace-search-input,
 .desktop-shell[data-theme="dark"] .connection-group-control select,
 .desktop-shell[data-theme="dark"] .group-filter select,
@@ -111,7 +99,6 @@
 .desktop-shell[data-theme="dark"] .profile-fields textarea { background: var(--input); color: var(--text); border-color: var(--line); }
 .desktop-shell[data-theme="dark"] .workspace-search-input input { color: var(--text); }
 .desktop-shell[data-theme="dark"] .objects-section-content .schema-search,
-.desktop-shell[data-theme="dark"] .objects-section-content .schema-type-filter select,
 .desktop-shell[data-theme="dark"] .object-scope-switch { border-color: var(--line); }
 .desktop-shell[data-theme="dark"] .db-icon.mint,
 .desktop-shell[data-theme="dark"] .output-icon { background: var(--success-bg); color: var(--accent-text); border-color: var(--success-border); }
@@ -165,27 +152,15 @@
 .desktop-shell[data-theme="light"] .button-primary { color: var(--on-accent); }
 .desktop-shell[data-theme="light"] .explorer::-webkit-scrollbar-track { background: var(--panel); }
 .desktop-shell[data-theme="light"] .explorer::-webkit-scrollbar-thumb { background: var(--surface-raised); }
-.desktop-shell[data-theme="light"] .objects-section-content .oracle-explorer-caption,
-.desktop-shell[data-theme="light"] .oracle-object-target,
-.desktop-shell[data-theme="light"] .oracle-property-row > b,
-.desktop-shell[data-theme="light"] .oracle-details-empty,
-.desktop-shell[data-theme="light"] .oracle-object-details .oracle-column-copy em { color: var(--muted); }
-.desktop-shell[data-theme="light"] .oracle-object-details { border-left-color: var(--line); }
-.desktop-shell[data-theme="light"] .oracle-property-row { border-bottom-color: var(--line-soft); }
-.desktop-shell[data-theme="light"] .oracle-source-node > summary { color: var(--accent-text); }
+.desktop-shell[data-theme="light"] .oracle-object-target { color: var(--muted); }
 .desktop-shell[data-theme="light"] .oracle-object-tree > .oracle-schema-node > summary:hover,
-.desktop-shell[data-theme="light"] .schema-type-filter button:hover,
 .desktop-shell[data-theme="light"] .object-favorites-filter:hover,
-.desktop-shell[data-theme="light"] .object-favorites-filter.active,
-.desktop-shell[data-theme="light"] .oracle-object-favorite:hover,
-.desktop-shell[data-theme="light"] .oracle-object-favorite.active { background: var(--selection-bg); }
-.desktop-shell[data-theme="light"] .schema-type-filter button:hover { color: var(--text); }
+.desktop-shell[data-theme="light"] .object-favorites-filter.active { background: var(--selection-bg); }
 .desktop-shell[data-theme="light"] .object-favorites-filter,
 .desktop-shell[data-theme="light"] .object-scope-switch button,
 .desktop-shell[data-theme="light"] .oracle-category-node > summary,
 .desktop-shell[data-theme="light"] .oracle-object-row { color: var(--muted); }
 .desktop-shell[data-theme="light"] .oracle-object-virtual-list { scrollbar-color: var(--surface-raised) transparent; }
-.desktop-shell[data-theme="light"] .oracle-explorer-stale { background: var(--surface); border-color: var(--warning-border); color: var(--warning); }
 
 /* Metadata inspector is also shown as a full editor tab. */
 .oracle-object-inspector {
@@ -207,7 +182,6 @@
 .oracle-object-inspector-body > p,
 .oracle-inspector-column span,
 .oracle-inspector-dependency small,
-.oracle-tree-hint,
 .oracle-inspector-properties dt,
 .oracle-inspector-empty,
 .oracle-inspector-column-list > .oracle-inspector-column > div span,
@@ -233,10 +207,8 @@
 .oracle-object-inspector pre { scrollbar-color: var(--line) transparent; }
 
 /* Shell controls that previously retained dark text or fills in the light theme. */
-.desktop-shell[data-theme="light"] .titlebar .brand-name span { color: var(--accent-text); }
 .desktop-shell[data-theme="light"] .rail-button:hover,
 .desktop-shell[data-theme="light"] .icon-button:hover,
-.desktop-shell[data-theme="light"] .menu-bar button:hover,
 .desktop-shell[data-theme="light"] .section-heading button:hover,
 .desktop-shell[data-theme="light"] .pager-button:hover { background: var(--hover-bg); color: var(--text); }
 .desktop-shell[data-theme="light"] .rail-button.selected { background: var(--selection-bg); color: var(--accent-text); }
@@ -245,11 +217,9 @@
 .desktop-shell[data-theme="light"] .button-secondary { border-color: var(--line); color: var(--text); }
 .desktop-shell[data-theme="light"] .transaction-button:hover,
 .desktop-shell[data-theme="light"] .button-secondary:hover { background: var(--hover-bg); }
-.desktop-shell[data-theme="light"] .toolbar-separator,
-.desktop-shell[data-theme="light"] .status-divider { background: var(--line); }
+.desktop-shell[data-theme="light"] .toolbar-separator { background: var(--line); }
 .desktop-shell[data-theme="light"] .breadcrumb b,
 .desktop-shell[data-theme="light"] .breadcrumb > span:last-child,
-.desktop-shell[data-theme="light"] .editor-status .status-sql,
 .desktop-shell[data-theme="light"] .result-tabs button.active,
 .desktop-shell[data-theme="light"] .result-footer b,
 .desktop-shell[data-theme="light"] .output-empty b { color: var(--text); }
@@ -284,9 +254,7 @@
 .desktop-shell[data-theme="light"] .picker-list .connection-row.selected { background: var(--selection-bg); border-color: var(--line); }
 .desktop-shell[data-theme="light"] .connection-detail { background: var(--surface); border-color: var(--line); }
 .desktop-shell[data-theme="light"] .connection-row:hover { background: var(--hover-bg); }
-.desktop-shell[data-theme="light"] .connection-sub,
-.desktop-shell[data-theme="light"] .source-button { color: var(--muted); }
-.desktop-shell[data-theme="light"] .source-button { border-color: var(--line); }
+.desktop-shell[data-theme="light"] .connection-sub { color: var(--muted); }
 .desktop-shell[data-theme="light"] .db-icon { background: var(--success-bg); border-color: var(--success-border); color: var(--success); }
 .desktop-shell[data-theme="light"] .db-icon.blue { background: var(--info-bg); border-color: var(--info-border); color: var(--info); }
 .desktop-shell[data-theme="light"] .db-icon.rose { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
@@ -349,14 +317,9 @@
 .desktop-shell[data-theme="light"] .query-history-empty b,
 .desktop-shell[data-theme="light"] .workspace-search-result b { color: var(--text); }
 .desktop-shell[data-theme="light"] .query-history-label { background: var(--surface-raised); color: var(--muted); }
-.desktop-shell[data-theme="light"] .query-history-label.succeeded,
-.desktop-shell[data-theme="light"] .state-tag { background: var(--success-bg); border-color: var(--success-border); color: var(--success); }
-.desktop-shell[data-theme="light"] .query-history-label.failed,
-.desktop-shell[data-theme="light"] .state-tag.overdue { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
-.desktop-shell[data-theme="light"] .query-history-label.cancelled,
-.desktop-shell[data-theme="light"] .state-tag.pending { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning); }
-.desktop-shell[data-theme="light"] .workspace-name:hover,
-.desktop-shell[data-theme="light"] .workspace-action:hover { background: var(--hover-bg); color: var(--text); }
+.desktop-shell[data-theme="light"] .query-history-label.succeeded { background: var(--success-bg); border-color: var(--success-border); color: var(--success); }
+.desktop-shell[data-theme="light"] .query-history-label.failed { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger); }
+.desktop-shell[data-theme="light"] .query-history-label.cancelled { background: var(--warning-bg); border-color: var(--warning-border); color: var(--warning); }
 .desktop-shell[data-theme="light"] .result-page-number,
 .desktop-shell[data-theme="light"] .appearance-header p,
 .desktop-shell[data-theme="light"] .syntax-settings > div > p,
@@ -437,7 +400,6 @@
 /* Docked Connections and Object Explorer use the active theme's chrome. */
 .desktop-shell[data-theme] .connections-section-content .explorer-tabs button,
 .desktop-shell[data-theme] .connections-section-content .group-filter > span,
-.desktop-shell[data-theme] .objects-section-content .schema-type-filter > span,
 .desktop-shell[data-theme] .objects-section-content .object-scope-switch button,
 .desktop-shell[data-theme] .objects-section-content .schema-scope,
 .desktop-shell[data-theme] .objects-section-content .oracle-category-node > summary,
@@ -476,14 +438,12 @@
   background: color-mix(in srgb, currentColor 10%, var(--panel));
   border-color: color-mix(in srgb, currentColor 25%, var(--line));
 }
-.desktop-shell[data-theme] .connections-section-content .group-filter select,
-.desktop-shell[data-theme] .objects-section-content .schema-type-filter select {
+.desktop-shell[data-theme] .connections-section-content .group-filter select {
   background: var(--input);
   color: var(--text);
   border-color: var(--line);
 }
-.desktop-shell[data-theme] .connections-section-content .group-filter select option,
-.desktop-shell[data-theme] .objects-section-content .schema-type-filter select option {
+.desktop-shell[data-theme] .connections-section-content .group-filter select option {
   background: var(--surface);
   color: var(--text);
 }
@@ -502,8 +462,7 @@
 .desktop-shell[data-theme] .objects-section-content .schema-scope .schema-refresh {
   color: var(--muted);
 }
-.desktop-shell[data-theme] .objects-section-content .schema-scope .schema-refresh:hover,
-.desktop-shell[data-theme] .objects-section-content .schema-type-filter button:hover {
+.desktop-shell[data-theme] .objects-section-content .schema-scope .schema-refresh:hover {
   background: color-mix(in srgb, var(--accent) 10%, var(--panel));
   color: var(--text);
 }
@@ -522,23 +481,19 @@
   border-color: var(--line);
   color: var(--muted);
 }
-.desktop-shell[data-theme] .panel-resizer,
-.desktop-shell[data-theme] .vertical-splitter { background: var(--line); }
+.desktop-shell[data-theme] .panel-resizer { background: var(--line); }
 .desktop-shell[data-theme] .panel-resizer:hover,
 .desktop-shell[data-theme] .panel-resizer:focus-visible,
 .desktop-shell[data-theme] .panel-resizer:active { background: var(--accent); }
 .desktop-shell[data-theme] .editor-status > span:first-child,
 .desktop-shell[data-theme] .editor-status .session-profile,
 .desktop-shell[data-theme] .editor-status .editor-position,
-.desktop-shell[data-theme] .editor-status .status-sql,
 .desktop-shell[data-theme] .editor-status svg,
 .desktop-shell[data-theme] .result-tabs button,
 .desktop-shell[data-theme] .result-tabs button svg,
 .desktop-shell[data-theme] .result-page-controls .result-context {
   color: var(--muted);
 }
-.desktop-shell[data-theme] .editor-status .session-status-connected,
-.desktop-shell[data-theme] .editor-status .session-status-connected svg,
 .desktop-shell[data-theme] .editor-status .editor-save-button,
 .desktop-shell[data-theme] .success-state,
 .desktop-shell[data-theme] .success-state svg {
@@ -591,8 +546,6 @@
 }
 .desktop-shell[data-theme] .profile-editor > .profile-fields::-webkit-scrollbar-track { background: var(--surface); }
 .desktop-shell[data-theme] .profile-editor > .profile-fields::-webkit-scrollbar-thumb { background: var(--line); }
-.desktop-shell[data-theme] .completion-head svg,
-.desktop-shell[data-theme] .workspace-file svg,
 .desktop-shell[data-theme] .file-connection-chip svg { color: var(--accent-text); }
 .desktop-shell[data-theme] .file-connection-chip {
   color: var(--accent-text);
@@ -610,14 +563,7 @@
 .desktop-shell[data-theme] :is(button, input, select, textarea):focus-visible {
   outline-color: var(--accent);
 }
-.desktop-shell[data-theme] .profile-fields :is(input, select, textarea):focus,
-.desktop-shell[data-theme] .auth-fields input:focus,
-.desktop-shell[data-theme] .bind-row :is(input, select):focus,
-.desktop-shell[data-theme] .preference-row :is(input, select):focus,
-.desktop-shell[data-theme] .snippet-form-panel :is(input, textarea):focus,
-.desktop-shell[data-theme] .connection-group-control select:focus,
-.desktop-shell[data-theme] .group-filter select:focus,
-.desktop-shell[data-theme] .new-group-form input:focus {
+.desktop-shell[data-theme] .profile-fields :is(input, select, textarea):focus, .desktop-shell[data-theme] .auth-fields input:focus, .desktop-shell[data-theme] .bind-row :is(input, select):focus, .desktop-shell[data-theme] .snippet-form-panel :is(input, textarea):focus, .desktop-shell[data-theme] .connection-group-control select:focus, .desktop-shell[data-theme] .group-filter select:focus, .desktop-shell[data-theme] .new-group-form input:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
 }
@@ -628,7 +574,6 @@
   border-color: var(--accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 18%, transparent);
 }
-.desktop-shell[data-theme] .workspace-file.selected,
 .desktop-shell[data-theme] .snippet-option.selected {
   box-shadow: inset 2px 0 var(--accent);
 }

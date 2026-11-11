@@ -18,7 +18,7 @@ Scope: title/preview presentation. Normal file opening continues to activate an 
 
 User-approved product decision. The third point was replaced on 2026-11-11 (see below); the others still hold.
 
-- The switch that turns row editing on lives in the result toolbar (pencil icon, `aria-pressed`), next to the other view controls. Descriptions has a toolbar icon as well.
+- The switch that turns row editing on lives in the result toolbar (pencil icon, `aria-pressed`), next to the other view controls. (Replaced on 2026-11-11: Descriptions is no longer a button by default, see "Fewer buttons and menu entries".)
 - (Replaced on 2026-11-11: the buttons moved into the toolbar row.) The separate edit row above the grid appears only while editing is on (or while an applied-changes status or verification is shown). Outside edit mode no extra row takes space.
 - Inside the edit row, core actions stay visible (Set NULL, New row, Delete row, Undo/Redo, invalid-cell counter, Pending); the rest sit in a "More" menu and can be pinned to the row. A switched-on filter stays visible on the row.
 - Every grid edit action is also available in the command palette with a "Grid: " prefix.
@@ -73,3 +73,13 @@ User-approved product decision. Preserve these choices in later changes.
 - Missing `PLSQL_PROFILER_*` tables are listed with their DDL and created in the user's schema only after the user confirms; never on a PROD connection. Profiling itself is allowed on PROD when the tables already exist.
 - Each run is read and then deleted from the tables; the panel offers Copy as CSV.
 - Results: a panel with unit times and the slowest lines, and line time/count marks beside open sources of profiled units, with hot (≥10% of the unit) and warm (≥2%) lines highlighted.
+
+## 2026-11-11 — Fewer buttons and menu entries
+
+User-approved product decision. Preserve these choices in later changes.
+
+- The result toolbar shows nine actions by default: Table view options, Edit rows, Filters, Sorting, Find in results, Copy selection formats, Load result rows, Export results and Reset result view.
+- The other ten wait in the toolbar's overflow menu and in the command palette with a "Result: " prefix: Descriptions, Pivot options, Navigate to row or column, Marks, Highlights, SQL generation, Pin result, Result memory, Generate execution plan and Result commands. Settings → Toolbars can bring any of them back as a button; a user's own saved choice is kept.
+- The editor context menu keeps what belongs to the clicked place: Run, Explain plan, Format, Undo, Redo, Cut, Copy, Paste, Select all, Toggle comment, Rename local variable or parameter, Quick fixes, Surround with, Find and Replace (plus the bind entries on a bind).
+- Removed from the context menu and available from the command palette only; do not put them back without asking: Explain CASE or analytic function, Convert identifier case, Change local procedure signature, Extract PL/SQL assignments, Move statement up/down, Edit SQL inside EXECUTE IMMEDIATE, Clipboard history, Editor macros, Review references before delete, Extract query into CTE, Generate documentation comment, Paste column names as cursors and Paste as.
+- Commands shown in both the palette and the context menu are described once in `src/editorCommands.js`.

@@ -500,7 +500,6 @@ public sealed partial class MainPage
         private async Task<bool> ExecuteSqlAsync(CoreWebView2 sender, string? requestId, JsonElement payload, CancellationToken cancellationToken = default, Action<SqlExecutionResult>? onResult = null, Action<string>? onError = null)
         {
             var sql = payload.TryGetProperty("sql", out var sqlValue) ? sqlValue.GetString() ?? string.Empty : string.Empty;
-            if (payload.TryGetProperty("miniTool", out var miniToolValue) && miniToolValue.ValueKind == JsonValueKind.True) MiniToolService.AssertSelect(sql);
             var rowLimit = (payload.TryGetProperty("pageSize", out var rowLimitValue) || payload.TryGetProperty("rowLimit", out rowLimitValue)) && rowLimitValue.TryGetInt32(out var requestedRowLimit)
                 ? Math.Clamp(requestedRowLimit, 100, 10000)
                 : 1000;
@@ -591,7 +590,7 @@ public sealed partial class MainPage
             var tabId = Context.Tab.Id;
             try
             {
-                MiniToolService.AssertSelect(sql);
+                SelectOnlyGuard.AssertSelect(sql);
                 // Grid editing by ROWID reads the executed query again with each row's ROWID in front (see GridRowIds).
                 var withRowIds = payload.TryGetProperty("withRowIds", out var rowIdsValue) && rowIdsValue.ValueKind == JsonValueKind.True;
                 if (withRowIds) sql = GridRowIds.Wrap(sql);

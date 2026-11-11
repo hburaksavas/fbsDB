@@ -86,5 +86,7 @@ test('workbench and IDE dialogs render with disconnected session and explicit co
   assert.match(module.exports.replacement,/SELECT 2 FROM dual/);
   assert.match(module.exports.diagnostics,/Authentication/);
   assert.match(module.exports.toolbar,/aria-label="Fetch and export"/);
-  assert.match(module.exports.toolbar,/aria-label="Pivot options"/);
+  // Pivot is one of the actions that wait in the overflow menu by default.
+  assert.match(module.exports.toolbar,/aria-label="Filters"/);assert.match(module.exports.toolbar,/aria-label="More result actions"/);
+  assert.doesNotMatch(module.exports.toolbar,/aria-label="Pivot options"/);
 });

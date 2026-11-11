@@ -27,18 +27,3 @@ export function mapApplyErrors(statements, outcomes, columns) {
   });
   return errors;
 }
-
-export const splitConstraint = (text, defaultOwner = '') => { const parts = String(text || '').split('.'); return parts.length > 1 ? { owner: parts[0], name: parts.slice(1).join('.') } : { owner: defaultOwner, name: parts[0] }; };
-
-// One plain sentence about what a constraint requires, from the database's own definition.
-export function constraintGuidance(info) {
-  if (!info?.found) return null;
-  const columns = (info.columns || []).join(', ');
-  switch (info.constraintType) {
-    case 'C': return info.condition ? `${info.name} requires: ${info.condition}` : `${info.name} is a column rule${columns ? ` on ${columns}` : ''}.`;
-    case 'U': return `${info.name} requires unique values in (${columns}).`;
-    case 'P': return `${info.name} is the primary key (${columns}); it must be unique and not NULL.`;
-    case 'R': return `${info.name} requires (${columns}) to match an existing parent row${info.referenced ? ` (${info.referenced})` : ''}.`;
-    default: return `${info.name}${columns ? ` covers ${columns}` : ''}.`;
-  }
-}

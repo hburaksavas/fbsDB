@@ -115,7 +115,7 @@ test('Run routes source compilation to review before any SQL command is sent',()
   f.actions.runQuery();
   assert.equal(review.statement,sql);
   assert.equal(f.commands.length,0);
-  const request=f.actions.executeStatement(sql,[],false,{ddlConfirmed:true,sourceReviewId:'review-token',executedSql:sql,statementOffset:0});
+  const request=f.actions.executeStatement(sql,[],{ddlConfirmed:true,sourceReviewId:'review-token',executedSql:sql,statementOffset:0});
   assert.equal(f.commands[0].payload.sourceReviewId,'review-token');
   assert.equal(f.operations.metadata.get('a').statementOffset,0);
   assert.equal(f.operations.owners.get(request),'a');

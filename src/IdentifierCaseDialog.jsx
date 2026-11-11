@@ -11,7 +11,7 @@ export function IdentifierCaseDialog({request,onApply,onClose}){
  const apply=()=>{try{onApply(plan)}catch(failure){setError(failure.message)}};
  return <ModalBackdrop onClose={onClose}><section ref={ref} className="appearance-modal identifier-case-dialog" role="dialog" aria-modal="true" aria-labelledby="identifier-case-title">
   <header className="appearance-header"><h2 id="identifier-case-title">Convert identifier case</h2></header>
-  <div className="mini-tool-content">
+  <div className="dialog-content">
    <fieldset className="identifier-case-styles"><legend>Style</legend>{[...identifierCaseStyles,...(request.dictionary?.terms?.length?projectIdentifierStyles:[])].map(item=><label key={item.id}><input type="radio" name="identifier-case-style" checked={style===item.id} onChange={()=>setStyle(item.id)}/>{item.label}</label>)}</fieldset>
    <label><input type="checkbox" checked={includeQuoted} onChange={event=>setIncludeQuoted(event.target.checked)}/>Include quoted identifiers (case-sensitive; changes their identity)</label>
    <p>Only the selection changes. String literals, comments, bind variables and keywords are kept. Unquoted names are folded to upper case by Oracle, so word changes such as order_id → orderId refer to a different object. Other references, files and database objects are not updated.</p>

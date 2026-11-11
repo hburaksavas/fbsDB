@@ -72,22 +72,6 @@ public sealed partial class MainPage
                     var sources = await Task.Run(() => _workspace.ReadSourceFilesAsync(sourceRoot));
                     Send(sender, new { type = "workspace.sources", requestId = id, sources });
                     break;
-                case "workspace.tools.list":
-                case "workspace.tools.save":
-                    var toolRoot = _workspace.Root ?? throw new InvalidOperationException("Open a workspace to use mini tools.");
-                    if (!payload.TryGetProperty("root", out var toolRootValue) || toolRootValue.GetString() != toolRoot) throw new InvalidOperationException("The active workspace changed. Reopen mini tools.");
-                    if (command == "workspace.tools.list")
-                    {
-                        var catalog = await Task.Run(() => MiniToolService.ListAsync(toolRoot));
-                        Send(sender, new { type = command, requestId = id, root = toolRoot, catalog });
-                    }
-                    else
-                    {
-                        var toolDocument = payload.GetProperty("tool").Clone();
-                        var savedTool = await Task.Run(() => MiniToolService.SaveAsync(toolRoot, toolDocument));
-                        Send(sender, new { type = command, requestId = id, root = toolRoot, tool = savedTool });
-                    }
-                    break;
                 case "workspace.git":
                     try { var state = await Task.Run(() => Development.GitStateAsync()); Send(sender,new {type="workspace.git",requestId=id,state}); }
                     catch(Exception error){ Send(sender,new {type="workspace.git",requestId=id,error=error.Message}); }

@@ -26,9 +26,3 @@ export function createConsoleStore() {
     clear(tabId) { tabs.delete(tabId); },
   };
 }
-
-// Values can be re-used for a rerun only when they were explicitly retained; otherwise the bind form asks again.
-export function rerunPlan(entry) {
-  const hasValues = entry.parameters.length > 0 && entry.parameters.every(parameter => 'value' in parameter);
-  return { sql: entry.sql, values: hasValues ? entry.parameters.map(parameter => ({ name: parameter.name, value: parameter.value, type: parameter.type })) : null, needsInput: entry.parameters.length > 0 && !hasValues };
-}

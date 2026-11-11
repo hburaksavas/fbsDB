@@ -1,10 +1,10 @@
 # Product focus and release acceptance
 
-Primary users are Oracle developers and analysts doing daily SQL work and data investigation. The first-use guide covers profile selection, environment verification, workspace files, SELECT with binds, and reusable mini tools. DBA administration and team governance are not release promises.
+Primary users are Oracle developers and analysts doing daily SQL work and data investigation. The first-use guide covers profile selection, environment verification, workspace files and SELECT with binds. DBA administration and team governance are not release promises.
 
 ## Success criteria for a moderated pilot
 
-Run five task sessions with representative users, recording outcomes in a local spreadsheet or issue; do not collect SQL, credentials, or personal data. Initial targets (hypotheses, not measured results): four of five users complete first connection and SELECT in five minutes; four of five save and reopen a mini tool without assistance; every user correctly identifies the environment and explains Commit/Rollback before a data change. Track task completion, elapsed time and confusion points. Repeat after material workflow changes. No telemetry is sent by the guide.
+Run five task sessions with representative users, recording outcomes in a local spreadsheet or issue; do not collect SQL, credentials, or personal data. Initial targets (hypotheses, not measured results): four of five users complete first connection and SELECT in five minutes; every user correctly identifies the environment and explains Commit/Rollback before a data change. Track task completion, elapsed time and confusion points. Repeat after material workflow changes. No telemetry is sent by the guide.
 
 ## Execution acceptance
 
@@ -13,7 +13,6 @@ Run five task sessions with representative users, recording outcomes in a local 
 - Timeout, cancellation and connection failure show the reported transaction state, or explicitly say it is unconfirmed. Never automatically retry a data change. A connection lost during Commit, manual or automatic, is reported as an unknown outcome and ends the session's transaction, so the tab can reconnect; OracleLiveRegression checks this through a relay that loses the request or the reply. After reconnecting, the grid can read its changes back and say row by row whether Oracle saved them; only rows still holding their old values can become drafts again, and new rows are reported as not checked. Grid Apply starts its own transaction before its savepoint, so a failed batch and Undo last Apply work in a clean session. It reads changed rows back in the same transaction, and a failed read never counts as a failed change. Grid values for TIME ZONE columns need an explicit offset, so they never silently take the session's time zone; a LOCAL TIME ZONE column cannot identify a row. Script progress identifies completed/failed steps; earlier commits survive subsequent failures.
 - SQL history stores SQL text, which can contain sensitive literals. Users can disable it globally (limit zero), exclude profile IDs, or expire it by age. Expiry runs on load, settings changes and every minute while open. Bind values remain excluded.
 - Draft recovery storage failure is visible and tells users to save to a file. Failed local preferences/history writes never crash the renderer.
-- Mini tools retain description, usage example, latest change notes and monotonically increasing revision. Old version-1 definitions default to revision zero. Stale saves are rejected within the app process; this is not a distributed collaboration protocol or a full revision archive. Avoid personal values in shared example text.
 
 ## Release gate
 

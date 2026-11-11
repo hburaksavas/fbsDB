@@ -1,4 +1,4 @@
-import { assertMiniToolSelect } from './miniTools.js';
+import { assertSelectOnly } from './selectOnly.js';
 import { getOracleBindNames } from './oracleBinds.js';
 
 export const lookupDescriptionsStorageKey = 'fbsdb.lookupDescriptions';
@@ -27,7 +27,7 @@ export function prepareDescriptionQuery(template, values) {
   if (!distinct.length) return { error: 'The loaded rows have no values in this column.' };
   const used = distinct.slice(0, descriptionKeyLimit);
   const sql = text.replace('{keys}', used.map((_, at) => `:k${at}`).join(', '));
-  try { assertMiniToolSelect(sql); } catch (error) { return { error: error.message.replace(/^Mini tools support/, 'A description lookup is') }; }
+  try { assertSelectOnly(sql, 'A description lookup is'); } catch (error) { return { error: error.message }; }
   if (getOracleBindNames(text.replace('{keys}', '')).length) return { error: 'The query cannot use binds of its own; only {keys}.' };
   return { sql, parameters: used.map((value, at) => ({ name: `K${at}`, type: /^-?\d+(\.\d+)?$/.test(value) ? 'NUMBER' : 'VARCHAR2', value, direction: 'IN' })), covered: used.length, total: distinct.length };
 }

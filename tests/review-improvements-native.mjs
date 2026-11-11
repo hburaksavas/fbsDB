@@ -9,7 +9,7 @@ const [endpoint,root]=process.argv.slice(2),cdp=await connectNativePage(endpoint
 const editor=`window.monaco?.editor.getEditors().find(e=>document.contains(e.getDomNode()))`;
 let installed,failure;
 // Key descriptions are switched from the result toolbar.
-const clickBar=cdp=>cdp.evaluate(`document.querySelector('.results-toolbar [aria-label="Show descriptions beside key values"]').click()`);
+const clickBar=cdp=>cdp.paletteCommand('Result: Show descriptions beside key values');
 async function check(name,fn){await cdp.evaluate(`window.__currentCheck=${JSON.stringify(name)}`).catch(()=>{});await fn();checks.push(name);console.log('PASS '+name)}
 try {
  const source=nativeUxFixture+`;(()=>{
@@ -19,7 +19,6 @@ try {
  chrome.webview.postMessage=value=>{post(value);const m=JSON.parse(value);
  if(m.command==='completion.definition'&&m.payload.objectType==='PLSQL FRAME')setTimeout(()=>window.__uxFixture.emit({type:'completion.reply',requestId:m.id,tabId:m.tabId,epoch:m.payload.epoch,result:{owner:'APP',name:'BROKEN_PKG',type:'PACKAGE BODY',text:'PACKAGE BODY broken_pkg AS\\nPROCEDURE run IS BEGIN\\nraise_application_error(-20001,"fixture");\\nEND;\\nEND;'}}),10);
  if(m.command==='completion.metadata'&&m.payload.name==='INVOICES')setTimeout(()=>window.__uxFixture.emit({type:'completion.reply',requestId:m.id,tabId:m.tabId,epoch:m.payload.epoch,result:{owner:'APP',name:'INVOICES',type:'TABLE',columns:[{name:'ID',type:'NUMBER(20,0)'},{name:'NAME',type:'VARCHAR2(30)'}]}}),10);
- if(m.command==='workspace.tools.list')setTimeout(()=>window.__uxFixture.emit({type:'workspace.tools.list',root:m.payload.root,tabId:m.tabId,requestId:m.id,catalog:{tools:[{version:1,id:'a'.repeat(32),name:'Shared lookup',sql:'SELECT :ID FROM dual',fields:[],columns:[],description:'Lookup description',usage:'Supply :ID',changeNotes:'Initial definition',revision:3}],errors:[]}}),10);
  };
  window.__reviewErrors=[];window.__errorLog=[];window.addEventListener('error',e=>{window.__reviewErrors.push(e.message);window.__errorLog.push({message:e.message,file:e.filename,line:e.lineno,stack:e.error?.stack?.slice(0,200),during:window.__currentCheck})});window.addEventListener('unhandledrejection',e=>window.__reviewErrors.push(String(e.reason)));
  })();`;
@@ -88,36 +87,6 @@ try {
   await cdp.evaluate(`${editor}.focus()`);await cdp.key('Enter',2);
   assert.equal(await cdp.evaluate(`window.__uxFixture.commands.filter(c=>c.command==='sql.execute').length`),1);
   assert.equal(await cdp.evaluate(`!!document.querySelector('[role="alertdialog"]')`),false);
- });
- await check('shared mini tool description, example and revision notes render',async()=>{
-  await cdp.click('[aria-label="SQL mini tools"]');await cdp.until(`document.querySelector('.mini-tool-item')`);
-  await cdp.textClick('.mini-tool-item','Shared lookup');
-  const text=await cdp.evaluate(`document.querySelector('.mini-tool-content').textContent`);assert.match(text,/Revision 3/);
-  const values=await cdp.evaluate(`[...document.querySelectorAll('.mini-tool-content textarea')].map(e=>e.value)`);
-  assert.ok(values.includes('Lookup description'));assert.ok(values.includes('Supply :ID'));assert.ok(values.includes('Initial definition'));
-  await cdp.key('Escape');
- });
- await check('inline renaming: a saved mini tool is renamed in its list with validation and an unchanged identity', async () => {
-  const typeName = text => cdp.evaluate(`(()=>{const input=document.querySelector('[aria-label="Tool name"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(text)});input.dispatchEvent(new Event('input',{bubbles:true}))})()`);
-  const saves = () => cdp.evaluate(`__uxFixture.commands.filter(c=>c.command==='workspace.tools.save').length`);
-  await cdp.click('[aria-label="SQL mini tools"]'); await cdp.until(`document.querySelector('.mini-tool-item')`);
-  const before = await saves();
-  await cdp.evaluate(`document.querySelector('.mini-tool-item').focus()`); await cdp.key('F2');
-  await cdp.until(`document.querySelector('[aria-label="Tool name"]')`, 'F2 opens the inline name field');
-  await typeName('   '); await cdp.key('Enter');
-  await cdp.until(`document.querySelector('.mini-tool-rename [role="alert"]')?.textContent==='Enter a tool name.'`, 'Empty name rejected in place');
-  assert.equal(await saves(), before, 'Nothing is saved for an invalid name');
-  await cdp.key('Escape'); await cdp.until(`!document.querySelector('[aria-label="Tool name"]')`, 'Escape cancels');
-  assert.equal(await saves(), before);
-  await cdp.evaluate(`document.querySelector('.mini-tool-item').dispatchEvent(new MouseEvent('dblclick',{bubbles:true}))`);
-  await cdp.until(`document.querySelector('[aria-label="Tool name"]')`, 'Double click opens the field');
-  await typeName('Customer lookup'); await cdp.key('Enter');
-  await cdp.until(`__uxFixture.commands.filter(c=>c.command==='workspace.tools.save').length>${before}`, 'Rename saved');
-  const sent = await cdp.evaluate(`__uxFixture.commands.filter(c=>c.command==='workspace.tools.save').at(-1)`);
-  assert.equal(sent.payload.tool.name, 'Customer lookup'); assert.match(sent.payload.tool.id, /^[a-f0-9]{32}$/);
-  await cdp.evaluate(`__uxFixture.emit({type:'workspace.error',requestId:${JSON.stringify(sent.id)},tabId:'tab-1',message:'The tools folder is read-only.'})`);
-  await cdp.until(`document.querySelector('.mini-tool-rename [role="alert"]')?.textContent==='The tools folder is read-only.'`, 'Save failure is shown in place');
-  await cdp.key('Escape'); await cdp.key('Escape');
  });
  await check('editor context: environment and pending state use visible text; source comparison survives saving',async()=>{
   assert.equal(await cdp.evaluate(`document.querySelector('.editor-workspace').dataset.env`),'DEV');
@@ -300,7 +269,7 @@ try {
   const source="SELECT order_id, \"Mixed\" FROM orders WHERE note = 'order_id' AND id = :order_id";
   await cdp.evaluate(`${editor}.setValue(${JSON.stringify(source)});${editor}.setSelection(${editor}.getModel().getFullModelRange());${editor}.focus()`);
   await cdp.key('F10',8);await cdp.until(`document.querySelector('[aria-label="SQL editor actions"]')`);
-  await cdp.textClick('[aria-label="SQL editor actions"] button','Convert identifier case…');await cdp.until(`document.querySelector('.identifier-case-dialog')`);
+  await cdp.key('Escape');await cdp.paletteCommand('Convert identifier case (snake_case, camelCase, UPPER_CASE)');await cdp.until(`document.querySelector('.identifier-case-dialog')`);
   await cdp.textClick('.identifier-case-styles label','camelCase');
   await cdp.until(`document.querySelector('.identifier-case-preview tr[data-identity="changed"]')?.textContent.includes('orderId')`,'Semantic rename preview');
   await cdp.textClick('.identifier-case-dialog footer button','Apply renames');await cdp.until(`!document.querySelector('.identifier-case-dialog')`);
@@ -688,7 +657,7 @@ try {
   const paste=async(clipboard,label)=>{
    await cdp.evaluate(`(()=>{Object.defineProperty(navigator.clipboard,'readText',{configurable:true,value:async()=>${JSON.stringify(clipboard)}});${editor}.setValue('');${editor}.focus()})()`);
    await cdp.key('F10',8);await cdp.until(`document.querySelector('[aria-label="SQL editor actions"]')`);
-   await cdp.textClick('[aria-label="SQL editor actions"] button','Paste as…');await cdp.textClick('[aria-label="SQL editor actions"] button',label);
+   await cdp.key('Escape');await cdp.paletteCommand('Paste as IN list, JSON_TABLE draft or INSERT template');await cdp.textClick('[aria-label="SQL editor actions"] button',label);
    await cdp.until(`${editor}.getValue().length>0`,label);return (await cdp.evaluate(`${editor}.getValue()`)).replace(/\r\n/g,'\n');
   };
   assert.equal(await paste("A\tO'B\nA\n",'IN list from copied values'),"column_name IN ('A', 'O''B')");
@@ -754,7 +723,7 @@ try {
   const sql='SELECT q.id FROM (SELECT id FROM orders) q';
   await cdp.evaluate(`${editor}.setValue(${JSON.stringify(sql)});${editor}.setSelection(new monaco.Selection(1,${sql.indexOf('(SELECT')+2},1,${sql.indexOf(') q')+1}));${editor}.focus()`);
   await cdp.key('F10',8);await cdp.until(`document.querySelector('[aria-label="SQL editor actions"]')`,'Editor actions');
-  await cdp.textClick('[aria-label="SQL editor actions"] button','Extract query into CTE');
+  await cdp.key('Escape');await cdp.paletteCommand('Extract selected subquery into a CTE');
   await cdp.until(`${editor}.getValue().startsWith('WITH cte_name AS')`,'Extracted CTE');
   assert.equal(await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length`),executes);
  });
@@ -762,7 +731,7 @@ try {
   const executes=await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length`);
   await cdp.evaluate(`(()=>{Object.defineProperty(navigator.clipboard,'readText',{configurable:true,value:async()=>"ID\\tFull Name\\tAMOUNT"});${editor}.setValue('');${editor}.focus()})()`);
   await cdp.key('F10',8);await cdp.until(`document.querySelector('[aria-label="SQL editor actions"]')`,'Editor actions');
-  await cdp.textClick('[aria-label="SQL editor actions"] button','Paste column names as cursors');
+  await cdp.key('Escape');await cdp.paletteCommand('Paste column names as multiple cursors');
   await cdp.until(`${editor}.getSelections().length===3`,'Three Monaco selections');
   assert.equal(await cdp.evaluate(`${editor}.getValue().replaceAll('\\r\\n','\\n')`),'ID\n"Full Name"\nAMOUNT');
   await cdp.evaluate(`${editor}.trigger('test','type',{text:'UPPER'})`);
@@ -863,7 +832,7 @@ try {
   const source='CREATE OR REPLACE PACKAGE BODY pkg AS\n  FUNCTION total(p_id IN NUMBER, p_note OUT VARCHAR2) RETURN NUMBER IS\n  BEGIN\n    RETURN 1;\n  END;\nEND;';
   const executes=await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length`);
   await cdp.evaluate(`${editor}.setValue(${JSON.stringify(source)});${editor}.getModel().updateOptions({tabSize:2,indentSize:2,insertSpaces:true});${editor}.setPosition({lineNumber:2,column:14});${editor}.focus()`);
-  const generate=async()=>{await cdp.key('F10',8);await cdp.until(`document.querySelector('[aria-label="SQL editor actions"]')`);await cdp.textClick('[aria-label="SQL editor actions"] button','Generate documentation comment')};
+  const generate=async()=>{await cdp.key('F10',8);await cdp.until(`document.querySelector('[aria-label="SQL editor actions"]')`);await cdp.key('Escape');await cdp.paletteCommand('Generate documentation comment for the routine at the cursor')};
   await generate();
   await cdp.until(`${editor}.getValue().includes('/**')`,'Comment inserted');
   const text=(await cdp.evaluate(`${editor}.getValue()`)).replace(/\r\n/g,'\n');
@@ -1168,7 +1137,8 @@ try {
   await cdp.key('p',2);await cdp.until(`document.querySelector('[aria-label="Search workbench"]')`);await fill('[aria-label="Search workbench"]','Open settings');await cdp.key('Enter');
   await cdp.until(`document.querySelector('.settings-frame')`,'Settings');await cdp.textClick('.settings-frame nav button','General');
   await cdp.until(`document.querySelector('[aria-label="Editor toolbar: Find"]')`,'Toolbar settings');
-  assert.ok(await cdp.evaluate(`document.querySelector('[aria-label="Result toolbar: View"]')===null&&document.querySelector('[aria-label="Result toolbar: Result commands"]').disabled`),'Fixed result actions cannot be hidden');
+  assert.ok(await cdp.evaluate(`document.querySelector('[aria-label="Result toolbar: Table view options"]').disabled&&document.querySelector('[aria-label="Result toolbar: Table view options"]').checked`),'The table view action cannot be hidden');
+  assert.ok(await cdp.evaluate(`['Result commands','Pivot options','Marks'].every(label=>{const box=document.querySelector('[aria-label="Result toolbar: '+label+'"]');return !box.disabled&&!box.checked})&&document.querySelector('[aria-label="Result toolbar: Filters"]').checked`),'Rare result actions start in the overflow menu and can be brought back');
   await cdp.click('[aria-label="Editor toolbar: Find"]');
   await cdp.until(`!document.querySelector('.commandbar [aria-label="Find in editor"]')`,'Find leaves the inline toolbar');
   await cdp.key('Escape');await cdp.until(`!document.querySelector('.modal-backdrop')`).catch(()=>{});
@@ -1349,31 +1319,6 @@ try {
   await cdp.until(`document.querySelector('.feedback-stack')?.textContent.includes('12,000 rows · 3.0 MB · 1.5 MB/s · 6,000 rows/s')`, 'Live progress with size and rates');
   await cdp.evaluate(`__uxFixture.emit({type:'result.exportComplete',requestId:'export-live',tabId:'tab-1',success:true,rowsWritten:20000,bytesWritten:5242880,elapsedMs:3000,message:'Exported 20,000 rows to big.csv.'})`);
   await cdp.until(`document.querySelector('.feedback-stack')?.textContent.includes('Exported 20,000 rows to big.csv. (20,000 rows · 5.0 MB')`, 'Completion reports the final size');
- });
- await check('coordinate viewer: WKT opens as an offline plot with stated conventions; sending to a map site needs consent', async () => {
-  await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);if(request)__uxFixture.result(request,[['1']],false)})()`); await new Promise(resolve => setTimeout(resolve, 300));
-  const before = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length`);
-  await cdp.click('[data-editor-tab="tab-1"] [role="tab"]'); await cdp.until(`${editor}`);
-  await cdp.evaluate(`${editor}.setValue('SELECT location FROM places');${editor}.setPosition({lineNumber:1,column:1});${editor}.focus()`); await cdp.key('Enter', 2);
-  await cdp.until(`__uxFixture.commands.filter(m=>m.command==='sql.execute').length>${before}`);
-  await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(m=>m.command==='sql.execute').at(-1);__uxFixture.emit({type:'sql.result',tabId:request.tabId,requestId:request.id,resultId:'result-'+request.id,columns:[{name:'LOCATION',type:'CLOB'}],rows:[['POINT(28.9784 41.0082)']],rowsAffected:null,elapsedMs:2,returnedRows:1,truncated:false,transactionPending:false,hasMore:false,pageSize:1000,offset:0})})()`);
-  await cdp.until(`document.querySelector('[data-cell="0:0"]')`);
-  await cdp.evaluate(`document.querySelector('[data-cell="0:0"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));document.querySelector('.grid-wrap').focus()`);
-  await cdp.evaluate(`document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',shiftKey:true,bubbles:true,cancelable:true}))`);
-  await cdp.until(`document.querySelector('.result-inspector .coordinate-map svg')`, 'Coordinate plot by default');
-  assert.equal(await cdp.evaluate(`document.querySelector('.result-inspector [aria-label="Value format"]').value`), 'map');
-  const text = await cdp.evaluate(`document.querySelector('.result-inspector .coordinate-map').textContent`);
-  assert.match(text, /lat 41\.008200, lon 28\.978400/); assert.match(text, /longitude first/);
-  const opens = await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.openUrl').length`);
-  await cdp.textClick('.result-inspector .map-actions button', 'Open in OpenStreetMap…');
-  await cdp.until(`document.querySelector('.map-consent')`, 'Consent prompt');
-  assert.equal(await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.openUrl').length`), opens, 'Nothing is sent before consent');
-  await cdp.textClick('.map-consent button', 'Cancel');
-  assert.equal(await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.openUrl').length`), opens);
-  await cdp.textClick('.result-inspector .map-actions button', 'Open in OpenStreetMap…'); await cdp.textClick('.map-consent button', 'Send and open');
-  await cdp.until(`__uxFixture.commands.filter(m=>m.command==='result.openUrl').length>${opens}`, 'Opened after consent');
-  assert.match(await cdp.evaluate(`__uxFixture.commands.filter(m=>m.command==='result.openUrl').at(-1).payload.url`), /^https:\/\/www\.openstreetmap\.org\/\?mlat=41\.008200&mlon=28\.978400/);
-  await cdp.click('[aria-label="Close inspector"]');
  });
  await check('icon themes: built-in themes switch object icons and an imported path-only pack is validated, previewed and removable', async () => {
   const setSelect = (selector, value) => cdp.evaluate(`(()=>{const el=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event('change',{bubbles:true}))})()`);
@@ -1681,14 +1626,6 @@ try {
   await cdp.until(`!document.querySelector('.held-drafts-notice')`, 'Discard clears the notice');
   await cdp.until(`!document.querySelector('.footer-drafts')`, 'The footer reminder goes with the discarded edit');
  });
- await check('color previews: hex and rgb text in strings get swatches and are left alone in code', async () => {
-  await cdp.click('[data-editor-tab="tab-1"] [role="tab"]'); await cdp.until(`${editor}`);
-  await cdp.evaluate(`${editor}.setValue("SELECT '#ff8800' warn, 'rgb(0, 128, 255)' info FROM dual -- #00ff00\\nWHERE note = '#nothex'");${editor}.setPosition({lineNumber:1,column:1});${editor}.focus()`);
-  await cdp.until(`document.querySelectorAll('.colorpicker-color-decoration').length===3`, 'Three swatches (two literals and one comment)');
-  assert.equal(await cdp.evaluate(`getComputedStyle(document.querySelector('.colorpicker-color-decoration')).backgroundColor`), 'rgb(255, 136, 0)');
-  await cdp.evaluate(`${editor}.setValue("SELECT 1 FROM dual WHERE x = #fff");`);
-  await cdp.until(`document.querySelectorAll('.colorpicker-color-decoration').length===0`, 'A # in code is not a color');
- });
  await check('date format designer: TO_CHAR preview, TO_DATE reading, unsupported elements and insertion', async () => {
   const input = (label, value) => cdp.evaluate(`(()=>{const el=document.querySelector('[aria-label="${label}"]');const proto=el.tagName==='SELECT'?HTMLSelectElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event(el.tagName==='SELECT'?'change':'input',{bubbles:true}))})()`);
   await cdp.click('[data-editor-tab="tab-1"] [role="tab"]'); await cdp.until(`${editor}`);
@@ -1710,23 +1647,6 @@ try {
   await cdp.until(`[...document.querySelectorAll('[aria-label="Date format designer"] button')].find(b=>b.textContent.startsWith('Insert'))?.disabled===false`);
   await cdp.evaluate(`[...document.querySelectorAll('[aria-label="Date format designer"] button')].find(b=>b.textContent.startsWith('Insert')).click()`);
   await cdp.until(`!document.querySelector('[aria-label="Date format designer"]')&&${editor}.getValue().includes("TO_CHAR(SYSDATE, 'YYYY-MM-DD')")`, 'Format inserted as a quoted literal');
- });
- await check('regex workbench: Oracle patterns run locally, unsupported constructs are refused and the call can be inserted', async () => {
-  const input = (label, value) => cdp.evaluate(`(()=>{const el=document.querySelector('[aria-label="${label}"]');const proto=el.tagName==='SELECT'?HTMLSelectElement.prototype:el.tagName==='TEXTAREA'?HTMLTextAreaElement.prototype:HTMLInputElement.prototype;Object.getOwnPropertyDescriptor(proto,'value').set.call(el,${JSON.stringify(value)});el.dispatchEvent(new Event(el.tagName==='SELECT'?'change':'input',{bubbles:true}))})()`);
-  await cdp.click('[data-editor-tab="tab-1"] [role="tab"]'); await cdp.until(`${editor}`);
-  await cdp.evaluate(`${editor}.setValue('SELECT  FROM dual');${editor}.setPosition({lineNumber:1,column:8});${editor}.focus()`);
-  await cdp.key('p', 2); await cdp.until(`document.querySelector('.ide-command-palette')`);
-  await cdp.evaluate(`(()=>{const input=document.querySelector('.ide-command-palette input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'Oracle regex workbench');input.dispatchEvent(new Event('input',{bubbles:true}));input.focus()})()`); await cdp.frame(); await cdp.key('Enter');
-  await cdp.until(`document.querySelector('[aria-label="Regex workbench"]')`, 'Workbench opens');
-  await cdp.until(`document.querySelector('[aria-label="Regex result"] output')?.textContent==='1042'`, 'Default pattern finds the number');
-  await input('Regex pattern', '(\\d{4})-(\\d{2})-(\\d{2})'); await input('Regex function', 'replace'); await input('Regex replacement', '\\3.\\2.\\1');
-  await cdp.until(`document.querySelector('[aria-label="Regex result"] output')?.textContent==='Order 1042 shipped on 02.11.2026'`, 'REGEXP_REPLACE with back references');
-  await input('Regex pattern', '(?=Order)');
-  await cdp.until(`document.querySelector('[aria-label="Regex workbench"] [role="alert"]')?.textContent.includes('Lookahead')`, 'Lookaround refused');
-  await input('Regex function', 'count'); await input('Regex pattern', '[[:upper:]]');
-  await cdp.until(`document.querySelector('[aria-label="Regex result"] output')?.textContent==='1'`, 'REGEXP_COUNT with a POSIX class');
-  await cdp.evaluate(`[...document.querySelectorAll('[aria-label="Regex workbench"] button')].find(b=>b.textContent==='Insert the call').click()`);
-  await cdp.until(`!document.querySelector('[aria-label="Regex workbench"]')&&${editor}.getValue()==="SELECT REGEXP_COUNT(<text>, '[[:upper:]]', 1) FROM dual"`, 'The call is inserted with quoted pattern');
  });
  await check('key descriptions: a configured query annotates key values without replacing them', async () => {
   await cdp.evaluate(`document.querySelector('[aria-label="Close cell value"]')?.click()`);

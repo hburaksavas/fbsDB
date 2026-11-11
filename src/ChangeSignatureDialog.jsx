@@ -11,7 +11,7 @@ export function ChangeSignatureDialog({request,onApply,onClose}){
   const change={operation,index,name,type,order:order.split(',').map(value=>Number(value.trim())-1)};
   const plan=useMemo(()=>planChangeSignature(request.source,request.cursor,change),[request,operation,index,name,type,order]);
   return <ModalBackdrop onClose={onClose}><section ref={ref} className="appearance-modal local-rename-dialog" role="dialog" aria-modal="true" aria-label="Change Signature">
-    <header className="appearance-header"><h2>Change Signature</h2></header><div className="mini-tool-content">
+    <header className="appearance-header"><h2>Change Signature</h2></header><div className="dialog-content">
       <p>Preview direct calls to one local procedure in this document. Other files, dynamic SQL, qualified calls and overloads need manual review.</p>
       <label>Change<select aria-label="Signature change" value={operation} onChange={event=>{setOperation(event.target.value);setError('')}}><option value="rename">Rename parameter</option><option value="reorder">Reorder parameters</option><option value="add">Add optional IN parameter</option></select></label>
       {operation==='rename'&&<><label>Parameter<select aria-label="Parameter" value={index} onChange={event=>setIndex(Number(event.target.value))}>{routine?.parameters.map((parameter,at)=><option key={parameter.start} value={at}>{parameter.name}</option>)}</select></label><label>New name<input aria-label="New parameter name" value={name} onChange={event=>setName(event.target.value)}/></label></>}

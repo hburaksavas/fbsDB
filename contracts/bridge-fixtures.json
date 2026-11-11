@@ -329,20 +329,6 @@
     }
   },
   {
-    "name": "list tools needs no tool body",
-    "direction": "command",
-    "valid": true,
-    "message": {
-      "type": "command",
-      "id": "r-1",
-      "tabId": "a",
-      "command": "workspace.tools.list",
-      "payload": {
-        "root": "D:/sql"
-      }
-    }
-  },
-  {
     "name": "saved reply",
     "direction": "reply",
     "valid": true,
@@ -427,47 +413,6 @@
     "valid": false,
     "message": {
       "type": "__proto__"
-    }
-  },
-  {
-    "name": "mini tool catalog uses native object shape",
-    "direction": "reply",
-    "valid": true,
-    "message": {
-      "type": "workspace.tools.list",
-      "requestId": "tools-1",
-      "tabId": "a",
-      "root": "D:/SQL",
-      "catalog": {
-        "tools": [
-          {
-            "version": 1,
-            "name": "Lookup",
-            "revision": 3
-          }
-        ],
-        "errors": []
-      }
-    }
-  },
-  {
-    "name": "mini tool catalog rejects obsolete array shape",
-    "direction": "reply",
-    "valid": false,
-    "message": {
-      "type": "workspace.tools.list",
-      "catalog": []
-    }
-  },
-  {
-    "name": "mini tool catalog requires errors and tools",
-    "direction": "reply",
-    "valid": false,
-    "message": {
-      "type": "workspace.tools.list",
-      "catalog": {
-        "tools": []
-      }
     }
   },
   {

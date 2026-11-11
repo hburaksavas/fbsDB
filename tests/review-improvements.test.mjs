@@ -6,7 +6,6 @@ import {retainHistory,historyAllowed} from '../src/queryHistory.js';
 import {persistLocal} from '../src/localPersistence.js';
 import {feedbackSnapshot,dismissFeedback} from '../src/feedbackStore.js';
 import {isDdl} from '../src/sqlSafety.js';
-import {normalizeMiniTool} from '../src/miniTools.js';
 test('history expiry, disabled profiles and zero retention remove stored SQL',()=>{
  const now=10*86400000,entries=[{profile:'PROD',startedAt:now},{profile:'DEV',startedAt:now},{profile:'DEV',startedAt:0}];
  assert.deepEqual(retainHistory(entries,{limit:50,days:1,excludedProfiles:' prod '},now),[entries[1]]);
@@ -21,12 +20,6 @@ test('failed draft persistence reports recovery risk without throwing',()=>{
 test('DDL classification ignores comments and quoted literal contents',()=>{
  assert.equal(isDdl('/* review */ CREATE TABLE t (n NUMBER)'),true);
  assert.equal(isDdl("SELECT 'DROP TABLE t' FROM dual"),false);assert.equal(isDdl('-- ALTER\nSELECT 1 FROM dual'),false);
-});
-test('mini tools keep bounded sharing metadata and remain backward compatible',()=>{
- const old=normalizeMiniTool({version:1,name:'tool',sql:'SELECT :ID FROM dual'});
- assert.equal(old.revision,0);assert.equal(old.description,'');
- const next=normalizeMiniTool({...old,description:'d'.repeat(2100),usage:'Enter :ID',changeNotes:'Add ID',revision:2});
- assert.equal(next.description.length,2000);assert.equal(next.revision,2);assert.equal(next.changeNotes,'Add ID');assert.equal('values' in next,false);
 });
 
 test('execution recovery never claims timeout or cancellation undoes committed data',()=>{

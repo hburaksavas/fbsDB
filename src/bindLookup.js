@@ -1,5 +1,5 @@
 import { getOracleBindNames } from './oracleBinds.js';
-import { assertMiniToolSelect } from './miniTools.js';
+import { assertSelectOnly } from './selectOnly.js';
 
 export const bindLookupStorageKey = 'fbsdb.bindLookups';
 export const lookupRowLimit = 50;
@@ -22,7 +22,7 @@ export function saveBindLookup(storage, name, sql) {
 export function prepareLookup(text) {
   const sql = String(text || '').trim().replace(/;\s*$/, '');
   if (!sql) return { error: 'Enter a SELECT query that returns the value in its first column.' };
-  try { assertMiniToolSelect(sql); } catch (error) { return { error: error.message.replace(/^Mini tools support/, 'A picker runs') }; }
+  try { assertSelectOnly(sql, 'A picker runs'); } catch (error) { return { error: error.message }; }
   const other = getOracleBindNames(sql).filter(name => name !== 'SEARCH');
   if (other.length) return { error: `Only :search can be used as a bind here; remove ${other.map(name => `:${name}`).join(', ')}.` };
   return { sql, usesSearch: getOracleBindNames(sql).includes('SEARCH') };

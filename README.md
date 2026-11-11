@@ -262,14 +262,6 @@ To copy rows from one grid into another table, copy them with headers in the sou
 
 **Pending** shows each change with the parameterized SQL it would run. **Apply** states the effect, the target connection and a production warning, then sends the statements one at a time after a savepoint in the tab's session. Apply never commits and is refused while auto commit is on. It stops at the first failure or unexpected row count and by default returns to the savepoint; values changed by another session are reported rather than overwritten. The last Apply can be undone back to its savepoint, and corrected drafts can be retried without resending what already succeeded. Commit or Rollback remains your explicit step. Before deleting, **related-record checks** list foreign keys in both directions and can count referencing rows.
 
-## SQL mini tools
-
-Run a SELECT, then open **SQL mini tools** in the activity rail and choose **Save SELECT as tool**. Name the tool, edit bind labels/types/required fields, and select visible result columns under **SQL and view definition**. **Save tool** writes a versioned JSON definition containing SQL and view settings to `<workspace>/.fbsdb/tools/`.
-
-Copy that folder with the workspace to share tools. Open a saved tool, choose your own Oracle profile, enter parameters, and click **Run**. Opening or saving never runs SQL. SQL remains visible and editable; both the UI and native host restrict mini tools to a single SELECT, including ordinary WITH queries. SELECT functions can still have side effects and Oracle permissions apply. Bind values, result rows and connection details are not saved in tool definitions. Results use the current SQL tab's session and paged cursor; existing Commit/Rollback rules still apply.
-
-Native persistence and classification checks: `.tools/dotnet/dotnet.exe run --project tests/MiniToolsSmoke/FbsDb.MiniToolsSmoke.csproj -c Release`. Live Oracle/profile permission checks require a database.
-
 ## Develop and test
 
 The first UX phase (items 1–11) is implemented: **Ctrl+P** searches open editors, workspace files, loaded Oracle objects, profiles and SQL history, with type filters. History opens in a new SQL tab without executing. **Ctrl+Shift+F** retains workspace content search. The **Open editors** menu searches by file/object name, path and profile.

@@ -17,11 +17,3 @@ test('failed statements map to a cell when the column is in the result, otherwis
  const errors=mapApplyErrors(statements,outcomes,columns);
  assert.deepEqual(errors.map(item=>[item.row,item.col,item.insertId,item.constraint]),[[3,1,null,null],[5,null,null,'A.FK'],[null,null,2,null]]);
 });
-import {constraintGuidance,splitConstraint} from '../src/oracleErrorMap.js';
-test('constraint names are split and the database definition is explained in one sentence',()=>{
- assert.deepEqual(splitConstraint('APP.POS_CHK'),{owner:'APP',name:'POS_CHK'});assert.deepEqual(splitConstraint('POS_CHK','APP'),{owner:'APP',name:'POS_CHK'});
- assert.equal(constraintGuidance({found:true,name:'POS_CHK',constraintType:'C',condition:'qty > 0',columns:['QTY']}),'POS_CHK requires: qty > 0');
- assert.equal(constraintGuidance({found:true,name:'UK',constraintType:'U',columns:['A','B']}),'UK requires unique values in (A, B).');
- assert.match(constraintGuidance({found:true,name:'FK',constraintType:'R',columns:['PID'],referenced:'PARENT_PK'}),/match an existing parent row \(PARENT_PK\)/);
- assert.equal(constraintGuidance({found:false}),null);assert.equal(constraintGuidance(null),null);
-});

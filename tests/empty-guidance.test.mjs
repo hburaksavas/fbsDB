@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {idleGuidance,noRowsGuidance,pendingEmptyGuidance} from '../src/emptyGuidance.js';
+import {idleGuidance,noRowsGuidance} from '../src/emptyGuidance.js';
 test('the idle result area points to the next step for the current situation',()=>{
  assert.deepEqual(idleGuidance({connected:false}).action,'connect');
  assert.match(idleGuidance({connected:false}).detail,/Connect to a database first/);
@@ -13,7 +13,6 @@ test('nothing is offered while a statement is running',()=>{
  const running=idleGuidance({connected:true,hasSql:true,executing:true});
  assert.equal(running.action,null);assert.equal(running.title,'Running…');
 });
-test('an empty result and an empty draft list explain what to check or do next',()=>{
+test('an empty result explains what to check next',()=>{
  assert.match(noRowsGuidance().detail,/WHERE conditions/);
- assert.match(pendingEmptyGuidance(),/press F2/);assert.match(pendingEmptyGuidance(),/apply or discard/);
 });

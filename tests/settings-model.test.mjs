@@ -4,7 +4,7 @@ import {loadSettings,saveSettings,SETTINGS_KEY,resolveSetting,changeSetting,chan
 import {formatResultValue,copyResultData,matchesCondition} from '../src/resultFeatures.js';
 import {getVisibleResultRows} from '../src/resultRows.js';
 import {projectDisplayExport} from '../src/resultPresentationData.js';
-import {languageLabel,regionLabel} from '../src/localeProfile.js';
+import {regionLabel} from '../src/localeProfile.js';
 
 const storage=(entries={})=>{const data=new Map(Object.entries(entries));return {getItem:key=>data.get(key)??null,setItem:(key,value)=>data.set(key,value),removeItem:key=>data.delete(key),data};};
 test('settings migrate legacy page size and preserve user/workspace precedence with scoped reset',()=>{
@@ -75,10 +75,9 @@ test('local Turkish comparison preferences preserve dotted/dotless I while keepi
  assert.equal(matchesCondition('I',{op:'equals',value:'ı',locale:'tr-TR',caseSensitive:true}),false);
  assert.deepEqual(rows,[['I'],['ı'],['İ'],['i']]);
 });
-test('Turkish language and region labels render as valid Unicode',()=>{
- assert.equal(languageLabel('tr'),'Türkçe');
+test('Turkish region labels render as valid Unicode',()=>{
  assert.equal(regionLabel('tr-TR'),'Türkçe (Türkiye)');
- assert.doesNotMatch(`${languageLabel('tr')} ${regionLabel('tr-TR')}`,/[ÃÄÅ]/);
+ assert.doesNotMatch(regionLabel('tr-TR'),/[ÃÄÅ]/);
 });
 
 test('changing regional formats refreshes table selections without resetting unrelated preferences',()=>{

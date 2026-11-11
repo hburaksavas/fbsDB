@@ -416,7 +416,6 @@ export interface CommandPayloads {
 };
   "sql.execute": {
   "sql": string;
-  "miniTool"?: boolean;
   "pageSize"?: number;
   "rowLimit"?: number;
   "parameters"?: Array<SqlBindParameter>;
@@ -633,16 +632,6 @@ export interface CommandPayloads {
 };
   "workspace.sources": {
   "root": string;
-};
-  "workspace.tools.list": {
-  "root": string;
-  "tool"?: Record<string, JsonValue>;
-  "tabId"?: string;
-};
-  "workspace.tools.save": {
-  "root": string;
-  "tool": Record<string, JsonValue>;
-  "tabId"?: string;
 };
   "workspace.update": {
   "id": string;
@@ -1370,28 +1359,6 @@ export interface ReplyMessages {
   "error"?: JsonValue;
   "projectRules"?: ProjectRules;
   "fileConnections"?: Record<string, JsonValue>;
-};
-  "workspace.tools.list": { type: "workspace.tools.list" } & {
-  "requestId"?: string | null;
-  "tabId"?: string;
-  "autoCommit"?: boolean;
-  "root"?: string;
-  "catalog"?: {
-  "tools": Array<Record<string, JsonValue>>;
-  "errors": Array<string>;
-};
-  "tool"?: Record<string, JsonValue>;
-};
-  "workspace.tools.save": { type: "workspace.tools.save" } & {
-  "requestId"?: string | null;
-  "tabId"?: string;
-  "autoCommit"?: boolean;
-  "root"?: string;
-  "catalog"?: {
-  "tools": Array<Record<string, JsonValue>>;
-  "errors": Array<string>;
-};
-  "tool"?: Record<string, JsonValue>;
 };
   "workspace.worksetOpened": { type: "workspace.worksetOpened" } & {
   "requestId"?: string | null;

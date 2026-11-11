@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {adjacentEdit,cellDraft,editCell,editInserted,emptyDrafts,insertRow,isDeleted,isDirty,pendingChanges,pendingSummary,redo,removeInserted,revertCell,revertRow,toggleDeleted,undo} from '../src/gridDrafts.js';
+import {cellDraft,editCell,editInserted,emptyDrafts,insertRow,isDeleted,isDirty,pendingChanges,pendingSummary,redo,removeInserted,toggleDeleted,undo} from '../src/gridDrafts.js';
 test('edits are staged with the original and an explicit NULL differs from an empty string',()=>{
  let state=editCell(emptyDrafts(),0,1,'old',{value:'new'});
  assert.deepEqual(cellDraft(state,0,1),{original:'old',value:'new',isNull:false});
@@ -20,12 +20,6 @@ test('undo and redo walk the draft history and new edits clear redo',()=>{
  state=undo(undo(state));assert.equal(isDirty(state),false);assert.equal(undo(state),state);
  state=editCell(state,3,0,'x',{value:'y'});assert.equal(redo(state),state);
 });
-test('reverting one cell or one row keeps all other draft changes',()=>{
- let state=editCell(emptyDrafts(),0,0,'a',{value:'1'});state=editCell(state,0,1,'b',{value:'2'});state=editCell(state,1,0,'c',{value:'3'});state=toggleDeleted(state,0);
- state=revertCell(state,0,0);assert.equal(cellDraft(state,0,0),null);assert.ok(cellDraft(state,0,1));
- state=revertRow(state,0);assert.equal(cellDraft(state,0,1),null);assert.equal(isDeleted(state,0),false);assert.ok(cellDraft(state,1,0));
- assert.equal(revertRow(state,9),state);assert.equal(revertCell(state,9,9),state);
-});
 test('summary and ordered change list cover updates, inserts and deletes',()=>{
  let state=editCell(emptyDrafts(),3,1,'a',{value:'b'});state=editCell(state,1,0,'c',{isNull:true});state=editCell(state,1,2,'x',{value:'y'});
  state=toggleDeleted(state,5);state=insertRow(state,{});state=editInserted(state,1,0,{value:'new'});
@@ -38,12 +32,6 @@ test('deleting a row hides its cell edits from the pending list and counts it on
  let state=editCell(emptyDrafts(),2,0,'a',{value:'b'});state=toggleDeleted(state,2);
  assert.deepEqual(pendingSummary(state),{updates:0,cells:1,inserts:0,deletes:1,total:1});assert.deepEqual(pendingChanges(state).map(item=>item.kind),['delete']);
  assert.equal(isDeleted(toggleDeleted(state,2),2),false);
-});
-test('stepping between edited cells wraps in both directions',()=>{
- let state=editCell(emptyDrafts(),1,0,'a',{value:'b'});state=editCell(state,4,2,'c',{value:'d'});
- assert.deepEqual(adjacentEdit(state,null,1),{row:1,col:0});assert.deepEqual(adjacentEdit(state,{row:1,col:0},1),{row:4,col:2});
- assert.deepEqual(adjacentEdit(state,{row:4,col:2},1),{row:1,col:0});assert.deepEqual(adjacentEdit(state,{row:1,col:0},-1),{row:4,col:2});
- assert.deepEqual(adjacentEdit(state,null,-1),{row:4,col:2});assert.equal(adjacentEdit(emptyDrafts(),null,1),null);
 });
 import {settleApplied} from '../src/gridDrafts.js';
 test('applied statements leave the drafts while failed, mismatched and skipped ones stay editable',()=>{

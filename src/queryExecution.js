@@ -42,16 +42,16 @@ export function createQueryExecution(getPorts) {
       if (getOracleBindNames(statement).length) { if (p.ui.inlineBinds?.(statement)) return; p.ui.bind(statement); return; }
       return actions.executeStatement(statement);
     },
-    executeStatement(statement, parameters = [], miniTool = false, executionContext = {}) {
+    executeStatement(statement, parameters = [], executionContext = {}) {
       const p = getPorts(), { owner, session, view } = active(p), operations = p.operations;
       if(p.documents.active?.readOnly||p.ui.readOnly)return;
       if (isDdl(statement)) {
         if (session.transactionPending) { p.session.status('Commit or roll back pending changes before running DDL. DDL commits automatically.', owner); return; }
-        if (!executionContext.ddlConfirmed && !p.ui.confirmDdl?.({statement,parameters,miniTool,owner,profileId:session.activeConnection?.id})) return;
+        if (!executionContext.ddlConfirmed && !p.ui.confirmDdl?.({statement,parameters,owner,profileId:session.activeConnection?.id})) return;
       }
       operations.cancellations.delete(owner);
       set(p, owner, { queryOutcome: null, rendering: false, sqlStage: 'Executing SQL', operationStartedAt: Date.now(), runtimeProblems: [] });
-      if (miniTool || executionContext.serverFilter) p.session.update('executionTarget', miniTool ? 'mini tool' : 'server filter', owner);
+      if (executionContext.serverFilter) p.session.update('executionTarget', 'server filter', owner);
       p.history.learn(statement);
       statement = statement.replace(/^(\s*SELECT)(?=\*)/i, '$1 ');
       const editor = p.editor.current, model = editor?.getModel(), selection = editor?.getSelection();
@@ -73,7 +73,7 @@ export function createQueryExecution(getPorts) {
       set(p, owner, { fetchingPage: false, executionKind: 'query', executing: true, cancelling: false });
       p.history.start(owner, statement, session.activeConnection?.id);
       p.session.status('Executing Oracle statement…', owner); p.ui.bind(null);
-      const requestId = p.send('sql.execute', { tabId: owner, sql: statement, parameters, miniTool,
+      const requestId = p.send('sql.execute', { tabId: owner, sql: statement, parameters,
         ...(executionContext.sourceReviewId ? {sourceReviewId:executionContext.sourceReviewId} : {}),
         timeoutSeconds: p.settings.timeout, pageSize: p.settings.pageSize,
         previousResultId: (view.resultSets || []).some(item => item.pinned && item.result.resultId === view.queryResult?.resultId) ? null : view.queryResult?.resultId || null });

@@ -23,7 +23,6 @@ import {PivotOptionsPanel} from '../src/PivotPopover';
 import {ResultValueDialog} from '../src/ResultDialogs';
 import {ColumnFormatPopover} from '../src/ColumnFormatPopover';
 import {ResultToolbar} from '../src/ResultToolbar';
-import {MiniToolsDialog} from '../src/MiniToolsDialog';
 import {WorkspaceDevelopmentDialog} from '../src/WorkspaceDevelopmentDialog';
 import {IdeCommandPalette} from '../src/IdeCommandPalette';
 import {WorkspaceExplorer,OpenEditors} from '../src/WorkspaceExplorer';
@@ -65,7 +64,6 @@ function Harness(){
  else if(page.startsWith('value-'))content=<ResultValueDialog key={page} cell={{column:columns[1],row:0,value:page==='value-json'?'{"id":1,"name":"Alpha"}':page==='value-xml'?'<item id="1">Alpha</item>':'Sample value'}} onClose={noop}/>;
  else if(page==='column-format')content=<ColumnFormatPopover {...shared} column={columns[0]} position={{left:60,top:60}} triggerRef={trigger}/>;
  else if(page==='toolbar')content=<ResultToolbar {...shared} hasData hasExecution hasSelection hasMore loadedRows={rows} sourceColumns={columns} memoryItems={[]}/>;
- else if(page==='tools')content=<MiniToolsDialog root="D:/theme-fixture" tabId="theme-qa" sourceResult={{executedSql:'select :id from dual',columns,rows}} profiles={[profile]} profile={profile} connected onClose={noop} onRun={()=>'fixture-run'}/>;
  else if(page==='git')content=<WorkspaceDevelopmentDialog mode="git" state={{git:{branch:'main',files:[{path:'query.sql',status:'M'}]},diff:{commit:'abc123 Latest SQL update',diff:'+select * from items'}}} files={[{path:'query.sql',relativePath:'query.sql'}]} onClose={noop}/>;
  else if(page==='replace')content=<WorkspaceDevelopmentDialog mode="replace" state={{preview:{files:[{path:'query.sql',before:'select old from dual',after:'select new from dual'}],skipped:[]}}} files={[]} onClose={noop}/>;
  else if(page==='palette')content=<IdeCommandPalette mode="search" files={[{id:'qa',name:'query.sql',path:'D:/query.sql'}]} objects={[object]} connections={[profile]} commands={[{id:'qa-command',label:'Format SQL'}]} onChoose={noop} onClose={noop}/>;

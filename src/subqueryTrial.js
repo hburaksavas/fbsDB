@@ -1,6 +1,6 @@
 import { lexOracle } from './oracleLexer.js';
 import { getOracleBindNames } from './oracleBinds.js';
-import { assertMiniToolSelect } from './miniTools.js';
+import { assertSelectOnly } from './selectOnly.js';
 import { impureCalls } from './quickEval.js';
 
 export const trialRowLimit = 20;
@@ -63,7 +63,7 @@ export function prepareSubqueryTrial(text) {
   let sql = String(text || '').trim().replace(/;\s*$/, '').trim();
   if (!sql) return { error: 'Select a subquery to try.' };
   while (sql.startsWith('(') && sql.endsWith(')') && balanced(sql.slice(1, -1))) sql = sql.slice(1, -1).trim();
-  try { assertMiniToolSelect(sql); } catch (error) { return { error: error.message.replace(/^Mini tools support/, 'A trial runs') }; }
+  try { assertSelectOnly(sql, 'A trial runs'); } catch (error) { return { error: error.message }; }
   const unresolved = unresolvedReferences(sql);
   if (unresolved.length) return { error: `This subquery refers to ${unresolved.map(name => `${name}.`).join(', ')} from the outer query, so it cannot run on its own. Supply those values as binds instead; the query is not changed for you.`, unresolved };
   const tokens = lexOracle(sql).filter(token => token.kind !== 'comment');
