@@ -1,5 +1,5 @@
 $ErrorActionPreference = "Stop"
-$repoRoot = Split-Path -Parent $PSScriptRoot
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $installDir = Join-Path $repoRoot ".tools\dotnet"
 $installer = Join-Path $env:TEMP "fbsdb-dotnet-install.ps1"
 

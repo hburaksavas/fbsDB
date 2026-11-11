@@ -12,5 +12,5 @@ for (const fixture of fixtures) test(`shared bridge contract: ${fixture.name}`, 
 });
 
 test('generated JavaScript, TypeScript and C# contracts match the source schema', () => {
-  execFileSync(process.execPath, ['scripts/generate-bridge-contract.mjs', '--check']);
+  execFileSync(process.execPath, ['scripts/generate/generate-bridge-contract.mjs', '--check']);
 });

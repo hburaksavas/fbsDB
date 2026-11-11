@@ -46,7 +46,7 @@ The workspace semaphore serializes workspace operations. Oracle services retain 
 
 `contracts/native-bridge.json` defines command names, payload fields, handler ownership, session-resume policy, reply discriminators, and shared data shapes. Additional domain fields are allowed for compatibility; the contract validates the declared fields rather than replacing service-level checks such as path containment, permissions, transaction guards, or SQL classification.
 
-`scripts/generate-bridge-contract.mjs` produces:
+`scripts/generate/generate-bridge-contract.mjs` produces:
 
 - JavaScript runtime schema data in `src/bridge/contract.generated.js`.
 - TypeScript payload maps and discriminated reply types in `src/bridge/contract.generated.d.ts`.

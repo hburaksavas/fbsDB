@@ -54,5 +54,5 @@ for (const version of versions) for (const kind of ['keyword', 'plsql', 'functio
   const count = data.entries.filter(entry => entry.kind === kind && entry.versions.includes(version)).length;
   if (count < (kind === 'keyword' ? 90 : kind === 'plsql' ? 150 : 150)) throw new Error(`Incomplete ${version} ${kind} catalog (${count})`);
 }
-await writeFile(new URL('../src/oracleCatalog.json', import.meta.url), JSON.stringify(data, null, 2) + '\n');
+await writeFile(new URL('../../src/oracleCatalog.json', import.meta.url), JSON.stringify(data, null, 2) + '\n');
 process.stdout.write(`Updated ${data.entries.length} Oracle catalog entries.\n`);

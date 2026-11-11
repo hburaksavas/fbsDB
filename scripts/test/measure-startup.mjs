@@ -1,4 +1,4 @@
-// Usage: node scripts/measure-startup.mjs <playwright-module-path-or-file-url> <url> [samples]
+// Usage: node scripts/test/measure-startup.mjs <playwright-module-path-or-file-url> <url> [samples]
 // Run against a production preview. Each sample uses a fresh browser context.
 import { pathToFileURL } from 'node:url';
 const [modulePath, url = 'http://127.0.0.1:4173/', count = '5'] = process.argv.slice(2);

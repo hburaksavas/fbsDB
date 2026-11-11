@@ -31,7 +31,7 @@ npm test
 npm run test:load -- --profile smoke --enforce-budgets
 .\scripts\test\test-native.ps1
 dotnet run --project tests/ScaleLoad/ScaleLoad.csproj -c Release -- tns 1000 1 .artifacts/ci/tns-load.json
-node scripts/sync-webcontent.mjs
+node scripts/build/sync-webcontent.mjs
 dotnet build native/FbsDb/FbsDb.csproj -c Release -r win-x64 -p:Platform=x64 -p:WindowsPackageType=None
 ```
 

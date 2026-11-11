@@ -1,5 +1,5 @@
 $ErrorActionPreference = "Stop"
-$repoRoot = Split-Path -Parent $PSScriptRoot
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $localDotnet = Join-Path $repoRoot ".tools\dotnet"
 $project = Join-Path $repoRoot "native\FbsDb\FbsDb.csproj"
 $runningExecutable = Join-Path $repoRoot "native\FbsDb\bin\x64\Debug\net10.0-windows10.0.26100.0\win-x64\FbsDb.exe"
@@ -33,7 +33,7 @@ try {
     npm run build
     if ($LASTEXITCODE -ne 0) { throw "The editor bundle build failed." }
 
-    node scripts/sync-webcontent.mjs
+    node scripts/build/sync-webcontent.mjs
     if ($LASTEXITCODE -ne 0) { throw "The editor bundle sync failed." }
 
     & $dotnetExe build $project -c Debug -r win-x64 -p:Platform=x64 -p:WindowsPackageType=None

@@ -4,7 +4,7 @@ $localDotnet = Join-Path $repoRoot ".tools\dotnet"
 $project = Join-Path $repoRoot "tests\WorkspaceSmoke\FbsDb.WorkspaceSmoke.csproj"
 
 if (-not (Test-Path (Join-Path $localDotnet "dotnet.exe"))) {
-    & (Join-Path (Split-Path -Parent $PSScriptRoot) "setup-dotnet.ps1")
+    & (Join-Path (Split-Path -Parent $PSScriptRoot) "build\setup-dotnet.ps1")
     if ($LASTEXITCODE -ne 0) { throw "The local .NET SDK setup failed." }
 }
 

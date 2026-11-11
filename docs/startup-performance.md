@@ -26,7 +26,7 @@ Tekrar ölçmek için üretim derlemesini preview ile çalıştırın:
 npm run build
 npx vite preview --host 127.0.0.1 --port 4173
 # Başka bir terminalde, mevcut Playwright modülünün yolunu verin:
-node scripts/measure-startup.mjs <playwright/index.mjs> http://127.0.0.1:4173/ 5
+node scripts/test/measure-startup.mjs <playwright/index.mjs> http://127.0.0.1:4173/ 5
 ```
 
 Build manifesti `dist/client/.vite/manifest.json` içindedir.

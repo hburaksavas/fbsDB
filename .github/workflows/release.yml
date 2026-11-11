@@ -52,7 +52,7 @@ jobs:
         run: npm ci
 
       - name: Build portable package
-        run: ./scripts/package-desktop.ps1
+        run: ./scripts/release/package-desktop.ps1
 
       - name: Publish GitHub release
         env:

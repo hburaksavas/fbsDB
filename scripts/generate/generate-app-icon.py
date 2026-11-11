@@ -10,7 +10,7 @@ import numpy as np
 from PIL import Image
 
 
-ASSETS = Path(__file__).resolve().parents[1] / "native" / "FbsDb" / "Assets"
+ASSETS = Path(__file__).resolve().parents[2] / "native" / "FbsDb" / "Assets"
 SOURCE = ASSETS / "AppIconTealSource.png"
 MINT = np.array([137.0, 222.0, 207.0])
 TEAL = np.array([22.0, 166.0, 153.0])

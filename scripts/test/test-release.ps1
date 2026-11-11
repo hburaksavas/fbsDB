@@ -15,9 +15,9 @@ try {
     & ./scripts/test/test-desktop.ps1
     & ./.tools/dotnet/dotnet.exe run --project tests/OracleLiveRegression/OracleLiveRegression.csproj -c Release -- $OracleProfile
     if ($LASTEXITCODE -ne 0) { throw 'Live Oracle release checks failed.' }
-    & ./scripts/package-desktop.ps1 -CertificateThumbprint $CertificateThumbprint -RequireSigned:$RequireSigned
+    & ./scripts/release/package-desktop.ps1 -CertificateThumbprint $CertificateThumbprint -RequireSigned:$RequireSigned
     & ./scripts/test/test-portable.ps1
     if ($LASTEXITCODE -ne 0) { throw 'Portable smoke failed.' }
-    & ./scripts/package-hash.ps1 -ArchivePath ./artifacts/fbsDB-win-x64.zip | Format-List
+    & ./scripts/release/package-hash.ps1 -ArchivePath ./artifacts/fbsDB-win-x64.zip | Format-List
 }
 finally { Pop-Location }

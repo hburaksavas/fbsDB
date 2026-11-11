@@ -4,7 +4,7 @@ $regressionRepo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $regressionRoot = Join-Path $regressionRepo ('.artifacts\desktop-regression\' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $regressionApp = Join-Path $regressionRoot 'app'
 $regressionDotnet = Join-Path $regressionRepo '.tools\dotnet\dotnet.exe'
-if (-not (Test-Path -LiteralPath $regressionDotnet)) { throw 'Run scripts/setup-dotnet.ps1 first.' }
+if (-not (Test-Path -LiteralPath $regressionDotnet)) { throw 'Run scripts/build/setup-dotnet.ps1 first.' }
 # Refuse to attach to an unrelated application already using this port.
 $regressionPortProbe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $DesktopDebugPort)
 try { $regressionPortProbe.Start() } finally { $regressionPortProbe.Stop() }
@@ -64,7 +64,7 @@ try {
         npm run build
         if ($LASTEXITCODE -ne 0) { throw 'Web build failed.' }
     }
-    node scripts/sync-webcontent.mjs
+    node scripts/build/sync-webcontent.mjs
     if ($LASTEXITCODE -ne 0) { throw 'Web content sync failed.' }
     & $regressionDotnet build native/FbsDb/FbsDb.csproj -c Debug -r win-x64 -p:Platform=x64 -p:WindowsPackageType=None "-p:OutDir=$regressionApp\"
     if ($LASTEXITCODE -ne 0) { throw 'Isolated desktop build failed.' }

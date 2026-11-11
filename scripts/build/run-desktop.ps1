@@ -1,5 +1,5 @@
 $ErrorActionPreference = "Stop"
-$repoRoot = Split-Path -Parent $PSScriptRoot
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $localDotnet = Join-Path $repoRoot ".tools\dotnet"
 
 $systemDotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue

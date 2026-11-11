@@ -64,7 +64,7 @@ test('legacy default SQL colors upgrade while explicit user customization remain
   const doc={documentElement:{dataset:{},style:{}}};applyDocumentTheme('light',doc);assert.equal(doc.documentElement.dataset.theme,'light');assert.equal(doc.documentElement.style.colorScheme,'light');
 });
 test('CSS/XAML palette generation stays synchronized with the single shared source',()=>{
-  assert.doesNotThrow(()=>execFileSync(process.execPath,['scripts/generate-theme-tokens.mjs','--check'],{stdio:'pipe'}));
+  assert.doesNotThrow(()=>execFileSync(process.execPath,['scripts/generate/generate-theme-tokens.mjs','--check'],{stdio:'pipe'}));
 });
 test('component CSS has no palette literals or unresolved color variables',()=>{
   const definitions=new Set(),references=[],literals=[];
