@@ -1,6 +1,6 @@
 param([int]$DesktopDebugPort = 9348, [switch]$SkipBuild, [switch]$LoadTest, [switch]$ProjectRulesTest, [switch]$DragTest, [switch]$OracleFlowTest, [switch]$SshTunnelTest, [string]$OracleProfile = 'FBSDB_LOCAL')
 $ErrorActionPreference = 'Stop'
-$regressionRepo = Split-Path -Parent $PSScriptRoot
+$regressionRepo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $regressionRoot = Join-Path $regressionRepo ('.artifacts\desktop-regression\' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $regressionApp = Join-Path $regressionRoot 'app'
 $regressionDotnet = Join-Path $regressionRepo '.tools\dotnet\dotnet.exe'
@@ -106,7 +106,7 @@ try {
     if ($regressionProcess -and -not $regressionProcess.HasExited) { Stop-Process -Id $regressionProcess.Id }
     # Old runs only: this run is among the newest kept. A cleanup problem must not change the test result.
     try {
-        node scripts/clean-test-output.mjs --apply
+        node scripts/test/clean-test-output.mjs --apply
         if ($LASTEXITCODE -ne 0) { Write-Warning 'Could not clean old test output.' }
     } catch { Write-Warning "Could not clean old test output: $_" }
     Pop-Location

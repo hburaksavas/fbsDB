@@ -44,7 +44,7 @@ npm ci
 
 Extract the entire ZIP and run the icon-bearing `fbsDB.exe` at its root. Keep the `app/` folder beside it when moving the package. Application DLLs, .NET/Windows App SDK files, localization folders, icons and the web editor are grouped inside `app/`; the root contains only the launcher, `app/` and `README-portable.txt`. The native launcher adds no additional runtime dependency. Web content is replaced on each build so obsolete hashed bundles do not accumulate in the ZIP.
 
-`scripts/test-portable.ps1` extracts the ZIP into a new path containing spaces and Turkish characters, launches it from an unrelated working directory with isolated settings, and checks WebView2/Monaco startup plus embedded EXE icons and running window icons. It saves its report under `.artifacts/portable-smoke/`.
+`scripts/test/test-portable.ps1` extracts the ZIP into a new path containing spaces and Turkish characters, launches it from an unrelated working directory with isolated settings, and checks WebView2/Monaco startup plus embedded EXE icons and running window icons. It saves its report under `.artifacts/portable-smoke/`.
 
 For UI-only development, `npm run dev` starts the Vite preview. It cannot connect to Oracle outside the native desktop host.
 
@@ -284,7 +284,7 @@ npm test
 npm run typecheck:bridge
 npm run typecheck:domain
 .\.tools\dotnet\dotnet.exe run --project tests/BridgeContractSmoke/BridgeContractSmoke.csproj -c Release
-.\scripts\test-workspace.ps1
+.\scripts\test\test-workspace.ps1
 ```
 
 The JavaScript tests cover editor, workbench, results, and bridge behavior. Additional .NET smoke projects under `tests/` cover native services; some require a configured live Oracle database.
@@ -297,7 +297,7 @@ Live Oracle service regression: `.\.tools\dotnet\dotnet.exe run --project tests/
 
 Document state, native command handlers, and the shared bridge contract are described in [Architecture](docs/architecture.md). After changing `contracts/native-bridge.json`, run `npm run generate:bridge`; the production build checks that generated JavaScript, TypeScript, and C# files are up to date.
 
-[Windows CI](docs/ci.md) validates PRs and `master` pushes with JavaScript tests, bridge generation/type checks, load smoke scenarios, eleven database-independent native smoke projects, a large TNS smoke, and a Windows x64 Release build. The shared native suite is available locally as `scripts/test-native.ps1`; desktop UI and live Oracle checks remain separate integration commands.
+[Windows CI](docs/ci.md) validates PRs and `master` pushes with JavaScript tests, bridge generation/type checks, load smoke scenarios, eleven database-independent native smoke projects, a large TNS smoke, and a Windows x64 Release build. The shared native suite is available locally as `scripts/test/test-native.ps1`; desktop UI and live Oracle checks remain separate integration commands.
 
 ## Repository map
 

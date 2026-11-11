@@ -12,12 +12,12 @@
     "generate:bridge": "node scripts/generate-bridge-contract.mjs",
     "check:bridge": "node scripts/generate-bridge-contract.mjs --check",
     "typecheck:bridge": "tsc -p tsconfig.bridge.json",
-    "test": "node scripts/test-unit.mjs",
-    "test:load": "node scripts/test-load.mjs",
-    "test:desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-desktop.ps1",
-    "clean:test-output": "node scripts/clean-test-output.mjs",
+    "test": "node scripts/test/test-unit.mjs",
+    "test:load": "node scripts/test/test-load.mjs",
+    "test:desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test/test-desktop.ps1",
+    "clean:test-output": "node scripts/test/clean-test-output.mjs",
     "typecheck:domain": "tsc -p tsconfig.domain.json",
-    "test:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-release.ps1"
+    "test:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test/test-release.ps1"
   },
   "dependencies": {
     "@fontsource/dm-mono": "5.3.0",

@@ -1,6 +1,6 @@
 // FI-069 desktop check: the real app reaches the local Oracle database through
 // an SSH tunnel. A stand-in ssh opens a real local forward, so every Oracle
-// byte crosses it. Run with scripts/test-desktop.ps1 -SshTunnelTest.
+// byte crosses it. Run with scripts/test/test-desktop.ps1 -SshTunnelTest.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import net from 'node:net';
@@ -9,7 +9,7 @@ import path from 'node:path';
 import { connectNativePage } from './nativeCdp.mjs';
 
 const [endpoint, root, PROFILE = 'FBSDB_LOCAL'] = process.argv.slice(2);
-assert.ok(endpoint && root, 'Run scripts/test-desktop.ps1 -SshTunnelTest.');
+assert.ok(endpoint && root, 'Run scripts/test/test-desktop.ps1 -SshTunnelTest.');
 const settings = JSON.parse(await readFile(path.join(root, 'settings.json'), 'utf8'));
 assert.equal(settings.connectionProfiles?.[0]?.ssh?.host, 'unknown.test', 'Only the isolated SSH test profile may be used.');
 const publicKey = (await readFile(path.join(root, 'ssh_host_key.pub'), 'utf8')).split(' ')[1];

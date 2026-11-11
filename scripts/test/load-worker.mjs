@@ -1,5 +1,5 @@
 import { performance } from 'node:perf_hooks';
-import { profiles, scenarios } from '../tests/load/scenarios.mjs';
+import { profiles, scenarios } from '../../tests/load/scenarios.mjs';
 
 const [profile, name, repetitions, duration] = process.argv.slice(2);
 try {

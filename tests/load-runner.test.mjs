@@ -9,7 +9,7 @@ function invoke(args, check) {
   const directory = mkdtempSync(join(tmpdir(), 'fbsdb-load-'));
   const output = join(directory, 'report.json');
   try {
-    const result = spawnSync(process.execPath, ['scripts/test-load.mjs', '--output', output, ...args], { encoding: 'utf8', timeout: 30000 });
+    const result = spawnSync(process.execPath, ['scripts/test/test-load.mjs', '--output', output, ...args], { encoding: 'utf8', timeout: 30000 });
     assert.ifError(result.error);
     check(result, existsSync(output) ? JSON.parse(readFileSync(output, 'utf8')) : undefined);
   } finally {

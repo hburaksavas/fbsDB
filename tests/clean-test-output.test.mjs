@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { REMOVABLE, runsToClean } from '../scripts/clean-test-output.mjs';
+import { REMOVABLE, runsToClean } from '../scripts/test/clean-test-output.mjs';
 
 const older = '20261104-233611-60000dae';
 const middle = '20261105-001722-1b7a15d1';
@@ -18,8 +18,8 @@ test('anything not named like a run is left alone', () => {
 });
 
 test('the desktop suite cleans up after every run, passed or failed', () => {
-  const script = readFileSync('scripts/test-desktop.ps1', 'utf8');
-  assert.match(script.slice(script.lastIndexOf('finally')), /node scripts\/clean-test-output\.mjs --apply/);
+  const script = readFileSync('scripts/test/test-desktop.ps1', 'utf8');
+  assert.match(script.slice(script.lastIndexOf('finally')), /node scripts\/test\/clean-test-output\.mjs --apply/);
 });
 
 test('reports are never among the removable contents of a run', () => {

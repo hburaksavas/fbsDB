@@ -1,6 +1,6 @@
 param([string]$DotnetExe = '', [string]$ReportDirectory = '')
 $ErrorActionPreference = 'Stop'
-$nativeTestRepo = Split-Path -Parent $PSScriptRoot
+$nativeTestRepo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if (-not $DotnetExe) {
     $nativeTestSystemDotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue
     $DotnetExe = if ($nativeTestSystemDotnet) { $nativeTestSystemDotnet.Source } else { Join-Path $nativeTestRepo '.tools\dotnet\dotnet.exe' }

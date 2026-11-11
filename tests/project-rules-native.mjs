@@ -6,7 +6,7 @@ import {connectNativePage} from './nativeCdp.mjs';
 import {desktopRegressionFixture} from './desktopRegressionFixture.mjs';
 
 const [endpoint,directory]=process.argv.slice(2);
-assert.ok(endpoint&&directory,'Run scripts/test-desktop.ps1 -ProjectRulesTest.');
+assert.ok(endpoint&&directory,'Run scripts/test/test-desktop.ps1 -ProjectRulesTest.');
 const root=path.resolve(directory),files=path.join(root,'files'),quote=JSON.stringify;
 assert.equal(JSON.parse(await readFile(path.join(root,'settings.json'),'utf8')).lastWorkspace,files,'Only an isolated workspace may be tested.');
 for(const folder of ['spec','impl','tests'])await mkdir(path.join(files,folder),{recursive:true});

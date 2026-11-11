@@ -9,7 +9,7 @@ The job performs these checks in order:
 3. Build the web bundle and reject generated theme-file drift.
 4. Run JavaScript tests with console and JUnit reports.
 5. Run the load smoke scenarios with budgets enforced.
-6. Run the eleven database-independent native smoke projects listed explicitly in `scripts/test-native.ps1`.
+6. Run the eleven database-independent native smoke projects listed explicitly in `scripts/test/test-native.ps1`.
 7. Run the large TNS smoke, `tests/ScaleLoad` with 1,000 aliases and no database.
 8. Sync the editor bundle and build the unpackaged Windows x64 application in Release configuration.
 
@@ -29,7 +29,7 @@ npm run typecheck:domain
 npm run build
 npm test
 npm run test:load -- --profile smoke --enforce-budgets
-.\scripts\test-native.ps1
+.\scripts\test\test-native.ps1
 dotnet run --project tests/ScaleLoad/ScaleLoad.csproj -c Release -- tns 1000 1 .artifacts/ci/tns-load.json
 node scripts/sync-webcontent.mjs
 dotnet build native/FbsDb/FbsDb.csproj -c Release -r win-x64 -p:Platform=x64 -p:WindowsPackageType=None
@@ -43,7 +43,7 @@ The native runner accepts `-DotnetExe <absolute-path>` for a workspace-local SDK
 
 ## Separate integration checks
 
-Hosted validation does not launch the WinUI/WebView2 workbench or connect to Oracle. `npm run test:desktop` remains the isolated desktop integration command. Its interface tests use a simulated bridge; `scripts/test-desktop.ps1 -OracleFlowTest` runs the same application against a local, non-production Oracle profile with saved credentials, with nothing faked, and loses the connection through a local relay during Commit and Rollback. `scripts/dev/setup-fbsqa-fixtures.ps1` prepares the local test database for the checks that need grants from another owner, identity columns, triggers and views; those checks report themselves as skipped without it, and `-Remove` undoes it. `OracleLiveRegression` and `OracleLoad` require a configured live database and are intentionally absent from the native CI allowlist; the Oracle mode of `ScaleLoad` does too and is not run by the workflow. No Oracle secret is required by the workflow.
+Hosted validation does not launch the WinUI/WebView2 workbench or connect to Oracle. `npm run test:desktop` remains the isolated desktop integration command. Its interface tests use a simulated bridge; `scripts/test/test-desktop.ps1 -OracleFlowTest` runs the same application against a local, non-production Oracle profile with saved credentials, with nothing faked, and loses the connection through a local relay during Commit and Rollback. `scripts/dev/setup-fbsqa-fixtures.ps1` prepares the local test database for the checks that need grants from another owner, identity columns, triggers and views; those checks report themselves as skipped without it, and `-Remove` undoes it. `OracleLiveRegression` and `OracleLoad` require a configured live database and are intentionally absent from the native CI allowlist; the Oracle mode of `ScaleLoad` does too and is not run by the workflow. No Oracle secret is required by the workflow.
 
 To require the workflow before merging, a repository administrator can add `Windows validation` as a required check in the repository's branch rules.
 

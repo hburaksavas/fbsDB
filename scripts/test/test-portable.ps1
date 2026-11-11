@@ -1,6 +1,6 @@
 param([string]$ArchivePath, [int]$DesktopDebugPort = 9351)
 $ErrorActionPreference = 'Stop'
-$repoRoot = Split-Path -Parent $PSScriptRoot
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 if (-not $ArchivePath) { $ArchivePath = Join-Path $repoRoot 'artifacts\fbsDB-win-x64.zip' }
 $runRoot = Join-Path $repoRoot ('.artifacts\portable-smoke\' + [Guid]::NewGuid().ToString('N'))
 $extracted = Join-Path $runRoot 'Taşınmış portable paket'

@@ -6,7 +6,7 @@ import { connectNativePage } from './nativeCdp.mjs';
 import { desktopRegressionFixture } from './desktopRegressionFixture.mjs';
 
 const [endpoint, runDirectory] = process.argv.slice(2);
-assert.ok(endpoint && runDirectory, 'Run scripts/test-desktop.ps1 to provide an isolated application and profile.');
+assert.ok(endpoint && runDirectory, 'Run scripts/test/test-desktop.ps1 to provide an isolated application and profile.');
 const root = path.resolve(runDirectory), fixtureRoot = path.join(root, 'files');
 assert.equal(JSON.parse(await readFile(path.join(root, 'settings.json'), 'utf8')).lastWorkspace, undefined, 'The runner must start with isolated settings.');
 await mkdir(fixtureRoot, { recursive: true });

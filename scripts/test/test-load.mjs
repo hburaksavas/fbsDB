@@ -3,9 +3,9 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cpus } from 'node:os';
-import { profiles, scenarios } from '../tests/load/scenarios.mjs';
+import { profiles, scenarios } from '../../tests/load/scenarios.mjs';
 
-const root = fileURLToPath(new URL('../', import.meta.url));
+const root = fileURLToPath(new URL('../../', import.meta.url));
 const options = { profile: 'standard', duration: '0', timeout: '120', output: '.artifacts/load/latest.json' };
 const flags = new Set(['--enforce-budgets']);
 try {
