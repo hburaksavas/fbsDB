@@ -45,8 +45,10 @@ public sealed partial class OracleSessionService
                 object? Get(string key) => row is not null && row.Table.Columns.Contains(key) && row[key] is not DBNull ? row[key] : null;
                 int? Number(string key) => Get(key) is { } value ? Convert.ToInt32(value, CultureInfo.InvariantCulture) : null;
                 var temporal=reader.GetProviderSpecificFieldType(i).Name switch {"OracleDate"=>"DATE","OracleTimeStamp"=>"TIMESTAMP","OracleTimeStampTZ"=>"TIMESTAMP WITH TIME ZONE","OracleTimeStampLTZ"=>"TIMESTAMP WITH LOCAL TIME ZONE",_=>null};
+                // ODP.NET reports a NUMBER declared without precision as (38, 127) and a FLOAT as (126, -127). Neither is a declared limit.
+                var scale = Number("NumericScale"); var declared = scale is null or (>= -84 and < 127);
                 return new SqlColumn(reader.GetName(i), temporal??reader.GetDataTypeName(i)) { TemporalKind=temporal,
-                    Size = Number("ColumnSize"), Precision = Number("NumericPrecision"), Scale = Number("NumericScale"),
+                    Size = Number("ColumnSize"), Precision = declared ? Number("NumericPrecision") : null, Scale = declared ? scale : null,
                     Nullable = Get("AllowDBNull") is bool nullable ? nullable : null,
                     SourceSchema = Get("BaseSchemaName")?.ToString(), SourceTable = Get("BaseTableName")?.ToString(), SourceColumn = Get("BaseColumnName")?.ToString()
                 };

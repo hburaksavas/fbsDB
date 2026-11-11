@@ -20,9 +20,11 @@ export function validateCell(column, draft) {
   if (/NUMBER|INTEGER|INT|DECIMAL|NUMERIC|FLOAT/.test(type)) {
     if (!/^[-+]?(?:\d+\.?\d*|\.\d+)(?:[eE][-+]?\d+)?$/.test(text.trim())) return `${name} needs a number.`;
     const precision = Number(column?.precision), scale = Number(column?.scale);
-    if (Number.isFinite(precision) && precision > 0 && !/e/i.test(text)) {
+    // The driver reports a NUMBER declared without precision as (38, 127) and a FLOAT as (126, -127); Oracle's real scale range is -84..127, so those mean "no declared limit".
+    const undeclared = Number.isFinite(scale) && (scale >= 127 || scale < -84);
+    if (Number.isFinite(precision) && precision > 0 && !undeclared && !/e/i.test(text)) {
       const [whole, fraction = ''] = text.trim().replace(/^[-+]/, '').split('.');
-      const integerDigits = whole.replace(/^0+/, '').length, allowed = precision - (Number.isFinite(scale) && scale > 0 ? scale : 0);
+      const integerDigits = whole.replace(/^0+/, '').length, allowed = Math.max(0, precision - (Number.isFinite(scale) ? scale : 0));
       if (integerDigits > allowed) return `${name} allows ${allowed} digit${allowed === 1 ? '' : 's'} before the decimal point.`;
       if (Number.isFinite(scale) && scale >= 0 && fraction.replace(/0+$/, '').length > scale && /NUMBER/.test(type) && scale > 0) return `${name} allows ${scale} decimal place${scale === 1 ? '' : 's'}.`;
     }

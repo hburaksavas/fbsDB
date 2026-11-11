@@ -11,6 +11,10 @@ test('numbers are checked for format, precision and scale',()=>{
  assert.equal(validateCell(column,{value:'123.45'}),null);assert.equal(validateCell(column,{value:'-1e3'}),null);
  assert.match(validateCell(column,{value:'abc'}),/needs a number/);assert.match(validateCell(column,{value:'1234.5'}),/3 digits before/);assert.match(validateCell(column,{value:'1.234'}),/2 decimal places/);
  assert.equal(validateCell(column,{value:'1.200'}),null,'Trailing zeros do not count');
+ assert.equal(validateCell({name:'CUSTOMER_ID',type:'NUMBER',precision:38,scale:127},{value:'1001'}),null,'NUMBER without declared precision has no digit limit');
+ assert.equal(validateCell({name:'F',type:'FLOAT',precision:126,scale:-127},{value:'12345.678'}),null);
+ assert.equal(validateCell({name:'N',type:'NUMBER',precision:3,scale:-2},{value:'12300'}),null,'Negative scale widens the integer part');
+ assert.match(validateCell({name:'N',type:'NUMBER',precision:2,scale:5},{value:'1'}),/0 digits before/);
 });
 test('NULL, dates and text length are checked locally',()=>{
  assert.match(validateCell({name:'ID',type:'NUMBER',nullable:false},{isNull:true}),/does not allow NULL/);assert.equal(validateCell({name:'N',type:'VARCHAR2',nullable:true},{isNull:true}),null);
