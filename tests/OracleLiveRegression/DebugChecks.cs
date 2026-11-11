@@ -2,7 +2,7 @@ using FbsDb.Services;
 
 // FI-007: PL/SQL debugging with DBMS_DEBUG against real Oracle. Session a is
 // the debugged tab; it runs an ordinary call while the debugger drives it.
-// Needs DEBUG CONNECT SESSION (scripts/setup-fbsqa-fixtures.ps1).
+// Needs DEBUG CONNECT SESSION (scripts/dev/setup-fbsqa-fixtures.ps1).
 sealed class DebugChecks(OracleSessionService a, string user, Func<string, Func<Task>, Task> check, Action<bool, string> require, Action<string, string> skipped)
 {
     private readonly string _suffix = Guid.NewGuid().ToString("N")[..8].ToUpperInvariant();
@@ -13,7 +13,7 @@ sealed class DebugChecks(OracleSessionService a, string user, Func<string, Func<
     public async Task RunAsync()
     {
         var privileges = await a.ExecuteAsync("SELECT COUNT(*) FROM session_privs WHERE privilege = 'DEBUG CONNECT SESSION'");
-        if (Convert.ToInt32(privileges.Rows[0][0]) == 0) { skipped("PL/SQL debugger", "DEBUG CONNECT SESSION is not granted; run scripts/setup-fbsqa-fixtures.ps1."); return; }
+        if (Convert.ToInt32(privileges.Rows[0][0]) == 0) { skipped("PL/SQL debugger", "DEBUG CONNECT SESSION is not granted; run scripts/dev/setup-fbsqa-fixtures.ps1."); return; }
         try
         {
             await a.ExecuteAsync($"""

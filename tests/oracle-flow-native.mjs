@@ -371,7 +371,7 @@ try{
   await check('privileges: a table with column grants locks the other columns and applies the granted one',async()=>{
     await showTab(tabA);
     const present=await read(`SELECT COUNT(*) FROM all_tables WHERE owner='FBSQA_GRANTS' AND table_name='COLUMN_GRANTED'`);
-    if(present[0][0]!=='1'){console.log('SKIP column grants: run scripts/setup-fbsqa-fixtures.ps1 first');return}
+    if(present[0][0]!=='1'){console.log('SKIP column grants: run scripts/dev/setup-fbsqa-fixtures.ps1 first');return}
     await beginEditing(`SELECT ID, OPEN_COL, CLOSED_COL FROM FBSQA_GRANTS.COLUMN_GRANTED ORDER BY ID`);
     await cdp.until(`document.querySelector('[aria-label="What your privileges do not allow"]')`,'Limits are named');
     assert.match(await cdp.evaluate(`document.querySelector('[aria-label="What your privileges do not allow"]').textContent`),/You cannot delete rows: you have no DELETE privilege on FBSQA_GRANTS\.COLUMN_GRANTED/);

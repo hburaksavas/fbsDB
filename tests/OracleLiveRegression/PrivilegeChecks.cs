@@ -93,6 +93,6 @@ sealed class PrivilegeChecks(OracleSessionService session, string user, Func<str
         });
 
         if ((await Rows("SELECT COUNT(*) FROM all_tables WHERE owner='FBSQA_GRANTS' AND table_name='COLUMN_GRANTED'"))[0][0] == "1") await GrantedByAnotherOwner();
-        else skipped("privileges: grants from another owner", "Run scripts/setup-fbsqa-fixtures.ps1 first.");
+        else skipped("privileges: grants from another owner", "Run scripts/dev/setup-fbsqa-fixtures.ps1 first.");
     }
 }

@@ -164,8 +164,8 @@ sealed class ReadbackChecks(OracleSessionService a, OracleSessionService b, stri
 
         var privileges = (await Read(a, "SELECT privilege FROM session_privs")).Rows.Select(row => Convert.ToString(row[0])).ToHashSet();
         if (privileges.Contains("CREATE SEQUENCE") && privileges.Contains("CREATE TRIGGER") && privileges.Contains("CREATE VIEW")) await IdentityTriggerAndView();
-        else skipped("read back: identity, trigger and view", "Run scripts/setup-fbsqa-fixtures.ps1 first.");
+        else skipped("read back: identity, trigger and view", "Run scripts/dev/setup-fbsqa-fixtures.ps1 first.");
         if (Convert.ToInt32((await Read(a, "SELECT COUNT(*) FROM all_tab_privs WHERE table_schema='FBSQA_GRANTS' AND table_name='INSERT_ONLY'")).Rows[0][0]) > 0) await InsertWithoutSelect();
-        else skipped("read back: INSERT without SELECT", "Run scripts/setup-fbsqa-fixtures.ps1 first.");
+        else skipped("read back: INSERT without SELECT", "Run scripts/dev/setup-fbsqa-fixtures.ps1 first.");
     }
 }
