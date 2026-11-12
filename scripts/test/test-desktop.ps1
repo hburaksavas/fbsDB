@@ -47,6 +47,7 @@ $regressionEnvironment = @{
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$DesktopDebugPort"
     WEBVIEW2_USER_DATA_FOLDER = (Join-Path $regressionRoot 'webview-profile')
     FBSDB_THEME_SETTINGS_PATH = $regressionSettings
+    FBSDB_LOG_PATH = (Join-Path $regressionRoot 'logs')
     FBSDB_WORKSPACE_SETTINGS_PATH = $regressionSettings
     FBSDB_CONNECTION_SETTINGS_PATH = $regressionSettings
 }

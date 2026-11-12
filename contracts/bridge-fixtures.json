@@ -769,5 +769,50 @@
         "template": "unknown"
       }
     }
+  },
+  {
+    "name": "report an interface error",
+    "direction": "command",
+    "valid": true,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "ui.logError",
+      "payload": {
+        "source": "window",
+        "message": "TypeError: x is undefined",
+        "stack": "at run (index.js:1:1)"
+      }
+    }
+  },
+  {
+    "name": "an interface error needs a known source",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "ui.logError",
+      "payload": {
+        "source": "elsewhere",
+        "message": "x"
+      }
+    }
+  },
+  {
+    "name": "an interface error needs a message",
+    "direction": "command",
+    "valid": false,
+    "message": {
+      "type": "command",
+      "id": "r-1",
+      "tabId": "a",
+      "command": "ui.logError",
+      "payload": {
+        "source": "render"
+      }
+    }
   }
 ]

@@ -19,6 +19,7 @@ $environment = @{
     WEBVIEW2_ADDITIONAL_BROWSER_ARGUMENTS = "--remote-debugging-port=$DesktopDebugPort"
     WEBVIEW2_USER_DATA_FOLDER = (Join-Path $runRoot 'webview-profile')
     FBSDB_THEME_SETTINGS_PATH = $settings
+    FBSDB_LOG_PATH = (Join-Path $runRoot 'logs')
     FBSDB_WORKSPACE_SETTINGS_PATH = $settings
     FBSDB_CONNECTION_SETTINGS_PATH = $settings
 }

@@ -10,8 +10,6 @@ export const editorCommands = Object.freeze({
   moveUp: { label: 'Move SQL item or PL/SQL statement up', writes: true },
   moveDown: { label: 'Move SQL item or PL/SQL statement down', writes: true },
   embeddedSql: { label: 'Edit static SQL inside EXECUTE IMMEDIATE', menuLabel: 'Edit SQL inside EXECUTE IMMEDIATE…', writes: true },
-  clipboardHistory: { label: 'Clipboard history (session only)', menuLabel: 'Clipboard history…', writes: true },
-  editorMacros: { label: 'Record or replay editor macros', menuLabel: 'Record or replay editor macros…', writes: true },
   quickFix: { label: 'Quick fixes for compiler diagnostic', menuLabel: 'Quick fixes…', detail: 'Alt+Enter', writes: true },
   deleteReview: { label: 'Review references before deleting local procedure or parameter', menuLabel: 'Review references before delete…', workspace: true },
   pasteAs: { label: 'Paste as IN list, JSON_TABLE draft or INSERT template', menuLabel: 'Paste as…', writes: true },

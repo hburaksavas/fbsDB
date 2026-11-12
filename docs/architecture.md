@@ -34,6 +34,30 @@ Result editing is local until the user applies it. `src/gridEditability.js` deci
 
 `native/FbsDb/Services/GridDmlGuard.cs` accepts only the three DML shapes the grid generates. `GridDmlBatch.cs` runs them one at a time in the tab's session after a savepoint, stops at the first failure or unexpected row count, and by default rolls back to that savepoint, leaving earlier session work untouched. It never commits and refuses to run while auto commit is on. After a successful Apply the changes wait in the tab's transaction for Commit or Rollback, like any other DML.
 
+## Workbench modules
+
+`src/App.jsx` holds the workbench state, its effects and the functions that act on it. Views that need none of that live in their own modules:
+
+- `SqlResultsView.jsx`, `ConnectionPicker.jsx`, `OracleObjectTree.jsx` and `ResizeHandle.jsx` are ordinary components.
+- `lazyViews.js` declares every view that is loaded on first use.
+- `WorkbenchCommandPalette.jsx`, `WorkbenchToolDialogs.jsx`, `WorkbenchEditorDialogs.jsx`, `WorkbenchOverlays.jsx` and `WorkbenchPrompts.jsx` each export one `render…(ctx)` function. `App` calls it inside its own return and passes the values the markup reads. These are functions, not components, on purpose: they add no component boundary, so state, effects and render order stay exactly as they were when the markup was written inline.
+
+A `render…` function must not call hooks and must not assign to a value it receives. To move more markup out, pass every `App` value the moved lines read and nothing else; a name that is missing from `ctx` is an unresolved identifier, which `tsc --allowJs --checkJs` reports as "Cannot find name".
+
+## Error log
+
+`DiagnosticLog` (native) appends to one file per day in `%LOCALAPPDATA%\fbsDB\logs` (`FBSDB_LOG_PATH` overrides the folder; the desktop tests use it). A file stops taking entries at 2 MB and the ten newest files are kept. Nothing is sent anywhere, and writing never throws.
+
+What is recorded:
+
+- The application start line with the app, Windows and .NET versions.
+- Unhandled exceptions of the UI thread, the process and unobserved tasks (`App.xaml.cs`). They are recorded only; none is marked as handled.
+- A WebView2 process failure, for the main window and for SQL windows.
+- A command that fails with a programming error such as `NullReferenceException`. Failures that are part of normal work (a refused action, a missing file, an Oracle error) are not logged, because their text can name the user's objects and files.
+- Interface errors: `src/errorReporting.js` listens for `error` and `unhandledrejection`, and the error boundary in `main.jsx` reports render failures, through the `ui.logError` command. A session sends at most 25 distinct entries. Chromium's ResizeObserver notice and Monaco's cancelled delays are ignored.
+
+Executed SQL, bind values and credentials are never passed to the log. **Open log folder** in the command palette (`ui.openLogFolder`) shows the folder in Explorer.
+
 ## Native commands
 
 `MainPage` initializes WebView2, validates the command envelope, selects the tab session, applies operation guards, and dispatches commands. Four handlers in `native/FbsDb/Commands/` own UI, file, workspace, and Oracle commands. They are nested classes to access WinUI host facilities; their shared base exposes host services and an explicit immutable request context.

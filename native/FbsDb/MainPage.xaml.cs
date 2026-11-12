@@ -128,6 +128,7 @@ public sealed partial class MainPage : Page
             EditorWebView.CoreWebView2.Settings.IsGeneralAutofillEnabled = false;
             EditorWebView.CoreWebView2.NavigationStarting += OnNavigationStarting;
             EditorWebView.CoreWebView2.WebMessageReceived += OnWebMessageReceived;
+            EditorWebView.CoreWebView2.ProcessFailed += LogWebViewProcessFailure;
             EditorWebView.CoreWebView2.NavigationCompleted += (_, _) =>
             {
                 StartupStatus.Text = "Loading the SQL workbench…";
@@ -193,6 +194,14 @@ public sealed partial class MainPage : Page
     }
 
     private void OnWebMessageReceived(CoreWebView2 sender, CoreWebView2WebMessageReceivedEventArgs args) => HandleWebMessage(sender, args, TabWindowOwnership.Main);
+
+    internal static void LogWebViewProcessFailure(CoreWebView2 sender, CoreWebView2ProcessFailedEventArgs args) =>
+        DiagnosticLog.Error("webview/process", $"{args.ProcessFailedKind}: {args.Reason}, exit code {args.ExitCode}", args.ProcessDescription);
+
+    // Failures a command reports to the user as part of normal work (a refused action, a missing file, an Oracle error)
+    // are not logged: their text can name the user's objects and files. A programming error is.
+    private static bool IsUnexpectedFailure(Exception error) => error is NullReferenceException or InvalidCastException or IndexOutOfRangeException
+        or KeyNotFoundException or ArgumentNullException or ArgumentOutOfRangeException or NotImplementedException or OutOfMemoryException;
 
     // Every window's WebView reports here, so all windows share one session
     // registry; windowId says which window sent the message.
@@ -286,6 +295,7 @@ public sealed partial class MainPage : Page
         catch (Exception ex)
         {
             Debug.WriteLine($"fbsDB WebView message failed: {ex.Message}");
+            if (IsUnexpectedFailure(ex)) DiagnosticLog.Exception("host/command", ex, receivedCommand);
             try
             {
                 if (receivedCommand?.StartsWith("workspace.", StringComparison.Ordinal) == true)

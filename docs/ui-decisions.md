@@ -81,5 +81,11 @@ User-approved product decision. Preserve these choices in later changes.
 - The result toolbar shows nine actions by default: Table view options, Edit rows, Filters, Sorting, Find in results, Copy selection formats, Load result rows, Export results and Reset result view.
 - The other ten wait in the toolbar's overflow menu and in the command palette with a "Result: " prefix: Descriptions, Pivot options, Navigate to row or column, Marks, Highlights, SQL generation, Pin result, Result memory, Generate execution plan and Result commands. Settings → Toolbars can bring any of them back as a button; a user's own saved choice is kept.
 - The editor context menu keeps what belongs to the clicked place: Run, Explain plan, Format, Undo, Redo, Cut, Copy, Paste, Select all, Toggle comment, Rename local variable or parameter, Quick fixes, Surround with, Find and Replace (plus the bind entries on a bind).
-- Removed from the context menu and available from the command palette only; do not put them back without asking: Explain CASE or analytic function, Convert identifier case, Change local procedure signature, Extract PL/SQL assignments, Move statement up/down, Edit SQL inside EXECUTE IMMEDIATE, Clipboard history, Editor macros, Review references before delete, Extract query into CTE, Generate documentation comment, Paste column names as cursors and Paste as.
+- Removed from the context menu and available from the command palette only; do not put them back without asking: Explain CASE or analytic function, Convert identifier case, Change local procedure signature, Extract PL/SQL assignments, Move statement up/down, Edit SQL inside EXECUTE IMMEDIATE, Review references before delete, Extract query into CTE, Generate documentation comment, Paste column names as cursors and Paste as.
 - Commands shown in both the palette and the context menu are described once in `src/editorCommands.js`.
+
+## 2026-11-13 — Four more side features removed
+
+User-approved product decision. Do not bring these back without asking.
+
+- Removed: editor macros (with Ctrl+Alt+Shift+M), clipboard history, opening SQLcl, SQL*Plus or a terminal in the project directory (`ui.openTerminal`, `ExternalTerminalService`) and the workspace portability check.

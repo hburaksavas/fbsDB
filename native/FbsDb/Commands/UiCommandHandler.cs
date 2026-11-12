@@ -60,20 +60,18 @@ public sealed partial class MainPage
                         FlashWindowEx(ref info);
                     }
                     break;
-                case "ui.openTerminal":
+                case "ui.logError":
                 {
                     string? Text(string name) => payload.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
-                    var plan = ExternalTerminalService.Build(Text("tool") ?? "", Text("userName"), Text("identifier"), Text("directory"), Text("tnsSource"), name => ExternalTerminalService.FindOnPath(name));
-                    string message;
-                    if (plan.Error is null)
-                    {
-                        try { ExternalTerminalService.Start(plan); message = "Opened an external terminal in the project directory. It has its own session and transaction."; }
-                        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException) { plan = plan with { Error = ex.Message }; message = ex.Message; }
-                    }
-                    else message = plan.Error;
-                    Send(sender, new { type = "ui.terminal", requestId = id, tabId, opened = plan.Error is null, message });
+                    DiagnosticLog.Error("ui/" + (Text("source") ?? "window"), Text("message"), Text("stack"));
                     break;
                 }
+                case "ui.openLogFolder":
+                    Directory.CreateDirectory(DiagnosticLog.Directory);
+                    var logFolder = new ProcessStartInfo("explorer.exe") { UseShellExecute = true };
+                    logFolder.ArgumentList.Add(DiagnosticLog.Directory);
+                    Process.Start(logFolder);
+                    break;
                 case "system.locale":
                     Send(sender, new
                     {

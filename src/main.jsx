@@ -2,6 +2,8 @@ import React, { useLayoutEffect } from "react";
 import { recordStartupMilestone } from "./startupPerformance.js";
 import { createRoot } from "react-dom/client";
 import { App } from "./App.jsx";
+import { sendNativeCommand } from "./nativeBridge.js";
+import { createErrorReporter, installErrorReporting } from "./errorReporting.js";
 import "@fontsource/dm-mono/400.css";
 import "@fontsource/dm-mono/500.css";
 import "@fontsource/dm-sans/400.css";
@@ -37,6 +39,10 @@ applyDocumentTheme(resolveSetting(loadSettings(localStorage),'ui.theme').value);
 // Feature-specific menus, such as the Results grid menu, still receive the event.
 document.addEventListener("contextmenu", (event) => event.preventDefault(), { capture: true });
 
+// Unexpected interface errors go to the local log file kept by the desktop host.
+const reportUiError = createErrorReporter(sendNativeCommand);
+installErrorReporting(window, reportUiError);
+
 class ApplicationErrorBoundary extends React.Component {
   state = { error: null };
 
@@ -46,6 +52,7 @@ class ApplicationErrorBoundary extends React.Component {
 
   componentDidCatch(error, details) {
     console.error("fbsDB application render failed", error, details.componentStack);
+    reportUiError("render", error, details.componentStack);
   }
 
   render() {
@@ -75,7 +82,6 @@ createRoot(document.getElementById("root")).render(
 
 import './oracleSourceHeader.css';
 import './runConsole.css';
-import './portability.css';
 import './relatedFiles.css';
 import './localHistory.css';
 import './compare.css';

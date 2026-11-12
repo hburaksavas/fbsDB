@@ -31,9 +31,10 @@ test('a menu label falls back to the palette label and unknown ids are refused',
 
 test('the workbench defines a runner for every shared command and no second definition of it', () => {
   const app = readFileSync(new URL('../src/App.jsx', import.meta.url), 'utf8');
+  const palette = readFileSync(new URL('../src/WorkbenchCommandPalette.jsx', import.meta.url), 'utf8');
   const runners = app.slice(app.indexOf('const editorCommandRunners={'), app.indexOf('const editorCommandState='));
   for (const id of Object.keys(editorCommands)) {
     assert.match(runners, new RegExp(`[{,]\\s*${id}:`), `runner for ${id}`);
-    assert.equal(app.includes(`{id:'${id}',label:`), false, `${id} is defined only in editorCommands.js`);
+    for (const source of [app, palette]) assert.equal(source.includes(`{id:'${id}',label:`), false, `${id} is defined only in editorCommands.js`);
   }
 });

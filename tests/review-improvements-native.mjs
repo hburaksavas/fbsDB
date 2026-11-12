@@ -1019,21 +1019,6 @@ try {
   await cdp.until(`document.querySelectorAll('.editor-tabs-track [data-editor-tab]').length===${tabsBefore+1}`,'Loaded into a new tab');
   assert.equal(await cdp.evaluate(`${editor}.getValue()`),sql);
  });
- await check('portability check: absolute machine paths and local tools are listed read-only with advice',async()=>{
-  const fill=async(selector,value)=>{await cdp.evaluate(`(()=>{const input=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(value)});input.dispatchEvent(new Event('input',{bubbles:true}));input.focus()})()`);await cdp.frame()};
-  await cdp.evaluate(`__uxFixture.emit({type:'workspace.state',root:'D:/ux-fixture',name:'UX fixture',files:[],entries:[],recent:[]})`);
-  await cdp.click('[data-editor-tab="tab-1"] [role="tab"]');await cdp.until(`${editor}`);
-  const before=await cdp.evaluate(`__uxFixture.commands.filter(c=>c.command==='workspace.sources').length`);
-  await cdp.evaluate(`${editor}.focus()`);await cdp.key('p',2);await cdp.until(`document.querySelector('[aria-label="Search workbench"]')`);await fill('[aria-label="Search workbench"]','absolute paths, TNS and local tool dependencies');await cdp.key('Enter');
-  await cdp.until(`__uxFixture.commands.filter(c=>c.command==='workspace.sources').length>${before}`,'Scan requested');
-  const executes=await cdp.evaluate(`__uxFixture.commands.filter(c=>c.command==='sql.execute').length`);
-  await cdp.evaluate(`(()=>{const request=__uxFixture.commands.filter(c=>c.command==='workspace.sources').at(-1);__uxFixture.emit({type:'workspace.sources',requestId:request.id,tabId:request.tabId,sources:{root:'D:/ux-fixture',files:[{path:'D:/ux-fixture/load.sql',name:'load.sql',content:'SPOOL C:\\\\temp\\\\out.log\\nHOST sqlldr control=load.ctl\\nselect 1 from dual;',connectionProfileId:null},{path:'D:/ux-fixture/ok.sql',name:'ok.sql',content:'select 1 from dual;',connectionProfileId:null}],truncated:false,skipped:[]}})})()`);
-  await cdp.until(`document.querySelector('[aria-label="Workspace portability check"] .portability-list')`,'Findings');
-  const text=await cdp.evaluate(`document.querySelector('[aria-label="Workspace portability check"]').textContent`);
-  assert.match(text,/Machine-specific path/);assert.match(text,/C:\\temp\\out\.log/);assert.match(text,/Local tool/);assert.match(text,/Read-only/);assert.doesNotMatch(text,/ok\.sql/);
-  await cdp.textClick('[aria-label="Workspace portability check"] button.button-primary','Close');await cdp.until(`!document.querySelector('[aria-label="Workspace portability check"]')`);
-  assert.equal(await cdp.evaluate(`__uxFixture.commands.filter(c=>c.command==='sql.execute').length`),executes);
- });
  await check('contextual file creation: package source proposes test, migration and example files and writes the chosen one only on request',async()=>{
   const fill=async(selector,value)=>{await cdp.evaluate(`(()=>{const input=document.querySelector(${JSON.stringify(selector)});Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(value)});input.dispatchEvent(new Event('input',{bubbles:true}));input.focus()})()`);await cdp.frame()};
   await cdp.evaluate(`__uxFixture.emit({type:'workspace.state',root:'D:/ux-fixture',name:'UX fixture',files:[],entries:[],recent:[]})`);
@@ -1172,17 +1157,6 @@ try {
    assert.match(text,/Parameters/);assert.match(text,/p_name/);assert.match(text,/display name/);assert.match(text,/Returns/);
    await cdp.key('Escape');
   }
- });
- await check('external terminal: palette opens a separate tool with no credentials and reports the native result',async()=>{
-  await cdp.click('[data-editor-tab="tab-1"] [role="tab"]');
-  const before=await cdp.evaluate(`__uxFixture.commands.filter(c=>c.command==='ui.openTerminal').length`);
-  await cdp.key('p',2);await cdp.until(`document.querySelector('.ide-command-palette')`);
-  await cdp.evaluate(`(()=>{const input=document.querySelector('.ide-command-palette input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'Open SQLcl in the project directory');input.dispatchEvent(new Event('input',{bubbles:true}));input.focus()})()`);await cdp.frame();await cdp.key('Enter');
-  await cdp.until(`__uxFixture.commands.filter(c=>c.command==='ui.openTerminal').length>${before}`,'Terminal command sent');
-  const sent=await cdp.evaluate(`__uxFixture.commands.filter(c=>c.command==='ui.openTerminal').at(-1)`);
-  assert.equal(sent.payload.tool,'sqlcl');assert.ok(sent.payload.directory);assert.ok(!JSON.stringify(sent.payload).toLowerCase().includes('password'),'No credentials are sent');
-  await cdp.evaluate(`__uxFixture.emit({type:'ui.terminal',requestId:${JSON.stringify('x')},tabId:'tab-1',opened:false,message:'SQLcl (sql) was not found on PATH.'})`);
-  await cdp.until(`document.body.textContent.includes('SQLcl (sql) was not found on PATH.')`,'Native result is shown');
  });
  await check('quick evaluation: a selected expression runs only on Evaluate; user-defined calls need a second confirmation',async()=>{
   const palette=async label=>{await cdp.key('p',2);await cdp.until(`document.querySelector('.ide-command-palette')`);await cdp.evaluate(`(()=>{const input=document.querySelector('.ide-command-palette input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(label)});input.dispatchEvent(new Event('input',{bubbles:true}));input.focus()})()`);await cdp.frame();await cdp.key('Enter')};

@@ -6,12 +6,12 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
   <ItemGroup><Compile Include="../../native/FbsDb/Services/NativeSettingsStore.cs" Link="NativeSettingsStore.cs"/>
-    <Compile Include="../../native/FbsDb/Services/ExternalTerminalService.cs" Link="ExternalTerminalService.cs"/>
     <Compile Include="..\..\native\FbsDb\Services\WorkspaceService.cs" Link="WorkspaceService.cs" />
     <Compile Include="../../native/FbsDb/Services/WorkspaceManagement.cs" Link="WorkspaceManagement.cs" />
     <Compile Include="../../native/FbsDb/Services/WorkspaceAdvanced.cs" Link="WorkspaceAdvanced.cs" />
     <Compile Include="../../native/FbsDb/Services/WorkspaceFileService.cs" Link="WorkspaceFileService.cs" />
     <Compile Include="../../native/FbsDb/Services/BindFormService.cs" Link="BindFormService.cs" />
     <Compile Include="../../native/FbsDb/Services/LocalHistoryService.cs" Link="LocalHistoryService.cs" />
+    <Compile Include="../../native/FbsDb/Services/DiagnosticLog.cs" Link="DiagnosticLog.cs" />
   <Compile Include="../../native/FbsDb/Services/WorkspaceProjectRules.cs" Link="WorkspaceProjectRules.cs" /><Compile Include="../../native/FbsDb/Services/WorkspaceTemplates.cs" Link="WorkspaceTemplates.cs" /></ItemGroup>
 </Project>

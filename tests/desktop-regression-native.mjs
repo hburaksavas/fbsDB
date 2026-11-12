@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { connectNativePage } from './nativeCdp.mjs';
@@ -189,6 +189,18 @@ try {
     await cdp.until(`!document.querySelector('.draft-recovery')`, 'Discarded recovery'); await expectSql('');
     assert.equal(await cdp.evaluate(`document.querySelectorAll('.file-tab').length`), 1);
     await cdp.until('window.__desktopRegression.ready', 'Post-discard native handshake');
+  });
+  await check('error log: the host records its start, a reported interface error and an uncaught window error in the isolated log folder', async () => {
+    const logFolder = path.join(root, 'logs');
+    const logText = async () => (await Promise.all((await readdir(logFolder).catch(() => [])).filter(name => /^fbsdb-\d{8}\.log$/.test(name)).map(name => readFile(path.join(logFolder, name), 'utf8')))).join('\n');
+    const logged = async (text, label) => { const end = Date.now() + 15000; let content = ''; while (Date.now() < end) { content = await logText(); if (content.includes(text)) return content; await new Promise(resolve => setTimeout(resolve, 100)); } assert.fail(`${label} was not written to the log: ${content.slice(-400)}`); };
+    assert.match(await logged('[app] fbsDB ', 'The start entry'), /INFO \[app\] fbsDB \S+ started on /);
+    await cdp.evaluate(`window.__desktopRegression.post({ type: 'command', id: 'log-probe', tabId: 'tab-1', command: 'ui.logError', payload: { source: 'render', message: 'fbsDB log probe', stack: 'at probe (index.js:1:1)' } })`);
+    assert.match(await logged('fbsDB log probe', 'The reported error'), /ERROR \[ui\/render\] fbsDB log probe\r?\n    at probe \(index\.js:1:1\)/);
+    // A real uncaught error reaches the same file through the page's own listener. The suite's error list is cleared of this one deliberate error.
+    await cdp.evaluate(`window.dispatchEvent(new ErrorEvent('error', { message: 'fbsDB window probe', error: new Error('fbsDB window probe') }))`);
+    assert.match(await logged('fbsDB window probe', 'The uncaught error'), /ERROR \[ui\/window\] Error: fbsDB window probe/);
+    await cdp.evaluate(`(() => { const state = window.__desktopRegression; state.errors = state.errors.filter(message => message !== 'fbsDB window probe'); })()`);
   });
 } catch (error) {
   failure = error;

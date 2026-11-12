@@ -466,6 +466,15 @@ export interface CommandPayloads {
   "ui.requestAttention": {
   "tabId"?: string;
 };
+  "ui.logError": {
+  "source": string;
+  "message": string;
+  "stack"?: string;
+  "tabId"?: string;
+};
+  "ui.openLogFolder": {
+  "tabId"?: string;
+};
   "ui.setTaskbarProgress": {
   "state": string;
   "tabId"?: string;
@@ -657,13 +666,6 @@ export interface CommandPayloads {
 };
   "workspace.worksets": {
   "tabId"?: string;
-};
-  "ui.openTerminal": {
-  "tool": string;
-  "directory": string;
-  "userName"?: string;
-  "identifier"?: string;
-  "tnsSource"?: string;
 };
   "sql.evaluate": {
   "withRowIds"?: boolean;
@@ -1465,12 +1467,6 @@ export interface ReplyMessages {
   "id"?: string;
   "entries"?: Array<JsonValue>;
   "content"?: string | null;
-};
-  "ui.terminal": { type: "ui.terminal" } & {
-  "requestId"?: string | null;
-  "tabId"?: string;
-  "opened": boolean;
-  "message": string;
 };
   "sql.evaluated": { type: "sql.evaluated" } & {
   "requestId"?: string | null;

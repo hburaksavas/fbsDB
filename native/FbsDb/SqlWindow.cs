@@ -68,6 +68,7 @@ public sealed class SqlWindow : Window
             core.Settings.IsGeneralAutofillEnabled = false;
             core.NavigationStarting += (_, args) => MainPage.GuardNavigation(args);
             core.WebMessageReceived += (sender, args) => MainPage.Current?.HandleWebMessage(sender, args, Id);
+            core.ProcessFailed += MainPage.LogWebViewProcessFailure;
             core.SetVirtualHostNameToFolderMapping("fbsdb.local", Path.Combine(AppContext.BaseDirectory, "WebContent"), CoreWebView2HostResourceAccessKind.DenyCors);
             _bootstrapScript = await core.AddScriptToExecuteOnDocumentCreatedAsync(Bootstrap(_transfer));
             core.NavigationCompleted += async (_, _) =>

@@ -30,6 +30,12 @@ public partial class App : Application
     public App()
     {
         InitializeComponent();
+        // Recording only: none of these marks an exception as handled, so the app behaves as it did without the log.
+        UnhandledException += (_, e) => Services.DiagnosticLog.Exception("app/ui-thread", e.Exception, e.Message);
+        AppDomain.CurrentDomain.UnhandledException += (_, e) => Services.DiagnosticLog.Exception("app/process", e.ExceptionObject as Exception, e.IsTerminating ? "the process is ending" : null);
+        TaskScheduler.UnobservedTaskException += (_, e) => Services.DiagnosticLog.Exception("app/task", e.Exception);
+        var version = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
+        Services.DiagnosticLog.Info("app", $"fbsDB {version} started on {Environment.OSVersion.VersionString}, .NET {Environment.Version}");
     }
 
     /// <summary>

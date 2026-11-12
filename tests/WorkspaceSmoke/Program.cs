@@ -263,16 +263,28 @@ try
     Require(LocalHistoryService.List(historyFile, historyRoot).Count == LocalHistoryService.MaxEntries, "Oversized snapshots must be skipped.");
     LocalHistoryService.Clear(historyFile, historyRoot);
     Require(LocalHistoryService.List(historyFile, historyRoot).Count == 0, "History was not cleared.");
-    var present = new Func<string, string?>(name => "C:\tools\\" + name + ".exe");
-    var absent = new Func<string, string?>(_ => null);
-    var launch = ExternalTerminalService.Build("sqlcl", "APP", "FIN_DEV", workspaceRoot, null, present);
-    Require(launch.Error is null && launch.Arguments == "/d /k sql APP@FIN_DEV" && launch.WorkingDirectory == workspaceRoot, "SQLcl must start in the project directory with a password-free connect string.");
-    Require(ExternalTerminalService.Build("sqlplus", null, null, workspaceRoot, null, present).Arguments == "/d /k sqlplus /nolog", "Without a user the tool starts disconnected.");
-    Require(ExternalTerminalService.Build("sqlcl", "APP&calc", "X", workspaceRoot, null, present).Error is not null, "Shell metacharacters must be rejected.");
-    Require(ExternalTerminalService.Build("sqlcl", "APP", "X|dir", workspaceRoot, null, present).Error is not null, "Pipes must be rejected.");
-    Require(ExternalTerminalService.Build("sqlcl", "APP", "X", workspaceRoot, null, absent).Error!.Contains("not found"), "A missing tool is reported.");
-    Require(ExternalTerminalService.Build("shell", null, null, Path.Combine(root, "missing"), null, present).Error is not null, "A missing directory is reported.");
-    Require(ExternalTerminalService.Build("rm", null, null, workspaceRoot, null, present).Error is not null, "Unknown tools are rejected.");
+    var logRoot = Path.Combine(root, "logs");
+    var logDay = new DateTimeOffset(2020, 1, 2, 9, 30, 0, TimeSpan.FromHours(3));
+    DiagnosticLog.Write("ERROR", "ui/window", "TypeError: x is undefined\r\nsecond line", "at run (index.js:1:1)\n\nat start (index.js:9:2)", logRoot, logDay);
+    var logFile = Path.Combine(logRoot, "fbsdb-20200102.log");
+    var logLines = File.ReadAllLines(logFile);
+    Require(logLines.Length == 3 && logLines[0] == "2020-01-02T09:30:00.000+03:00 ERROR [ui/window] TypeError: x is undefined  second line", "A log entry must be one dated line: " + logLines[0]);
+    Require(logLines[1] == "    at run (index.js:1:1)" && logLines[2] == "    at start (index.js:9:2)", "Details must follow the entry, indented, without blank lines.");
+    try { throw new InvalidCastException("bad cast"); } catch (Exception error) { DiagnosticLog.Exception("host/command", error, "sql.execute", logRoot); }
+    var today = Directory.GetFiles(logRoot).Single(file => file != logFile);
+    Require(File.ReadAllText(today).Contains("[host/command] System.InvalidCastException: bad cast (sql.execute)"), "An exception entry must name its type, message and note.");
+    DiagnosticLog.Write("ERROR", "ui/window", new string('m', DiagnosticLog.MaxMessageChars * 2), null, logRoot, logDay);
+    Require(File.ReadAllLines(logFile)[3].Length < DiagnosticLog.MaxMessageChars + 80, "Long messages must be cut.");
+    File.WriteAllBytes(logFile, new byte[DiagnosticLog.MaxFileBytes]);
+    DiagnosticLog.Write("ERROR", "ui/window", "after the limit", null, logRoot, logDay);
+    Require(new FileInfo(logFile).Length == DiagnosticLog.MaxFileBytes, "A full log file must take no more entries.");
+    var pruneRoot = Path.Combine(root, "logs-prune"); Directory.CreateDirectory(pruneRoot);
+    for (var day = 1; day <= 15; day++) File.WriteAllText(Path.Combine(pruneRoot, $"fbsdb-201910{day:00}.log"), "old");
+    File.WriteAllText(Path.Combine(pruneRoot, "notes.txt"), "kept");
+    DiagnosticLog.Write("INFO", "app", "started", null, pruneRoot, logDay);
+    var kept = Directory.GetFiles(pruneRoot, "fbsdb-*.log").Select(Path.GetFileName).OrderBy(name => name).ToArray();
+    Require(kept.Length == DiagnosticLog.MaxFiles && kept[0] == "fbsdb-20191007.log" && kept[^1] == "fbsdb-20200102.log" && File.Exists(Path.Combine(pruneRoot, "notes.txt")), "Only the newest log files are kept: " + string.Join(",", kept));
+    DiagnosticLog.Write("ERROR", "x", "unwritable", null, Path.Combine(logFile, "not-a-folder"), logDay);
     Console.WriteLine("Workspace smoke checks passed: directory tree, create/move, profile remapping, collisions, traversal, catalog/pins/properties, missing folders, relocation, forget, duplicate/scoped search, recents/close, restore, concurrent settings writes and corruption preservation.");
 }
 finally

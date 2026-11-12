@@ -2161,6 +2161,49 @@ export const bridgeContract = {
         "required": []
       }
     },
+    "ui.logError": {
+      "handler": "ui",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "source": {
+            "type": "string",
+            "enum": [
+              "window",
+              "promise",
+              "render"
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "stack": {
+            "type": "string"
+          },
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "message"
+        ]
+      }
+    },
+    "ui.openLogFolder": {
+      "handler": "ui",
+      "resumeSession": false,
+      "payload": {
+        "type": "object",
+        "properties": {
+          "tabId": {
+            "type": "string"
+          }
+        },
+        "required": []
+      }
+    },
     "ui.setTaskbarProgress": {
       "handler": "ui",
       "resumeSession": false,
@@ -3013,39 +3056,6 @@ export const bridgeContract = {
           }
         },
         "required": []
-      }
-    },
-    "ui.openTerminal": {
-      "handler": "ui",
-      "resumeSession": false,
-      "payload": {
-        "type": "object",
-        "properties": {
-          "tool": {
-            "type": "string",
-            "enum": [
-              "sqlcl",
-              "sqlplus",
-              "shell"
-            ]
-          },
-          "directory": {
-            "type": "string"
-          },
-          "userName": {
-            "type": "string"
-          },
-          "identifier": {
-            "type": "string"
-          },
-          "tnsSource": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "tool",
-          "directory"
-        ]
       }
     },
     "sql.evaluate": {
@@ -5703,30 +5713,6 @@ export const bridgeContract = {
       "required": [
         "operation",
         "path"
-      ]
-    },
-    "ui.terminal": {
-      "type": "object",
-      "properties": {
-        "requestId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "tabId": {
-          "type": "string"
-        },
-        "opened": {
-          "type": "boolean"
-        },
-        "message": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "opened",
-        "message"
       ]
     },
     "sql.evaluated": {
