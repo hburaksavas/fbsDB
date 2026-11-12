@@ -6,7 +6,9 @@ export function desktopRegressionFixture(root, workspace = false) {
     const state = window.__desktopRegression = { root, ready: false, commands: [], replies: [], errors: [], blocked: [], openPaths: [], savePaths: [], holdSaves: false, pendingReplies: [] };
     const normalize = value => value.split(String.fromCharCode(92)).join('/').toLowerCase();
     const inside = value => typeof value === 'string' && normalize(value).startsWith(normalize(root) + '/') && !value.replace(/\\\\/g, '/').split('/').includes('..');
-    window.addEventListener('error', event => state.errors.push(event.message));
+    // Chromium reports a resize observation that it postpones to the next frame as an "error" event. Monaco's reference peek does
+    // this when its preview editor settles one pixel smaller on a scaled display; nothing is lost and no script failed.
+    window.addEventListener('error', event => { if (!/^ResizeObserver loop /.test(event.message)) state.errors.push(event.message); });
     // Monaco leaves some cancelled delays unhandled, such as WordHighlighter when a
     // peek editor closes. Its own error handler does not count cancellation as an error.
     window.addEventListener('unhandledrejection', event => { if (event.reason?.name !== 'Canceled') state.errors.push(String(event.reason?.stack || event.reason)); });
