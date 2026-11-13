@@ -6,13 +6,13 @@
  border-color:var(--focus-ring);outline:0;box-shadow:none;
 }
 /* These inputs share their parent's frame, including toolbar row selectors. */
-:is(.desktop-shell,.theme-scope)[data-theme] :is(.explorer-search,.picker-search,.workspace-search-input,.fetch-limit-picker,.result-settings-search,.result-popover-search,.schema-search,.password-entry-frame){
+:is(.desktop-shell,.theme-scope)[data-theme] :is(.explorer-search,.picker-search,.workspace-search-input,.fetch-limit-picker,.result-settings-search,.result-popover-search,.schema-search,.password-entry-frame,.bind-input){
  border:1px solid var(--line);border-radius:6px;background:var(--input);outline:0;box-shadow:none;
 }
-:is(.desktop-shell,.theme-scope)[data-theme] :is(.explorer-search,.picker-search,.workspace-search-input,.fetch-limit-picker,.result-settings-search,.result-popover-search,.schema-search,.password-entry-frame):focus-within{
+:is(.desktop-shell,.theme-scope)[data-theme] :is(.explorer-search,.picker-search,.workspace-search-input,.fetch-limit-picker,.result-settings-search,.result-popover-search,.schema-search,.password-entry-frame,.bind-input):focus-within{
  border-color:var(--focus-ring);outline:0!important;box-shadow:none!important;
 }
-:is(.desktop-shell,.theme-scope)[data-theme] :is(.explorer-search,.picker-search,.workspace-search-input,.fetch-limit-picker,.result-settings-search,.result-popover-search,.schema-search,.ide-palette-search,.password-entry-frame) :is(input,select):is(*,:focus,:focus-visible){
+:is(.desktop-shell,.theme-scope)[data-theme] :is(.explorer-search,.picker-search,.workspace-search-input,.fetch-limit-picker,.result-settings-search,.result-popover-search,.schema-search,.ide-palette-search,.password-entry-frame,.bind-input) :is(input,select):is(*,:focus,:focus-visible){
  border:0!important;border-radius:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;color:var(--foreground);
 }
 .desktop-shell[data-theme] .ide-palette-search{outline:0;box-shadow:none}
