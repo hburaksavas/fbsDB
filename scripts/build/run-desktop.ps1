@@ -1,18 +1,10 @@
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$localDotnet = Join-Path $repoRoot ".tools\dotnet"
+$dotnetExe = & (Join-Path $PSScriptRoot "resolve-dotnet.ps1")
 
-$systemDotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue
-$useSystemDotnet = $false
-if ($systemDotnet) {
-    $systemVersion = & $systemDotnet.Source --version
-    $useSystemDotnet = $LASTEXITCODE -eq 0 -and $systemVersion -match '^10\.'
-}
-
+# winapp starts dotnet from PATH, so the resolved SDK has to come first there.
 $previousPath = $env:PATH
-if (-not $useSystemDotnet) {
-    $env:PATH = "$localDotnet;$previousPath"
-}
+$env:PATH = "$(Split-Path -Parent $dotnetExe);$previousPath"
 Push-Location $repoRoot
 try {
     & (Join-Path $PSScriptRoot "build-desktop.ps1")

@@ -13,7 +13,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Load smoke budgets failed.' }
     & ./scripts/test/test-native.ps1
     & ./scripts/test/test-desktop.ps1
-    & ./.tools/dotnet/dotnet.exe run --project tests/OracleLiveRegression/OracleLiveRegression.csproj -c Release -- $OracleProfile
+    & (& ./scripts/build/resolve-dotnet.ps1) run --project tests/OracleLiveRegression/OracleLiveRegression.csproj -c Release -- $OracleProfile
     if ($LASTEXITCODE -ne 0) { throw 'Live Oracle release checks failed.' }
     & ./scripts/release/package-desktop.ps1 -CertificateThumbprint $CertificateThumbprint -RequireSigned:$RequireSigned
     & ./scripts/test/test-portable.ps1

@@ -2,7 +2,6 @@
 $ErrorActionPreference = "Stop"
 if ($RequireSigned -and -not $CertificateThumbprint) { throw 'A code-signing certificate thumbprint is required for a signed release.' }
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$localDotnet = Join-Path $repoRoot ".tools\dotnet"
 $project = Join-Path $repoRoot "native\FbsDb\FbsDb.csproj"
 $artifactsRoot = Join-Path $repoRoot "artifacts"
 $publishDir = Join-Path $artifactsRoot "fbsDB-win-x64"
@@ -12,13 +11,10 @@ $launcherPath = Join-Path $repoRoot ".artifacts\portable-launcher\fbsDB.exe"
 # package.json is the single source of the release version.
 $version = (Get-Content -LiteralPath (Join-Path $repoRoot "package.json") -Raw -Encoding UTF8 | ConvertFrom-Json).version
 
-if (-not (Test-Path (Join-Path $localDotnet "dotnet.exe"))) {
-    & (Join-Path (Split-Path -Parent $PSScriptRoot) "build\setup-dotnet.ps1")
-    if ($LASTEXITCODE -ne 0) { throw "The local .NET SDK setup failed." }
-}
+$dotnetExe = & (Join-Path (Split-Path -Parent $PSScriptRoot) "build\resolve-dotnet.ps1")
 
 $previousPath = $env:PATH
-$env:PATH = "$localDotnet;$env:PATH"
+$env:PATH = "$(Split-Path -Parent $dotnetExe);$env:PATH"
 Push-Location $repoRoot
 try {
     & (Join-Path (Split-Path -Parent $PSScriptRoot) "build\build-portable-launcher.ps1") -OutputPath $launcherPath
@@ -39,7 +35,7 @@ try {
     }
     if (Test-Path $archivePath) { Remove-Item -LiteralPath $archivePath -Force }
 
-    & (Join-Path $localDotnet "dotnet.exe") publish $project -c Release -r win-x64 `
+    & $dotnetExe publish $project -c Release -r win-x64 `
         -p:Platform=x64 -p:WindowsPackageType=None -p:WindowsAppSDKSelfContained=true `
         "-p:Version=$version" --self-contained true -o $appDir
     if ($LASTEXITCODE -ne 0) { throw "The x64 desktop publish failed." }

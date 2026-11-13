@@ -81,7 +81,7 @@ The UI and the Oracle service talk through a tab-aware WebView2 message bridge g
 
 ## Build from source
 
-You need Windows, Node.js with npm and WebView2 Runtime. The .NET SDK version is pinned in `global.json`; the build script can install it locally under `.tools/dotnet/`.
+You need Windows, Node.js with npm and WebView2 Runtime. No .NET installation is needed: `global.json` names the oldest .NET SDK that works (any newer one is accepted too), and when the machine has none the build and test scripts download it into `.tools/dotnet/` on first use.
 
 ```powershell
 npm ci

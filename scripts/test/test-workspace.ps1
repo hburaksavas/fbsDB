@@ -1,12 +1,7 @@
 $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$localDotnet = Join-Path $repoRoot ".tools\dotnet"
 $project = Join-Path $repoRoot "tests\WorkspaceSmoke\FbsDb.WorkspaceSmoke.csproj"
+$dotnetExe = & (Join-Path (Split-Path -Parent $PSScriptRoot) "build\resolve-dotnet.ps1")
 
-if (-not (Test-Path (Join-Path $localDotnet "dotnet.exe"))) {
-    & (Join-Path (Split-Path -Parent $PSScriptRoot) "build\setup-dotnet.ps1")
-    if ($LASTEXITCODE -ne 0) { throw "The local .NET SDK setup failed." }
-}
-
-& (Join-Path $localDotnet "dotnet.exe") run --project $project -c Release
+& $dotnetExe run --project $project -c Release
 if ($LASTEXITCODE -ne 0) { throw "Workspace smoke checks failed." }

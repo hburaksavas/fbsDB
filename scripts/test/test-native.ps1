@@ -1,10 +1,7 @@
 param([string]$DotnetExe = '', [string]$ReportDirectory = '')
 $ErrorActionPreference = 'Stop'
 $nativeTestRepo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-if (-not $DotnetExe) {
-    $nativeTestSystemDotnet = Get-Command dotnet.exe -ErrorAction SilentlyContinue
-    $DotnetExe = if ($nativeTestSystemDotnet) { $nativeTestSystemDotnet.Source } else { Join-Path $nativeTestRepo '.tools\dotnet\dotnet.exe' }
-}
+if (-not $DotnetExe) { $DotnetExe = & (Join-Path $nativeTestRepo 'scripts\build\resolve-dotnet.ps1') }
 if (-not (Test-Path -LiteralPath $DotnetExe -PathType Leaf)) { throw 'A .NET SDK matching global.json is required.' }
 if (-not $ReportDirectory) { $ReportDirectory = Join-Path $nativeTestRepo '.artifacts\ci\native' }
 $ReportDirectory = [System.IO.Path]::GetFullPath($ReportDirectory)

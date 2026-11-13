@@ -19,7 +19,7 @@ Reports under `.artifacts/ci/` are uploaded even when a check fails and retained
 
 ## Local verification
 
-From a Windows checkout with Node.js 24 and the SDK required by `global.json`:
+From a Windows checkout with Node.js 24. The scripts find a .NET SDK through `scripts/build/resolve-dotnet.ps1`: the system SDK when it satisfies `global.json` (its version or any newer one), otherwise a workspace-local copy under `.tools/dotnet/` that is downloaded on first use. The two bare `dotnet` commands below need an SDK on `PATH`; without one, use the path that script prints.
 
 ```powershell
 npm ci

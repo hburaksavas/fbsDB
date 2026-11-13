@@ -3,8 +3,7 @@ $ErrorActionPreference = 'Stop'
 $regressionRepo = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $regressionRoot = Join-Path $regressionRepo ('.artifacts\desktop-regression\' + (Get-Date -Format 'yyyyMMdd-HHmmss') + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $regressionApp = Join-Path $regressionRoot 'app'
-$regressionDotnet = Join-Path $regressionRepo '.tools\dotnet\dotnet.exe'
-if (-not (Test-Path -LiteralPath $regressionDotnet)) { throw 'Run scripts/build/setup-dotnet.ps1 first.' }
+$regressionDotnet = & (Join-Path $regressionRepo 'scripts\build\resolve-dotnet.ps1')
 # Refuse to attach to an unrelated application already using this port.
 $regressionPortProbe = [System.Net.Sockets.TcpListener]::new([System.Net.IPAddress]::Loopback, $DesktopDebugPort)
 try { $regressionPortProbe.Start() } finally { $regressionPortProbe.Stop() }
