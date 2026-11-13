@@ -89,3 +89,13 @@ User-approved product decision. Preserve these choices in later changes.
 User-approved product decision. Do not bring these back without asking.
 
 - Removed: editor macros (with Ctrl+Alt+Shift+M), clipboard history, opening SQLcl, SQL*Plus or a terminal in the project directory (`ui.openTerminal`, `ExternalTerminalService`) and the workspace portability check.
+
+## 2026-11-14 — Vertical view instead of side row details; foreign keys in the cell menu
+
+User-approved product decision. Preserve these choices in later changes.
+
+- A row is read in the vertical view: the table area itself switches from the table to one row at a time, one line per column. There is no row-details side panel; do not bring it back without asking. The side panel keeps cell value, source definition and execution details.
+- The vertical view is the existing Transpose view option. It opens on the grid's focused row from the cell menu (`Vertical view`), the floating toolbar's Details, the list button in the panel's switcher and the `details` result command. `Table view` or Esc returns to the table on the row that was shown, on its page.
+- The vertical view walks every loaded row, not only the current page, and offers previous/next, Copy row and the same foreign key entries as the table.
+- While grid edits are unapplied the switch is refused with the reason, because the vertical view replaces the grid.
+- The cell menu has `Go to referenced row` and `Show referencing rows…`. They use the existing related/child record lookups, which open the generated SELECT in a new query tab without running it. They are enabled for columns with a known source table.

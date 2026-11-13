@@ -367,16 +367,25 @@ try {
   assert.equal(await cdp.evaluate(`!!document.querySelector('.result-floating-toolbar')`),false,'Toolbar must wait for pointer release');
   await cdp.call('Input.dispatchMouseEvent',{type:'mouseReleased',x:b.x,y:b.y,button:'left',buttons:0,clickCount:1});
   await cdp.until(`document.querySelector('.result-floating-toolbar')?.textContent.includes('3 × 2')`,'Floating toolbar');
-  await cdp.textClick('.result-floating-toolbar button','Details');await cdp.until(`document.querySelector('.result-inspector.open')`,'Row details open');
   await cdp.click('[aria-label="Hide selection toolbar"]');await cdp.until(`!document.querySelector('.result-floating-toolbar')`,'Dismissed for this selection');
   await cdp.evaluate(`document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',shiftKey:true,bubbles:true,cancelable:true}))`);
   await cdp.until(`document.querySelector('.result-floating-toolbar')`,'New selection shows toolbar');
+  // Details swaps the table for the vertical view on the focused row (the fourth); there is no side panel for it.
+  await cdp.textClick('.result-floating-toolbar button','Details');await cdp.until(`document.querySelector('.result-transpose')`,'Vertical view open');
+  assert.equal(await cdp.evaluate(`!!document.querySelector('.result-inspector.open')`),false,'Row details must not open a side panel');
+  assert.match(await cdp.evaluate(`document.querySelector('.result-transpose .result-form-row span').textContent`),/^4 \/ \d+$/);
+  assert.equal(await cdp.evaluate(`document.querySelectorAll('.result-transpose thead th').length`),2,'One row at a time');
+  assert.equal(await cdp.evaluate(`[...document.querySelectorAll('.transpose-context-menu button')].length`),0);
+  await cdp.click('[aria-label="Next row"]');await cdp.until(`document.querySelector('.result-transpose .result-form-row span').textContent.startsWith('5 /')`,'Next row shown');
+  await cdp.textClick('.result-transpose button','Table view');
+  await cdp.until(`!document.querySelector('.result-transpose')&&document.querySelector('[data-result-row="4"] .result-active-cell')`,'Table returns to the row that was shown');
+  await cdp.evaluate(`document.querySelector('.grid-wrap').dispatchEvent(new KeyboardEvent('keydown',{key:'ArrowDown',shiftKey:true,bubbles:true,cancelable:true}))`);
+  await cdp.until(`document.querySelector('.result-floating-toolbar')`,'Selection after returning shows toolbar');
   await cdp.textClick('.result-floating-toolbar button',"Don't show");await cdp.until(`!document.querySelector('.result-floating-toolbar')`);
   assert.equal(await cdp.evaluate(`localStorage.getItem('fbsdb.results.floatingSelectionToolbar')`),'off');
   await cdp.evaluate(`(()=>{const e=document.querySelector('[data-cell="0:0"]'),r=e.getBoundingClientRect();e.dispatchEvent(new MouseEvent('contextmenu',{clientX:r.left+5,clientY:r.top+5,bubbles:true,cancelable:true}))})()`);
   await cdp.until(`document.querySelector('.result-quick-menu')`);await cdp.textClick('.result-quick-menu button','Show floating selection toolbar');
   assert.equal(await cdp.evaluate(`localStorage.getItem('fbsdb.results.floatingSelectionToolbar')`),null);
-  await cdp.click('[aria-label="Close inspector"]');
  });
  await check('cell drawer: Shift+Enter shows the cell in the resizable side panel and follows keyboard selection',async()=>{
   await cdp.evaluate(`document.querySelector('.grid-wrap').scrollTop=0;document.querySelector('[data-cell="0:1"]').dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));document.querySelector('.grid-wrap').focus()`);
