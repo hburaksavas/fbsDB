@@ -1,9 +1,10 @@
-// What the object, editor and connection context menus and the command palette do when an item is chosen. App keeps a function of the same name that passes its values in; see docs/architecture.md.
+// What the context menus, the status bar indicators, the command palette, query history, workspace search and SQL snippets do when an item is chosen. App keeps a function of the same name that passes its values in; see docs/architecture.md.
 import { loadBindDefinitions, saveBindDefinitions } from "./bindDefinitions";
 import { notifyFeedback } from "./Feedback";
 import { persistLocal } from "./localPersistence.js";
 import { isNativeHost, sendNativeCommand } from "./nativeBridge";
 import { getOracleBindNames } from "./oracleBinds";
+import { completionCancellation } from "./oracleMetadataBroker";
 import { editableObjectDefinition, objectSqlDraft, qualifiedObject } from "./oracleObjectActions.js";
 import { oracleSchemaKey } from "./OracleObjectTree.jsx";
 import { resolveSetting } from "./settingsModel";
@@ -113,4 +114,64 @@ export function choosePaletteItem(ctx, item) {
     else if(item.kind==='outline'){setObjectTabActive(false);requestAnimationFrame(()=>jumpToOffset(item.start));}
     else if(item.kind==='setting'){setSettingsFocus({query:item.label,category:['privacy','accessibility'].includes(item.detail)?'preferences':item.detail});setShowAppearance(true);}
     else {item.run?.();if(item.detail)coachShortcut(`palette:${item.id}`,item.label,item.detail)}
+  }
+
+export function openObjectContext(ctx, event, item) {
+  const {
+    completionMetadataRef, documents, metadataOriginTabId, schemaOwner, sessionsRef, setObjectMenu
+  } = ctx;
+    event.preventDefault();event.stopPropagation();
+    const trigger=event.currentTarget,rect=trigger.getBoundingClientRect(),originTabId=metadataOriginTabId;
+    const profileId=sessionsRef.current[originTabId]?.activeConnection?.id;
+    if(!profileId||['No connection','Disconnected'].includes(profileId))return;
+    setObjectMenu({cancellation:completionCancellation(),item:{...item,owner:item.owner||schemaOwner},trigger,x:event.type==='contextmenu'?event.clientX||rect.left:rect.left,y:event.type==='contextmenu'?event.clientY||rect.bottom:rect.bottom,editorTabId:documents.activeId,originTabId,profileId,epoch:completionMetadataRef.current.session(originTabId).epoch});
+  }
+
+export function statusIndicatorAction(ctx, action) {
+  const {
+    activeTabReadonly, editorRef, monaco, openWorkspaceDevelopment, setPaletteMode, setSettingsFocus, setShowAppearance,
+    setShowSessionInspector, setStatusTick
+  } = ctx;
+    if(action==='outline')setPaletteMode('outline');
+    else if(action==='objects')setPaletteMode('files');
+    else if(action==='session')setShowSessionInspector(true);
+    else if(action==='git')openWorkspaceDevelopment('git');
+    else if(action==='indent'){setSettingsFocus({query:'Tab',category:'editor'});setShowAppearance(true)}
+    else if(action==='eol'){const model=editorRef.current?.getModel();if(model&&!activeTabReadonly){model.pushEOL(model.getEOL()==='\r\n'?monaco.editor.EndOfLineSequence.LF:monaco.editor.EndOfLineSequence.CRLF);setStatusTick(tick=>tick+1)}}
+  }
+
+export function insertHistorySql(ctx, statement) {
+  const {
+    editorIsReadonly, editorRef, monacoRef, setShowHistory
+  } = ctx; if (editorIsReadonly()) return; const editor = editorRef.current, model = editor?.getModel(), position = editor?.getPosition(); if (!editor || !model || !monacoRef.current) return; const target = position ?? { lineNumber: model.getLineCount(), column: model.getLineMaxColumn(model.getLineCount()) }; const range = new monacoRef.current.Range(target.lineNumber, target.column, target.lineNumber, target.column); editor.executeEdits("query-history", [{ range, text: `${target.column > 1 ? "\n" : ""}${statement}\n`, forceMoveMarkers: true }]); editor.focus(); setShowHistory(false); }
+
+export function openWorkspaceSearchMatch(ctx, match) {
+  const {
+    activateTab, editorRef, pendingSearchPositionRef, rememberEditorPosition, setShowSearch, tabs
+  } = ctx; const cached = tabs.find((tab) => tab.path?.toLowerCase() === match.path.toLowerCase()); if (cached) { activateTab(cached.id); setShowSearch(false); requestAnimationFrame(() => { editorRef.current?.setPosition({ lineNumber: match.lineNumber, column: match.column || 1 }); editorRef.current?.revealLineInCenter(match.lineNumber); editorRef.current?.focus(); }); return; } rememberEditorPosition(); pendingSearchPositionRef.current = { path: match.path, lineNumber: match.lineNumber, column: match.column }; setShowSearch(false); sendNativeCommand("file.openPath", { path: match.path }); }
+
+export async function reviewDeleteImpact(ctx) {
+  const {
+    documents, editorRef, schemaObjects, schemaOwner, setDeleteReview, setSearchQuery, setShowSearch, setWorkspaceSearchScope, workspace
+  } = ctx;
+    const editor=editorRef.current,model=editor?.getModel(),position=editor?.getPosition(),tabId=documents.activeId,version=model?.getVersionId();
+    if(!model||!position||!workspace.root||!isNativeHost){notifyFeedback({kind:'warning',title:'Delete review',message:'Open a workspace in the desktop app to inspect project references.',scope:tabId});return}
+    const source=model.getValue(),cursor=Math.min(source.length,model.getOffsetAt(position)+1),{deleteImpactSeed}=await import('./deleteImpact.js');
+    if(documents.activeId!==tabId||editor.getModel()!==model||model.getVersionId()!==version)return;
+    const impact=deleteImpactSeed(source,cursor,{objects:schemaObjects,currentSchema:schemaOwner});
+    if(impact.error){notifyFeedback({kind:'warning',title:'Delete review',message:impact.error,scope:tabId});return}
+    setDeleteReview(impact);setWorkspaceSearchScope(null);setSearchQuery(impact.name);setShowSearch(true);
+  }
+
+export function saveCustomSqlSnippet(ctx) {
+  const {
+    allSqlSnippets, setCustomSqlSnippets, setSelectedSnippetTrigger, setSnippetDraft, setSnippetError, setSnippetFilter, setSnippetFormOpen,
+    snippetDraft
+  } = ctx;
+    const trigger = snippetDraft.trigger.trim().toLowerCase(), label = snippetDraft.label.trim(), text = snippetDraft.text.trim();
+    if (!/^[a-z][a-z0-9_]{1,23}$/.test(trigger)) { setSnippetError("Use 2–24 letters, numbers, or underscores; start with a letter."); return; }
+    if (allSqlSnippets.some((snippet) => snippet.trigger.toLowerCase() === trigger)) { setSnippetError("That trigger is already in use."); return; }
+    if (!label || !text) { setSnippetError("Add a name and SQL template before saving."); return; }
+    const snippet = { trigger, label, detail: snippetDraft.detail.trim() || "Custom SQL snippet", text };
+    setCustomSqlSnippets((current) => [...current, snippet]); setSelectedSnippetTrigger(trigger); setSnippetFilter(""); setSnippetError(""); setSnippetDraft({ trigger: "", label: "", detail: "", text: "SELECT ${1:column_name}\nFROM ${2:table_name};" }); setSnippetFormOpen(false);
   }

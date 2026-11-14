@@ -1,19 +1,25 @@
-// Editor commands: the run gutter, formatting, CTE extraction, column paste, schema drops, bind drops, definitions and problem navigation. App keeps a function of the same name that passes its values in; see docs/architecture.md.
+// Editor commands: the run gutter, formatting, refactorings, quick fixes, surround and paste-as, statement moves, bookmarks, schema and bind drops, definitions and problem navigation. App keeps a function of the same name that passes its values in; see docs/architecture.md.
 import { columnCursorDraft } from "./columnMulticursor";
+import { docSkeletonAt } from "./docSkeleton";
 import { dragSqlDraft } from "./dragToSql";
 import { currentExecutionOffset } from "./editLocations";
 import { summaryHover, summaryLabel } from "./executionSummaries";
 import { notifyFeedback } from "./Feedback";
 import { LARGE_FILE_THRESHOLD } from "./largeFilePolicy.js";
-import { setNativeTabId } from "./nativeBridge";
+import { isNativeHost, sendNativeCommand, setNativeTabId } from "./nativeBridge";
 import { getOracleBindNames } from "./oracleBinds";
 import { oracleSchemaKey } from "./OracleObjectTree.jsx";
+import { inListSql, insertTemplateSql, jsonTableSql } from "./pasteToCode";
 import { offsetAtOraclePosition } from "./plsqlDiagnostics";
 import { extractCteSnippet } from "./postfixCompletion";
+import { projectOptions } from "./projectRules";
 import { cellDragType, planBindDrop } from "./resultBindDrop.js";
 import { resolveSetting } from "./settingsModel";
 import { sqlFormatterStyle } from "./sqlFormatterSettings.js";
 import { getSqlStatements } from "./sqlStatements.js";
+import { planStatementMove } from "./statementMove";
+import { surroundOptions, surroundSnippet } from "./surroundWith";
+import { pathKey } from "./workspaceTree";
 
 export function installRunGutter(ctx, editor, monacoInstance) {
   const {
@@ -216,4 +222,158 @@ export function returnToExecution(ctx) {
     if(typeof content!=='string'){setRunState('The execution source position was not recorded.');return;}
     rememberEditorPosition();documents.open({id,name:`Execution · ${context.fileName||original.name}`,content,readOnly:true,dirty:false,metadataOriginTabId:owner,sourceVersionNotice:'Recorded execution snapshot. Current editor source differs or its position is unavailable.'});setNativeTabId(owner);
     requestAnimationFrame(()=>jumpToOffset(hasPosition?context.statementOffset:0));
+  }
+
+export function applySurround(ctx, action, context) {
+  const {
+    applyPasteAs, documents, editorRef
+  } = ctx;
+    if(action.startsWith('paste:'))return applyPasteAs(action,context);
+    const editor=editorRef.current,model=context.model,id=action.replace(/^surround:/,'');
+    if(documents.activeId!==context.tabId||editor.getModel()!==model||model.isDisposed()||model.getVersionId()!==context.version)throw Error('The editor changed. Choose Surround with again.');
+    const modelOptions=model.getOptions(),indent=modelOptions.insertSpaces?' '.repeat(modelOptions.indentSize||modelOptions.tabSize||2):'	';
+    editor.setSelection(context.selection);editor.focus();
+    editor.getContribution('snippetController2').insert(surroundSnippet(id,model.getValueInRange(context.selection),{indent,newline:model.getEOL()}),{adjustWhitespace:false,undoStopBefore:true,undoStopAfter:true});
+  }
+
+export function openSurroundMenu(ctx, x, y, trigger) {
+  const {
+    activeTabReadonly, documents, editorRef, monacoRef, setSurroundMenu
+  } = ctx;
+    const editor=editorRef.current,model=editor?.getModel(),selection=editor?.getSelection();
+    if(!model||activeTabReadonly)return;
+    if(!selection||selection.isEmpty()){notifyFeedback({kind:'warning',title:'Surround with',message:'Select the code to wrap.',scope:documents.activeId});return}
+    const lines=new monacoRef.current.Range(selection.startLineNumber,1,selection.endColumn===1&&selection.endLineNumber>selection.startLineNumber?selection.endLineNumber-1:selection.endLineNumber,Number.MAX_SAFE_INTEGER),range=model.validateRange(lines),options=surroundOptions(model.getValueInRange(range));
+    if(!options.length)return;
+    setSurroundMenu({tabId:documents.activeId,model,version:model.getVersionId(),selection:range,trigger,x,y,options});
+  }
+
+export async function applyPasteAs(ctx, action, context) {
+  const {
+    documents, editorRef
+  } = ctx;
+    const editor=editorRef.current,model=context.model;
+    const text=await navigator.clipboard.readText();
+    if(documents.activeId!==context.tabId||editor.getModel()!==model||model.isDisposed()||model.getVersionId()!==context.version)throw Error('The editor changed. Choose Paste as again.');
+    const result=action==='paste:in'?inListSql(text):action==='paste:json'?jsonTableSql(text):insertTemplateSql(text);
+    if(result.error)throw Error(result.error);
+    const sqlText=result.sql.replace(/\n/g,model.getEOL());
+    editor.setSelection(context.selection);editor.focus();editor.pushUndoStop();editor.executeEdits('paste-as',[{range:context.selection,text:sqlText,forceMoveMarkers:true}]);editor.pushUndoStop();
+  }
+
+export function applyExtractProcedure(ctx, plan) {
+  const {
+    documents, editorRef, extractProcedure, monacoRef, setExtractProcedure
+  } = ctx;
+    const editor=editorRef.current,request=extractProcedure,model=request?.model;
+    if(!plan?.edits?.length||!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version||model.getValue()!==request.source)throw Error('The editor changed after the preview. Reopen Extract Procedure.');
+    editor.pushUndoStop();editor.executeEdits('extract-procedure',plan.edits.map(edit=>{const from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);return {range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.after}}));editor.pushUndoStop();setExtractProcedure(null);editor.focus();
+  }
+
+export function applyChangeSignature(ctx, plan) {
+  const {
+    changeSignature, documents, editorRef, monacoRef, setChangeSignature
+  } = ctx;
+    const editor=editorRef.current,request=changeSignature,model=request?.model;
+    if(!plan?.edits?.length||!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version||model.getValue()!==request.source)throw Error('The editor changed after the preview. Reopen Change Signature.');
+    editor.pushUndoStop();editor.executeEdits('change-signature',plan.edits.map(edit=>{const from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);return {range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.after}}));editor.pushUndoStop();setChangeSignature(null);editor.focus();
+  }
+
+export function moveStatement(ctx, direction) {
+  const {
+    documents, editorIsReadonly, editorRef, monacoRef
+  } = ctx;
+    const editor=editorRef.current,model=editor?.getModel(),position=editor?.getPosition();if(!model||!position||editorIsReadonly())return;
+    const plan=planStatementMove(model.getValue(),model.getOffsetAt(position),direction);
+    if(plan.error){notifyFeedback({kind:'warning',title:'Move statement',message:plan.error,scope:documents.activeId});return false}
+    const from=model.getPositionAt(plan.edit.start),to=model.getPositionAt(plan.edit.end);
+    editor.pushUndoStop();editor.executeEdits('move-statement',[{range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:plan.edit.after}]);editor.pushUndoStop();editor.focus();
+    return true;
+  }
+
+export function applyEmbeddedSql(ctx, plan) {
+  const {
+    documents, editorRef, embeddedSql, monacoRef, setEmbeddedSql
+  } = ctx;
+    const editor=editorRef.current,request=embeddedSql,model=request?.model;
+    if(!plan?.edit||!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version||model.getValue()!==request.source)throw Error('The editor changed after the preview. Reopen embedded SQL.');
+    const edit=plan.edit,from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);
+    editor.pushUndoStop();editor.executeEdits('embedded-sql',[{range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.after}]);editor.pushUndoStop();setEmbeddedSql(null);editor.focus();
+  }
+
+export function applyQuickFix(ctx, fix) {
+  const {
+    documents, editorRef, monacoRef, quickFix, setQuickFix
+  } = ctx;
+    const editor=editorRef.current,request=quickFix,model=request?.model;
+    if(!fix?.edits?.length||!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version||model.getValue()!==request.source)throw Error('The editor changed after the preview. Reopen Quick fixes.');
+    editor.pushUndoStop();editor.executeEdits('quick-fix',fix.edits.map(edit=>{const from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);return {range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.text}}));editor.pushUndoStop();setQuickFix(null);editor.focus();
+  }
+
+export function applyIdentifierCase(ctx, plan) {
+  const {
+    documents, editorRef, identifierCase, monacoRef, setIdentifierCase
+  } = ctx;
+    const editor=editorRef.current,request=identifierCase,model=request?.model;
+    if(!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version)throw Error('The editor changed after the preview. Close and convert again.');
+    editor.pushUndoStop();
+    editor.executeEdits('identifier-case',plan.edits.map(edit=>{const from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);return {range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.text}}));
+    editor.pushUndoStop();setIdentifierCase(null);editor.focus();
+  }
+
+export function openIdentifierCase(ctx) {
+  const {
+    activeTabReadonly, documents, editorRef, setIdentifierCase, workspace
+  } = ctx;
+    const editor=editorRef.current,model=editor?.getModel(),selection=editor?.getSelection();
+    if(!model||activeTabReadonly)return;
+    if(!selection||selection.isEmpty()){notifyFeedback({kind:'warning',title:'Convert identifier case',message:'Select the identifiers to convert.',scope:documents.activeId});return}
+    setIdentifierCase({tabId:documents.activeId,model,version:model.getVersionId(),source:model.getValue(),range:{start:model.getOffsetAt(selection.getStartPosition()),end:model.getOffsetAt(selection.getEndPosition())},dictionary:workspace.root?projectOptions(workspace.projectRules).dictionary:null});
+  }
+
+export function applyLocalRename(ctx, plan) {
+  const {
+    documents, editorRef, localRename, monacoRef, setLocalRename
+  } = ctx;
+    const editor=editorRef.current,request=localRename,model=request?.model;
+    if(!plan?.edits?.length||!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version)throw Error('The editor changed after the preview. Close and rename again.');
+    editor.pushUndoStop();editor.executeEdits('rename-local',plan.edits.map(edit=>{const from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);return {range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.after}}));editor.pushUndoStop();setLocalRename(null);editor.focus();
+  }
+
+export function generateDocComment(ctx) {
+  const {
+    activeTabReadonly, documents, editorRef
+  } = ctx;
+    const editor=editorRef.current,model=editor?.getModel(),position=editor?.getPosition();
+    if(!model||!position||activeTabReadonly)return;
+    const result=docSkeletonAt(model.getValue(),model.getOffsetAt(position));
+    if(result.error){notifyFeedback({kind:'warning',title:'Documentation comment',message:result.error,scope:documents.activeId});return}
+    const at=model.getPositionAt(result.insertAt);
+    editor.setPosition(at);editor.focus();
+    editor.getContribution('snippetController2').insert(result.snippet.replace(/\r?\n/g,model.getEOL()),{adjustWhitespace:false,undoStopBefore:true,undoStopAfter:true});
+  }
+
+export function flashExecutionTarget(ctx, target) {
+  const {
+    documents, editorRef, executionFlashRef, executionFlashTimerRef, updateTabSession
+  } = ctx;
+    const editor=editorRef.current,model=editor?.getModel();
+    if(!model||target?.start==null||target?.end==null)return;
+    clearTimeout(executionFlashTimerRef.current);executionFlashRef.current?.clear();
+    const start=model.getPositionAt(target.start),end=model.getPositionAt(target.end);
+    const decorations=editor.createDecorationsCollection([{range:{startLineNumber:start.lineNumber,startColumn:start.column,endLineNumber:end.lineNumber,endColumn:end.column},options:{className:'sql-execution-target',isWholeLine:false,description:'SQL execution target'}}]);
+    executionFlashRef.current=decorations;
+    executionFlashTimerRef.current=setTimeout(()=>decorations.clear(),1600);
+    updateTabSession('executionTarget',`${target.kind} · Ln ${start.lineNumber}–${end.lineNumber}`,documents.activeId);
+  }
+
+export function openBookmark(ctx, mark) {
+  const {
+    activateTab, bookmarkCursorRef, documents, editorRef, pendingSearchPositionRef, setObjectTabActive, setRunState
+  } = ctx;
+    bookmarkCursorRef.current=mark.id;setObjectTabActive(false);
+    const tab=documents.tabs.find(tab=>tab.id===mark.documentId)||documents.tabs.find(tab=>mark.path&&pathKey(tab.path)===pathKey(mark.path));
+    if(tab){if(documents.activeId!==tab.id)activateTab(tab.id);requestAnimationFrame(()=>{const editor=editorRef.current,position=editor?.getModel()?.validatePosition(mark);if(position){editor.setPosition(position);editor.revealPositionInCenter(position);editor.focus()}});return;}
+    if(mark.path&&isNativeHost){pendingSearchPositionRef.current={path:mark.path,lineNumber:mark.lineNumber,column:mark.column};sendNativeCommand('file.openPath',{path:mark.path});return;}
+    setRunState('This session-only bookmark source is no longer open.');
   }

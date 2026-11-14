@@ -1,4 +1,9 @@
-// Exporting a result as INSERT statements. App keeps a function of the same name that passes its values in; see docs/architecture.md.
+// Exporting and copying results as INSERT statements, CSV, JSON and TSV. App keeps a function of the same name that passes its values in; see docs/architecture.md.
+import { isNativeHost, sendNativeCommand } from "./nativeBridge";
+import { applyResultFeatures, copyResultData } from "./resultFeatures";
+import { projectDisplayExport } from "./resultPresentationData";
+import { getVisibleResultRows } from "./resultRows";
+import { csvText, deriveResultData } from "./resultWorkbench";
 
 export function exportResultsInsertSql(ctx) {
   const {
@@ -37,4 +42,61 @@ export function exportResultsInsertSql(ctx) {
     ];
     const url = URL.createObjectURL(new Blob([statements.join("\r\n")], { type: "text/sql;charset=utf-8" })), link = document.createElement("a");
     link.href = url; link.download = `${(fileName || "query").replace(/\.sql$/i, "")}-inserts.sql`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+export function resultExportData(ctx, overrideOptions) {
+  const {
+    resultFilter, resultTab, sqlResult, view
+  } = ctx;
+    const state=(resultTab==='Results'&&view.selectedResultKey?view.resultSets?.find(item=>item.key===view.selectedResultKey)?.view:view[resultTab==='Explain'?'planView':'queryView'])||{};
+    const options=overrideOptions||state.options||{};const data=deriveResultData(sqlResult?.rows||[],sqlResult?.columns||[],options.derivedColumns||[]);
+    return {columns:data.columns,rows:applyResultFeatures(getVisibleResultRows(data.rows,data.columns,resultTab==='Results'?resultFilter:'',state.sortColumn??-1,state.sortDirection||'asc',state.rowOrder||[],options),data.columns,options).map(item=>item.row),settings:options.exportSettings||{}};
+  }
+
+export function exportChosenColumns(ctx, format, indices, overrideOptions, displayData) {
+  const {
+    fileName, resultExportData, sqlResult, updateTabResult
+  } = ctx;
+    if(!sqlResult?.columns)return;
+    const data=displayData||resultExportData(overrideOptions),{columns,rows}=projectDisplayExport(data,indices,overrideOptions);
+    const settings=overrideOptions?.exportSettings||data.settings;
+    if(format==='xlsx'||format==='csv.gz'||format==='csv') {updateTabResult('streamState',{busy:true,message:'Choose an export destination…'});sendNativeCommand('result.export',{format,columns,rows,hasMore:false,csvOptions:settings,includeMetadata:Boolean(settings.includeMetadata),fileName:(fileName||'query').replace(/\.sql$/i,'')+'-results.'+format});return;}
+    const blob=new Blob([copyResultData(rows,columns,format,true)],{type:format==='json'?'application/json':'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='results.'+format;link.click();setTimeout(()=>URL.revokeObjectURL(url),0);
+  }
+
+export function exportResultsJson(ctx) {
+  const {
+    fileName, resultExportColumns, resultExportRows, sqlResult
+  } = ctx;
+    if (!sqlResult?.columns?.length) return;
+    const used = new Map();
+    const names = resultExportColumns().map((column, index) => {
+      const base = String(column.name || `COLUMN_${index + 1}`), key = base.toUpperCase();
+      const count = (used.get(key) ?? 0) + 1; used.set(key, count);
+      return count === 1 ? base : `${base}_${count}`;
+    });
+    const rows = resultExportRows().map((row) => Object.fromEntries(names.map((name, index) => [name, row[index] ?? null])));
+    const blob = new Blob([`${JSON.stringify(rows, null, 2)}\n`], { type: "application/json;charset=utf-8" }), url = URL.createObjectURL(blob), link = document.createElement("a");
+    link.href = url; link.download = `${(fileName || "query").replace(/\.sql$/i, "")}-results.json`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0);
+  }
+
+export function exportResultsCsv(ctx) {
+  const {
+    resultExportData, sqlResult, updateTabResult
+  } = ctx;
+    if (!sqlResult?.columns?.length) return;
+    const data=resultExportData();
+    if(isNativeHost){updateTabResult('streamState',{busy:true,message:'Choose CSV destination…'});sendNativeCommand('result.export',{format:'csv',columns:data.columns,rows:data.rows,hasMore:false,csvOptions:data.settings,fileName:'results.csv'});return;}
+    const blob=new Blob([(data.settings.bom?'\uFEFF':''),csvText(data.rows,data.columns,data.settings)],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='results.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),0);
+  }
+
+export async function copyResultsTsv(ctx) {
+  const {
+    resultExportColumns, resultExportRows, setCopiedResults, setRunState, sqlResult
+  } = ctx;
+    if (!sqlResult?.columns?.length) return;
+    const cell = (value) => { const text = String(value ?? ""); return /[\t\r\n"]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text; };
+    const lines = [resultExportColumns().map((column) => cell(column.name)).join("\t"), ...resultExportRows().map((row) => row.map(cell).join("\t"))];
+    try { await navigator.clipboard.writeText(lines.join("\r\n")); setCopiedResults(true); setTimeout(() => setCopiedResults(false), 1600); }
+    catch { setRunState("Clipboard access failed. Export the fetched rows as CSV instead."); }
   }

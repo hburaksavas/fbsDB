@@ -36,7 +36,7 @@ import './OracleSourceHeader';
 import './projectUsageCache.js';
 import { explainExpressionAt } from './expressionExplain.js';
 import './SideEditorPane.jsx';
-import { newQueryTemplates } from './newQueryOptions';
+import './newQueryOptions';
 import {dismissShortcutHint,nextShortcutHint} from './shortcutCoach';
 import { sourceRunConfigurations } from './runConfigurations';
 import { documentConnection } from './executionContext';
@@ -58,22 +58,22 @@ import './EditorToolbarOverflow';
 import { themePresets, applyDocumentTheme, monacoThemeColors, monacoTokenRules, resolveTokenColors } from './themeModel';
 import { EditorNavigationHistory,sourceLineEnding,sourcePositionAt } from './editorNavigation';
 import './EditorSessionStatus';
-import { deriveResultData, csvText } from './resultWorkbench';
+import './resultWorkbench';
 import { buildServerFilter } from "./resultAdvanced";
-import { applyResultFeatures, copyResultData } from "./resultFeatures";
-import { getVisibleResultRows } from "./resultRows";
-import { projectDisplayExport } from "./resultPresentationData";
+import "./resultFeatures";
+import "./resultRows";
+import "./resultPresentationData";
 import { GlobalTooltip } from "./GlobalTooltip";
 import {TreeNameOverlay} from './TreeNameOverlay.jsx';
 import { projectionRanges } from './projectionMap';
-import {surroundOptions,surroundSnippet} from './surroundWith';
-import {inListSql,insertTemplateSql,jsonTableSql} from './pasteToCode';
+import './surroundWith';
+import './pasteToCode';
 import './insertPairProviders';
 import {smartEnter} from './smartEnter';
 import './structuralSelection';
 import {layoutToolbar} from './editorToolbarModel';
 import './bindContext';
-import {docSkeletonAt} from './docSkeleton';
+import './docSkeleton';
 import {minimapSections,minimapLabel} from './minimapSections';
 import './statusBarModel';
 import {previewOpenPlan,settlePreview} from './previewTabs';
@@ -88,7 +88,7 @@ import './postfixCompletion';
 import './columnMulticursor';
 import './dragToSql';
 import {contextualQuickFixes} from './quickFixes';
-import {planStatementMove} from './statementMove';
+import './statementMove';
 import {embeddedSqlAt} from './embeddedSql';
 import { overridableSnippetTriggers, sqlSnippets } from './liveTemplates';
 import { effectiveLanguage, effectiveRegion } from './localeProfile';
@@ -485,12 +485,10 @@ export function App() {
   // Evaluated while rendering the status bar, after the session values below are initialized.
   const buildStatusContext=()=>({procedure:breadcrumbRoutine,schema:tabSession.sessionContext?.schema,oracleVersion:sessionConnected?completionSession.oracleVocabulary?.version:null,branch:workspaceDev.git?.repository?workspaceDev.git.branch:null,tabSize:codeStyle.tabSize,insertSpaces:codeStyle.insertSpaces,lineEnding:editorRef.current?.getModel()?.getEOL()==='\r\n'?'CRLF':editorRef.current?.getModel()?.getEOL()?'LF':''});
   function statusIndicatorAction(action) {
-    if(action==='outline')setPaletteMode('outline');
-    else if(action==='objects')setPaletteMode('files');
-    else if(action==='session')setShowSessionInspector(true);
-    else if(action==='git')openWorkspaceDevelopment('git');
-    else if(action==='indent'){setSettingsFocus({query:'Tab',category:'editor'});setShowAppearance(true)}
-    else if(action==='eol'){const model=editorRef.current?.getModel();if(model&&!activeTabReadonly){model.pushEOL(model.getEOL()==='\r\n'?monaco.editor.EndOfLineSequence.LF:monaco.editor.EndOfLineSequence.CRLF);setStatusTick(tick=>tick+1)}}
+    return contextActions.statusIndicatorAction({
+      activeTabReadonly, editorRef, monaco, openWorkspaceDevelopment, setPaletteMode, setSettingsFocus, setShowAppearance,
+      setShowSessionInspector, setStatusTick
+    }, action);
   }
   // Code lenses: reference counts and explicit actions; every action opens the existing review/form, nothing runs by itself.
   const lensActionRef=useRef(null),lensesOn=resolveSetting(settings,'editor.codeLenses').value;
@@ -527,13 +525,9 @@ export function App() {
   },[documentOutline,monaco,minimapOn,activeTabId]);
   // Inserts a documentation comment above the routine at the cursor; Tab walks the description and parameter stops.
   function generateDocComment() {
-    const editor=editorRef.current,model=editor?.getModel(),position=editor?.getPosition();
-    if(!model||!position||activeTabReadonly)return;
-    const result=docSkeletonAt(model.getValue(),model.getOffsetAt(position));
-    if(result.error){notifyFeedback({kind:'warning',title:'Documentation comment',message:result.error,scope:documents.activeId});return}
-    const at=model.getPositionAt(result.insertAt);
-    editor.setPosition(at);editor.focus();
-    editor.getContribution('snippetController2').insert(result.snippet.replace(/\r?\n/g,model.getEOL()),{adjustWhitespace:false,undoStopBefore:true,undoStopAfter:true});
+    return editorActions.generateDocComment({
+      activeTabReadonly, documents, editorRef
+    });
   }
   // Rewrites only the statement around the selection; Tab edits the CTE name in both places at once.
   function extractSelectionToCte() {
@@ -700,9 +694,9 @@ export function App() {
   }
 
   function pollOpenFiles(){
-    if(!isNativeHost||document.hidden||filePollRef.current&&Date.now()-filePollRef.current.at<12000)return;
-    const files=[...new Map(documents.tabs.filter(tab=>tab.path&&!tab.readOnly).map(tab=>[pathKey(tab.path),{path:tab.path,version:tab.diskVersion??null,hasError:!!tab.externalChange?.error}])).values()];
-    if(files.length){const offset=fileWatchOffsetRef.current%files.length,rotated=[...files.slice(offset),...files.slice(0,offset)].slice(0,100);filePollRef.current={id:sendNativeCommand('file.poll',{files:rotated}),at:Date.now(),offset,total:files.length};}
+    return tabActions.pollOpenFiles({
+      documents, filePollRef, fileWatchOffsetRef
+    });
   }
   useEffect(()=>{if(!isNativeHost)return;const timer=setInterval(pollOpenFiles,4000);window.addEventListener('focus',pollOpenFiles);return()=>{clearInterval(timer);window.removeEventListener('focus',pollOpenFiles)}},[]);
   useEffect(()=>{if(!showSearch)setWorkspaceSearchScope(null)},[showSearch]);
@@ -847,11 +841,9 @@ export function App() {
     requestAnimationFrame(()=>{editorRef.current?.setPosition(location);editorRef.current?.revealPositionInCenter(location);editorRef.current?.focus();navigatingRef.current=false});
   }
   function openBookmark(mark){
-    bookmarkCursorRef.current=mark.id;setObjectTabActive(false);
-    const tab=documents.tabs.find(tab=>tab.id===mark.documentId)||documents.tabs.find(tab=>mark.path&&pathKey(tab.path)===pathKey(mark.path));
-    if(tab){if(documents.activeId!==tab.id)activateTab(tab.id);requestAnimationFrame(()=>{const editor=editorRef.current,position=editor?.getModel()?.validatePosition(mark);if(position){editor.setPosition(position);editor.revealPositionInCenter(position);editor.focus()}});return;}
-    if(mark.path&&isNativeHost){pendingSearchPositionRef.current={path:mark.path,lineNumber:mark.lineNumber,column:mark.column};sendNativeCommand('file.openPath',{path:mark.path});return;}
-    setRunState('This session-only bookmark source is no longer open.');
+    return editorActions.openBookmark({
+      activateTab, bookmarkCursorRef, documents, editorRef, pendingSearchPositionRef, setObjectTabActive, setRunState
+    }, mark);
   }
   function navigateBookmark(direction){
     if(!bookmarks.items.length){setRunState('No bookmarks in this workspace.');return;}
@@ -884,11 +876,9 @@ export function App() {
     }, action, context);
   }
   function openObjectContext(event,item) {
-    event.preventDefault();event.stopPropagation();
-    const trigger=event.currentTarget,rect=trigger.getBoundingClientRect(),originTabId=metadataOriginTabId;
-    const profileId=sessionsRef.current[originTabId]?.activeConnection?.id;
-    if(!profileId||['No connection','Disconnected'].includes(profileId))return;
-    setObjectMenu({cancellation:completionCancellation(),item:{...item,owner:item.owner||schemaOwner},trigger,x:event.type==='contextmenu'?event.clientX||rect.left:rect.left,y:event.type==='contextmenu'?event.clientY||rect.bottom:rect.bottom,editorTabId:documents.activeId,originTabId,profileId,epoch:completionMetadataRef.current.session(originTabId).epoch});
+    return contextActions.openObjectContext({
+      completionMetadataRef, documents, metadataOriginTabId, schemaOwner, sessionsRef, setObjectMenu
+    }, event, item);
   }
   // Result values only navigate to objects already present in the loaded schema metadata.
   function showSmartObject({owner,name}) {
@@ -973,17 +963,14 @@ export function App() {
     return()=>{clearTimeout(timer);window.removeEventListener('pagehide',save)};
   },[tabs,sql,fileDirty,filePath,fileConnectionProfileId,activeTabId,recovery]);
   function restoreDrafts(files,reconnect) {
-    const restored=files.map(file=>({...file,id:`recovered-${crypto.randomUUID()}`})),selectedIndex=files.findIndex(file=>file.id===recovery.activeTabId),active=restored[Math.max(0,selectedIndex)];
-    const live=documents.tabs.filter(tab=>tab.dirty||tab.path||tab.content.trim());
-    documents.replace([...live,...restored], active.id);setNativeTabId(active.id);
-    setRecovery(null);if(isNativeHost)sendNativeCommand('file.activate',{tabId:active.id,path:active.path});
-    if(reconnect&&active.connectionProfileId){const profile=dbConnectionsRef.current.find(item=>item.id===active.connectionProfileId);if(profile)beginConnection({...profile,tabId:active.id});}
+    return tabActions.restoreDrafts({
+      beginConnection, dbConnectionsRef, documents, recovery, setRecovery
+    }, files, reconnect);
   }
   function worksetSnapshot(){
-    const root=workspace.root;if(!root)return {files:[]};
-    const inside=path=>pathKey(path).startsWith(pathKey(root)+'/');
-    const files=[...new Map(documents.tabs.filter(tab=>tab.path&&!tab.readOnly&&inside(tab.path)).map(tab=>{const position=tab.id===documents.activeId?editorRef.current?.getPosition():editorPositionsRef.current.get(tab.id);return [pathKey(tab.path),{path:tab.path.slice(root.replace(/[\\/]$/,'').length+1).replace(/\\/g,'/'),line:position?.lineNumber||1,column:position?.column||1}]})).values()];
-    return {files,activePath:documents.active?.path&&inside(documents.active.path)?documents.active.path.slice(root.length+1).replace(/\\/g,'/'):null};
+    return tabActions.worksetSnapshot({
+      documents, editorPositionsRef, editorRef, workspace
+    });
   }
   function openWorkset(message){
     if(pathKey(message.root)!==pathKey(workspace.root))return;rememberEditorPosition();
@@ -1028,10 +1015,9 @@ export function App() {
     requestAnimationFrame(() => {const position=restorePosition;if(position){editorRef.current?.setPosition(position);editorRef.current?.revealPositionInCenterIfOutsideViewport(position)}editorRef.current?.focus();rememberLocation(id)}); }
   function cycleSqlTab(direction) { const items = documents.tabs; if (items.length < 2) return; const index = items.findIndex(item => item.id === documents.activeId); activateTab(items[(index + direction + items.length) % items.length].id); }
   function openIdentifierCase() {
-    const editor=editorRef.current,model=editor?.getModel(),selection=editor?.getSelection();
-    if(!model||activeTabReadonly)return;
-    if(!selection||selection.isEmpty()){notifyFeedback({kind:'warning',title:'Convert identifier case',message:'Select the identifiers to convert.',scope:documents.activeId});return}
-    setIdentifierCase({tabId:documents.activeId,model,version:model.getVersionId(),source:model.getValue(),range:{start:model.getOffsetAt(selection.getStartPosition()),end:model.getOffsetAt(selection.getEndPosition())},dictionary:workspace.root?projectOptions(workspace.projectRules).dictionary:null});
+    return editorActions.openIdentifierCase({
+      activeTabReadonly, documents, editorRef, setIdentifierCase, workspace
+    });
   }
   function openLocalRename(){
     const editor=editorRef.current,model=editor?.getModel(),position=editor?.getPosition();
@@ -1049,12 +1035,9 @@ export function App() {
     setExtractProcedure({tabId:documents.activeId,model,version:model.getVersionId(),source:model.getValue(),start:model.getOffsetAt(selection.getStartPosition()),end:model.getOffsetAt(selection.getEndPosition())});
   }
   function moveStatement(direction){
-    const editor=editorRef.current,model=editor?.getModel(),position=editor?.getPosition();if(!model||!position||editorIsReadonly())return;
-    const plan=planStatementMove(model.getValue(),model.getOffsetAt(position),direction);
-    if(plan.error){notifyFeedback({kind:'warning',title:'Move statement',message:plan.error,scope:documents.activeId});return false}
-    const from=model.getPositionAt(plan.edit.start),to=model.getPositionAt(plan.edit.end);
-    editor.pushUndoStop();editor.executeEdits('move-statement',[{range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:plan.edit.after}]);editor.pushUndoStop();editor.focus();
-    return true;
+    return editorActions.moveStatement({
+      documents, editorIsReadonly, editorRef, monacoRef
+    }, direction);
   }
   function openEmbeddedSql(){
     const editor=editorRef.current,model=editor?.getModel(),position=editor?.getPosition();if(!model||!position||editorIsReadonly())return;
@@ -1068,14 +1051,10 @@ export function App() {
     setQuickFix({tabId:documents.activeId,model,version:model.getVersionId(),source,fixes});
   }
   quickFixRef.current=openQuickFix;
-  async function reviewDeleteImpact(){
-    const editor=editorRef.current,model=editor?.getModel(),position=editor?.getPosition(),tabId=documents.activeId,version=model?.getVersionId();
-    if(!model||!position||!workspace.root||!isNativeHost){notifyFeedback({kind:'warning',title:'Delete review',message:'Open a workspace in the desktop app to inspect project references.',scope:tabId});return}
-    const source=model.getValue(),cursor=Math.min(source.length,model.getOffsetAt(position)+1),{deleteImpactSeed}=await import('./deleteImpact.js');
-    if(documents.activeId!==tabId||editor.getModel()!==model||model.getVersionId()!==version)return;
-    const impact=deleteImpactSeed(source,cursor,{objects:schemaObjects,currentSchema:schemaOwner});
-    if(impact.error){notifyFeedback({kind:'warning',title:'Delete review',message:impact.error,scope:tabId});return}
-    setDeleteReview(impact);setWorkspaceSearchScope(null);setSearchQuery(impact.name);setShowSearch(true);
+  function reviewDeleteImpact(){
+    return contextActions.reviewDeleteImpact({
+      documents, editorRef, schemaObjects, schemaOwner, setDeleteReview, setSearchQuery, setShowSearch, setWorkspaceSearchScope, workspace
+    });
   }
   function pasteColumnCursors() {
     return editorActions.pasteColumnCursors({
@@ -1084,12 +1063,9 @@ export function App() {
   }
   // Wraps whole selected lines with a snippet so Tab moves through the placeholders.
   function openSurroundMenu(x,y,trigger) {
-    const editor=editorRef.current,model=editor?.getModel(),selection=editor?.getSelection();
-    if(!model||activeTabReadonly)return;
-    if(!selection||selection.isEmpty()){notifyFeedback({kind:'warning',title:'Surround with',message:'Select the code to wrap.',scope:documents.activeId});return}
-    const lines=new monacoRef.current.Range(selection.startLineNumber,1,selection.endColumn===1&&selection.endLineNumber>selection.startLineNumber?selection.endLineNumber-1:selection.endLineNumber,Number.MAX_SAFE_INTEGER),range=model.validateRange(lines),options=surroundOptions(model.getValueInRange(range));
-    if(!options.length)return;
-    setSurroundMenu({tabId:documents.activeId,model,version:model.getVersionId(),selection:range,trigger,x,y,options});
+    return editorActions.openSurroundMenu({
+      activeTabReadonly, documents, editorRef, monacoRef, setSurroundMenu
+    }, x, y, trigger);
   }
   const pasteAsOptions=[{id:'paste:in',label:'IN list from copied values'},{id:'paste:json',label:'JSON_TABLE draft from copied JSON'},{id:'paste:insert',label:'INSERT template from copied column names'}];
   function openPasteAsMenu(x,y,trigger) {
@@ -1097,55 +1073,45 @@ export function App() {
     setSurroundMenu({tabId:documents.activeId,model,version:model.getVersionId(),selection:editor.getSelection(),trigger,x,y,paste:true,options:pasteAsOptions});
   }
   // Converted clipboard text replaces the selection as one undoable edit; it is never executed.
-  async function applyPasteAs(action,context) {
-    const editor=editorRef.current,model=context.model;
-    const text=await navigator.clipboard.readText();
-    if(documents.activeId!==context.tabId||editor.getModel()!==model||model.isDisposed()||model.getVersionId()!==context.version)throw Error('The editor changed. Choose Paste as again.');
-    const result=action==='paste:in'?inListSql(text):action==='paste:json'?jsonTableSql(text):insertTemplateSql(text);
-    if(result.error)throw Error(result.error);
-    const sqlText=result.sql.replace(/\n/g,model.getEOL());
-    editor.setSelection(context.selection);editor.focus();editor.pushUndoStop();editor.executeEdits('paste-as',[{range:context.selection,text:sqlText,forceMoveMarkers:true}]);editor.pushUndoStop();
+  function applyPasteAs(action,context) {
+    return editorActions.applyPasteAs({
+      documents, editorRef
+    }, action, context);
   }
   function applySurround(action,context) {
-    if(action.startsWith('paste:'))return applyPasteAs(action,context);
-    const editor=editorRef.current,model=context.model,id=action.replace(/^surround:/,'');
-    if(documents.activeId!==context.tabId||editor.getModel()!==model||model.isDisposed()||model.getVersionId()!==context.version)throw Error('The editor changed. Choose Surround with again.');
-    const modelOptions=model.getOptions(),indent=modelOptions.insertSpaces?' '.repeat(modelOptions.indentSize||modelOptions.tabSize||2):'	';
-    editor.setSelection(context.selection);editor.focus();
-    editor.getContribution('snippetController2').insert(surroundSnippet(id,model.getValueInRange(context.selection),{indent,newline:model.getEOL()}),{adjustWhitespace:false,undoStopBefore:true,undoStopAfter:true});
+    return editorActions.applySurround({
+      applyPasteAs, documents, editorRef
+    }, action, context);
   }
   function applyIdentifierCase(plan) {
-    const editor=editorRef.current,request=identifierCase,model=request?.model;
-    if(!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version)throw Error('The editor changed after the preview. Close and convert again.');
-    editor.pushUndoStop();
-    editor.executeEdits('identifier-case',plan.edits.map(edit=>{const from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);return {range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.text}}));
-    editor.pushUndoStop();setIdentifierCase(null);editor.focus();
+    return editorActions.applyIdentifierCase({
+      documents, editorRef, identifierCase, monacoRef, setIdentifierCase
+    }, plan);
   }
   function applyLocalRename(plan){
-    const editor=editorRef.current,request=localRename,model=request?.model;
-    if(!plan?.edits?.length||!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version)throw Error('The editor changed after the preview. Close and rename again.');
-    editor.pushUndoStop();editor.executeEdits('rename-local',plan.edits.map(edit=>{const from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);return {range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.after}}));editor.pushUndoStop();setLocalRename(null);editor.focus();
+    return editorActions.applyLocalRename({
+      documents, editorRef, localRename, monacoRef, setLocalRename
+    }, plan);
   }
   function applyChangeSignature(plan){
-    const editor=editorRef.current,request=changeSignature,model=request?.model;
-    if(!plan?.edits?.length||!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version||model.getValue()!==request.source)throw Error('The editor changed after the preview. Reopen Change Signature.');
-    editor.pushUndoStop();editor.executeEdits('change-signature',plan.edits.map(edit=>{const from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);return {range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.after}}));editor.pushUndoStop();setChangeSignature(null);editor.focus();
+    return editorActions.applyChangeSignature({
+      changeSignature, documents, editorRef, monacoRef, setChangeSignature
+    }, plan);
   }
   function applyExtractProcedure(plan){
-    const editor=editorRef.current,request=extractProcedure,model=request?.model;
-    if(!plan?.edits?.length||!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version||model.getValue()!==request.source)throw Error('The editor changed after the preview. Reopen Extract Procedure.');
-    editor.pushUndoStop();editor.executeEdits('extract-procedure',plan.edits.map(edit=>{const from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);return {range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.after}}));editor.pushUndoStop();setExtractProcedure(null);editor.focus();
+    return editorActions.applyExtractProcedure({
+      documents, editorRef, extractProcedure, monacoRef, setExtractProcedure
+    }, plan);
   }
   function applyEmbeddedSql(plan){
-    const editor=editorRef.current,request=embeddedSql,model=request?.model;
-    if(!plan?.edit||!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version||model.getValue()!==request.source)throw Error('The editor changed after the preview. Reopen embedded SQL.');
-    const edit=plan.edit,from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);
-    editor.pushUndoStop();editor.executeEdits('embedded-sql',[{range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.after}]);editor.pushUndoStop();setEmbeddedSql(null);editor.focus();
+    return editorActions.applyEmbeddedSql({
+      documents, editorRef, embeddedSql, monacoRef, setEmbeddedSql
+    }, plan);
   }
   function applyQuickFix(fix){
-    const editor=editorRef.current,request=quickFix,model=request?.model;
-    if(!fix?.edits?.length||!model||model.isDisposed()||documents.activeId!==request.tabId||editor.getModel()!==model||model.getVersionId()!==request.version||model.getValue()!==request.source)throw Error('The editor changed after the preview. Reopen Quick fixes.');
-    editor.pushUndoStop();editor.executeEdits('quick-fix',fix.edits.map(edit=>{const from=model.getPositionAt(edit.start),to=model.getPositionAt(edit.end);return {range:new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column),text:edit.text}}));editor.pushUndoStop();setQuickFix(null);editor.focus();
+    return editorActions.applyQuickFix({
+      documents, editorRef, monacoRef, quickFix, setQuickFix
+    }, fix);
   }
   function switchPackageSource() {
     const result = relatedPackageDocument(documents.active || {}, documents.tabs, {root: workspace.root, sessions: sessionsRef.current,rules:workspace.projectRules});
@@ -1193,12 +1159,10 @@ export function App() {
     const defaults=projectOptions(workspace.projectRules).run;setQueryTimeout(defaults.timeoutSeconds);setMaxRows(defaults.pageSize);setRunState('Project run defaults applied; SQL has not been executed.');
   }
   function newProjectSqlFile() {
-    setObjectTabActive(false);newSqlFileNow();
-    const options=projectOptions(workspace.projectRules);setQueryTimeout(options.run.timeoutSeconds);updateTabSession('pageSizePreference',options.run.pageSize,documents.activeId);
-    const profile=dbConnectionsRef.current.find(item=>item.id.toLowerCase()===options.defaultConnectionId?.toLowerCase());
-    if(options.defaultConnectionId)documents.patch(documents.activeId,{connectionProfileId:options.defaultConnectionId});
-    if(profile&&profile.available!==false){beginConnection({...profile,tabId:documents.activeId})}
-    else setRunState(options.defaultConnectionId?'The project default profile is unavailable. Choose a saved connection.':'Project SQL file created; choose its connection.');
+    return tabActions.newProjectSqlFile({
+      beginConnection, dbConnectionsRef, documents, newSqlFileNow, setObjectTabActive, setQueryTimeout, setRunState, updateTabSession,
+      workspace
+    });
   }
   function newScratchFile() { setObjectTabActive(false); setActiveObject(''); newSqlFileFromLastConnection({ name: nextScratchName(documents.tabs), scratch: true }); }
   function promoteScratch(id) { if (documents.activeId !== id) activateTab(id); setObjectTabActive(false); saveSqlFile(); }
@@ -1244,10 +1208,9 @@ export function App() {
   }
   // Starter text never runs; the current connection is reused like the main New action.
   function newSqlFileFromTemplate(templateId) {
-    const template=newQueryTemplates.find(item=>item.id===templateId);if(!template)return;
-    const current=activeConnectionRef.current,profile=dbConnectionsRef.current.find(item=>item.id===(current&&!['No connection','Disconnected'].includes(current.id)?current.id:null));
-    setObjectTabActive(false);newSqlFileNow(template.content);
-    if(profile){if(isNativeHost)beginConnection({...profile,tabId:documents.activeId});else{setActiveConnection(profile);setTabs(tabs=>tabs.map(tab=>tab.id===documents.activeId?{...tab,connectionProfileId:profile.id}:tab))}}
+    return tabActions.newSqlFileFromTemplate({
+      activeConnectionRef, beginConnection, dbConnectionsRef, documents, newSqlFileNow, setActiveConnection, setObjectTabActive, setTabs
+    }, templateId);
   }
   function saveSqlFile(afterSave = null) {
     learnSqlUsage(documents.text);
@@ -1278,41 +1241,31 @@ export function App() {
 
 
   function resultExportData(overrideOptions) {
-    const state=(resultTab==='Results'&&view.selectedResultKey?view.resultSets?.find(item=>item.key===view.selectedResultKey)?.view:view[resultTab==='Explain'?'planView':'queryView'])||{};
-    const options=overrideOptions||state.options||{};const data=deriveResultData(sqlResult?.rows||[],sqlResult?.columns||[],options.derivedColumns||[]);
-    return {columns:data.columns,rows:applyResultFeatures(getVisibleResultRows(data.rows,data.columns,resultTab==='Results'?resultFilter:'',state.sortColumn??-1,state.sortDirection||'asc',state.rowOrder||[],options),data.columns,options).map(item=>item.row),settings:options.exportSettings||{}};
+    return resultExports.resultExportData({
+      resultFilter, resultTab, sqlResult, view
+    }, overrideOptions);
   }
   function resultExportRows(){return resultExportData().rows;}
   function resultExportColumns(){return resultExportData().columns;}
   function exportResultsCsv() {
-    if (!sqlResult?.columns?.length) return;
-    const data=resultExportData();
-    if(isNativeHost){updateTabResult('streamState',{busy:true,message:'Choose CSV destination…'});sendNativeCommand('result.export',{format:'csv',columns:data.columns,rows:data.rows,hasMore:false,csvOptions:data.settings,fileName:'results.csv'});return;}
-    const blob=new Blob([(data.settings.bom?'\uFEFF':''),csvText(data.rows,data.columns,data.settings)],{type:'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='results.csv';link.click();setTimeout(()=>URL.revokeObjectURL(url),0);
+    return resultExports.exportResultsCsv({
+      resultExportData, sqlResult, updateTabResult
+    });
   }
   function exportResultsJson() {
-    if (!sqlResult?.columns?.length) return;
-    const used = new Map();
-    const names = resultExportColumns().map((column, index) => {
-      const base = String(column.name || `COLUMN_${index + 1}`), key = base.toUpperCase();
-      const count = (used.get(key) ?? 0) + 1; used.set(key, count);
-      return count === 1 ? base : `${base}_${count}`;
+    return resultExports.exportResultsJson({
+      fileName, resultExportColumns, resultExportRows, sqlResult
     });
-    const rows = resultExportRows().map((row) => Object.fromEntries(names.map((name, index) => [name, row[index] ?? null])));
-    const blob = new Blob([`${JSON.stringify(rows, null, 2)}\n`], { type: "application/json;charset=utf-8" }), url = URL.createObjectURL(blob), link = document.createElement("a");
-    link.href = url; link.download = `${(fileName || "query").replace(/\.sql$/i, "")}-results.json`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0);
   }
   function exportResultsInsertSql() {
     return resultExports.exportResultsInsertSql({
       fileName, resultExportColumns, resultExportRows, sqlResult
     });
   }
-  async function copyResultsTsv() {
-    if (!sqlResult?.columns?.length) return;
-    const cell = (value) => { const text = String(value ?? ""); return /[\t\r\n"]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text; };
-    const lines = [resultExportColumns().map((column) => cell(column.name)).join("\t"), ...resultExportRows().map((row) => row.map(cell).join("\t"))];
-    try { await navigator.clipboard.writeText(lines.join("\r\n")); setCopiedResults(true); setTimeout(() => setCopiedResults(false), 1600); }
-    catch { setRunState("Clipboard access failed. Export the fetched rows as CSV instead."); }
+  function copyResultsTsv() {
+    return resultExports.copyResultsTsv({
+      resultExportColumns, resultExportRows, setCopiedResults, setRunState, sqlResult
+    });
   }
   function requestSchemaDetails(item,originTabId=metadataOriginTabId,force=false) { const key = oracleSchemaKey(item).toLowerCase(); if(force){schemaLoadedRef.current.delete(key);schemaRequestedRef.current.delete(key)} if (!isNativeHost || schemaLoadedRef.current.has(key) || schemaRequestedRef.current.has(key)) return; schemaRequestedRef.current.add(key); sendNativeCommand("schema.objectDetails", { tabId:originTabId, owner: item.owner, name: item.name, objectType: item.type }); }
   function refreshSchema(owner = documents.activeId) { if (schemaRequestRef.current) sendNativeCommand('schema.cancel', { requestId: schemaRequestRef.current, tabId: owner }); const id = sendNativeCommand("schema.refresh", { tabId: owner }); schemaRequestRef.current = id || null; return id; }
@@ -1362,14 +1315,9 @@ export function App() {
 
   const executionFlashRef=useRef(null),executionFlashTimerRef=useRef(null);
   function flashExecutionTarget(target) {
-    const editor=editorRef.current,model=editor?.getModel();
-    if(!model||target?.start==null||target?.end==null)return;
-    clearTimeout(executionFlashTimerRef.current);executionFlashRef.current?.clear();
-    const start=model.getPositionAt(target.start),end=model.getPositionAt(target.end);
-    const decorations=editor.createDecorationsCollection([{range:{startLineNumber:start.lineNumber,startColumn:start.column,endLineNumber:end.lineNumber,endColumn:end.column},options:{className:'sql-execution-target',isWholeLine:false,description:'SQL execution target'}}]);
-    executionFlashRef.current=decorations;
-    executionFlashTimerRef.current=setTimeout(()=>decorations.clear(),1600);
-    updateTabSession('executionTarget',`${target.kind} · Ln ${start.lineNumber}–${end.lineNumber}`,documents.activeId);
+    return editorActions.flashExecutionTarget({
+      documents, editorRef, executionFlashRef, executionFlashTimerRef, updateTabSession
+    }, target);
   }
   useEffect(()=>{executionFlashRef.current?.clear();return()=>{clearTimeout(executionFlashTimerRef.current);executionFlashRef.current?.clear()}},[activeTabId]);
 
@@ -1388,11 +1336,9 @@ export function App() {
     executeStatement(filtered.sql,filtered.parameters,{serverFilter:{...base,ruleCount:options.filters?.length||0}});
   }
   function exportChosenColumns(format,indices,overrideOptions,displayData) {
-    if(!sqlResult?.columns)return;
-    const data=displayData||resultExportData(overrideOptions),{columns,rows}=projectDisplayExport(data,indices,overrideOptions);
-    const settings=overrideOptions?.exportSettings||data.settings;
-    if(format==='xlsx'||format==='csv.gz'||format==='csv') {updateTabResult('streamState',{busy:true,message:'Choose an export destination…'});sendNativeCommand('result.export',{format,columns,rows,hasMore:false,csvOptions:settings,includeMetadata:Boolean(settings.includeMetadata),fileName:(fileName||'query').replace(/\.sql$/i,'')+'-results.'+format});return;}
-    const blob=new Blob([copyResultData(rows,columns,format,true)],{type:format==='json'?'application/json':'text/csv;charset=utf-8'}),url=URL.createObjectURL(blob),link=document.createElement('a');link.href=url;link.download='results.'+format;link.click();setTimeout(()=>URL.revokeObjectURL(url),0);
+    return resultExports.exportChosenColumns({
+      fileName, resultExportData, sqlResult, updateTabResult
+    }, format, indices, overrideOptions, displayData);
   }
   function requestPrimaryKey(target) {sendNativeCommand('result.primaryKey',target);}
   function openChildRecords(column,rowValues) {sendNativeCommand('result.children',{column,rowValues});}
@@ -1400,15 +1346,17 @@ export function App() {
     relatedRunRequestsRef.current.add(sendNativeCommand('result.related',{column,value,rowValues}));
   }
   function bindCurrentConnectionToFile() { if (!isNativeHost || !filePath) return; if (["No connection", "Disconnected"].includes(activeConnection.id)) { setRunState("Connect to Oracle before binding this file."); return; } sendNativeCommand("file.bindConnection"); }
-  function insertHistorySql(statement) { if (editorIsReadonly()) return; const editor = editorRef.current, model = editor?.getModel(), position = editor?.getPosition(); if (!editor || !model || !monacoRef.current) return; const target = position ?? { lineNumber: model.getLineCount(), column: model.getLineMaxColumn(model.getLineCount()) }; const range = new monacoRef.current.Range(target.lineNumber, target.column, target.lineNumber, target.column); editor.executeEdits("query-history", [{ range, text: `${target.column > 1 ? "\n" : ""}${statement}\n`, forceMoveMarkers: true }]); editor.focus(); setShowHistory(false); }
+  function insertHistorySql(statement) {
+    return contextActions.insertHistorySql({
+      editorIsReadonly, editorRef, monacoRef, setShowHistory
+    }, statement);
+  }
   function insertSqlSnippet(snippet) { const editor = editorRef.current; if (!editor || !snippet || editorIsReadonly()) return; editor.focus(); editor.getContribution("snippetController2")?.insert(snippet.text); setShowSnippets(false); }
   function saveCustomSqlSnippet() {
-    const trigger = snippetDraft.trigger.trim().toLowerCase(), label = snippetDraft.label.trim(), text = snippetDraft.text.trim();
-    if (!/^[a-z][a-z0-9_]{1,23}$/.test(trigger)) { setSnippetError("Use 2–24 letters, numbers, or underscores; start with a letter."); return; }
-    if (allSqlSnippets.some((snippet) => snippet.trigger.toLowerCase() === trigger)) { setSnippetError("That trigger is already in use."); return; }
-    if (!label || !text) { setSnippetError("Add a name and SQL template before saving."); return; }
-    const snippet = { trigger, label, detail: snippetDraft.detail.trim() || "Custom SQL snippet", text };
-    setCustomSqlSnippets((current) => [...current, snippet]); setSelectedSnippetTrigger(trigger); setSnippetFilter(""); setSnippetError(""); setSnippetDraft({ trigger: "", label: "", detail: "", text: "SELECT ${1:column_name}\nFROM ${2:table_name};" }); setSnippetFormOpen(false);
+    return contextActions.saveCustomSqlSnippet({
+      allSqlSnippets, setCustomSqlSnippets, setSelectedSnippetTrigger, setSnippetDraft, setSnippetError, setSnippetFilter,
+      setSnippetFormOpen, snippetDraft
+    });
   }
   function deleteCustomSqlSnippet(trigger) { setCustomSqlSnippets((current) => current.filter((snippet) => snippet.trigger !== trigger)); setSelectedSnippetTrigger("sel"); }
   // Opens the hierarchy for the routine at the caret; the index reads workspace sources plus the current text of open editors.
@@ -1447,13 +1395,9 @@ export function App() {
     }, ids, sessionIds);
   }
   function adoptTransfer(transfer) {
-    for (const id of [...transfer.sessionIds, ...transfer.documents.map(tab => tab.id)]) { closedTabsRef.current.delete(id); draftsConfirmedRef.current.delete(id); }
-    for (const id of transfer.sessionIds) { results.revive(id, transfer.results[id]); if (transfer.metadata[id]) operations.metadata.set(id, transfer.metadata[id]); }
-    sessionsRef.current = { ...sessionsRef.current, ...transfer.sessions };
-    setTabSessions(current => ({ ...current, ...transfer.sessions }));
-    rememberEditorPosition();
-    for (const tab of transfer.documents) documents.open(tab);
-    requestAnimationFrame(() => activateTab(transfer.activeId, false));
+    return tabActions.adoptTransfer({
+      activateTab, closedTabsRef, documents, draftsConfirmedRef, operations, rememberEditorPosition, results, sessionsRef, setTabSessions
+    }, transfer);
   }
   windowMessageRef.current = message => {
     if (message.type === 'window.list') { setAppWindows({ current: message.current, label: message.label, windows: message.windows || [] }); return; }
@@ -1498,7 +1442,11 @@ export function App() {
   function openExpressionExplain() { const editor = editorRef.current, model = editor?.getModel(), position = editor?.getPosition(); if (!model || !position) return; const explanation = explainExpressionAt(model.getValue(), model.getOffsetAt(position)); if (explanation) setExpressionExplanation(explanation); else notifyFeedback({ kind: 'info', title: 'Explain expression', message: 'Place the caret inside a CASE expression or an analytic function (… OVER (…)).' }); }
   function openDependencyGraph() { const editor = editorRef.current, model = editor?.getModel(), position = editor?.getPosition(); if (!model || !position) return; setDependencyGraph({ root: isNativeHost ? workspace.root || null : null, document: { ...documents.active, content: documents.text }, offset: model.getOffsetAt(position) }); }
   function openCallHierarchyPlace(place) { setCallHierarchy(null); setStructuralSearch(null); setDependencyGraph(null); if (!place.path || pathKey(place.path) === pathKey(documents.active?.path || '')) { requestAnimationFrame(() => jumpToOffset(place.start)); return; } openWorkspaceSearchMatch(place); }
-  function openWorkspaceSearchMatch(match) { const cached = tabs.find((tab) => tab.path?.toLowerCase() === match.path.toLowerCase()); if (cached) { activateTab(cached.id); setShowSearch(false); requestAnimationFrame(() => { editorRef.current?.setPosition({ lineNumber: match.lineNumber, column: match.column || 1 }); editorRef.current?.revealLineInCenter(match.lineNumber); editorRef.current?.focus(); }); return; } rememberEditorPosition(); pendingSearchPositionRef.current = { path: match.path, lineNumber: match.lineNumber, column: match.column }; setShowSearch(false); sendNativeCommand("file.openPath", { path: match.path }); }
+  function openWorkspaceSearchMatch(match) {
+    return contextActions.openWorkspaceSearchMatch({
+      activateTab, editorRef, pendingSearchPositionRef, rememberEditorPosition, setShowSearch, tabs
+    }, match);
+  }
 
 
   const { runQuery, explainQuery, executeStatement, fetchMoreResults, cancelQuery, startScript } = useQueryExecution({
