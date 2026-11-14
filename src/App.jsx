@@ -1,13 +1,13 @@
-import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {nextQueryName} from './tabPathLabels';
 import {useEditorOverview} from './useEditorOverview.js';
-import {largeFilePolicy,lightweightEditorOptions,LARGE_FILE_THRESHOLD} from './largeFilePolicy.js';
+import { largeFilePolicy, LARGE_FILE_THRESHOLD } from './largeFilePolicy.js';
 import { layoutPresets, restoreLayout } from './savedLayouts.js';
 import { useConnectionLifecycle } from './useConnectionLifecycle.js';
 import { retainHistory, historyAllowed } from './queryHistory.js';
 import { persistLocal } from './localPersistence.js';
-import { recordStartupMilestone } from './startupPerformance.js';
-import { editorPresentable } from './editorStartup.js';
+import './startupPerformance.js';
+import './editorStartup.js';
 import { DocumentSaves } from './documentSaves.js';
 import {useDocumentSessions} from './useDocumentSessions.js';
 import {useResultSessions} from './useResultSessions.js';
@@ -22,7 +22,7 @@ import { sqlFormatterStyle } from './sqlFormatterSettings.js';
 import { SuggestionLearning, learningScope } from './suggestionLearning.js';
 import { automaticCompletionAllowed } from './oracleCompletionContext.js';
 import { loadSettings,saveSettings,newResultDefaults,saveResultDefaults,resolveSetting,changeSetting,settingDefinitions,resultPageSizes } from './settingsModel';
-import { EditorTabs } from './EditorTabs';
+import './EditorTabs';
 import { ConnectionControl } from './ConnectionControl';
 import { ConnectionTree } from './ConnectionTree';
 import { connectionContext, connectionContextKey } from './ConnectionContextMenu';
@@ -30,35 +30,35 @@ import {connectionOrganization,emptyConnectionOrganization,organizedProfiles,cha
 import { WorkspaceExplorer, OpenEditors } from './WorkspaceExplorer';
 import './WorkspaceWorksets';
 import './WorkspaceOpenPopup';
-import {ExternalFileNotice} from './ExternalFileNotice';
+import './ExternalFileNotice';
 import {describeOracleSource, relatedPackageDocument, packageDocumentGroups} from './oracleSourceIdentity.js';
-import {OracleSourceHeader} from './OracleSourceHeader';
+import './OracleSourceHeader';
 import { projectUsage as loadProjectUsage } from './projectUsageCache.js';
 import { explainExpressionAt } from './expressionExplain.js';
-import { SideEditorPane } from './SideEditorPane.jsx';
-import { newQueryMainLabel, newQueryProfileItems, newQueryTemplates } from './newQueryOptions';
+import './SideEditorPane.jsx';
+import { newQueryTemplates } from './newQueryOptions';
 import {dismissShortcutHint,nextShortcutHint} from './shortcutCoach';
 import { sourceRunConfigurations } from './runConfigurations';
-import {documentConnection,editedSinceExecution} from './executionContext';
-import {EnvironmentBadge,ResultSourceProvenance} from './ExecutionContextBadges';
-import {prepareSourceCompilation,sourceBaseline,sourceCompilationUnits,sourceIdentity} from './sourceCompilation';
+import { documentConnection } from './executionContext';
+import { EnvironmentBadge } from './ExecutionContextBadges';
+import { prepareSourceCompilation, sourceCompilationUnits, sourceIdentity } from './sourceCompilation';
 import {defaultProjectRules,projectOptions} from './projectRules';
 import { FileMenu } from './FileMenu';
 import { ViewMenu } from './ViewMenu';
 import { DockWorkbench } from './DockWorkbench';
 import { defaultDockLayout, normalizeDockLayout } from './dockLayout';
-import { remapWorkspacePath, pathKey } from './workspaceTree';
+import { pathKey } from './workspaceTree';
 import { draftSnapshot, parseDraftSnapshot } from './draftRecovery';
-import { EditorSymbolBreadcrumb } from './EditorSymbolBreadcrumb';
+import './EditorSymbolBreadcrumb';
 import { actionableState } from './workbenchUx';
 import { ActionableState } from './ActionableState';
 import { ExecutionTargetContext } from './executionTarget';
 import { commitButtonTitle, rollbackButtonTitle } from './reversibility';
-import { EditorToolbarOverflow } from './EditorToolbarOverflow';
+import './EditorToolbarOverflow';
 import { themePresets, applyDocumentTheme, monacoThemeColors, monacoTokenRules, resolveTokenColors } from './themeModel';
 import { EditorNavigationHistory,sourceLineEnding,sourcePositionAt } from './editorNavigation';
-import { EditorSessionStatus } from './EditorSessionStatus';
-import { deriveResultData, estimateResultMemory, csvText } from './resultWorkbench';
+import './EditorSessionStatus';
+import { deriveResultData, csvText } from './resultWorkbench';
 import { buildServerFilter } from "./resultAdvanced";
 import { applyResultFeatures, copyResultData } from "./resultFeatures";
 import { getVisibleResultRows } from "./resultRows";
@@ -68,21 +68,21 @@ import {TreeNameOverlay} from './TreeNameOverlay.jsx';
 import { projectionRanges } from './projectionMap';
 import {surroundOptions,surroundSnippet} from './surroundWith';
 import {inListSql,insertTemplateSql,jsonTableSql} from './pasteToCode';
-import {installInsertPairProviders} from './insertPairProviders';
+import './insertPairProviders';
 import {smartEnter} from './smartEnter';
-import {installStructuralSelection} from './structuralSelection';
+import './structuralSelection';
 import {layoutToolbar} from './editorToolbarModel';
 import { bindAtOffset } from './bindContext';
 import {docSkeletonAt} from './docSkeleton';
 import {minimapSections,minimapLabel} from './minimapSections';
-import { statusIndicatorContent } from './statusBarModel';
+import './statusBarModel';
 import {previewOpenPlan,settlePreview} from './previewTabs';
 import { nextScratchName, promptsOnClose } from './scratchFiles';
 import {codeLensItems} from './codeLenses';
 import {createConsoleEntry,createConsoleStore} from './runConsole';
 import { loadBindDefinitions, saveBindDefinitions } from './bindDefinitions';
 import {createSummaryStore,summaryHover,summaryLabel} from './executionSummaries';
-import {installPostfixCompletion} from './postfixProvider';
+import './postfixProvider';
 import {formatElapsed,playCompletionTone,postExecutionActions,taskbarProgressState} from './postExecution';
 import {extractCteSnippet} from './postfixCompletion';
 import {columnCursorDraft} from './columnMulticursor';
@@ -96,22 +96,22 @@ import { KeyTips } from "./KeyTips.jsx";
 import { ServerSourceTree } from "./ServerSourceTree.jsx";
 import "./quickEval.js";
 import { cellDragType, planBindDrop } from "./resultBindDrop.js";
-import { exportProgressText } from "./exportProgress.js";
+import "./exportProgress.js";
 import { loadIconPacks, resolveIconTheme, setIconTheme } from "./iconTheme.js";
 import { countTabDrafts } from "./draftStore.js";
 import { FooterDrafts } from './FooterDrafts';
 import { LoadingSkeleton } from './LoadingSkeleton';
-import { announce, resultAnnouncement } from './announcer';
+import './announcer';
 import { contextOf, opensShortcutMap } from './shortcutMap';
 import "./InlineBindZone.jsx";
 import "./subqueryTrial.js";
 import "./bindLookup.js";
 import { InlineBindStore, inlineBindParameters } from "./inlineBinds.js";
 import { ToolbarPrefsContext } from "./toolbarPrefs.js";
-import { announceUiReady, isNativeHost, sendNativeCommand, subscribeNativeMessages, setNativeTabId } from "./nativeBridge";
-import { compilationProblemItems, offsetAtOraclePosition } from "./plsqlDiagnostics";
-import {runtimeStackProblems} from './runtimeStack';
-import {StackTraceLinks} from './StackTraceLinks';
+import { isNativeHost, sendNativeCommand, subscribeNativeMessages, setNativeTabId } from "./nativeBridge";
+import { offsetAtOraclePosition } from "./plsqlDiagnostics";
+import './runtimeStack';
+import './StackTraceLinks';
 import { useSourceBookmarks } from './useSourceBookmarks';
 import { WorkbenchStatus } from './WorkbenchStatus';
 import {transactionStatus} from './workbenchStatusModel.js';
@@ -119,7 +119,7 @@ import { EditLocations, currentExecutionOffset } from './editLocations';
 import {batchClosePlan} from './batchClose';
 import {LayoutLockContext} from './LayoutLockContext';
 import {FileStructurePanel} from './FileStructurePanel';
-import { ProblemsPanel } from "./ProblemsPanel";
+import "./ProblemsPanel";
 import { getOracleBindNames } from "./oracleBinds";
 import { getSqlStatements } from "./sqlStatements.js";
 import { OracleCompletionClient } from "./oracleCompletionClient";
@@ -131,17 +131,20 @@ import { DebugPanel, DebugCompileDialog } from "./DebugPanel.jsx";
 import { usePlsqlProfiler } from "./usePlsqlProfiler.js";
 import { ProfilePanel, ProfileTablesDialog } from "./ProfilePanel.jsx";
 import { buildTabTransfer, collectWindowDrafts, parseTabTransfer, tabMoveBlocker, windowDraftKey } from "./tabTransfer.js";
-import { Activity, AlignLeft, BookOpen, Braces, Check, ChevronDown, ChevronRight, CircleHelp, Clock3, Code2, Database, Filter, Folder, FolderOpen, History, ListFilter, LockKeyhole, Play, Plus, RefreshCw, Save, Search, Settings2, Redo2, Star, Table2, Terminal, Undo2, Workflow, X } from "lucide-react";
-import { autoRunStatement, autoRunStep } from './relatedAutoRun.js';
-import { Editor, ExplainPlanView, OracleDefinitionView, OracleObjectInspector } from './lazyViews.js';
+import { Activity, AlignLeft, Braces, Check, CircleHelp, Clock3, Code2, Database, Filter, Folder, FolderOpen, History, ListFilter, LockKeyhole, Play, Plus, RefreshCw, Save, Search, Settings2, Redo2, Star, Undo2, Workflow, X } from "lucide-react";
+import { autoRunStep } from './relatedAutoRun.js';
+import { OracleObjectInspector } from './lazyViews.js';
 import { ResizeHandle } from './ResizeHandle.jsx';
 import { OracleObjectTree, isOracleRelation, makeOracleRelationLookup, oracleObjectLabel, oracleSchemaKey } from './OracleObjectTree.jsx';
-import { SqlResultsView } from './SqlResultsView.jsx';
+import './SqlResultsView.jsx';
 import { renderWorkbenchPrompts } from './WorkbenchPrompts.jsx';
 import { renderWorkbenchOverlays } from './WorkbenchOverlays.jsx';
 import { renderEditorDialogs } from './WorkbenchEditorDialogs.jsx';
 import { renderCommandPalette } from './WorkbenchCommandPalette.jsx';
 import { renderToolDialogs } from './WorkbenchToolDialogs.jsx';
+import { renderEditorWorkspace } from './WorkbenchEditorWorkspace.jsx';
+import { renderResultPanel } from './WorkbenchResultPanel.jsx';
+import { subscribeWorkbenchMessages } from './WorkbenchNativeMessages.jsx';
 
 const EMPTY_SCHEMA_OBJECTS = [];
 const mockConnections = [
@@ -721,314 +724,22 @@ export function App() {
   }, [showSearch, searchQuery, workspace.root,workspaceSearchScope]);
   useEffect(()=>{if(!showSearch)setDeleteReview(null)},[showSearch]);
 
-  useEffect(() => {
-    const unsubscribe = subscribeNativeMessages((message) => {
-      if (message?.type?.startsWith("window.")) { windowMessageRef.current?.(message); return; }
-      // FI-007: the debugger hook handles its own replies and events.
-      if (message?.type?.startsWith("debug.")) return;
-      const owner = message?.tabId || operations.owners.get(message?.requestId) || documents.activeId;
-      const operation=operations.running.get(owner);
-      if(typeof message.connected==='boolean')updateTabSession('connectionLost',!message.connected,owner);
-      if((['sql.result','sql.timeout'].includes(message?.type)||message?.type==='host.error'&&operations.history.has(message.requestId))&&operation&&(operation.requestId!==message.requestId||operation.status!=='running'))return;
-      replyOwnerRef.current = owner;
-      try {
-      if(typeof message?.autoCommit==='boolean')updateTabSession('autoCommit',message.autoCommit,owner);
-      // Grid Apply and its undo change the session's transaction outside any query result; Commit and Rollback depend on this state.
-      if(['sql.dmlApplied','sql.gridBatchRolledBack'].includes(message?.type)&&typeof message.transactionPending==='boolean')setTransactionPending(message.transactionPending,owner);
-      if(message?.type==='transaction.autoCommit'){updateTabSession('autoCommitPending',false,owner);return;}
-      if(['workspace.git','workspace.gitDiff','workspace.gitStage','workspace.gitUnstage','workspace.gitCommit','workspace.replacePreview','workspace.replaceApply'].includes(message?.type)) {
-        if(workspaceDevRequestsRef.current.get(message.type)!==message.requestId)return;
-        workspaceDevRequestsRef.current.delete(message.type);
-        setWorkspaceDev(current=>({...current,busy:false,error:message.error||'',...(message.state?{git:message.state}:{}),...(message.type==='workspace.gitCommit'?{committed:message.commit||null}:message.type==='workspace.gitStage'||message.type==='workspace.gitUnstage'?{committed:null}:{}),...(message.diff?{diff:message.diff}:{}),...(message.preview?{preview:message.preview,applied:null}:{}),...(message.result?{applied:message.result,preview:null}:{} )}));
-        if(message.type==='workspace.replaceApply'&&message.result){
-          const changed=new Map(message.result.applied.map(file=>[file.path.toLowerCase(),file.content])),versions=new Map(message.result.applied.map(file=>[file.path.toLowerCase(),file.diskVersion]));
-          setTabs(current=>current.map(tab=>{const dirty=tab.dirty,content=tab.path?changed.get(tab.path.toLowerCase()):undefined;return !dirty&&content!==undefined?{...tab,content,diskVersion:versions.get(tab.path.toLowerCase())??tab.diskVersion,externalChange:null}:tab}));
-          refreshWorkspaceGit();
-        }
-        return;
-      }
-      if(message?.type==='ui.theme'){if(message.error)setSettingsError(message.error);return;}
-      if(message?.type==='connection.managed'&&message.diagnostics)setConnectionDiagnostics(message.diagnostics);
-      if(message?.type==='workspace.binds'&&message.operation==='load'&&Array.isArray(message.definitions)&&message.definitions.length){try{saveBindDefinitions(localStorage,message.path,message.definitions)}catch{/* the shared form stays on disk; the dialog falls back to its local copy */}}
-      if(message?.type==='schema.error')notifyFeedback({id:`schema:${owner}`,kind:'error',title:'Oracle metadata could not be loaded',message:message.message||'Metadata unavailable.',scope:owner});
-      if (completionMetadataRef.current?.handle(message)) return;
-      if(message?.type==='session.context'){if(!closedTabsRef.current.has(owner)&&message.epoch===completionMetadataRef.current.session(owner).epoch){updateTabSession('sessionContext',message.context||null,owner);updateTabSession('sessionContextError',message.error||'',owner)}return;}
-      if(message?.type==='sql.stage') {const run=operations.scripts.get(owner);if(operations.owners.has(message.requestId)||run?.running&&run.requestId===message.requestId&&run.index===message.scriptIndex){updateTabSession('sqlStage',message.stage,owner);setRunState(message.stage,owner)}return;}
-      if(message?.type==='analysis.state') {updateTabSession('analysisReadOnly',Boolean(message.enabled),owner);setTransactionPending(Boolean(message.transactionPending),owner);setRunState(message.enabled?'Read-only consistent analysis active':'Read-only analysis ended',owner);return;}
-      if(message?.type==='sql.runtimePlan') {setExecuting(false,owner);setCancelling(false,owner);if(message.error){setExplainMessage(message.error,owner);notifyFeedback({kind:'error',title:'Execution plan unavailable',message:message.error,scope:owner})}else{setExplainResult({...message,planKind:'runtime'},owner);setExplainMessage('',owner)}setResultTab('Explain',owner);return;}
-      if(message?.type?.startsWith('script.')) {
-        const previous=operations.scripts.get(owner)||{steps:[]};
-        const run={...previous,steps:[...(previous.steps||[])]};
-        if(message.type==='script.started'){notifyFeedback({id:`script:${owner}`,kind:'progress',title:'Running SQL script',message:'Starting script…',scope:owner,actions:[{label:'Cancel script',onClick:()=>cancelQuery(owner)}]});run.started=true;run.running=true;run.requestId=message.requestId;run.steps=[];run.completed=0;run.failed=0;}
-        if(message.type==='script.sourceReviewRequired'){
-          if(!run.running||run.requestId!==message.requestId)return;
-          setTransactionPending(Boolean(message.transactionPending),owner);
-          run.awaitingSourceReview={...message,profileId:sessionsRef.current[owner]?.activeConnection?.id,generation:sessionsRef.current[owner]?.connectionGeneration??0};
-          updateTabSession('sqlStage',`Script paused for source review: statement ${message.index+1}`,owner);
-        }
-        if(message.type==='script.reviewAccepted'&&message.accepted)run.awaitingSourceReview=null;
-        if(message.type==='script.step'){
-          if(message.error)notifyFeedback({id:`script-error:${message.requestId}:${message.index}`,kind:'error',title:`Script statement ${message.index+1} failed`,message:message.error,scope:owner});
-          run.steps[message.index]={...run.steps[message.index],...message};
-          if(message.status==='Running'){notifyFeedback({id:`script:${owner}`,kind:'progress',title:'Running SQL script',message:`Statement ${message.index+1}`,scope:owner,actions:[{label:'Cancel script',onClick:()=>cancelQuery(owner)}]});
-            run.index=message.index;updateTabSession('sqlStage','Executing script statement',owner);updateTabSession('operationStartedAt',Date.now(),owner);
-            const context=operations.metadata.get(owner)||{};
-            operations.metadata.set(owner,{...context,statementOffset:message.offset,executedSql:message.sql,executedAt:new Date().toISOString(),requestStartedAtPerf:performance.now(),executedParameters:(run.parameters||[]).filter(parameter=>getBindNames(message.sql).includes(parameter.name))});
-            setExecuting(true,owner);setCancelling(false,owner);
-          }
-        }
-        if(message.type==='script.completed'){notifyFeedback({id:`script:${owner}`,kind:message.failed?'error':message.cancelled?'warning':'success',title:message.cancelled?'Script cancelled':'Script completed',message:`${message.completed||0} completed · ${message.failed||0} failed`+(run.steps.filter(s=>s?.error).map(s=>'\n'+s.error).join('')),scope:owner});Object.assign(run,message,{running:false,awaitingSourceReview:null});setSourceCompile(current=>current?.scriptRequestId===message.requestId?null:current);setExecuting(false,owner);setCancelling(false,owner);setTransactionPending(Boolean(message.transactionPending),owner);}
-        operations.scripts.set(owner,run);updateTabSession('scriptRun',run,owner);return;
-      }
-      if(message?.type==='host.error'&&operations.scripts.get(owner)?.running){const run=operations.scripts.get(owner),index=run.index;run.steps[index]={...run.steps[index],error:message.message};if(!run.started){run.running=false;updateTabSession('scriptRun',{...run},owner)}}
-
-      if (message?.type === "completion.vocabulary") {
-        if (sessionsRef.current[owner]?.activeConnection?.id === message.profileId) updateTabSession("oracleVocabulary", { version: message.version, words: message.words || [], error: message.error }, owner);
-        return;
-      }
-      if (message?.type?.startsWith("schema.") && owner !== documents.activeId) {
-        if (message.type === "schema.loaded") { setSchemaObjects(message.objects || []); setSchemaOwner(message.schema || ""); setSchemaLoading(false); setSchemaError(""); updateTabSession("schemaReady", true); }
-        else if (message.type === "schema.loading") { setSchemaLoading(true); updateTabSession("schemaReady", false); }
-        else if (message.type === "schema.error") { setSchemaLoading(false); setSchemaError(message.message || "Oracle metadata could not be loaded."); }
-        else if ((message.type === "schema.table" || message.type === "schema.object") && message.item) setSchemaObjects(items => (items || []).map(item => oracleSchemaKey(item) === oracleSchemaKey(message.item) ? {...message.item,metadataFetchedAt:Date.now(),metadataExpiresAt:Date.now()+300000} : item));
-        return;
-      }
-
-      const baselineRequest=sourceBaselineRequests.current.get(message.requestId);
-      if(baselineRequest&&['source.review','source.review.error','host.error'].includes(message.type)){
-        sourceBaselineRequests.current.delete(message.requestId);
-        const tab=documents.tabs.find(tab=>tab.id===baselineRequest.tabId);
-        if(message.type==='source.review'&&tab&&sessionsRef.current[tab.id]?.activeConnection?.id===baselineRequest.profile&&sourceCompilationUnits(tab,workspace.projectRules).some(prepared=>sourceIdentity(prepared.declaration)===baselineRequest.identity)){
-          const snapshot=message.review.snapshot,baseline=sourceBaseline(snapshot);
-          documents.patch(tab.id,{sourceBaseline:baseline,sourceBaselines:{...tab.sourceBaselines,[JSON.stringify([snapshot.owner,snapshot.name,snapshot.type,snapshot.profileId,snapshot.context])]:baseline}});
-        }
-        return;
-      }
-      if (message?.type === "tab.closed" || message?.type === "tab.closeFailed") {
-        const action = tabCloseActionsRef.current.get(message.requestId); tabCloseActionsRef.current.delete(message.requestId);
-        if (!action) return;
-        if (message.type === "tab.closed") { setPendingTabClose(null); action.complete(); }
-        else setPendingTabClose({ ...action, tabId: owner, message: message.message, pending: message.transactionPending, resolving: false });
-      } else if (message?.type === "file.opened") {
-        const cached = documents.tabs.find(tab => message.path && pathKey(tab.path) === pathKey(message.path));
-        if (cached && !message.forceNew) { activateTab(cached.id); return; }
-        rememberEditorPosition();
-        const path = message.path ?? null, id = `file:${crypto.randomUUID()}`;
-        documents.open({ id, name: message.fileName ?? "query.sql", path, content: message.content ?? "",savedContent:message.content??"", dirty: false, connectionProfileId: message.profileId ?? null, diskVersion: message.diskVersion ?? null });
-        if (path && previewPathRef.current && pathKey(previewPathRef.current) === pathKey(path)) { previewPathRef.current = null; const old = previewTabRef.current; setPreviewTabId(id); if (old && old !== id) setTimeout(() => closeTabRef.current?.(old), 0); }
-        setNativeTabId(id); sendNativeCommand("file.activate", { path, tabId: id });
-        const searchPosition = pendingSearchPositionRef.current;
-        if (searchPosition && path?.toLowerCase() === searchPosition.path.toLowerCase()) { pendingSearchPositionRef.current = null; requestAnimationFrame(() => { editorRef.current?.setPosition({ lineNumber: searchPosition.lineNumber, column: searchPosition.column||1 }); editorRef.current?.revealLineInCenter(searchPosition.lineNumber); editorRef.current?.focus(); }); }
-        if (!message.profileId || message.profileId.toLowerCase() === (tabSessions[id]?.activeConnection?.id || "").toLowerCase()) queueSchemaForSql(documents.text);
-        if (message.profileId) { const profile = dbConnectionsRef.current.find((item) => item.id.toLowerCase() === message.profileId.toLowerCase()); if (profile && profile.id.toLowerCase() !== (tabSessions[id]?.activeConnection?.id || "").toLowerCase()) { setTimeout(() => beginConnection({ ...profile, tabId: id }), 0); } }
-      } else if(message?.type==='file.changes'){
-        if(filePollRef.current?.id!==message.requestId)return;fileWatchOffsetRef.current=(filePollRef.current.offset+Math.max(1,message.processed||0))%filePollRef.current.total;filePollRef.current=null;
-        documents.dispatch({ type: 'externalChanges', changes: message.changes || [] });
-      } else if(message?.type==='file.conflict'){
-        documentSavesRef.current.take(message.requestId, message.tabId);
-        setTabs(current=>current.map(tab=>tab.id===owner?{...tab,externalChange:{...message.snapshot,noticeId:message.requestId,baselineUnknown:!!message.baselineUnknown}}:tab));
-        setRunState('File changed on disk. Reload it or keep your editor text before saving.');
-      } else if (message?.type === "file.saved") {
-        const tab = documents.tabs.find(tab => tab.id === owner);
-        const saved = documentSavesRef.current.saved(message, tab);
-        if (!saved) return;
-        const document = saved.document;
-        documents.patch(owner, document);
-        setRunState(document.dirty ? 'Saved earlier version; newer edits are still unsaved.' : `Saved ${document.name}`);
-        saved.afterSave?.();
-      } else if (message?.type === "file.connectionBound") {
-        const profileId = message.profileId ?? null;
-        documents.patch(owner, { connectionProfileId: profileId });
-        setRunState(`${profileId} linked to ${documents.tabs.find(tab => tab.id === owner)?.name || 'SQL file'}`);
-      } else if (message?.type === "file.saveCancelled") {
-        documentSavesRef.current.take(message.requestId, message.tabId);
-      } else if (message?.type === "workspace.state") {
-        setWorkspace({ root: message.root ?? null, name: message.name ?? "No workspace", files: message.files ?? [], entries: message.entries ?? [], recent: message.recent ?? [], catalog:message.catalog??[],error:message.error??null,projectRules:message.projectRules??defaultProjectRules,fileConnections:message.fileConnections??{} });
-       } else if (message?.type === "workspace.error") {
-        notifyFeedback({id:`workspace:${message.requestId}`,kind:'error',title:'Workspace operation failed',message:message.message||'Workspace operation failed.',scope:owner});
-        if(message.requestId===searchRequestRef.current){setSearching(false);searchRequestRef.current=null;}
-        if([...workspaceDevRequestsRef.current.values()].includes(message.requestId)){setWorkspaceDev(current=>({...current,busy:false,error:message.message}));for(const [key,value] of workspaceDevRequestsRef.current)if(value===message.requestId)workspaceDevRequestsRef.current.delete(key);}
-        setRunState(message.message || 'Workspace operation failed');
-      } else if (message?.type === "workspace.changed") {
-        if(message.error)notifyFeedback({id:`workspace:${message.requestId}`,kind:'error',title:'Workspace operation partially completed',message:message.error,scope:owner});
-        const moves=message.moves||(message.source&&message.destination?[{source:message.source,destination:message.destination}]:[]);
-        if (moves.length) {
-          const remap = path => moves.reduce((value,move)=>remapWorkspacePath(value,move.source,move.destination),path);
-          setTabs(current => current.map(tab => { const path = remap(tab.path); return path !== tab.path ? { ...tab, path, name: path.split(/[\\/]/).at(-1) } : tab; }));
-        }
-        if (message.entry && !message.entry.isDirectory) openWorkspaceFile(message.entry);
-      } else if (message?.type === "workspace.searchResults") {
-        if (message.requestId !== searchRequestRef.current) return;
-        setSearchMatches(message.results ?? []); setSearchTruncated(Boolean(message.truncated)); setSearching(false);
-      } else if (message?.type === "connection.profiles") {
-        const organization=connectionOrganization(message.profiles??[],message.organization);
-        const profiles = organizedProfiles(message.profiles??[],organization).map(profile=>({...profile,title:profile.name||profile.id,group:profile.groups[0]||'',color:profile.env==='PROD'?'rose':profile.env==='UAT'?'amber':profile.env==='TEST'?'blue':profile.env==='DEV'?'mint':'neutral',recent:recentProfiles.includes(profile.id),favorite:favorites.includes(profile.id)}));
-        setConnectionOrg(organization);dbConnectionsRef.current=profiles;setDbConnections(profiles);setTnsAliases(message.aliases??[]);
-        // Every connected tab shows the current label; the session behind it is not affected.
-        setTabSessions(current=>Object.fromEntries(Object.entries(current).map(([id,session])=>{const profile=profiles.find(item=>item.id===session.activeConnection?.id);return [id,profile&&id!==owner?{...session,activeConnection:{...session.activeConnection,name:profile.name,title:profile.title}}:session]})));
-        setActiveConnection((current) => {
-          if (["No connection", "Disconnected"].includes(current.id)) return { id: "No connection", title: profiles.length ? "No active session" : "No TNS aliases found", host: profiles.length ? "" : "Add a tnsnames.ora file", port: "", service: "", env: "—", color: "mint" };
-          return profiles.find((profile) => profile.id === current.id) ?? current;
-        });
-      } else if (message?.type === "connection.managed") {
-        if (message.requestId === authTestRequestRef.current) {
-          authTestRequestRef.current = null; setConnecting(false);
-          setConnectionError(message.success ? "Test successful. Active session unchanged." : message.message);
-        } else if (message.operation === "connection.rename") {
-          // The field in the connection list reports this itself.
-        } else if (message.operation === "connection.delete") {
-          if (!message.success) setManagementError(message.message);
-          else { setFavorites(current => current.filter(id => id !== message.profileId)); setRecentProfiles(current => current.filter(id => id !== message.profileId)); }
-        }
-      } else if (message?.type === "connection.sshHostKey") {
-        // FI-069: the connection that follows fails; the user may trust the key and connect again.
-        setSshHostKey({ ...message, tabId: owner });
-      } else if (message?.type === "connection.connected") {
-        completionMetadataRef.current.reset(owner);
-        updateTabSession("tunnel", message.tunnel || null, owner);
-        updateTabSession("connectionLost",false,owner);updateTabSession("connectionGeneration",generation=>(generation||0)+1,owner);updateTabSession("connectionEnvironment",message.profile?.env||'UNKNOWN',owner);
-        updateTabSession("inactive",false,owner);
-        updateTabSession("analysisReadOnly",false,owner);
-        updateTabSession("oracleVocabulary", { version: message.serverVersion || 19, words: [] }, owner);
-        pendingConnectionsRef.current.delete(message.requestId);
-        updateTabSession('sessionContext',null,owner);updateTabSession('sessionContextError','',owner);
-        sendNativeCommand('session.context',{tabId:owner,epoch:completionMetadataRef.current.session(owner).epoch});
-        const profile = dbConnectionsRef.current.find((item) => item.id === message.profile?.id);
-        if (profile) { if (owner === documents.activeId) { activeConnectionRef.current = profile; } setActiveConnection(profile); setTabs(current => current.map(tab => tab.id === owner ? { ...tab, connectionProfileId: profile.id } : tab)); }
-        if (authProfileRef.current?.tabId === owner) setAuthProfile(null); setConnecting(false); setConnectionError(""); setQueryResult(current => current ? { ...current, hasMore: false, cursorUnavailable:current.hasMore } : current); updateTabResult("resultSets",sets=>(sets||[]).map(item=>({...item,result:{...item.result,hasMore:false,cursorUnavailable:item.result.hasMore}}))); setSchemaObjects([]); updateTabSession("schemaReady", false); setTransactionPending(false);
-        if (owner === documents.activeId) { schemaReadyRef.current = false; schemaLookupRef.current = new Map(); schemaRequestedRef.current.clear(); schemaLoadedRef.current.clear(); }
-        setRunState(`Connected to ${message.profile?.id ?? "Oracle"}`);
-        if (message.profile?.id) setRecentProfiles((current) => [message.profile.id, ...current.filter((id) => id !== message.profile.id)].slice(0, 20));
-      } else if (message?.type === "connection.inactive" || message?.type === "connection.resumed") {
-        updateTabSession("inactive", message.type === "connection.inactive", owner);
-        if(message.type==='connection.resumed'){updateTabSession("connectionLost",false,owner);updateTabSession("connectionGeneration",generation=>(generation||0)+1,owner);sendNativeCommand('session.context',{tabId:owner,epoch:completionMetadataRef.current.session(owner).epoch})}
-        if (message.type === "connection.inactive") {
-          setQueryResult(current => current ? { ...current, hasMore: false, cursorUnavailable: current.hasMore } : current);
-          updateTabResult("resultSets", sets => (sets || []).map(item => ({ ...item, result: { ...item.result, hasMore: false, cursorUnavailable: item.result.hasMore } })));
-        }
-      } else if (message?.type === "connection.disconnected") {
-        updateTabSession("tunnel", null, owner);
-        updateTabSession("sessionContext",null,owner);updateTabSession("rendering",false,owner);
-        updateTabSession("analysisReadOnly",false,owner);
-        completionMetadataRef.current.reset(owner);
-        updateTabSession("completionMetadataStatus", "Offline Oracle vocabulary; connect to load object metadata.", owner);
-        updateTabSession("oracleVocabulary", null, owner);
-        setQueryResult(current=>current?{...current,hasMore:false,cursorUnavailable:current.hasMore||current.cursorUnavailable}:current);
-        updateTabResult('resultSets',sets=>(sets||[]).map(item=>({...item,result:{...item.result,hasMore:false,cursorUnavailable:item.result.hasMore||item.result.cursorUnavailable}})));
-        if (owner === documents.activeId) activeConnectionRef.current = { id: "Disconnected" }; setSchemaOwner(""); setRunState("Disconnected"); setActiveConnection({ id: "Disconnected", title: "No active session", host: "", port: "", service: "", env: "—", color: "mint" }); if (owner === documents.activeId) schemaReadyRef.current = false; setSchemaObjects([]); updateTabSession("schemaReady", false); setTransactionPending(false);
-      } else if (message?.type === "sql.page") {
-        if (pageRequestRef.current?.id !== message.requestId) return;
-        const owner = pageRequestRef.current.owner; operations.cancellations.delete(owner);pageRequestRef.current = null; setFetchingPage(false); setCancelling(false,owner); setPageError("", owner);
-        results.appendPage(owner, message);
-      } else if (message?.type === "sql.pageError") {
-        if (pageRequestRef.current?.id !== message.requestId) return;
-        const owner = pageRequestRef.current.owner, failedId = pageRequestRef.current.resultId; operations.cancellations.delete(owner);pageRequestRef.current = null; setFetchingPage(false); setCancelling(false,owner);
-        results.invalidateCursor(owner, failedId); setPageError(message.message || "Page could not be loaded. Run the query again.", owner);
-      } else if (message?.type === "result.exportProgress" || message?.type === "result.exportComplete") {
-        const exporting=message.type==='result.exportProgress',exportText=exporting?`${exportProgressText(message)} written…`:message.success&&message.bytesWritten!=null?`${message.message} (${exportProgressText(message)})`:message.message||`${message.rowsWritten||0} rows written`;
-        updateTabResult('streamState',{busy:exporting,message:exportText},owner);
-        notifyFeedback({id:`export:${owner}`,kind:exporting?'progress':message.cancelled?'info':message.success===false?'error':'success',title:exporting?'Exporting results':message.cancelled?'Export cancelled':message.success===false?'Export failed':'Export completed',message:exportText,scope:owner,actions:exporting?[{label:'Cancel export',onClick:()=>sendNativeCommand('result.cancelExport',{tabId:owner})}]:[]});
-        if(message.type==='result.exportComplete'&&message.consumed) {
-          results.invalidateCursor(owner, message.resultId);
-        }
-      } else if (message?.type === "result.columnDefinition") {
-        if(sourceDefinitionRequestRef.current.get(owner)!==message.requestId){operations.owners.delete(message.requestId);return;}
-        sourceDefinitionRequestRef.current.delete(owner);
-        operations.owners.delete(message.requestId);
-        setDefinition({...message.definition,tabId:owner,...(!message.definition?{message:"Source column not found"}:{})});
-      } else if (message?.type === "result.primaryKey") {
-        if(message.columns?.length){setKeyLookup({...message,tabId:owner});setKeyValues({})}else setRunState(message.message||'No primary key found.');
-      } else if (message?.type === "result.children") {
-        if(message.links?.length){setKeyLookup({links:message.links,tabId:owner});setKeyValues({})}else setRunState(message.message||'No child relationships found.');
-      } else if (message?.type === "result.related") {
-        // Only the foreign key lookups run by themselves; UPDATE drafts and primary key lookups share this reply and stay unrun.
-        const runsItself=relatedRunRequestsRef.current.delete(message.requestId);
-        if(message.sql) { const profile=sessionsRef.current[owner]?.activeConnection;newSqlFileNow(); const id=documents.activeId; setTabs(current=>current.map(tab=>tab.id===id?{...tab,name:'Related.sql',content:message.sql,dirty:true,connectionProfileId:profile?.id}:tab));if(profile?.id&&!['Disconnected','No connection'].includes(profile.id)){beginConnection({...profile,tabId:id});const statement=runsItself?autoRunStatement(message.sql):null;if(statement)setRelatedAutoRun({tabId:id,sql:statement})} } else setRunState(message.message||'No related records metadata available');
-      } else if (message?.type === "sql.result") {
-        const owner = message.tabId || operations.owners.get(message.requestId) || operations.lastOwner || documents.activeId; operations.owners.delete(message.requestId);
-        if(operation)operation.status='complete';operations.cancellations.delete(owner);updateTabSession('queryOutcome',null,owner);
-        if (closedTabsRef.current.has(owner)) { if (message.resultId) sendNativeCommand("sql.closeResult", { resultId: message.resultId, tabId: owner }); setExecuting(false); setCancelling(false); setTransactionPending(Boolean(message.transactionPending)); finishHistoryEntry("Succeeded", "Statement completed in closed tab"); return; }
-        notifyExecutionFinished(owner,true,{elapsedMs:message.elapsedMs,rows:message.returnedRows,rowsAffected:message.rowsAffected,hasMore:message.hasMore,output:message.output});
-        finishHistoryEntry("Succeeded", message.rowsAffected == null ? `${message.returnedRows ?? 0} rows · ${message.elapsedMs ?? 0} ms` : `${message.rowsAffected} rows affected · ${message.elapsedMs ?? 0} ms`);
-        if (/^\s*(?:CREATE|ALTER|DROP|RENAME|COMMENT|GRANT|REVOKE)\b/i.test(operations.metadata.get(owner)?.executedSql || "")) { completionMetadataRef.current.reset(owner); refreshSchema(owner); }
-        if(/^\s*(?:--[^\n]*\n|\/\*[\s\S]*?\*\/\s*)*ALTER\s+SESSION\b/i.test(operations.metadata.get(owner)?.executedSql||'')){sendNativeCommand('session.nls',{tabId:owner,epoch:completionMetadataRef.current.session(owner).epoch});sendNativeCommand('session.context',{tabId:owner,epoch:completionMetadataRef.current.session(owner).epoch});}
-        const executionMeta=operations.metadata.get(owner)||{},responseAt=performance.now(),renderRequestId=`${message.requestId||Date.now()}:${message.resultId||'statement'}`;
-        updateTabSession("rendering",Boolean(message.columns?.length),owner);updateTabSession("renderingRequestId",renderRequestId,owner);
-        if(message.columns?.length)announce(resultAnnouncement({rows:message.rows?.length??message.returnedRows,elapsedMs:message.elapsedMs,hasMore:message.hasMore}));
-        setSqlResult({ ...message, ...executionMeta,renderRequestId,clientTiming:executionMeta.requestStartedAtPerf?{startedAtPerf:executionMeta.requestStartedAtPerf,responseAtPerf:responseAt,renderMs:null,totalMs:null}:undefined,fetchMetrics:[{offset:0,rows:message.rows?.length||0,elapsedMs:message.elapsedMs,bytes:new TextEncoder().encode(JSON.stringify(message.rows||[])).length}] }, owner); const output = [...(message.output ?? []),...(message.outParameters||[]).map(parameter=>`${executionMeta.parameterLabels?.[parameter.name]||parameter.name} (${parameter.type}) = ${parameter.value==null?'(NULL)':typeof parameter.value==='object'?JSON.stringify(parameter.value):parameter.value}`)].join("\n"); setOutputMessage(output, owner);updateTabResult("outputProvenance",{...message,...executionMeta},owner); setTransactionPending(Boolean(message.transactionPending)); setExecuting(false); setCancelling(false); setRunState(executionMeta.runConfiguration?`Call completed · ${message.elapsedMs??0} ms${message.transactionPending?' · pending transaction':''}`:message.rowsAffected == null ? `${message.returnedRows ?? 0} rows · ${message.elapsedMs ?? 0} ms` : `${message.rowsAffected} rows affected · ${message.elapsedMs ?? 0} ms`); setResultTab(output ? "Output" : "Results", owner);
-      } else if (message?.type === "sql.compilation") {
-        if(operation?.requestId===message.requestId){operation.status='complete';operations.cancellations.delete(owner);updateTabSession('queryOutcome',null,owner)}
-
-        operations.owners.delete(message.requestId);
-        if (closedTabsRef.current.has(owner)) return;
-        const context = operations.metadata.get(owner) || {}, problems = compilationProblemItems(message.compilation, context, owner);
-        if(message.compilation?.snapshot){const snapshot=message.compilation.snapshot,current=documents.tabs.find(tab=>tab.id===owner);documents.patch(owner,{sourceBaseline:sourceBaseline(snapshot),sourceBaselines:{...current?.sourceBaselines,[JSON.stringify([snapshot.owner,snapshot.name,snapshot.type,snapshot.profileId,snapshot.context])]:sourceBaseline(snapshot)}});}
-        else if(context.sourceReviewId)documents.patch(owner,{sourceBaseline:null});
-        updateTabSession("compilationProblems", problems, owner); updateTabSession("runtimeProblems", [], owner);
-        setTransactionPending(!!message.transactionPending, owner); setExecuting(false, owner); setCancelling(false, owner);
-        const errors = problems.filter(problem => problem.severity === "error").length;
-        const summary = message.metadataError ? `Compilation completed; diagnostics unavailable: ${message.metadataError}` : errors ? `${errors} PL/SQL compilation error${errors === 1 ? "" : "s"}` : `PL/SQL compilation completed${problems.length ? ` with ${problems.length} warning(s)` : ""}`;
-        setRunState(summary, owner); setOutputMessage([...(message.output || []), summary].join("\n"), owner);updateTabResult("outputProvenance",{...context,sqlVersion:message.sqlVersion,compiledSourceVersion:message.compilation?.snapshot?.version},owner); setResultTab(problems.length ? "Problems" : "Output", owner);
-        notifyFeedback({id:`compilation:${message.requestId}`,kind:errors?"error":problems.length?"warning":"success",title:"PL/SQL compilation",message:summary,scope:owner,actions:problems.length?[{label:"View problems",onClick:()=>{activateTab(owner);setResultTab("Problems",owner)}}]:[]}); finishHistoryEntry(errors ? "Failed" : "Succeeded", summary);
-        completionMetadataRef.current.reset(owner); refreshSchema(owner);
-      } else if (message?.type === "sql.cancelled") {
-        const fetching=sessionsRef.current[owner]?.fetchingPage;
-        if(operation&&!fetching&&!sessionsRef.current[owner]?.scriptRun?.running&&(operation.status!=='running'||message.requestId&&![operation.requestId,operations.cancellations.get(owner)].includes(message.requestId)))return;
-        setTransactionPending(Boolean(message.transactionPending));
-        if (message.complete) { operations.cancellations.delete(owner);if(operation?.status==='running'){operations.owners.delete(operation.requestId);operation.status='complete';updateTabSession('queryOutcome',{transactionPending:message.transactionPending,kind:'cancelled',elapsedMs:Date.now()-operation.startedAt,requestId:operation.requestId},owner)}if(fetching){setFetchingPage(false,owner);setPageError('Row loading cancelled.',owner)}finishHistoryEntry("Cancelled", "Query cancelled"); setExecuting(false); setCancelling(false); setRunState("Query cancelled."); }
-        else { setCancelling(true); setRunState("Waiting for Oracle to stop the query…"); }
-      } else if (message?.type === "sql.timeout") {
-        operations.owners.delete(message.requestId);
-        if(operation)operation.status='complete';operations.cancellations.delete(owner);updateTabSession('queryOutcome',{transactionPending:message.transactionPending,kind:'timeout',message:message.message||'Query timed out.',elapsedMs:operation?Date.now()-operation.startedAt:undefined,requestId:message.requestId},owner);setResultTab('Results',owner);
-
-        notifyExecutionFinished(owner,false,{message:'Query timed out.'});
-        finishHistoryEntry("Failed", message.message || "Query timed out.");
-        setTransactionPending(Boolean(message.transactionPending), owner); setExecuting(false, owner); setCancelling(false, owner); setRunState(message.message || "Query timed out.", owner);
-      } else if (message?.type === "sql.explainResult") {
-        const owner = message.tabId || operations.owners.get(message.requestId) || operations.lastOwner || documents.activeId; operations.owners.delete(message.requestId);
-        setExplainResult(message, owner); setExplainMessage("", owner); setExecuting(false); setCancelling(false); setRunState(`Execution plan · ${message.returnedRows ?? 0} steps · ${message.elapsedMs ?? 0} ms`);
-      } else if (message?.type === "transaction.state" && message.unconfirmed) {
-        setUncertainCommit({ message: message.message || '' }); setRunState('Commit outcome not confirmed'); setTransactionPending(Boolean(message.pending), owner);
-        if (pendingSwitchRef.current?.tabId === owner) setPendingSwitch(null);
-        if (pendingTabCloseRef.current?.tabId === owner) setPendingTabClose(null);
-      } else if (message?.type === "transaction.state") {
-        if(!message.pending)updateTabSession("analysisReadOnly",false,owner); setTransactionPending(Boolean(message.pending)); setRunState(`Transaction ${message.state}`);
-        if (!message.pending && pendingTabCloseRef.current?.tabId === owner && pendingTabCloseRef.current.resolving) { pendingTabCloseRef.current.retry(); setPendingTabClose(null); }
-        if (!message.pending && pendingSwitchRef.current?.tabId === owner) { const profile = pendingSwitchRef.current; setPendingSwitch(null); if (profile.disconnect) sendNativeCommand("connection.disconnect", { tabId: owner }); else setTimeout(() => beginConnection(profile), 0); }
-      } else if (message?.type === "sql.evaluated") { setLookupPicker(current => current && current.requestId === message.requestId ? { ...current, state: { running: false, ...(message.error ? { error: message.error } : { columns: message.columns, rows: message.rows, truncated: message.truncated }) } } : current); setSubqueryTrial(current => current && current.requestId === message.requestId ? { ...current, state: { running: false, ...(message.error ? { error: message.error } : { columns: message.columns, rows: message.rows, truncated: message.truncated, elapsedMs: message.elapsedMs, transactionPending: message.transactionPending }) } } : current); setQuickEval(current => current && current.requestId === message.requestId ? { ...current, state: { running: false, ...(message.error ? { error: message.error } : { columns: message.columns, rows: message.rows, elapsedMs: message.elapsedMs, transactionPending: message.transactionPending }) } } : current);
-      } else if (message?.type === "schema.loading") { setSchemaLoading(true); setSchemaError(""); setSchemaStale((sessionsRef.current[owner]?.schemaObjects || []).length > 0); updateTabSession("schemaReady", false); schemaReadyRef.current = false;
-      } else if (message?.type === "schema.loaded") {
-        if (schemaRequestRef.current === message.requestId) schemaRequestRef.current = null; const objects = message.objects ?? []; schemaLookupRef.current = makeOracleRelationLookup(objects, message.schema ?? ""); setSchemaObjects(objects); setSchemaOwner(message.schema ?? ""); setSchemaLoading(false); setSchemaStale(false); setSchemaError(""); schemaReadyRef.current = true; updateTabSession("schemaReady", true); schemaRequestedRef.current.clear(); schemaLoadedRef.current.clear(); queueSchemaForSql(documents.text);
-      } else if (message?.type === "schema.cancelled") {
-        if (schemaRequestRef.current === message.requestId) schemaRequestRef.current = null; setSchemaLoading(false); setSchemaStale((sessionsRef.current[owner]?.schemaObjects || []).length > 0); setSchemaError('Metadata loading cancelled.');
-      } else if (message?.type === "schema.table" || message?.type === "schema.object") {
-        const item = message.item?{...message.item,metadataFetchedAt:Date.now(),metadataExpiresAt:Date.now()+300000}:null; if (item?.name) { const key = oracleSchemaKey(item).toLowerCase(); schemaLoadedRef.current.add(key); schemaRequestedRef.current.delete(key); if (isOracleRelation(item)) schemaLookupRef.current.set(item.name.toLowerCase(), item); setSchemaObjects((current) => current.map((entry) => oracleSchemaKey(entry) === oracleSchemaKey(item) ? item : entry)); setObjectTabs(current => current.map(tab => tab.key === oracleSchemaKey(item) ? { ...tab, object: item } : tab)); requestAnimationFrame(() => { const position = editorRef.current?.getPosition(); const line = position && editorRef.current?.getModel()?.getLineContent(position.lineNumber); if (line) editorRef.current?.render(); }); }
-      } else if (message?.type === "schema.error") { setSchemaLoading(false); setSchemaError(message.message ?? "Oracle metadata could not be loaded."); schemaReadyRef.current = true; if (message.tableName || message.name) { const failed = [...schemaObjects].find(item => item.name.toLowerCase() === (message.tableName || message.name).toLowerCase() && (!message.owner || item.owner === message.owner)); if (failed) schemaRequestedRef.current.delete(oracleSchemaKey(failed).toLowerCase()); }
-      } else if (message?.type === "host.error") {
-        const failedQuery=!!operation&&operation.requestId===message.requestId&&operation.status==='running';
-        if(failedQuery){notifyExecutionFinished(message.tabId||operations.owners.get(message.requestId)||operations.lastOwner||documents.activeId,false,{message:message.message})}
-        if(failedQuery||message.explain)finishHistoryEntry("Failed", "Execution failed");
-        documentSavesRef.current.take(message.requestId, message.tabId);
-        if(message.requestId===filePollRef.current?.id)filePollRef.current=null;
-        const owner = message.tabId || operations.owners.get(message.requestId) || operations.lastOwner || documents.activeId; operations.owners.delete(message.requestId);
-        if(message.requestId===sessionsRef.current[owner]?.autoCommitRequestId)updateTabSession('autoCommitPending',false,owner);
-        const failedConnection = pendingConnectionsRef.current.get(message.requestId);
-        if (failedConnection) { pendingConnectionsRef.current.delete(message.requestId); setConnecting(false, owner); setAuthProfile({ ...dbConnectionsRef.current.find(p => p.id === failedConnection.id), ...failedConnection, credentials: undefined }); setConnectionError(message.message || "Connection failed", owner); }
-        if(results.tabs[owner]?.streamState?.busy){updateTabResult("streamState",{busy:false,message:message.message||"Export failed"},owner);dismissFeedback(`export:${owner}`)} const error = message.message ?? "Desktop operation failed"; if(!failedQuery)notifyFeedback({id:`native:${message.requestId||owner}`,kind:"error",title:"Operation failed",message:error,scope:owner,scopeLabel:documents.tabs.find(t=>t.id===owner)?.name}); if(failedQuery)updateTabSession('runState',error,owner);else setRunState(error); if (typeof message.transactionPending === "boolean") setTransactionPending(message.transactionPending);
-        if (authProfileRef.current?.tabId === owner) { setConnectionError(error); setConnecting(false); }
-        if (pendingTabCloseRef.current?.tabId === owner) setPendingTabClose(current => current ? { ...current, resolving: false, message: error } : current);
-        if(!operation||operation.status!=='running'||failedQuery||message.explain){setExecuting(false);setCancelling(false)}
-        if(failedQuery){
-          operation.status='complete';operations.cancellations.delete(owner);
-          updateTabSession('queryOutcome',{transactionPending:message.transactionPending,kind:'error',message:error,elapsedMs:Date.now()-operation.startedAt,requestId:message.requestId},owner);setResultTab('Results',owner);setOutputMessage(error,owner);
-          updateTabSession('runtimeProblems',[{id:`${owner}:runtime`,tabId:owner,severity:'error',source:'Oracle',message:error,fileName:documents.tabs.find(tab=>tab.id===owner)?.name||'SQL'},...runtimeStackProblems(error,operations.metadata.get(owner),owner)],owner);
-        }
-        else if ((!failedConnection && !authProfileRef.current && /ORA-\d+/i.test(error)) || message.explain) { if (message.explain) setExplainMessage(error, owner); else setOutputMessage(error, owner); setResultTab(message.explain ? "Explain" : "Output", owner); updateTabSession("runtimeProblems", [{ id: `${owner}:runtime`, tabId: owner, severity: "error", source: "Oracle", message: error, fileName: documents.tabs.find(tab => tab.id === owner)?.name || "SQL" },...runtimeStackProblems(error,operations.metadata.get(owner),owner)], owner); }
-      }
-      } finally { replyOwnerRef.current = null; }
-    });
-    return unsubscribe;
-  }, []);
+  useEffect(() => subscribeWorkbenchMessages({
+      activateTab, activeConnectionRef, authProfileRef, authTestRequestRef, beginConnection, cancelQuery, closeTabRef, closedTabsRef,
+      completionMetadataRef, dbConnectionsRef, documentSavesRef, documents, editorRef, favorites, filePollRef, fileWatchOffsetRef,
+      finishHistoryEntry, getBindNames, newSqlFileNow, notifyExecutionFinished, openWorkspaceFile, operations, pageRequestRef,
+      pendingConnectionsRef, pendingSearchPositionRef, pendingSwitchRef, pendingTabCloseRef, previewPathRef, previewTabRef,
+      queueSchemaForSql, recentProfiles, refreshSchema, refreshWorkspaceGit, relatedRunRequestsRef, rememberEditorPosition, replyOwnerRef,
+      results, schemaLoadedRef, schemaLookupRef, schemaObjects, schemaReadyRef, schemaRequestRef, schemaRequestedRef, searchRequestRef,
+      sessionsRef, setActiveConnection, setAuthProfile, setCancelling, setConnecting, setConnectionDiagnostics, setConnectionError,
+      setConnectionOrg, setDbConnections, setDefinition, setExecuting, setExplainMessage, setExplainResult, setFavorites, setFetchingPage,
+      setKeyLookup, setKeyValues, setLookupPicker, setManagementError, setObjectTabs, setOutputMessage, setPageError, setPendingSwitch,
+      setPendingTabClose, setPreviewTabId, setQueryResult, setQuickEval, setRecentProfiles, setRelatedAutoRun, setResultTab, setRunState,
+      setSchemaError, setSchemaLoading, setSchemaObjects, setSchemaOwner, setSchemaStale, setSearchMatches, setSearchTruncated, setSearching,
+      setSettingsError, setSourceCompile, setSqlResult, setSshHostKey, setSubqueryTrial, setTabSessions, setTabs, setTnsAliases,
+      setTransactionPending, setUncertainCommit, setWorkspace, setWorkspaceDev, sourceBaselineRequests, sourceDefinitionRequestRef,
+      tabCloseActionsRef, tabSessions, updateTabResult, updateTabSession, windowMessageRef, workspace, workspaceDevRequestsRef
+    }), []);
 
   useEffect(() => {
     const refreshCompletionMetadata = () => {
@@ -2269,56 +1980,37 @@ export function App() {
     </FileMenu>
     <div className="workbench"><aside className="activity-rail"><button className={`rail-button explorer-rail-toggle${sidebarOpen && !focusMode ? " selected" : ""}`} title={sidebarOpen && !focusMode ? "Hide explorer" : "Show explorer"} aria-label={sidebarOpen && !focusMode ? "Hide explorer" : "Show explorer"} aria-pressed={sidebarOpen && !focusMode} onClick={() => {if(focusMode){setFocusMode(false);setSidebarOpen(true)}else setSidebarOpen(open=>!open)}}><Database size={18} /></button><button className="rail-button" title="Search workbench (Ctrl+P)" aria-label="Search workbench" onClick={() => setPaletteMode("files")}><Search size={18} /></button><button className="rail-button" title="History" aria-label="History" onClick={() => { setShowHistory(true); setShowSearch(false); }}><History size={18} /></button><button className="rail-button" title="SQL snippets" aria-label="SQL snippets" onClick={() => { setSnippetFilter(""); setShowSnippets(true); }}><Braces size={18} /></button><div className="rail-spacer" /><button className={`rail-button${focusMode?" selected":""}`} title="Editor focus mode (Ctrl+Alt+Z)" aria-label="Editor focus mode" aria-pressed={focusMode} onClick={()=>setFocusMode(value=>!value)}><Code2 size={18}/></button><button className="rail-button" title="Settings" aria-label="Settings" onClick={() => setShowAppearance(true)}><Settings2 size={18} /></button></aside>
       <LayoutLockContext.Provider value={!!layout.locked}><DockWorkbench layout={layout} onChange={updateLayout} panels={dockPanels} hidden={focusMode||!!maximizedPanel||hostWindow.secondary}>
-      <div className="editor-results-stack"><section className="editor-workspace" data-env={visibleConnection.environment} data-inspector={Boolean(objectInspectorView)}><div className="commandbar" ref={commandBarRef} onDoubleClick={event=>{if(!event.target.closest('button,input,select,label'))togglePanelMaximized('editor')}}><div className="command-left">{runButton}{toolbarLayout.inline.map((item,index,list)=><Fragment key={item.id}>{(index===0||list[index-1].group!==item.group)&&<span className="toolbar-separator" />}{renderToolbarItem(item)}</Fragment>)}</div><div className="command-end"><EditorToolbarOverflow theme={theme} items={toolbarLayout.overflow.map(item=>({...toolbarDefs[item.id],id:item.id,kind:item.kind}))} pageSize={maxRows} onPageSize={setMaxRows}/><button className="icon-button panel-maximize" aria-label={maximizedPanel==='editor'?'Restore editor panel':'Maximize editor panel'} aria-pressed={maximizedPanel==='editor'} title="Temporarily maximize editor (Escape restores)" onClick={()=>togglePanelMaximized('editor')}>{maximizedPanel==='editor'?'↙':'↗'}</button></div></div><EditorTabs windowTargets={windowTargets} onMoveToWindow={(id,target)=>moveTabsToWindow([id],target)} onPromoteScratch={promoteScratch} onPromote={id=>setPreviewTabId(current=>current===id?null:current)} packageGroups={packageGroups} tabs={[...tabs.map(tab=>({...tab,preview:tab.id===previewTabId,isScratch:Boolean(tab.scratch&&!tab.path),connection:documentConnection(tab,tabSessions,dbConnections),sourceEdited:editedSinceExecution(tab,operations.metadata.get(tab.id)),queryFailed:['error','timeout'].includes(tabSessions[tab.id]?.queryOutcome?.kind),latestStatus:tabSessions[tab.id]?.cancelling?'Cancelling':tabSessions[tab.id]?.executing?'Executing':tabSessions[tab.id]?.runState||'No execution yet',profileName:dbConnections.find(p=>p.id===(tabSessions[tab.id]?.activeConnection?.id||tab.connectionProfileId))?.name,connectionProfileId:tabSessions[tab.id]?.activeConnection?.id||tab.connectionProfileId})), ...objectTabs.map(tab => ({ id: tab.id, name: `${tab.object.owner}.${tab.object.name}`, kind: 'object', connection:documentConnection({id:tab.originTabId},tabSessions,dbConnections), connectionProfileId:tabSessions[tab.originTabId]?.activeConnection?.id }))]} activeId={objectTabActive ? objectTabId : activeTabId} onActivate={id => { const selected = objectTabs.find(tab => tab.id === id); if (selected) { setActiveObjectTabId(id); setObjectTabActive(true); setActiveObject(selected.key); inspectOracleObject(selected.object,selected.originTabId,selected.view==='Related tables'); } else { setObjectTabActive(false); setActiveObject(''); activateTab(id); } }} onClose={id => { if (objectTabs.some(tab => tab.id === id)) { setObjectTabs(current => current.filter(tab => tab.id !== id)); if (activeObjectTabId === id) { setObjectTabActive(false); setActiveObjectTabId(null); objectAnalysisRequestRef.current?.cancel(); setObjectAnalysis(null); } } else closeTab(id); }} onCloseMany={ids => { const objectIds = new Set(objectTabs.map(tab => tab.id)); if (ids.includes(activeObjectTabId)) { setObjectTabActive(false); setActiveObjectTabId(null); objectAnalysisRequestRef.current?.cancel(); setObjectAnalysis(null); } setObjectTabs(current => current.filter(tab => !ids.includes(tab.id))); closeTabs(ids.filter(id => !objectIds.has(id))); }} onNew={() => { setObjectTabActive(false); setActiveObject(''); newSqlFile(); }} newOptions={{label:newQueryMainLabel(dbConnections,activeConnection?.id),profiles:newQueryProfileItems(dbConnections,activeConnection?.id),templates:newQueryTemplates,onProfile:id=>{setActiveObject('');newSqlFileOnProfile(id)},onTemplate:id=>{setActiveObject('');newSqlFileFromTemplate(id)}}}>{!objectInspectorView && filePath && <button className={fileConnectionProfileId === activeConnection.id ? "icon-button file-connection-button bound" : "icon-button file-connection-button"} title="Bind current connection to this file" aria-label="Bind current connection to this file" disabled={!isNativeHost || !workspace.root || ["No connection", "Disconnected"].includes(activeConnection.id)} onClick={bindCurrentConnectionToFile}><Database size={14} /></button>}</EditorTabs><div className="breadcrumb"><EnvironmentBadge environment={visibleConnection.environment} profileName={visibleConnection.profileName}/><span>{workspace.name}</span>{filePath && <><ChevronRight size={12} /><span>{filePath.split(/[\\/]/).slice(-2, -1)[0]}</span></>}<ChevronRight size={12} /><b>{objectTabActive&&inspectorObject?`${inspectorObject.owner}.${inspectorObject.name}`:fileName}{!objectTabActive&&fileDirty ? " *" : ""}</b>{!objectInspectorView&&<EditorSymbolBreadcrumb source={activeSource.declaration} schema={completionSchema} onNavigate={jumpToOffset} editor={editorRef.current} tabId={activeTabId} outline={documentOutline}/>}{filePath && <span className="file-connection-chip" title="Saved connection for this file"><Database size={11} />{(dbConnections.find(item => item.id === fileConnectionProfileId)?.name || fileConnectionProfileId) ?? "No profile bound"}</span>}</div>{!objectInspectorView&&<OracleSourceHeader onApi={()=>setShowPackageApi(true)} onCall={isNativeHost?openRunConfigurations:undefined} onCompile={!activeTabReadonly&&isNativeHost?reviewSourceForCompilation:undefined} compileDisabled={executing||fetchingPage||connecting||!!tabSession.scriptRun?.running} source={activeSource} related={relatedPackage} document={activeEditorTab} onSwitch={switchPackageSource} onFind={isNativeHost&&workspace.root&&!activeTabReadonly&&!activeSource.warning?()=>setRelatedSources({root:workspace.root,document:documents.active}):undefined}/>}{!objectInspectorView&&activeEditorTab?.sourceVersionNotice&&<div className="result-source-provenance" role="status">{activeEditorTab.sourceVersionNotice}</div>}{largePolicy.large&&<div className="large-file-notice" role="status"><b>Large file mode</b><span>{sql.length.toLocaleString()} characters · lightweight rendering. Enable only the analysis needed for this document:</span>{[['completion','Completion & navigation'],['diagnostics','Diagnostics'],['outline','Outline & folding'],['source','Source identity & comparison']].map(([feature,label])=><label key={feature}><input type="checkbox" aria-label={`Large file ${label}`} checked={largePolicy[feature]} onChange={event=>{const enabled=event.target.checked;setLargeFileOverrides(current=>({...current,[activeTabId]:{...current[activeTabId],[feature]:enabled}}))}}/>{label}</label>)}</div>}<ExternalFileNotice key={activeTabId} change={tabs.find(tab=>tab.id===activeTabId)?.externalChange} dirty={fileDirty} onReload={()=>resolveExternalFile(true)} onKeep={()=>resolveExternalFile(false)} onRetry={pollOpenFiles}/><div className="editor-container"><div className={`editor-sql-surface${sideEditor?' has-side-editor':''}`} hidden={Boolean(objectInspectorView)} onDragOverCapture={event=>{if(event.dataTransfer?.types?.includes('application/x-fbsdb-schema')){event.preventDefault();event.dataTransfer.dropEffect='copy'}}} onDropCapture={dropSchemaInEditor}><Suspense fallback={<div className="editor-loading">Loading SQL editor…</div>}><Editor height="100%" defaultLanguage="sql" value={sql} onChange={handleEditorChange} theme={editorThemeName} onMount={(editor, monacoInstance) => { setMonaco(monacoInstance);attachBindDrop(editor);
-    let trackedEditTab=documents.activeId;
-    editor.onDidChangeModelContent(event=>{const id=documents.activeId;if(controlledEditorUpdateRef.current||event.isEolChange){trackedEditTab=id;return;}if(trackedEditTab!==id){trackedEditTab=id;return;}if(event.isFlush){if(trackedEditTab===id)editLocationsRef.current.forget(id);trackedEditTab=id;return;}trackedEditTab=id;if(!documents.active?.readOnly)editLocationsRef.current.record(id,event.changes,editor.getModel()?.getValueLength()||0)});
-    editor.onDidChangeModelContent(event => { const accepted = lastSuggestionAcceptanceRef.current; if (event.isUndoing && accepted && accepted.tabId === documents.activeId && event.versionId === accepted.version + 1 && Date.now()-accepted.at < 10000 && completionSettingsRef.current.learning) { suggestionLearningRef.current.record(accepted.scope, accepted.context, accepted.key, -1); lastSuggestionAcceptanceRef.current = null; publishLearning(); } }); completionTabKeyRef.current = editor.createContextKey("fbsdb.acceptCompletionOnTab", completionSettings.acceptTab); completionAcceptanceRef.current = editor.addCommand(0, (_accessor, key, context) => { if (completionSettingsRef.current.learning) { const scope = suggestionScope(); suggestionLearningRef.current.record(scope, context || 'statement', key); lastSuggestionAcceptanceRef.current = { scope, context: context || 'statement', key, tabId: documents.activeId, version: editor.getModel().getVersionId(), at: Date.now() }; publishLearning(); } const tabId = documents.activeId; completionRecentRef.current.set(tabId, [key, ...(completionRecentRef.current.get(tabId) || []).filter(item => item !== key)].slice(0, 100)); completionClientRef.current?.remember(key); }); editor.addCommand(monacoInstance.KeyCode.Tab, () => { editor.trigger("keyboard", "hideSuggestWidget", {}); editor.trigger("keyboard", "editor.action.inlineSuggest.hide", {}); editor.trigger("keyboard", "tab", {}); }, "(suggestWidgetVisible || inlineSuggestionVisible) && editorTextFocus && !fbsdb.acceptCompletionOnTab"); editor.addAction({ id: "fbsdb.runStatement", label: "Run SQL statement", run: () => runQueryRef.current?.() }); editor.addAction({ id: "fbsdb.deleteLine", label: "Delete line", precondition: "editorTextFocus && !editorReadonly", run: () => editor.trigger("keyboard", "editor.action.deleteLines", {}) }); editor.addAction({ id: "fbsdb.formatSql", label: "Format SQL", run: () => formatterRef.current?.() }); editor.addAction({ id: 'fbsdb.smartEnter', label: 'Complete statement (Smart Enter)', precondition: 'editorTextFocus && !editorReadonly', run: () => smartEnterRef.current?.() }); editor.addAction({ id: 'fbsdb.quickFix', label: 'Quick fixes', keybindings: [monacoInstance.KeyMod.Alt | monacoInstance.KeyCode.Enter], precondition: 'editorTextFocus && !editorReadonly', run: () => quickFixRef.current?.() }); installRunGutter(editor, monacoInstance); plsqlDebugger.installEditor(editor, monacoInstance); plsqlProfiler.installEditor(editor, monacoInstance); insertPairProvidersRef.current?.dispose(); insertPairProvidersRef.current = installInsertPairProviders(monacoInstance); structuralSelectionRef.current?.dispose(); structuralSelectionRef.current = installStructuralSelection(monacoInstance); postfixProviderRef.current?.dispose(); postfixProviderRef.current = installPostfixCompletion(monacoInstance); editorRef.current = editor; lastEditorPositionRef.current = editor.getPosition(); editor.onDidChangeCursorPosition(({ position }) => { lastEditorPositionRef.current = position;editorPositionsRef.current.set(documents.activeId,position);projectionCursorRef.current?.(position);setCursorLine(position.lineNumber); }); editor.focus(); recordStartupMilestone("editor-ready"); editorPresentable(monacoInstance).then(() => { recordStartupMilestone("editor-presentable"); announceUiReady(); }); }} options={{ fontFamily: `"${resolveSetting(settings,"editor.fontFamily").value}", Consolas, monospace`, fontSize: codeStyle.fontSize, readOnly: activeTabReadonly, lineHeight: Math.max(codeStyle.fontSize + 2, resolveSetting(settings,"editor.lineHeight").value), minimap: { enabled: resolveSetting(settings,"editor.minimap").value, showRegionSectionHeaders: true, showMarkSectionHeaders: true }, padding: { top: 18, bottom: 18 }, lineNumbers: resolveSetting(settings,"editor.lineNumbers").value ? "on" : "off", renderLineHighlight: resolveSetting(settings,"editor.lineHighlight").value ? "line" : "none", renderWhitespace: resolveSetting(settings,"editor.whitespace").value ? "all" : "none", scrollBeyondLastLine: false, smoothScrolling: !reduceMotion, automaticLayout: true, contextmenu:false, wordWrap: resolveSetting(settings,"editor.wordWrap").value ? "on" : "off", glyphMargin: true, folding: resolveSetting(settings,"editor.folding").value, guides: { indentation: resolveSetting(settings,"editor.indentGuides").value, highlightActiveIndentation: resolveSetting(settings,"editor.indentGuides").value }, suggest: { showWords: false, showSnippets: completionSettings.snippets, preview: false }, inlineSuggest: { enabled: completionSettings.inline, mode: "prefix", showToolbar: "never", minShowDelay: completionSettings.delay, suppressSuggestions: false }, 'semanticHighlighting.enabled':resolveSetting(settings,'editor.semanticHighlighting').value&&!largePolicy.large,quickSuggestions: false, suggestOnTriggerCharacters: autoCompletion, acceptSuggestionOnEnter: completionSettings.acceptEnter ? "on" : "off", tabCompletion: completionSettings.acceptTab ? "on" : "off", parameterHints: { enabled: completionSettings.signatureHelp }, tabSize: codeStyle.tabSize, insertSpaces: codeStyle.insertSpaces, cursorBlinking: reduceMotion?"solid":resolveSetting(settings,"editor.cursorBlinking").value, cursorStyle: resolveSetting(settings,"editor.cursorStyle").value, cursorSmoothCaretAnimation: reduceMotion?"off":"on", bracketPairColorization: { enabled: resolveSetting(settings,"editor.bracketColors").value }, stickyScroll:{enabled:resolveSetting(settings,'editor.stickyHeaders').value,maxLineCount:4,defaultModel:'outlineModel'},codeLens: resolveSetting(settings,'editor.codeLenses').value&&!largePolicy.large, overviewRulerLanes: resolveSetting(settings,'editor.overviewRuler').value?3:0,overviewRulerBorder:false, fixedOverflowWidgets: true,...lightweightEditorOptions(largePolicy), find: { addExtraSpaceOnTop: false } }} /></Suspense>{sideEditor&&<SideEditorPane tabs={tabs} tabId={sideEditor.tabId} onTab={id=>setSideEditor({tabId:id})} onChange={(id,value)=>documents.editTab(id,value)} onClose={()=>setSideEditor(null)} theme={editorThemeName} options={sideEditorOptions}/>}</div>{objectInspectorView}{!objectInspectorView && objectDefinition && objectDefinition.originTabId === metadataOriginTabId && <Suspense fallback={<div role="status">Loading…</div>}><OracleDefinitionView hidden={focusMode} source={objectDefinition} onClose={() => setObjectDefinition(null)}/></Suspense>}</div><div className="editor-status" onContextMenu={event=>{if(event.target.closest('input,select,textarea'))return;event.preventDefault();setStatusMenu({tabId:activeTabId,x:event.clientX,y:event.clientY,trigger:event.currentTarget,model:null,version:0,selection:null})}}><EditorSessionStatus sourceEdited={editedSinceExecution(activeEditorTab||{},operations.metadata.get(activeTabId))} executionTarget={tabSession.executionTarget} inactive={Boolean(tabSession.inactive)} editor={editorRef.current} tabId={activeTabId} connection={activeConnection} connected={sessionConnected} connecting={connecting} executing={executing} cancelling={cancelling} fetching={fetchingPage} startedAt={tabSession.operationStartedAt} stage={tabSession.sqlStage} readOnlyAnalysis={tabSession.analysisReadOnly} transactionPending={transactionPending} exporting={Boolean(view.streamState?.busy)} /><span>SQL</span><button type="button" className="status-overview" aria-label="Next local change" disabled={!overview.ranges.length} onClick={overview.next} title="Overview ruler: diagnostics, find matches, and local changes (left lane). Click the ruler to scroll to a location.">{overview.label}</button>{enabledStatusIndicators.map(id=>{const item=statusIndicatorContent(id,buildStatusContext());if(!item)return null;const inner=<>{item.icon==='code'&&<Code2 size={12} />}{item.text}</>;return item.action?<button type="button" key={id} className="status-indicator" data-indicator={id} title={item.title} onClick={()=>statusIndicatorAction(item.action)}>{inner}</button>:<span key={id} className="status-indicator" data-indicator={id} title={item.title}>{inner}</span>})}<button type="button" className="status-intellisense saved-state editor-save-button" title={activeTabReadonly ? "Read only" : "Save SQL file (Ctrl+S)"} aria-label={activeTabReadonly ? "Read only" : "Save SQL file (Ctrl+S)"} disabled={activeTabReadonly} onClick={() => saveSqlFile()}>{activeTabReadonly ? <><LockKeyhole size={12} /> Read only</> : fileDirty ? <><Save size={12} /> Unsaved</> : <><Save size={12} /> Saved</>}</button></div></section>
+      <div className="editor-results-stack">{renderEditorWorkspace({
+      activateTab, activeConnection, activeEditorTab, activeObjectTabId, activeSource, activeTabId, activeTabReadonly, attachBindDrop,
+      autoCompletion, bindCurrentConnectionToFile, buildStatusContext, cancelling, closeTab, closeTabs, codeStyle, commandBarRef,
+      completionAcceptanceRef, completionClientRef, completionRecentRef, completionSchema, completionSettings, completionSettingsRef,
+      completionTabKeyRef, connecting, controlledEditorUpdateRef, dbConnections, documentOutline, documents, dropSchemaInEditor,
+      editLocationsRef, editorPositionsRef, editorRef, editorThemeName, enabledStatusIndicators, executing, fetchingPage,
+      fileConnectionProfileId, fileDirty, fileName, filePath, focusMode, formatterRef, handleEditorChange, insertPairProvidersRef,
+      inspectOracleObject, inspectorObject, installRunGutter, jumpToOffset, largePolicy, lastEditorPositionRef, lastSuggestionAcceptanceRef,
+      maxRows, maximizedPanel, metadataOriginTabId, moveTabsToWindow, newSqlFile, newSqlFileFromTemplate, newSqlFileOnProfile,
+      objectAnalysisRequestRef, objectDefinition, objectInspectorView, objectTabActive, objectTabId, objectTabs, openRunConfigurations,
+      operations, overview, packageGroups, plsqlDebugger, plsqlProfiler, pollOpenFiles, postfixProviderRef, previewTabId,
+      projectionCursorRef, promoteScratch, publishLearning, quickFixRef, reduceMotion, relatedPackage, renderToolbarItem,
+      resolveExternalFile, reviewSourceForCompilation, runButton, runQueryRef, saveSqlFile, sessionConnected, setActiveObject,
+      setActiveObjectTabId, setCursorLine, setLargeFileOverrides, setMaxRows, setMonaco, setObjectAnalysis, setObjectDefinition,
+      setObjectTabActive, setObjectTabs, setPreviewTabId, setRelatedSources, setShowPackageApi, setSideEditor, setStatusMenu, settings,
+      sideEditor, sideEditorOptions, smartEnterRef, sql, statusIndicatorAction, structuralSelectionRef, suggestionLearningRef,
+      suggestionScope, switchPackageSource, tabSession, tabSessions, tabs, theme, togglePanelMaximized, toolbarDefs, toolbarLayout,
+      transactionPending, view, visibleConnection, windowTargets, workspace
+    })}
       <ResizeHandle locked={layout.locked} axis="y" value={resultsHeight} onChange={value=>{setFocusMode(false);setResultsHeight(value)}} min={15} max={70} label="Resize results" panelSelector=".result-panel" />
-      <section className="result-panel" data-collapsed={bottomCollapsed}>
-        <div className="result-header" onDoubleClick={event=>{if(!event.target.closest('button,input,select'))togglePanelMaximized('results')}}><button className="icon-button panel-maximize" aria-label={maximizedPanel==='results'?'Restore results panel':'Maximize results panel'} aria-pressed={maximizedPanel==='results'} title="Temporarily maximize results (Escape restores)" onClick={()=>togglePanelMaximized('results')}>{maximizedPanel==='results'?'↙':'↗'}</button><div className="result-tabs">
-          <button className={resultTab === "Results" ? "active" : ""} onClick={() => { updateLayout(current => ({ ...current, resultsCollapsed: false })); setFocusMode(false); setResultTab("Results"); }}><Table2 size={14} /> Results{queryResult && <span className="result-tab-count">{queryResult.returnedRows ?? queryResult.rowsAffected ?? ""}</span>}</button>
-          <button className={resultTab === "Output" ? "active" : ""} onClick={() => { updateLayout(current => ({ ...current, resultsCollapsed: false })); setFocusMode(false); setResultTab("Output"); }}><Terminal size={14} /> Output</button>
-          <button className={resultTab === "Problems" ? "active" : ""} onClick={() => { updateLayout(current => ({ ...current, resultsCollapsed: false })); setFocusMode(false); setResultTab("Problems"); }} title="SQL and PL/SQL problems (F8 / Shift+F8)"><CircleHelp size={14} /> Problems{activeProblems.length > 0 && <span className="result-tab-count">{activeProblems.length}</span>}</button>
-          <button className={resultTab === "Explain" ? "active" : ""} onClick={() => { updateLayout(current => ({ ...current, resultsCollapsed: false })); setFocusMode(false); setResultTab("Explain"); }} title="View the last execution plan"><Activity size={14} /> Explain plan</button>
-        </div><button className="icon-button result-panel-collapse" aria-label={bottomCollapsed ? "Restore bottom panel" : "Minimize bottom panel"} title={bottomCollapsed ? "Restore bottom panel" : "Minimize bottom panel"} onClick={() => { setFocusMode(false); updateLayout(current => ({ ...current, resultsCollapsed: !bottomCollapsed })); }}><ChevronDown size={14} style={{ transform: bottomCollapsed ? "rotate(180deg)" : undefined }}/></button></div>
-        {resultTab === "Results" && <div className="result-set-tabs">
-          <input aria-label="Search result sets" placeholder="Search results" value={resultSetSearch} onChange={event => setResultSetSearch(event.target.value)} />
-          <button title="Double-click to rename latest result" onDoubleClick={() => { setRenameResult("latest"); setNewResultName(view.latestResultName || "Latest"); }} className={!view.selectedResultKey ? "active" : ""} onClick={() => updateTabResult("selectedResultKey", null)}>{view.latestResultName || "Latest"}</button>
-          {(view.resultSets || []).filter(item => item.pinned && (item.label + " " + (item.result.executedSql || "")).toLowerCase().includes(resultSetSearch.toLowerCase())).map(item => <div key={item.key} className={view.selectedResultKey === item.key ? "active" : ""}>
-            <button title={item.result.executedSql + " · Double-click to rename"} onDoubleClick={() => { setRenameResult(item.key); setNewResultName(item.label); }} onClick={() => updateTabResult("selectedResultKey", item.key)}>{item.pinned ? "◆ " : ""}{item.label}</button>
-            <button aria-label="Close result set" onClick={() => { if (item.result.resultId && item.result.resultId !== view.queryResult?.resultId && !(view.resultSets || []).some(other => other.key !== item.key && other.result.resultId === item.result.resultId)) sendNativeCommand("sql.closeResult", { resultId: item.result.resultId }); updateTabResult("resultSets", sets => sets.filter(value => value.key !== item.key)); if (view.selectedResultKey === item.key) updateTabResult("selectedResultKey", null); }}>×</button>
-          </div>)}
-        </div>}
-        {['Results','Output'].includes(resultTab)&&<StackTraceLinks items={tabSession.runtimeProblems} onNavigate={navigateProblem}/>}
-        {['Results','Output'].includes(resultTab)&&<ResultSourceProvenance result={resultTab==='Output'?view.outputProvenance:queryResult} document={activeEditorTab||{}} connection={editorConnection} context={tabSession.sessionContext}/>}
-        {resultTab === "Problems" ? <ProblemsPanel onReturnToEditor={()=>editorRef.current?.focus()} items={allProblems} activeTabId={activeTabId} onNavigate={navigateProblem} /> : resultTab === "Explain" ? <Suspense fallback={<div role="status">Loading…</div>}><ExplainPlanView result={explainResult} loading={executing && executionKind === "explain"} error={explainMessage} mode={view.planPresentation || "diagram"} onModeChange={mode => updateTabResult("planPresentation", mode, activeTabId)} /></Suspense> : resultTab === "Results"
-          ? <SqlResultsView transactionOpen={transactionPending} onFindObject={()=>setPaletteMode('files')} onRun={()=>runQueryRef.current?.()} runShortcut={resolveSetting(settings,'editor.shortcuts').value.run}
-              liveAppearance={resultTab==='Results'&&resultLiveAppearance?.key===currentAppearanceKey?resultLiveAppearance:null} onAppearanceApplied={sequence=>setResultLiveAppearance(current=>current?.sequence===sequence?null:current)}
-              budget={{maxRows:resolveSetting(settings,'results.budgetRows').value,maxMemoryMb:resolveSetting(settings,'results.budgetMemoryMb').value,action:resolveSetting(settings,'results.budgetAction').value}}
-              onSelectionSummary={summary=>updateTabResult('selectionSummary',summary,activeTabId)} onExportInsert={exportResultsInsertSql} onSmartObject={showSmartObject} linkedColumn={linkedProjectionColumn} onColumnSource={showProjectionSource}
-              sourceDefinition={definition?.tabId === activeTabId ? definition : null}
-              onCloseSourceDefinition={() => { const owner = documents.activeId, requestId = sourceDefinitionRequestRef.current.get(owner); if (requestId) operations.owners.delete(requestId); sourceDefinitionRequestRef.current.delete(owner); setDefinition(null); }}
-              memoryItems={[{ key: "latest", label: view.latestResultName || "Latest", result: view.queryResult }, ...(view.resultSets || []).filter(item => item.pinned)].filter(item => item.result).map(item => ({ ...item, memoryKB: Math.round(estimateResultMemory(item.result) / 1024) }))}
-              onReleaseResult={releaseResult} onPin={pinCurrentResult} onExplain={explainQuery}
-              key={`${activeTabId}:${resultTab}:${view.selectedResultKey || "latest"}:${sqlResult?.viewIdentity||sqlResult?.resultId||"empty"}`}
-              initialView={(resultTab === "Results" && view.selectedResultKey ? view.resultSets?.find(item => item.key === view.selectedResultKey)?.view : view[resultTab === "Explain" ? "planView" : "queryView"]) || {}}
-              onViewStateChange={state => { if (resultTab === "Results" && view.selectedResultKey) updateTabResult("resultSets", sets => (sets || []).map(item => item.key === view.selectedResultKey ? { ...item, view: state } : item), activeTabId); else updateTabResult(resultTab === "Explain" ? "planView" : "queryView", state, activeTabId); }}
-              onMetadata={metadata => { const url = URL.createObjectURL(new Blob([JSON.stringify(metadata, null, 2)], { type: "application/json" })), link = document.createElement("a"); link.href = url; link.download = "result-metadata.json"; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0); }}
-              onGenerateSql={sql => sendNativeCommand("result.openSql", { sql })}
-              onSourceDefinition={column => { const owner = documents.activeId; setDefinition(null); const requestId = sendNativeCommand("result.columnDefinition", { column, tabId: owner }); if (requestId) { sourceDefinitionRequestRef.current.set(owner, requestId); operations.owners.set(requestId, owner); } }}
-              onUpdateDraft={(columns, rows) => sendNativeCommand("result.updateDraft", { columns, rows })}
-              connected={sessionConnected} onConnect={()=>setShowPicker(true)} onEdit={()=>editorRef.current?.focus()} onClearServerFilter={()=>{const base=queryResult?.serverFilter;if(base&&!executing&&!fetchingPage&&!view.streamState?.busy)executeStatement(base.sql,base.parameters);}} onServerFilter={applyServerFilters} onExportColumns={exportChosenColumns} onLookup={requestPrimaryKey}
-              onClearFilter={() => setResultFilter("")} onChildren={openChildRecords} onSql={insertEditorText} onRelated={openRelatedRecords}
-              onStreamExport={streamResultToFile} streamState={view.streamState} onCancelExport={() => sendNativeCommand("result.cancelExport",{tabId:activeTabId})}
-              result={sqlResult} onResultRendered={resultRenderMeasured} region={region} language={language} editorSql={sql} runState={runState} executing={executing && (resultTab === "Explain" ? executionKind === "explain" : executionKind !== "explain")}
-              startedAt={tabSession.operationStartedAt} outcome={!view.selectedResultKey?tabSession.queryOutcome:null} onCancel={()=>cancelQuery(activeTabId,tabSession.scriptRun?.running||fetchingPage?undefined:tabSession.queryRequestId)}
-              cancelling={cancelling} filter={resultTab === "Explain" ? "" : resultFilter} pageSize={maxRows}
-              onFetchMore={resultTab === "Explain" ? undefined : fetchMoreResults}
-              fetching={resultTab === "Results" && fetchingPage && pageRequestRef.current?.owner === activeTabId}
-              pageError={resultTab === "Results" ? pageError : ""}
-            />
-          : /ORA-\d+/i.test(panelMessage||'') ? <ActionableState className="output-empty" title={/ORA-0*1031\b/i.test(panelMessage)?'Oracle access denied':/ORA-0*942\b/i.test(panelMessage)?'Oracle object missing or inaccessible':'Oracle execution error'} detail={panelMessage} action={/ORA-0*1031\b/i.test(panelMessage)?'Choose another profile':'Return to SQL'} onAction={()=>/ORA-0*1031\b/i.test(panelMessage)?setShowPicker(true):editorRef.current?.focus()}/>: <div className="output-empty"><div className="output-icon"><BookOpen size={18}/></div><b>{panelMessage?'DBMS_OUTPUT':'No output messages'}</b><span>{panelMessage||'DBMS_OUTPUT and execution notices appear here.'}</span></div>}
-      </section>
+      {renderResultPanel({
+      activeEditorTab, activeProblems, activeTabId, allProblems, applyServerFilters, bottomCollapsed, cancelQuery, cancelling,
+      currentAppearanceKey, definition, documents, editorConnection, editorRef, executeStatement, executing, executionKind, explainMessage,
+      explainQuery, explainResult, exportChosenColumns, exportResultsInsertSql, fetchMoreResults, fetchingPage, insertEditorText, language,
+      linkedProjectionColumn, maxRows, maximizedPanel, navigateProblem, openChildRecords, openRelatedRecords, operations, pageError,
+      pageRequestRef, panelMessage, pinCurrentResult, queryResult, region, releaseResult, requestPrimaryKey, resultFilter,
+      resultLiveAppearance, resultRenderMeasured, resultSetSearch, resultTab, runQueryRef, runState, sessionConnected, setDefinition,
+      setFocusMode, setNewResultName, setPaletteMode, setRenameResult, setResultFilter, setResultLiveAppearance, setResultSetSearch,
+      setResultTab, setShowPicker, settings, showProjectionSource, showSmartObject, sourceDefinitionRequestRef, sql, sqlResult,
+      streamResultToFile, tabSession, togglePanelMaximized, transactionPending, updateLayout, updateTabResult, view
+    })}
     </div>
       </DockWorkbench></LayoutLockContext.Provider>
     </div>

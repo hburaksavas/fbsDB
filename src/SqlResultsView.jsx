@@ -33,7 +33,8 @@ function ResultRenderMeasurement({result,onMeasured}){
   return null;
 }
 
-export function SqlResultsView({ onRun, runShortcut, onFindObject, result, editorSql, runState, executing, cancelling, outcome,startedAt,onCancel, filter = "", pageSize = 1000, region,language='en',onFetchMore, fetching = false, pageError = "", initialView = {}, onViewStateChange, onResultRendered,onSql, onRelated, onStreamExport, streamState, onCancelExport, onServerFilter, onClearServerFilter, onConnect, connected, transactionOpen, onEdit, onExportColumns, onLookup, onClearFilter, onChildren, onSourceDefinition,sourceDefinition,onCloseSourceDefinition, onUpdateDraft,onGenerateSql,onMetadata,onPin,onExplain,memoryItems=[],onReleaseResult,onExportInsert,liveAppearance,onAppearanceApplied,onSelectionSummary,onSmartObject,linkedColumn,onColumnSource,budget }) {
+export function SqlResultsView({ actions = {}, runShortcut, result, editorSql, runState, executing, cancelling, outcome, startedAt, filter = "", pageSize = 1000, region, language='en', fetching = false, pageError = "", initialView = {}, streamState, connected, transactionOpen, sourceDefinition, memoryItems=[], liveAppearance, linkedColumn, budget }) {
+  const { onRun, onFindObject, onCancel, onFetchMore, onViewStateChange, onResultRendered, onSql, onRelated, onStreamExport, onCancelExport, onServerFilter, onClearServerFilter, onConnect, onEdit, onExportColumns, onLookup, onClearFilter, onChildren, onSourceDefinition, onCloseSourceDefinition, onUpdateDraft, onGenerateSql, onMetadata, onPin, onExplain, onReleaseResult, onExportInsert, onAppearanceApplied, onSelectionSummary, onSmartObject, onColumnSource } = actions;
   const [page, setPage] = useState(initialView.page || 0), [requestedPage, setRequestedPage] = useState(null);
   const [sortColumn, setSortColumn] = useState(initialView.sortColumn ?? -1);
   const [sortDirection, setSortDirection] = useState(initialView.sortDirection || "asc");

@@ -40,9 +40,13 @@ Result editing is local until the user applies it. `src/gridEditability.js` deci
 
 - `SqlResultsView.jsx`, `ConnectionPicker.jsx`, `OracleObjectTree.jsx` and `ResizeHandle.jsx` are ordinary components.
 - `lazyViews.js` declares every view that is loaded on first use.
-- `WorkbenchCommandPalette.jsx`, `WorkbenchToolDialogs.jsx`, `WorkbenchEditorDialogs.jsx`, `WorkbenchOverlays.jsx` and `WorkbenchPrompts.jsx` each export one `render…(ctx)` function. `App` calls it inside its own return and passes the values the markup reads. These are functions, not components, on purpose: they add no component boundary, so state, effects and render order stay exactly as they were when the markup was written inline.
+- `WorkbenchCommandPalette.jsx`, `WorkbenchToolDialogs.jsx`, `WorkbenchEditorDialogs.jsx`, `WorkbenchOverlays.jsx`, `WorkbenchPrompts.jsx`, `WorkbenchEditorWorkspace.jsx` (toolbar, tabs, breadcrumb and the Monaco editor) and `WorkbenchResultPanel.jsx` (results, problems and output tabs) each export one `render…(ctx)` function. `App` calls it inside its own return and passes the values the markup reads. These are functions, not components, on purpose: they add no component boundary, so state, effects and render order stay exactly as they were when the markup was written inline.
+- `WorkbenchNativeMessages.jsx` holds the handler of native host messages. App's mount effect is `useEffect(() => subscribeWorkbenchMessages({ … }), [])`. The object is built when the effect runs, not during the render, because some of the values it passes are declared further down in `App`; it therefore holds exactly the values the effect read when it was written inline.
+- `ResultsGridView.jsx` follows the same pattern for `ResultsGrid.jsx`: `renderResultsGridView(ctx)` is the grid's return value.
 
 A `render…` function must not call hooks and must not assign to a value it receives. To move more markup out, pass every `App` value the moved lines read and nothing else; a name that is missing from `ctx` is an unresolved identifier, which `tsc --allowJs --checkJs` reports as "Cannot find name".
+
+`SqlResultsView` takes its callbacks in one `actions` prop (`actions={{ onRun, onCancel, … }}`); every other prop is passed as before.
 
 ## Error log
 
