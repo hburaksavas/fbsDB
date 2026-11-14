@@ -97,7 +97,7 @@ public sealed partial class MainPage
                     if(Uri.TryCreate(payload.GetProperty("url").GetString(),UriKind.Absolute,out var url)&&url.Scheme is "http" or "https" or "mailto")await Windows.System.Launcher.LaunchUriAsync(url);
                     break;
                 case "result.columnDefinition": {
-                    var column=payload.GetProperty("column");var definition=await Task.Run(()=>_oracle.GetColumnDefinitionAsync(column.GetProperty("sourceSchema").GetString()??"",column.GetProperty("sourceTable").GetString()??"",column.GetProperty("sourceColumn").GetString()??column.GetProperty("name").GetString()!));Send(sender,new{type="result.columnDefinition",requestId=id,definition});break;
+                    var column=payload.GetProperty("column");var definition=await Task.Run(()=>_oracle.GetColumnDefinitionAsync(OptionalText(column,"sourceSchema"),column.GetProperty("sourceTable").GetString()??"",OptionalText(column,"sourceColumn") is {Length:>0} sourceName?sourceName:column.GetProperty("name").GetString()!));Send(sender,new{type="result.columnDefinition",requestId=id,definition});break;
                 }
                 case "result.updateDraft": {
                     var columns=JsonSerializer.Deserialize<SqlColumn[]>(payload.GetProperty("columns").GetRawText(),WebJsonOptions)??[];
@@ -153,7 +153,7 @@ public sealed partial class MainPage
                 }
                 case "result.children": {
                     var column=payload.GetProperty("column");var values=payload.GetProperty("rowValues").EnumerateObject().ToDictionary(p=>p.Name,p=>ReadWireValue(p.Value));
-                    var links=await Task.Run(()=>_oracle.ChildRecordsSqlAsync(column.GetProperty("sourceSchema").GetString()??"",column.GetProperty("sourceTable").GetString()??"",values));Send(sender,new{type="result.children",requestId=id,links,message="No child relationship with all required values was found."});break;
+                    var links=await Task.Run(()=>_oracle.ChildRecordsSqlAsync(OptionalText(column,"sourceSchema"),column.GetProperty("sourceTable").GetString()??"",values));Send(sender,new{type="result.children",requestId=id,links,message="No child relationship with all required values was found."});break;
                 }
                 case "result.exportSql": {
                     var picker = new FileSavePicker { SuggestedStartLocation = PickerLocationId.DocumentsLibrary, SuggestedFileName = "merge-draft.sql" };
@@ -171,7 +171,7 @@ public sealed partial class MainPage
                     var relatedValue = payload.GetProperty("value");
                     object? value = ReadWireValue(relatedValue);
                     var relatedRow = payload.TryGetProperty("rowValues", out var rowValues) ? rowValues.EnumerateObject().ToDictionary(p => p.Name, p => ReadWireValue(p.Value)) : null;
-                    var relatedSql = await Task.Run(() => _oracle.RelatedRecordsSqlAsync(relatedColumn.GetProperty("sourceSchema").GetString() ?? "", relatedColumn.GetProperty("sourceTable").GetString() ?? "", relatedColumn.GetProperty("sourceColumn").GetString() ?? relatedColumn.GetProperty("name").GetString()!, value, relatedRow));
+                    var relatedSql = await Task.Run(() => _oracle.RelatedRecordsSqlAsync(OptionalText(relatedColumn, "sourceSchema"), relatedColumn.GetProperty("sourceTable").GetString() ?? "", OptionalText(relatedColumn, "sourceColumn") is { Length: > 0 } relatedName ? relatedName : relatedColumn.GetProperty("name").GetString()!, value, relatedRow));
                     Send(sender, new { type = "result.related", requestId = id, sql = relatedSql, message = "No foreign key with all required non-NULL columns was found for this value." });
                     break;
                 case "sql.closeResult":
@@ -738,6 +738,8 @@ public sealed partial class MainPage
             }
         }
 
+        // A column from a query without a schema prefix has no sourceSchema; absent and null both mean the current schema.
+        private static string OptionalText(JsonElement item, string name) => item.TryGetProperty(name, out var found) && found.ValueKind == JsonValueKind.String ? found.GetString() ?? "" : "";
         private static object? ReadWireValue(JsonElement value) => value.ValueKind switch {
             JsonValueKind.Null => null,
             JsonValueKind.Number => value.GetDecimal(),

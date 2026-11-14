@@ -431,6 +431,36 @@ try{
     assert.deepEqual((await read('SELECT 49 FROM dual'))[0],['49'],'Saved credentials no longer connect after the rename.');
     await showTab(tabB);
   });
+
+  await check('foreign key: the cell menu opens the referenced row and the referencing rows in new tabs and runs them there',async()=>{
+    const cells=()=>cdp.evaluate(`[...document.querySelectorAll('[data-cell]')].map(cell=>cell.textContent.trim())`);
+    const menu=async(cell,label)=>{
+      await cdp.evaluate(`(()=>{const e=document.querySelector('[data-cell="${cell}"]'),r=e.getBoundingClientRect();e.dispatchEvent(new PointerEvent('pointerdown',{bubbles:true,button:0}));window.dispatchEvent(new PointerEvent('pointerup'));e.dispatchEvent(new MouseEvent('contextmenu',{clientX:r.left+5,clientY:r.top+5,bubbles:true,cancelable:true}))})()`);
+      await cdp.until(`[...document.querySelectorAll('.result-quick-menu button')].some(b=>b.textContent.trim()===${JSON.stringify(label)}&&!b.disabled)`,label+' offered',20000);
+      await cdp.textClick('.result-quick-menu button',label);
+    };
+    try{
+      await run(`CREATE TABLE ${PARENT} (ID NUMBER PRIMARY KEY, NAME VARCHAR2(20))`,{ddl:true});
+      await run(`CREATE TABLE ${CHILD} (ID NUMBER PRIMARY KEY, PARENT_ID NUMBER REFERENCES ${PARENT}(ID))`,{ddl:true});
+      await run(`INSERT INTO ${PARENT} VALUES (7,'Seven')`);await run(`INSERT INTO ${CHILD} VALUES (31,7)`);await run('COMMIT');
+      assert.deepEqual(await read(`SELECT ID, PARENT_ID FROM ${CHILD}`),[['31','7']]);
+      await menu('0:1','Go to referenced row');
+      await cdp.until(`document.querySelector('.file-tab.active')?.dataset.editorTab!==${JSON.stringify(tabB)}&&${editor}?.getValue().includes(${JSON.stringify(PARENT)})`,'Referenced row query opened in a new tab',20000);
+      const parentTab=await activeTab();
+      // Nothing is pressed here: the new tab connects with its own session and runs the SELECT itself.
+      await cdp.until(`[...document.querySelectorAll('[data-cell]')].some(cell=>cell.textContent.trim()==='Seven')`,'Referenced row shown without pressing Run',60000);
+      assert.deepEqual(await cells(),['7','Seven']);
+      await menu('0:0','Show referencing rows…');
+      await cdp.until(`[...document.querySelectorAll('.result-settings-links button')].some(b=>b.textContent.includes(${JSON.stringify(CHILD)}))`,'Referencing tables listed',20000);
+      await cdp.evaluate(`[...document.querySelectorAll('.result-settings-links button')].find(b=>b.textContent.includes(${JSON.stringify(CHILD)})).click()`);
+      await cdp.until(`document.querySelector('.file-tab.active')?.dataset.editorTab!==${JSON.stringify(parentTab)}&&${editor}?.getValue().includes(${JSON.stringify(CHILD)})`,'Referencing rows query opened in a new tab',20000);
+      await cdp.until(`[...document.querySelectorAll('[data-cell]')].some(cell=>cell.textContent.trim()==='31')`,'Referencing rows shown without pressing Run',60000);
+      assert.deepEqual(await cells(),['31','7']);
+    }finally{
+      await showTab(tabB);
+      for(const table of [CHILD,PARENT])await run(`BEGIN EXECUTE IMMEDIATE 'DROP TABLE ${table} PURGE'; EXCEPTION WHEN OTHERS THEN IF SQLCODE != -942 THEN RAISE; END IF; END;`);
+    }
+  });
 }catch(error){
   failure=error;
   // Taken before cleanup, while the screen still shows the failure.
