@@ -17,7 +17,7 @@ import './RunMenu';
 import { configureFeedback } from './feedbackStore';
 import { useFeedbackState, notifyFeedback, dismissFeedback, setFeedbackScopes } from './Feedback';
 import { objectSqlDraft, qualifiedObject, editableObjectDefinition } from './oracleObjectActions.js';
-import { matchesShortcut, editorShortcutActions } from './editorShortcuts.js';
+import './editorShortcuts.js';
 import { sqlFormatterStyle } from './sqlFormatterSettings.js';
 import { SuggestionLearning, learningScope } from './suggestionLearning.js';
 import { automaticCompletionAllowed } from './oracleCompletionContext.js';
@@ -33,7 +33,7 @@ import './WorkspaceOpenPopup';
 import './ExternalFileNotice';
 import {describeOracleSource, relatedPackageDocument, packageDocumentGroups} from './oracleSourceIdentity.js';
 import './OracleSourceHeader';
-import { projectUsage as loadProjectUsage } from './projectUsageCache.js';
+import './projectUsageCache.js';
 import { explainExpressionAt } from './expressionExplain.js';
 import './SideEditorPane.jsx';
 import { newQueryTemplates } from './newQueryOptions';
@@ -41,7 +41,7 @@ import {dismissShortcutHint,nextShortcutHint} from './shortcutCoach';
 import { sourceRunConfigurations } from './runConfigurations';
 import { documentConnection } from './executionContext';
 import './ExecutionContextBadges';
-import { prepareSourceCompilation, sourceCompilationUnits, sourceIdentity } from './sourceCompilation';
+import { prepareSourceCompilation } from './sourceCompilation';
 import { projectOptions } from './projectRules';
 import './FileMenu';
 import './ViewMenu';
@@ -72,7 +72,7 @@ import './insertPairProviders';
 import {smartEnter} from './smartEnter';
 import './structuralSelection';
 import {layoutToolbar} from './editorToolbarModel';
-import { bindAtOffset } from './bindContext';
+import './bindContext';
 import {docSkeletonAt} from './docSkeleton';
 import {minimapSections,minimapLabel} from './minimapSections';
 import './statusBarModel';
@@ -124,7 +124,7 @@ import { getOracleBindNames } from "./oracleBinds";
 import { getSqlStatements } from "./sqlStatements.js";
 import { OracleCompletionClient } from "./oracleCompletionClient";
 import { OracleMetadataBroker, completionCancellation } from "./oracleMetadataBroker";
-import { installOracleLanguageProviders } from "./oracleLanguageProviders";
+import "./oracleLanguageProviders";
 import { hostWindow } from "./hostWindow.js";
 import { usePlsqlDebugger } from "./usePlsqlDebugger.js";
 import { DebugPanel, DebugCompileDialog } from "./DebugPanel.jsx";
@@ -151,6 +151,8 @@ import { renderFooter } from './WorkbenchFooter.jsx';
 import { renderDockPanels } from './WorkbenchDockPanels.jsx';
 import { renderToolbarDefs } from './WorkbenchToolbarDefs.jsx';
 import { renderManagementContent } from './WorkbenchManagementContent.jsx';
+import { installWorkbenchShortcuts, installEditorShortcuts } from './WorkbenchShortcutEffects.js';
+import { reviewSourceBaselines, installLanguageProviders, scheduleDiagnostics, installEditorContextMenu } from './WorkbenchEditorEffects.js';
 
 const EMPTY_SCHEMA_OBJECTS = [];
 const mockConnections = [
@@ -613,21 +615,9 @@ export function App() {
   const metadataOriginTabId = activeEditorTab?.metadataOriginTabId || activeTabId;
   const completionSession = tabSessions[metadataOriginTabId] || {};
   useEffect(()=>{setObjectMenu(null)},[activeTabId,metadataOriginTabId,completionSession.activeConnection?.id,completionSession.connecting,completionMetadataRef.current.session(metadataOriginTabId).epoch]);
-  useEffect(()=>{
-    const tab=documents.active,session=tabSessions[tab?.id]||{},profile=session.activeConnection?.id;
-    if(!largePolicy.source||!isNativeHost||!tab?.path||tab.readOnly||!profile||['No connection','Disconnected'].includes(profile)||session.connectionLost||session.executing||session.connecting||session.inactive||session.scriptRun?.running)return;
-    const timer=setTimeout(()=>{
-      for(const prepared of sourceCompilationUnits(tab,workspace.projectRules).slice(0,32)){
-        const identity=sourceIdentity(prepared.declaration);
-        const key=JSON.stringify([tab.id,tab.path,profile,identity,completionSession.schemaOwner]);
-        if(sourceBaselineAttempts.current.has(key))continue;
-        sourceBaselineAttempts.current.add(key);
-        const request=sendNativeCommand('source.review',{tabId:tab.id,sql:prepared.sql});
-        sourceBaselineRequests.current.set(request,{tabId:tab.id,profile,key,identity});
-      }
-    },300);
-    return()=>clearTimeout(timer);
-  },[activeTabId,filePath,sql,tabSession.activeConnection?.id,tabSession.executing,tabSession.connecting,tabSession.inactive,tabSession.connectionLost,tabSession.scriptRun?.running,workspace.projectRules,completionSession.schemaOwner,largePolicy.source]);
+  useEffect(()=>reviewSourceBaselines({
+    completionSession, documents, largePolicy, sourceBaselineAttempts, sourceBaselineRequests, tabSessions, workspace
+  }),[activeTabId,filePath,sql,tabSession.activeConnection?.id,tabSession.executing,tabSession.connecting,tabSession.inactive,tabSession.connectionLost,tabSession.scriptRun?.running,workspace.projectRules,completionSession.schemaOwner,largePolicy.source]);
   const completionObjects = completionSession.schemaObjects || EMPTY_SCHEMA_OBJECTS;
   const completionSchema = completionSession.schemaOwner || "";
   const completionSettingsRef = useRef(completionSettings); completionSettingsRef.current = completionSettings;
@@ -768,39 +758,12 @@ export function App() {
     return () => window.removeEventListener("keydown", manualCompletion, true);
   }, []);
 
-  useEffect(() => {
-    const handler = (event) => {
-      if(event.altKey&&event.shiftKey&&!event.ctrlKey&&!event.metaKey&&event.key.toLowerCase()==='o'&&!document.querySelector('.modal-backdrop')&&isNativeHost&&workspace.root&&editorRef.current?.hasTextFocus()){event.preventDefault();setRelatedSources({root:workspace.root,document:documents.active});return;}
-      if(event.altKey&&!event.ctrlKey&&!event.metaKey&&!event.shiftKey&&event.key.toLowerCase()==='o'&&!document.querySelector('.modal-backdrop')&&editorRef.current?.hasTextFocus()){event.preventDefault();switchPackageSource();return;}
-      if(editorRef.current?.hasTextFocus()&&!document.querySelector('.modal-backdrop')){
-        const shortcuts=resolveSetting(settingsRef.current,'editor.shortcuts').value;
-        if(matchesShortcut(event,shortcuts.bookmark)){event.preventDefault();setShowBookmarks(true);return}
-        if(matchesShortcut(event,shortcuts.nextBookmark)){event.preventDefault();navigateBookmark(1);return}
-        if(matchesShortcut(event,shortcuts.previousBookmark)){event.preventDefault();navigateBookmark(-1);return}
-      }
-      if(editorRef.current?.hasTextFocus()&&!document.querySelector('.modal-backdrop')){
-        const shortcuts=resolveSetting(settingsRef.current,'editor.shortcuts').value;
-        if(matchesShortcut(event,shortcuts.callHierarchy)){event.preventDefault();openCallHierarchy();return}
-        if(matchesShortcut(event,shortcuts.lastEdit)){event.preventDefault();navigateEdit('last');return}
-        if(matchesShortcut(event,shortcuts.previousEdit)){event.preventDefault();navigateEdit(-1);return}
-        if(matchesShortcut(event,shortcuts.nextEdit)){event.preventDefault();navigateEdit(1);return}
-        if(matchesShortcut(event,shortcuts.lastExecution)){event.preventDefault();returnToExecution();return}
-      }
-      if(matchesShortcut(event,resolveSetting(settingsRef.current,'editor.shortcuts').value.outline)){event.preventDefault();if(!document.querySelector('.modal-backdrop'))setPaletteMode('outline');return;}
-      if(event.altKey&&!event.shiftKey&&!event.ctrlKey&&!event.metaKey&&['ArrowLeft','ArrowRight'].includes(event.key)){event.preventDefault();navigateHistory(event.key==='ArrowLeft'?-1:1);return;}
-      if((event.ctrlKey||event.metaKey)&&event.key.toLowerCase()==='p'){event.preventDefault();event.stopPropagation();if(!document.querySelector('.modal-backdrop')||paletteMode)setPaletteMode(event.shiftKey?'commands':'files');return;}
-      if ((event.ctrlKey || event.metaKey) && event.altKey && event.key.toLowerCase() === "z") { event.preventDefault(); setFocusMode(value=>!value); return; }
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && !event.altKey && event.key.toLowerCase() === "f" && !editorRef.current?.hasTextFocus()) { event.preventDefault(); setShowSearch(true); setShowHistory(false); return; }
-      if (event.key === "F8" && !document.querySelector(".modal-backdrop, .feedback-notification")) { const items = problemsRef.current.filter(problem => problem.tabId === documents.activeId); if (items.length) { event.preventDefault(); problemCursorRef.current = problemCursorRef.current < 0 ? event.shiftKey ? items.length - 1 : 0 : (problemCursorRef.current + (event.shiftKey ? -1 : 1) + items.length) % items.length; navigateProblem(items[problemCursorRef.current]); } return; }
-      if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "o") { event.preventDefault(); openSqlFile(); return; }
-      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === "n") { event.preventDefault(); if (!document.querySelector('.modal-backdrop')) newSqlFileFromLastConnection(); return; }
-      if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key === "Tab") { event.preventDefault(); if (!document.querySelector('.modal-backdrop')) cycleSqlTab(event.shiftKey ? -1 : 1); return; }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") { event.preventDefault(); if(!editorIsReadonly())saveSqlFile(); return; }
-      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "o") { event.preventDefault(); if (!editorIsReadonly()) setShowPicker(true); return; }
-      if ((event.ctrlKey || event.metaKey) && event.code === "Space" && !event.defaultPrevented && editorRef.current?.hasTextFocus()) { manualSuggestionRef.current = true; event.preventDefault(); editorRef.current.trigger("keyboard", "editor.action.triggerSuggest", {}); }
-    };
-    window.addEventListener("keydown", handler,true); return () => window.removeEventListener("keydown", handler,true);
-  }, [showPicker, showAppearance, showHistory, showSearch, showSnippets, fileDirty, sql, filePath, fileName, recentProfiles, workspace.root,workspace.projectRules]);
+  useEffect(() => installWorkbenchShortcuts({
+    cycleSqlTab, documents, editorIsReadonly, editorRef, manualSuggestionRef, navigateBookmark, navigateEdit, navigateHistory,
+    navigateProblem, newSqlFileFromLastConnection, openCallHierarchy, openSqlFile, paletteMode, problemCursorRef, problemsRef,
+    returnToExecution, saveSqlFile, setFocusMode, setPaletteMode, setRelatedSources, setShowBookmarks, setShowHistory, setShowPicker,
+    setShowSearch, settingsRef, switchPackageSource, workspace
+  }), [showPicker, showAppearance, showHistory, showSearch, showSnippets, fileDirty, sql, filePath, fileName, recentProfiles, workspace.root,workspace.projectRules]);
 
   useEffect(() => {
     if (!autoCompletion) return;
@@ -815,24 +778,9 @@ export function App() {
     return () => clearTimeout(timer);
   }, [sql, autoCompletion, completionSettings.delay, completionSettings.minCharacters, schemaObjects]);
 
-  useEffect(() => {
-    const runStatementShortcut = (event) => {
-      const editor=editorRef.current;if(!editor?.hasTextFocus())return;
-      const shortcuts=resolveSetting(settingsRef.current,'editor.shortcuts').value;
-      if(matchesShortcut(event,shortcuts.run)){event.preventDefault();event.stopImmediatePropagation();runQueryRef.current?.();return;}
-      if(matchesShortcut(event,'Ctrl+Shift+F')||matchesShortcut(event,shortcuts.format)){event.preventDefault();event.stopImmediatePropagation();formatterRef.current?.();return;}
-      for(const action of editorShortcutActions.filter(action=>action.command)){
-        if(matchesShortcut(event,shortcuts[action.id])){
-          event.preventDefault();event.stopImmediatePropagation();
-          if(action.id==='suggest')manualSuggestionRef.current=true;
-          if(!action.edits||!editorIsReadonly())editor.trigger('keyboard',action.command,{});
-          return;
-        }
-      }
-    };
-    window.addEventListener("keydown", runStatementShortcut, true);
-    return () => window.removeEventListener("keydown", runStatementShortcut, true);
-  }, [settings.user['editor.shortcuts']]);
+  useEffect(() => installEditorShortcuts({
+    editorIsReadonly, editorRef, formatterRef, manualSuggestionRef, runQueryRef, settingsRef
+  }), [settings.user['editor.shortcuts']]);
 
   useEffect(() => { persistLocal(localStorage, "fbsdb.theme", theme); persistLocal(localStorage, "fbsdb.tokenColors", JSON.stringify(allTokenColors)); }, [theme, allTokenColors]);
   useEffect(() => {
@@ -867,55 +815,17 @@ export function App() {
   // What project usage examples in completion details are built from: the workspace and the current text of open editors.
   const usageSourcesRef = useRef(null);
   usageSourcesRef.current = () => ({ root: isNativeHost ? workspace.root || null : null, activePath: documents.active?.path || null, documents: [...documents.tabs.filter(tab => tab.id !== documents.activeId), { ...documents.active, content: documents.text }].map(tab => ({ path: tab?.path, content: tab?.content, dirty: tab?.dirty })) });
-  useEffect(() => {
-    if (!monaco || !completionClientRef.current) return;
-    const client = completionClientRef.current;
-    const broker = completionMetadataRef.current;
-    client.configure({ settings: completionSettings, objects: completionObjects, currentSchema: completionSchema, version: completionSession.oracleVocabulary?.version || 19, liveWords: completionSession.oracleVocabulary?.words || [], snippets: allSqlSnippets, learning: completionSettings.learning ? suggestionLearningRef.current.snapshot(suggestionScope()) : [], recent: completionRecentRef.current.get(activeTabId) || [] });
-    client.metadata(broker.objects(metadataOriginTabId), broker.systemObjects(metadataOriginTabId), broker.version(metadataOriginTabId));
-    return installOracleLanguageProviders({
-      monaco, editor: editorRef.current, client, broker, acceptanceCommand: completionAcceptanceRef.current, definitionModels: definitionModelsRef.current,
-      snapshot: () => {
-        const tab = documents.tabs.find(item => item.id === documents.activeId), originTabId = tab?.metadataOriginTabId || documents.activeId;
-        const originSession = sessionsRef.current[originTabId] || {}, connection = originSession.activeConnection;
-        return { semanticHighlighting:resolveSetting(settingsRef.current,'editor.semanticHighlighting').value,languageFeatures:largeFilePolicy(tab?.content,largeFileOverridesRef.current[tab?.id]), busy: !!(originSession.executing || originSession.scriptRun?.running || originSession.fetchingPage), sourceObject: tab?.definitionObject, tabId: documents.activeId, originTabId, connected: isNativeHost && !!connection && !["No connection", "Disconnected"].includes(connection.id), settings: completionSettings,
-          manualSuggestion: () => { const manual = manualSuggestionRef.current; manualSuggestionRef.current = false; return manual; } };
-      },
-      onDefinition: openOracleDefinition,
-      onBeforeNavigate:()=>rememberLocation(),
-      onReveal: target => {
-        if (metadataOriginTabId !== documents.activeId) activateTab(metadataOriginTabId);
-        setSidebarOpen(true); setSchemaQuery("");
-        const object = sessionsRef.current[metadataOriginTabId]?.schemaObjects?.find(item => item.owner === target.owner && item.name === target.name && item.type === target.type);
-        if (object) { setActiveObject(oracleSchemaKey(object)); requestSchemaDetails(object); requestAnimationFrame(() => { const section = document.querySelector('.schema-section'); if (section) section.open = true; }); }
-        else setCompletionError("This object is not in the current Object Explorer scope.");
-      },
-      onError: setCompletionError,
-      onPlscope: setPlscopeReport,
-      projectUsage: () => { const sources = usageSourcesRef.current?.(); return sources ? { activePath: sources.activePath, usage: loadProjectUsage(sources) } : null; },
-    });
-  }, [monaco, completionSettings, completionObjects, completionSchema, completionSession.oracleVocabulary, allSqlSnippets, activeTabId, metadataOriginTabId,largeFileOverrides,settings.user['editor.semanticHighlighting']]);
+  useEffect(() => installLanguageProviders({
+    activateTab, activeTabId, allSqlSnippets, completionAcceptanceRef, completionClientRef, completionMetadataRef, completionObjects,
+    completionRecentRef, completionSchema, completionSession, completionSettings, definitionModelsRef, documents, editorRef,
+    largeFileOverridesRef, manualSuggestionRef, metadataOriginTabId, monaco, openOracleDefinition, rememberLocation, requestSchemaDetails,
+    sessionsRef, setActiveObject, setCompletionError, setPlscopeReport, setSchemaQuery, setSidebarOpen, settingsRef, suggestionLearningRef,
+    suggestionScope, usageSourcesRef
+  }), [monaco, completionSettings, completionObjects, completionSchema, completionSession.oracleVocabulary, allSqlSnippets, activeTabId, metadataOriginTabId,largeFileOverrides,settings.user['editor.semanticHighlighting']]);
 
-  useEffect(() => {
-    if (!monaco) return;
-    const owner = activeTabId;
-    if(!largePolicy.diagnostics){updateTabSession('lintProblems',[],owner);const model=editorRef.current?.getModel();if(model)monaco.editor.setModelMarkers(model,'fbsdb-lint',[]);return;}
-    let cancelled=false;
-    const timer = setTimeout(async () => {
-      const model = editorRef.current?.getModel(), client = completionClientRef.current;
-      if (!model || !client) return;
-      const text = model.getValue(), version = model.getVersionId();
-      const result = await client.request("diagnostics", text, 0);
-      if (cancelled || !result.diagnostics || model.isDisposed() || model.getVersionId() !== version || documents.activeId !== owner) return;
-      const problems = result.diagnostics.map((item, index) => {
-        const start = model.getPositionAt(item.start), end = model.getPositionAt(item.end);
-        return { ...item, id: `${owner}:lint:${index}`, tabId: owner, fileName: documents.tabs.find(tab => tab.id === owner)?.name || "SQL", line: start.lineNumber, column: start.column, offset: item.start, editorSnapshot: text, startLineNumber: start.lineNumber, startColumn: start.column, endLineNumber: end.lineNumber, endColumn: end.column };
-      });
-      updateTabSession("lintProblems", problems, owner);
-      monaco.editor.setModelMarkers(model, "fbsdb-lint", problems.map(problem => ({ ...problem, severity: problem.severity === "warning" ? monaco.MarkerSeverity.Warning : monaco.MarkerSeverity.Error })));
-    }, 250);
-    return () => {cancelled=true;clearTimeout(timer)};
-  }, [monaco, sql, activeTabId, completionSettings, completionObjects, completionSchema, completionSession.oracleVocabulary,largePolicy.diagnostics]);
+  useEffect(() => scheduleDiagnostics({
+    activeTabId, completionClientRef, documents, editorRef, largePolicy, monaco, updateTabSession
+  }), [monaco, sql, activeTabId, completionSettings, completionObjects, completionSchema, completionSession.oracleVocabulary,largePolicy.diagnostics]);
 
   useEffect(() => {
     const model = editorRef.current?.getModel(); if (!monaco || !model) return;
@@ -997,25 +907,9 @@ export function App() {
     requestAnimationFrame(()=>jumpToOffset(hasPosition?context.statementOffset:0));
   }
   function jumpToOffset(offset) {const editor=editorRef.current;if(!editor?.getModel())return;rememberLocation();const position=editor.getModel().validatePosition(sourcePositionAt(documents.text,offset));editor.setPosition(position);editor.revealPositionInCenter(position);editor.focus();rememberLocation();}
-  useEffect(()=>{
-    const editor=editorRef.current;if(!monaco||!editor)return;
-    let disposed = false;
-    const show=async event=>{
-      const model=editor.getModel();if(!model)return;
-      const position=event.target?.position||editor.getPosition(),selection=editor.getSelection();
-      if(position&&(!selection||selection.isEmpty()||!selection.containsPosition(position)))editor.setPosition(position);
-      const range=editor.getSelection(),start=model.getOffsetAt(range.getStartPosition()),end=model.getOffsetAt(range.getEndPosition());
-      const version = model.getVersionId();
-      event.event?.preventDefault?.();event.event?.stopPropagation?.();
-      const { editorContextObject } = await import('./editorContext.js');
-      if (disposed || model.isDisposed() || editor.getModel() !== model || model.getVersionId() !== version) return;
-      const object=editorContextObject(model.getValue(),start,end,model.getOffsetAt(position),completionObjects,completionSchema);
-      const trigger=editor.getDomNode(),r=trigger.getBoundingClientRect(),x=event.event?.posx||r.left+30,y=event.event?.posy||r.top+30;
-      event.event?.preventDefault?.();event.event?.stopPropagation?.();
-      if(object){openObjectContext({type:'contextmenu',preventDefault(){},stopPropagation(){},currentTarget:trigger,clientX:x,clientY:y},object);setEditorContext(null)}
-      else setEditorContext({tabId:documents.activeId,model,version:model.getVersionId(),selection:range,trigger,x,y,bind:range.isEmpty()?bindAtOffset(model.getValue(),model.getOffsetAt(position)):null,bindType:range.isEmpty()?bindTypeFor(bindAtOffset(model.getValue(),model.getOffsetAt(position)),model.getValue()):null,selected:!range.isEmpty(),canUndo:model.canUndo(),canRedo:model.canRedo(),readOnly:editorIsReadonly()});
-    };const listener=editor.onContextMenu(show),keyboard=editor.onKeyDown(event=>{const e=event.browserEvent;if(e.key==='ContextMenu'||e.key==='F10'&&e.shiftKey){e.preventDefault();e.stopPropagation();const position=editor.getPosition(),p=editor.getScrolledVisiblePosition(position),r=editor.getDomNode().getBoundingClientRect();show({target:{position},event:{posx:r.left+(p?.left||20),posy:r.top+(p?.top||20)+20}})}});return()=>{disposed=true;listener.dispose();keyboard.dispose();setEditorContext(null)};
-  },[monaco,activeTabId,completionObjects,completionSchema]);
+  useEffect(()=>installEditorContextMenu({
+    bindTypeFor, completionObjects, completionSchema, documents, editorIsReadonly, editorRef, monaco, openObjectContext, setEditorContext
+  }),[monaco,activeTabId,completionObjects,completionSchema]);
   // Saved bind types live in the file's bind form definition; unsaved documents have no file key, so types stay read-only there.
   function bindTypeFor(bind,text) {
     if(!bind||!filePath)return 'VARCHAR2';
