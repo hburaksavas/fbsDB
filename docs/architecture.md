@@ -47,6 +47,8 @@ Result editing is local until the user applies it. `src/gridEditability.js` deci
 - `WorkbenchContextActions.js`, `WorkbenchEditorActions.js`, `WorkbenchTabActions.js`, `WorkbenchScriptActions.js` and `WorkbenchResultExports.js` hold the bodies of App functions. App keeps a function of the same name and parameters that passes its values in: `function closeTabs(ids) { return tabActions.closeTabs({ … }, ids); }`. Default values and destructuring stay in App's parameter list, so they are evaluated where they were; the moved body receives the names they bind. The object is built when the function is called, so a function moves only if every `const` it reads is declared before the earliest point the render can call it (calls from effects run after the render). The wrapper of an async function is not async, so it returns the module's promise unchanged.
 - `ResultsGridView.jsx` follows the same pattern for `ResultsGrid.jsx`: `renderResultsGridView(ctx)` is the grid's return value.
 
+`scripts/refactor/` holds the tools that made these moves and verify them (see its README): they list which functions can move, write the wrapper and module, and check that putting the moved text back gives the original file byte for byte.
+
 A `render…` function must not call hooks and must not assign to a value it receives. To move more markup out, pass every `App` value the moved lines read and nothing else; a name that is missing from `ctx` is an unresolved identifier, which `tsc --allowJs --checkJs` reports as "Cannot find name".
 
 `SqlResultsView` takes its callbacks in one `actions` prop (`actions={{ onRun, onCancel, … }}`); every other prop is passed as before.
