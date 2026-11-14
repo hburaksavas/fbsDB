@@ -1,9 +1,13 @@
-// Creating, adopting, restoring, closing and detaching editor tabs, and polling open files. App keeps a function of the same name that passes its values in; see docs/architecture.md.
+// Creating, adopting, restoring, saving, closing, detaching and moving editor tabs, and polling open files. App keeps a function of the same name that passes its values in; see docs/architecture.md.
 import { batchClosePlan } from "./batchClose";
+import { countTabDrafts } from "./draftStore.js";
+import { notifyFeedback } from "./Feedback";
+import { hostWindow } from "./hostWindow.js";
 import { isNativeHost, sendNativeCommand, setNativeTabId } from "./nativeBridge";
 import { newQueryTemplates } from "./newQueryOptions";
 import { projectOptions } from "./projectRules";
 import { promptsOnClose } from "./scratchFiles";
+import { buildTabTransfer, tabMoveBlocker, windowDraftKey } from "./tabTransfer.js";
 import { pathKey } from "./workspaceTree";
 
 export function closeTabs(ctx, ids) {
@@ -111,3 +115,81 @@ export function pollOpenFiles(ctx) {
     const files=[...new Map(documents.tabs.filter(tab=>tab.path&&!tab.readOnly).map(tab=>[pathKey(tab.path),{path:tab.path,version:tab.diskVersion??null,hasError:!!tab.externalChange?.error}])).values()];
     if(files.length){const offset=fileWatchOffsetRef.current%files.length,rotated=[...files.slice(offset),...files.slice(0,offset)].slice(0,100);filePollRef.current={id:sendNativeCommand('file.poll',{files:rotated}),at:Date.now(),offset,total:files.length};}
   }
+
+export function closeTab(ctx, id, onClosed) {
+  const {
+    activateTab, batchDiscardRef, bookmarks, closeTab, closedTabsRef, completionMetadataRef, completionRecentRef, documentSavesRef,
+    documents, draftsConfirmedRef, editLocationsRef, executionSummaries, newSqlFileNow, operations, results, runConsoleStore, sessionsRef,
+    setDraftGuard, setObjectDefinition, setPendingFileAction, setTabSessions, setTabs, sourceBaselineAttempts, sourceBaselineRequests,
+    tabCloseActionsRef
+  } = ctx;
+    const tab = documents.tabs.find(item => item.id === id); if (!tab) return;
+    const complete = () => {
+      setObjectDefinition(current => current?.originTabId === id ? null : current);
+      documentSavesRef.current.forget(id);executionSummaries.current?.forget(id);runConsoleStore.current?.clear(id);
+      for(const [request,entry] of sourceBaselineRequests.current)if(entry.tabId===id)sourceBaselineRequests.current.delete(request);
+      for(const key of sourceBaselineAttempts.current)if(JSON.parse(key)[0]===id)sourceBaselineAttempts.current.delete(key);
+      bookmarks.forgetDocument(id);editLocationsRef.current.forget(id);batchDiscardRef.current.delete(id);closedTabsRef.current.add(id); operations.pages.delete(id); completionMetadataRef.current.forget(id); completionRecentRef.current.delete(id);
+      setTabSessions(current => { const next = { ...current }; delete next[id]; return next; });
+      results.forget(id);
+      const activeIdBeforeClose = documents.activeId;
+      const currentTabs = documents.tabs;
+      const remaining = currentTabs.filter(item => item.id !== id);
+      setTabs(current => current.filter(item => item.id !== id));
+      if (id !== activeIdBeforeClose) { onClosed?.(); return; }
+      if (remaining.length) { const next = remaining[Math.max(0, currentTabs.findIndex(item => item.id === id) - 1)]; activateTab(next.id, false); }
+      else newSqlFileNow();
+      onClosed?.();
+    };
+    const draftCount = countTabDrafts(id);
+    if (draftCount && !draftsConfirmedRef.current.has(id)) { if (id !== documents.activeId) activateTab(id); setDraftGuard({ reason: 'close', name: tab.name, tabId: id, count: draftCount, transaction: Boolean(sessionsRef.current[id]?.transactionPending), run: () => { draftsConfirmedRef.current.add(id); closeTab(id, onClosed); } }); return; }
+    const retry = () => { const request = sendNativeCommand("tab.close", { tabId: id }); tabCloseActionsRef.current.set(request, { complete, retry }); };
+    const close = () => isNativeHost && !tab.readOnly ? retry() : complete();
+    if (promptsOnClose(tab) && !batchDiscardRef.current.has(id)) { if (id !== documents.activeId) activateTab(id); setPendingFileAction({ run: close }); }
+    else close();
+  }
+
+export function moveTabsToWindow(ctx, ids, target, closeWindow) {
+  const {
+    documents, operations, pendingWindowMovesRef, results, sessionsRef, windowClosingRef
+  } = ctx;
+    if (!isNativeHost) return false;
+    const sessionIds = [...new Set(ids.map(id => documents.tabs.find(tab => tab.id === id)).filter(Boolean).map(tab => tab.metadataOriginTabId || tab.id))];
+    const refuse = message => { notifyFeedback({ kind: 'warning', title: closeWindow ? 'Window not closed' : 'Tab not moved', message, scope: sessionIds[0] }); if (closeWindow) sendNativeCommand('window.closeCancelled', {}); return false; };
+    if (!sessionIds.length) {
+      if (closeWindow) { windowClosingRef.current = true; try { localStorage.removeItem(windowDraftKey(hostWindow.id)); } catch {} sendNativeCommand('window.close', {}); }
+      return false;
+    }
+    for (const id of sessionIds) {
+      const blocker = tabMoveBlocker(sessionsRef.current[id], { gridDrafts: countTabDrafts(id), paging: operations.pages.has(id), exporting: Boolean(results.tabs[id]?.streamState?.busy) });
+      if (blocker) return refuse(`${documents.tabs.find(tab => tab.id === id)?.name || 'This tab'}: ${blocker}`);
+    }
+    let transfer;
+    try { transfer = buildTabTransfer({ tabIds: sessionIds, documents: documents.tabs, sessions: sessionsRef.current, results: results.tabs, metadata: Object.fromEntries(sessionIds.filter(id => operations.metadata.has(id)).map(id => [id, operations.metadata.get(id)])), activeId: documents.activeId, from: hostWindow.id }); }
+    catch (error) { return refuse(error.message); }
+    const movedIds = documents.tabs.filter(tab => sessionIds.includes(tab.metadataOriginTabId || tab.id)).map(tab => tab.id);
+    const request = sendNativeCommand('window.moveTab', { tabId: sessionIds[0], tabIds: sessionIds, target, transfer, closeWindow });
+    pendingWindowMovesRef.current.set(request, { ids: movedIds, sessionIds, closeWindow });
+    return true;
+  }
+
+export function saveSqlFile(ctx, afterSave) {
+  const {
+    documentSavesRef, documents, fileName, learnSqlUsage, setFileDirty, setRunState, sql
+  } = ctx;
+    learnSqlUsage(documents.text);
+    if (documents.tabs.find(tab => tab.id === documents.activeId)?.readOnly) return;
+    if (isNativeHost) {
+      const tab = documents.tabs.find(tab => tab.id === documents.activeId);
+      if (!tab) return;
+      const document = tab;
+      if (!documentSavesRef.current.start(sendNativeCommand, document, afterSave)) setRunState('A save is already in progress for this file.');
+      return;
+    }
+    const url = URL.createObjectURL(new Blob([sql], { type: "text/sql;charset=utf-8" })), link = document.createElement("a"); link.href = url; link.download = fileName || "query.sql"; link.click(); URL.revokeObjectURL(url); setFileDirty(false); afterSave?.();
+  }
+
+export function newSqlFileFromLastConnection(ctx, extra) {
+  const {
+    activeConnectionRef, beginConnection, dbConnectionsRef, documents, newSqlFileNow, setActiveConnection, setTabs
+  } = ctx; const current = activeConnectionRef.current; const profile = dbConnectionsRef.current.find(item => item.id === (current && !['No connection', 'Disconnected'].includes(current.id) ? current.id : null)); newSqlFileNow("", extra); if (profile) { if (isNativeHost) beginConnection({ ...profile, tabId: documents.activeId }); else { setActiveConnection(profile); setTabs(tabs => tabs.map(tab => tab.id === documents.activeId ? { ...tab, connectionProfileId: profile.id } : tab)); } } }

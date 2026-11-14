@@ -1,4 +1,4 @@
-// What the context menus, the status bar indicators, the command palette, query history, workspace search and SQL snippets do when an item is chosen. App keeps a function of the same name that passes its values in; see docs/architecture.md.
+// What the context menus, the object explorer, the status bar indicators, the command palette, query history, workspace search and SQL snippets do when an item is chosen. App keeps a function of the same name that passes its values in; see docs/architecture.md.
 import { loadBindDefinitions, saveBindDefinitions } from "./bindDefinitions";
 import { notifyFeedback } from "./Feedback";
 import { persistLocal } from "./localPersistence.js";
@@ -174,4 +174,41 @@ export function saveCustomSqlSnippet(ctx) {
     if (!label || !text) { setSnippetError("Add a name and SQL template before saving."); return; }
     const snippet = { trigger, label, detail: snippetDraft.detail.trim() || "Custom SQL snippet", text };
     setCustomSqlSnippets((current) => [...current, snippet]); setSelectedSnippetTrigger(trigger); setSnippetFilter(""); setSnippetError(""); setSnippetDraft({ trigger: "", label: "", detail: "", text: "SELECT ${1:column_name}\nFROM ${2:table_name};" }); setSnippetFormOpen(false);
+  }
+
+export async function inspectOracleObject(ctx, target, requestedOriginTabId, relationships) {
+  const {
+    completionMetadataRef, documents, objectAnalysisRequestRef, setObjectAnalysis
+  } = ctx;
+    objectAnalysisRequestRef.current?.cancel();const cancellation=completionCancellation();objectAnalysisRequestRef.current=cancellation;
+    const originTabId=requestedOriginTabId,broker=completionMetadataRef.current,epoch=broker.session(originTabId).epoch;
+    setObjectAnalysis({target,originTabId,loading:true});
+    const editorTabId=documents.activeId;
+    const [data,metadata]=await Promise.all([broker.load(originTabId,target,cancellation.token,'objectAnalysis'),relationships?broker.load(originTabId,target,cancellation.token,'metadata'):Promise.resolve(null)]);
+    if(documents.activeId===editorTabId&&!cancellation.token.isCancellationRequested&&epoch===broker.session(originTabId).epoch)setObjectAnalysis({target,originTabId,data:data?{...data,relationships:metadata?.foreignKeys||[]}:null,loading:false});
+  }
+
+export function openExplorerObject(ctx, item, view, originTabId) {
+  const {
+    inspectOracleObject, objectTabs, requestSchemaDetails, setActiveObject, setActiveObjectTabId, setDefinitionError, setObjectTabActive,
+    setObjectTabs, setRecentObjects
+  } = ctx;
+    setDefinitionError('');
+    const key=oracleSchemaKey(item),existing=objectTabs.find(tab=>tab.key===key&&tab.originTabId===originTabId),id=existing?.id||`oracle-object:${originTabId}:${key}`;
+    setActiveObject(key);setObjectTabs(current=>existing?current.map(tab=>tab.id===id?{...tab,object:item,view}:tab):[...current,{id,key,object:item,originTabId,view}]);
+    setActiveObjectTabId(id);setObjectTabActive(true);
+    requestAnimationFrame(()=>document.querySelector('.oracle-object-inspector [aria-selected="true"]')?.focus());
+    setRecentObjects(keys=>{const next=[key,...keys.filter(value=>value!==key)].slice(0,30);persistLocal(localStorage, 'fbsdb.recentObjects',JSON.stringify(next));return next});
+    requestSchemaDetails(item,originTabId);inspectOracleObject(item,originTabId,view==='Related tables');
+  }
+
+export async function openExplorerDefinition(ctx, target) {
+  const {
+    activeTabId, closedTabsRef, completionMetadataRef, documents, metadataOriginTabId, openOracleDefinition, setDefinitionError
+  } = ctx;
+    setDefinitionError('');
+    const originTabId=metadataOriginTabId,broker=completionMetadataRef.current,epoch=broker.session(originTabId).epoch;
+    const source=await broker.load(originTabId,target,undefined,'definition');
+    if(source&&broker.session(originTabId).epoch===epoch&&!closedTabsRef.current.has(originTabId)&&documents.activeId===activeTabId)openOracleDefinition({...source,originTabId});
+    else if(!source)setDefinitionError(broker.session(originTabId).lastError||'Oracle definition is unavailable for this object.');
   }

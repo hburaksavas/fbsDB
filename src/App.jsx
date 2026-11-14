@@ -1,7 +1,7 @@
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {nextQueryName} from './tabPathLabels';
 import {useEditorOverview} from './useEditorOverview.js';
-import { largeFilePolicy, LARGE_FILE_THRESHOLD } from './largeFilePolicy.js';
+import { largeFilePolicy } from './largeFilePolicy.js';
 import { layoutPresets, restoreLayout } from './savedLayouts.js';
 import { useConnectionLifecycle } from './useConnectionLifecycle.js';
 import { retainHistory, historyAllowed } from './queryHistory.js';
@@ -77,7 +77,7 @@ import './docSkeleton';
 import {minimapSections,minimapLabel} from './minimapSections';
 import './statusBarModel';
 import {previewOpenPlan,settlePreview} from './previewTabs';
-import { nextScratchName, promptsOnClose } from './scratchFiles';
+import { nextScratchName } from './scratchFiles';
 import {codeLensItems} from './codeLenses';
 import {createConsoleEntry,createConsoleStore} from './runConsole';
 import { loadBindDefinitions } from './bindDefinitions';
@@ -130,7 +130,7 @@ import { usePlsqlDebugger } from "./usePlsqlDebugger.js";
 import { DebugPanel, DebugCompileDialog } from "./DebugPanel.jsx";
 import { usePlsqlProfiler } from "./usePlsqlProfiler.js";
 import { ProfilePanel, ProfileTablesDialog } from "./ProfilePanel.jsx";
-import { buildTabTransfer, collectWindowDrafts, parseTabTransfer, tabMoveBlocker, windowDraftKey } from "./tabTransfer.js";
+import { collectWindowDrafts, parseTabTransfer, windowDraftKey } from "./tabTransfer.js";
 import { Activity, Play } from "lucide-react";
 import { autoRunStep } from './relatedAutoRun.js';
 import { OracleObjectInspector } from './lazyViews.js';
@@ -153,6 +153,7 @@ import { renderToolbarDefs } from './WorkbenchToolbarDefs.jsx';
 import { renderManagementContent } from './WorkbenchManagementContent.jsx';
 import { installWorkbenchShortcuts, installEditorShortcuts } from './WorkbenchShortcutEffects.js';
 import { reviewSourceBaselines, installLanguageProviders, scheduleDiagnostics, installEditorContextMenu } from './WorkbenchEditorEffects.js';
+import * as scriptActions from './WorkbenchScriptActions.js';
 import * as contextActions from './WorkbenchContextActions.js';
 import * as editorActions from './WorkbenchEditorActions.js';
 import * as tabActions from './WorkbenchTabActions.js';
@@ -414,12 +415,9 @@ export function App() {
   projectionCursorRef.current=position=>{const model=editorRef.current?.getModel();if(!model||!projectionMapping){setLinkedProjectionColumn(null);return}const offset=model.getOffsetAt(position),index=projectionMapping.findIndex(range=>range&&offset>=range.start&&offset<=range.end);setLinkedProjectionColumn(index<0?null:index)};
   useEffect(()=>{if(!projectionMapping){setLinkedProjectionColumn(null);projectionDecorations.current?.clear()}},[projectionMapping]);
   function showProjectionSource(columnIndex,reveal=false){
-    const editor=editorRef.current,model=editor?.getModel(),range=projectionMapping?.[columnIndex];
-    projectionDecorations.current?.clear();
-    if(!editor||!model||!range){if(reveal)notifyFeedback({kind:'warning',title:'Source expression',message:projectionMapping?'This column comes from * or an unmatched projection.':'The editor changed since this execution, so result columns are not linked to the SQL.',scope:documents.activeId});return}
-    const from=model.getPositionAt(range.start),to=model.getPositionAt(range.end),monacoRange=new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column);
-    projectionDecorations.current=editor.createDecorationsCollection([{range:monacoRange,options:{inlineClassName:'projection-source-highlight'}}]);
-    if(reveal){editor.setSelection(monacoRange);editor.revealRangeInCenterIfOutsideViewport(monacoRange);editor.focus()}
+    return editorActions.showProjectionSource({
+      documents, editorRef, monacoRef, projectionDecorations, projectionMapping
+    }, columnIndex, reveal);
   }
   const panelMessage = resultTab === "Explain" ? explainMessage : outputMessage;
   useEffect(()=>{
@@ -565,12 +563,9 @@ export function App() {
   const suggestionScope = () => learningScope(suggestionWorkspaceRef.current, activeConnectionRef.current?.id);
   const publishLearning = () => completionClientRef.current?.worker.postMessage({ type: 'learning', entries: completionSettingsRef.current.learning ? suggestionLearningRef.current.snapshot(suggestionScope()) : [] });
   function learnSqlUsage(source) {
-    if (source.length>=LARGE_FILE_THRESHOLD || !completionSettingsRef.current.learning || !completionClientRef.current) return;
-    const scope = suggestionScope(), epoch = learningEpochRef.current;
-    completionClientRef.current.request('learn', source, 0).then(result => {
-      if (!completionSettingsRef.current.learning || epoch !== learningEpochRef.current) return;
-      suggestionLearningRef.current.observe(scope, result.observations || []); publishLearning();
-    });
+    return editorActions.learnSqlUsage({
+      completionClientRef, completionSettingsRef, learningEpochRef, publishLearning, suggestionLearningRef, suggestionScope
+    }, source);
   }
   const completionTabKeyRef = useRef(null);
   const completionClientRef = useRef(null), completionAcceptanceRef = useRef(null), completionRecentRef = useRef(new Map());
@@ -834,11 +829,9 @@ export function App() {
   }
   function rememberLocation(tabId=documents.activeId,position=editorRef.current?.getPosition()) { if(!navigatingRef.current&&position)navigationHistoryRef.current.push({tabId,...position}); }
   function navigateHistory(direction) {
-    if(direction<0&&navigationHistoryRef.current.index===navigationHistoryRef.current.items.length-1)rememberLocation();
-    const location=navigationHistoryRef.current.move(direction,item=>documents.tabs.some(tab=>tab.id===item.tabId));if(!location)return;
-    navigatingRef.current=true;
-    if(location.tabId!==documents.activeId)activateTab(location.tabId);
-    requestAnimationFrame(()=>{editorRef.current?.setPosition(location);editorRef.current?.revealPositionInCenter(location);editorRef.current?.focus();navigatingRef.current=false});
+    return editorActions.navigateHistory({
+      activateTab, documents, editorRef, navigatingRef, navigationHistoryRef, rememberLocation
+    }, direction);
   }
   function openBookmark(mark){
     return editorActions.openBookmark({
@@ -850,11 +843,9 @@ export function App() {
     const index=bookmarks.items.findIndex(mark=>mark.id===bookmarkCursorRef.current),next=index<0?(direction>0?0:bookmarks.items.length-1):(index+direction+bookmarks.items.length)%bookmarks.items.length;openBookmark(bookmarks.items[next]);
   }
   function navigateEdit(direction) {
-    const history=editLocationsRef.current,available=item=>documents.tabs.some(tab=>tab.id===item.tabId);
-    const item=direction==='last'?history.last(available):history.move(direction,available);
-    if(!item){setRunState('No further edit location is available.');return;}
-    setObjectTabActive(false);if(documents.activeId!==item.tabId)activateTab(item.tabId);
-    requestAnimationFrame(()=>jumpToOffset(Math.min(item.offset,editorRef.current?.getModel()?.getValueLength()||0)));
+    return editorActions.navigateEdit({
+      activateTab, documents, editLocationsRef, editorRef, jumpToOffset, setObjectTabActive, setRunState
+    }, direction);
   }
   function returnToExecution() {
     return editorActions.returnToExecution({
@@ -887,13 +878,10 @@ export function App() {
     else notifyFeedback({kind:'warning',title:'Oracle object',message:`${owner}.${name} is not in the loaded schema metadata. Refresh the explorer or check access.`,scope:documents.activeId});
   }
   function openExplorerObject(item,view='Overview',originTabId=metadataOriginTabId) {
-    setDefinitionError('');
-    const key=oracleSchemaKey(item),existing=objectTabs.find(tab=>tab.key===key&&tab.originTabId===originTabId),id=existing?.id||`oracle-object:${originTabId}:${key}`;
-    setActiveObject(key);setObjectTabs(current=>existing?current.map(tab=>tab.id===id?{...tab,object:item,view}:tab):[...current,{id,key,object:item,originTabId,view}]);
-    setActiveObjectTabId(id);setObjectTabActive(true);
-    requestAnimationFrame(()=>document.querySelector('.oracle-object-inspector [aria-selected="true"]')?.focus());
-    setRecentObjects(keys=>{const next=[key,...keys.filter(value=>value!==key)].slice(0,30);persistLocal(localStorage, 'fbsdb.recentObjects',JSON.stringify(next));return next});
-    requestSchemaDetails(item,originTabId);inspectOracleObject(item,originTabId,view==='Related tables');
+    return contextActions.openExplorerObject({
+      inspectOracleObject, objectTabs, requestSchemaDetails, setActiveObject, setActiveObjectTabId, setDefinitionError, setObjectTabActive,
+      setObjectTabs, setRecentObjects
+    }, item, view, originTabId);
   }
   function openObjectSqlDraft(text,item,profileId,save=false) {
     setObjectTabActive(false);newSqlFileNow();
@@ -911,20 +899,15 @@ export function App() {
       openObjectSqlDraft, requestSchemaDetails, schemaObjects, sessionsRef, setObjectFavorites
     }, action, context);
   }
-  async function inspectOracleObject(target,requestedOriginTabId=metadataOriginTabId,relationships=false) {
-    objectAnalysisRequestRef.current?.cancel();const cancellation=completionCancellation();objectAnalysisRequestRef.current=cancellation;
-    const originTabId=requestedOriginTabId,broker=completionMetadataRef.current,epoch=broker.session(originTabId).epoch;
-    setObjectAnalysis({target,originTabId,loading:true});
-    const editorTabId=documents.activeId;
-    const [data,metadata]=await Promise.all([broker.load(originTabId,target,cancellation.token,'objectAnalysis'),relationships?broker.load(originTabId,target,cancellation.token,'metadata'):Promise.resolve(null)]);
-    if(documents.activeId===editorTabId&&!cancellation.token.isCancellationRequested&&epoch===broker.session(originTabId).epoch)setObjectAnalysis({target,originTabId,data:data?{...data,relationships:metadata?.foreignKeys||[]}:null,loading:false});
+  function inspectOracleObject(target,requestedOriginTabId=metadataOriginTabId,relationships=false) {
+    return contextActions.inspectOracleObject({
+      completionMetadataRef, documents, objectAnalysisRequestRef, setObjectAnalysis
+    }, target, requestedOriginTabId, relationships);
   }
-  async function openExplorerDefinition(target) {
-    setDefinitionError('');
-    const originTabId=metadataOriginTabId,broker=completionMetadataRef.current,epoch=broker.session(originTabId).epoch;
-    const source=await broker.load(originTabId,target,undefined,'definition');
-    if(source&&broker.session(originTabId).epoch===epoch&&!closedTabsRef.current.has(originTabId)&&documents.activeId===activeTabId)openOracleDefinition({...source,originTabId});
-    else if(!source)setDefinitionError(broker.session(originTabId).lastError||'Oracle definition is unavailable for this object.');
+  function openExplorerDefinition(target) {
+    return contextActions.openExplorerDefinition({
+      activeTabId, closedTabsRef, completionMetadataRef, documents, metadataOriginTabId, openOracleDefinition, setDefinitionError
+    }, target);
   }
   // Coaches pointer/menu use only; hints are counted per action and can be dismissed for good.
   function coachShortcut(id,label,shortcut) {
@@ -1030,9 +1013,9 @@ export function App() {
     setChangeSignature({tabId:documents.activeId,model,version:model.getVersionId(),source:model.getValue(),cursor:Math.min(model.getValueLength(),model.getOffsetAt(position)+1)});
   }
   function openExtractProcedure(){
-    const editor=editorRef.current,model=editor?.getModel(),selection=editor?.getSelection();
-    if(!model||!selection||selection.isEmpty()||editorIsReadonly()){notifyFeedback({kind:'warning',title:'Extract Procedure',message:'Select complete PL/SQL assignment statements first.',scope:documents.activeId});return}
-    setExtractProcedure({tabId:documents.activeId,model,version:model.getVersionId(),source:model.getValue(),start:model.getOffsetAt(selection.getStartPosition()),end:model.getOffsetAt(selection.getEndPosition())});
+    return editorActions.openExtractProcedure({
+      documents, editorIsReadonly, editorRef, setExtractProcedure
+    });
   }
   function moveStatement(direction){
     return editorActions.moveStatement({
@@ -1127,11 +1110,9 @@ export function App() {
     setSourceCompile({document:{...document},prepared,statementOffset:typeof statement==='string'?target?.start??null:0,tabId:document.id,profileId:session.activeConnection.id});
   }
   function reviewPausedScript(owner) {
-    const run=operations.scripts.get(owner),waiting=run?.awaitingSourceReview,document=documents.tabs.find(tab=>tab.id===owner);
-    if(!waiting||!document)return;
-    if(documents.activeId!==owner)activateTab(owner);
-    const prepared={sql:waiting.sql,original:waiting.sql};
-    setSourceCompile({document:{...document,content:run.source},prepared,statementOffset:waiting.offset,tabId:owner,profileId:waiting.profileId,generation:waiting.generation,scriptRequestId:run.requestId,scriptIndex:waiting.index,reviewNonce:waiting.reviewNonce});
+    return scriptActions.reviewPausedScript({
+      activateTab, documents, operations, setSourceCompile
+    }, owner);
   }
   useEffect(()=>{
     if(tabSession.scriptRun?.awaitingSourceReview)reviewPausedScript(activeTabId);
@@ -1166,32 +1147,18 @@ export function App() {
   }
   function newScratchFile() { setObjectTabActive(false); setActiveObject(''); newSqlFileFromLastConnection({ name: nextScratchName(documents.tabs), scratch: true }); }
   function promoteScratch(id) { if (documents.activeId !== id) activateTab(id); setObjectTabActive(false); saveSqlFile(); }
-  function newSqlFileFromLastConnection(extra = {}) { const current = activeConnectionRef.current; const profile = dbConnectionsRef.current.find(item => item.id === (current && !['No connection', 'Disconnected'].includes(current.id) ? current.id : null)); newSqlFileNow("", extra); if (profile) { if (isNativeHost) beginConnection({ ...profile, tabId: documents.activeId }); else { setActiveConnection(profile); setTabs(tabs => tabs.map(tab => tab.id === documents.activeId ? { ...tab, connectionProfileId: profile.id } : tab)); } } }
+  function newSqlFileFromLastConnection(extra = {}) {
+    return tabActions.newSqlFileFromLastConnection({
+      activeConnectionRef, beginConnection, dbConnectionsRef, documents, newSqlFileNow, setActiveConnection, setTabs
+    }, extra);
+  }
   function closeTab(id, onClosed = null) {
-    const tab = documents.tabs.find(item => item.id === id); if (!tab) return;
-    const complete = () => {
-      setObjectDefinition(current => current?.originTabId === id ? null : current);
-      documentSavesRef.current.forget(id);executionSummaries.current?.forget(id);runConsoleStore.current?.clear(id);
-      for(const [request,entry] of sourceBaselineRequests.current)if(entry.tabId===id)sourceBaselineRequests.current.delete(request);
-      for(const key of sourceBaselineAttempts.current)if(JSON.parse(key)[0]===id)sourceBaselineAttempts.current.delete(key);
-      bookmarks.forgetDocument(id);editLocationsRef.current.forget(id);batchDiscardRef.current.delete(id);closedTabsRef.current.add(id); operations.pages.delete(id); completionMetadataRef.current.forget(id); completionRecentRef.current.delete(id);
-      setTabSessions(current => { const next = { ...current }; delete next[id]; return next; });
-      results.forget(id);
-      const activeIdBeforeClose = documents.activeId;
-      const currentTabs = documents.tabs;
-      const remaining = currentTabs.filter(item => item.id !== id);
-      setTabs(current => current.filter(item => item.id !== id));
-      if (id !== activeIdBeforeClose) { onClosed?.(); return; }
-      if (remaining.length) { const next = remaining[Math.max(0, currentTabs.findIndex(item => item.id === id) - 1)]; activateTab(next.id, false); }
-      else newSqlFileNow();
-      onClosed?.();
-    };
-    const draftCount = countTabDrafts(id);
-    if (draftCount && !draftsConfirmedRef.current.has(id)) { if (id !== documents.activeId) activateTab(id); setDraftGuard({ reason: 'close', name: tab.name, tabId: id, count: draftCount, transaction: Boolean(sessionsRef.current[id]?.transactionPending), run: () => { draftsConfirmedRef.current.add(id); closeTab(id, onClosed); } }); return; }
-    const retry = () => { const request = sendNativeCommand("tab.close", { tabId: id }); tabCloseActionsRef.current.set(request, { complete, retry }); };
-    const close = () => isNativeHost && !tab.readOnly ? retry() : complete();
-    if (promptsOnClose(tab) && !batchDiscardRef.current.has(id)) { if (id !== documents.activeId) activateTab(id); setPendingFileAction({ run: close }); }
-    else close();
+    return tabActions.closeTab({
+      activateTab, batchDiscardRef, bookmarks, closeTab, closedTabsRef, completionMetadataRef, completionRecentRef, documentSavesRef,
+      documents, draftsConfirmedRef, editLocationsRef, executionSummaries, newSqlFileNow, operations, results, runConsoleStore, sessionsRef,
+      setDraftGuard, setObjectDefinition, setPendingFileAction, setTabSessions, setTabs, sourceBaselineAttempts, sourceBaselineRequests,
+      tabCloseActionsRef
+    }, id, onClosed);
   }
   function closeTabs(ids) {
     return tabActions.closeTabs({
@@ -1213,16 +1180,9 @@ export function App() {
     }, templateId);
   }
   function saveSqlFile(afterSave = null) {
-    learnSqlUsage(documents.text);
-    if (documents.tabs.find(tab => tab.id === documents.activeId)?.readOnly) return;
-    if (isNativeHost) {
-      const tab = documents.tabs.find(tab => tab.id === documents.activeId);
-      if (!tab) return;
-      const document = tab;
-      if (!documentSavesRef.current.start(sendNativeCommand, document, afterSave)) setRunState('A save is already in progress for this file.');
-      return;
-    }
-    const url = URL.createObjectURL(new Blob([sql], { type: "text/sql;charset=utf-8" })), link = document.createElement("a"); link.href = url; link.download = fileName || "query.sql"; link.click(); URL.revokeObjectURL(url); setFileDirty(false); afterSave?.();
+    return tabActions.saveSqlFile({
+      documentSavesRef, documents, fileName, learnSqlUsage, setFileDirty, setRunState, sql
+    }, afterSave);
   }
 
 
@@ -1311,7 +1271,11 @@ export function App() {
   function unsavedWorkspacePaths() {return documents.tabs.filter(tab=>tab.dirty&&tab.path).map(tab=>tab.path);}
   function previewWorkspaceReplace(search,replacement,caseSensitive){setWorkspaceDev(current=>({...current,preview:null,applied:null}));workspaceDevelopmentCommand('workspace.replacePreview',{search,replacement,caseSensitive,scope:workspaceReplaceScope,excluded:unsavedWorkspacePaths()});}
   function applyWorkspaceReplace(selected){if(!workspaceDev.preview)return;workspaceDevelopmentCommand('workspace.replaceApply',{previewId:workspaceDev.preview.id,selected,excluded:unsavedWorkspacePaths()});}
-  function openScriptPreview() { if(editorIsReadonly())return; const tabId=documents.activeId,run=operations.scripts.get(tabId),source=describeOracleSource(documents.active||{},workspace.projectRules);if(!run?.running&&!prepareSourceCompilation(documents.active||{},workspace.projectRules).error){reviewSourceForCompilation();return;}if(!run?.running&&source.expectedType&&source.warning){setRunState(source.warning+' Review the source declaration before compiling.');return;}setScriptDialog({tabId,source:run?.running?run.source:documents.text}); }
+  function openScriptPreview() {
+    return scriptActions.openScriptPreview({
+      documents, editorIsReadonly, operations, reviewSourceForCompilation, setRunState, setScriptDialog, workspace
+    });
+  }
 
   const executionFlashRef=useRef(null),executionFlashTimerRef=useRef(null);
   function flashExecutionTarget(target) {
@@ -1324,10 +1288,9 @@ export function App() {
 
 
   function streamResultToFile(format="csv",overrideOptions) {
-    updateTabSession('operationStartedAt',Date.now());
-    if(!isNativeHost || !sqlResult?.columns?.length)return;
-    updateTabResult('streamState',{busy:true,message:'Choose a CSV destination…'});
-    sendNativeCommand('result.export',{format,csvOptions:resultExportData(overrideOptions).settings,resultId:sqlResult.resultId,columns:sqlResult.columns,rows:sqlResult.rows,hasMore:sqlResult.hasMore,fileName:(fileName||'query').replace(/\.sql$/i,'')+'-results.'+format});
+    return resultExports.streamResultToFile({
+      fileName, resultExportData, sqlResult, updateTabResult, updateTabSession
+    }, format, overrideOptions);
   }
   function applyServerFilters(options) {
     if(view.streamState?.busy||executing||pageRequestRef.current)throw new Error('Wait for the active operation first.');
@@ -1362,29 +1325,18 @@ export function App() {
   // Opens the hierarchy for the routine at the caret; the index reads workspace sources plus the current text of open editors.
   function openCallHierarchy() { const editor = editorRef.current, model = editor?.getModel(), position = editor?.getPosition(); if (!model || !position) return; setCallHierarchy({ root: isNativeHost ? workspace.root || null : null, document: { ...documents.active, content: documents.text }, offset: model.getOffsetAt(position) }); }
   // Starts with the selected text or the word at the caret as the name to search.
-  function openStructuralSearch() { const editor = editorRef.current, model = editor?.getModel(), selection = editor?.getSelection(), position = editor?.getPosition(); const selected = model && selection && !selection.isEmpty() ? model.getValueInRange(selection).trim() : ''; const initialName = /^[\w$#".]{1,128}$/.test(selected) ? selected : model && position ? model.getWordAtPosition(position)?.word || '' : ''; setStructuralSearch({ root: isNativeHost ? workspace.root || null : null, document: { ...documents.active, content: documents.text }, initialName }); }
+  function openStructuralSearch() {
+    return editorActions.openStructuralSearch({
+      documents, editorRef, setStructuralSearch, workspace
+    });
+  }
   // The side editor shows a second document beside the main editor; it starts on the active document.
   // FI-106: moving tabs between application windows. The session stays in the
   // desktop process; documents and fetched results move as transfer text.
   function moveTabsToWindow(ids, target, closeWindow = false) {
-    if (!isNativeHost) return false;
-    const sessionIds = [...new Set(ids.map(id => documents.tabs.find(tab => tab.id === id)).filter(Boolean).map(tab => tab.metadataOriginTabId || tab.id))];
-    const refuse = message => { notifyFeedback({ kind: 'warning', title: closeWindow ? 'Window not closed' : 'Tab not moved', message, scope: sessionIds[0] }); if (closeWindow) sendNativeCommand('window.closeCancelled', {}); return false; };
-    if (!sessionIds.length) {
-      if (closeWindow) { windowClosingRef.current = true; try { localStorage.removeItem(windowDraftKey(hostWindow.id)); } catch {} sendNativeCommand('window.close', {}); }
-      return false;
-    }
-    for (const id of sessionIds) {
-      const blocker = tabMoveBlocker(sessionsRef.current[id], { gridDrafts: countTabDrafts(id), paging: operations.pages.has(id), exporting: Boolean(results.tabs[id]?.streamState?.busy) });
-      if (blocker) return refuse(`${documents.tabs.find(tab => tab.id === id)?.name || 'This tab'}: ${blocker}`);
-    }
-    let transfer;
-    try { transfer = buildTabTransfer({ tabIds: sessionIds, documents: documents.tabs, sessions: sessionsRef.current, results: results.tabs, metadata: Object.fromEntries(sessionIds.filter(id => operations.metadata.has(id)).map(id => [id, operations.metadata.get(id)])), activeId: documents.activeId, from: hostWindow.id }); }
-    catch (error) { return refuse(error.message); }
-    const movedIds = documents.tabs.filter(tab => sessionIds.includes(tab.metadataOriginTabId || tab.id)).map(tab => tab.id);
-    const request = sendNativeCommand('window.moveTab', { tabId: sessionIds[0], tabIds: sessionIds, target, transfer, closeWindow });
-    pendingWindowMovesRef.current.set(request, { ids: movedIds, sessionIds, closeWindow });
-    return true;
+    return tabActions.moveTabsToWindow({
+      documents, operations, pendingWindowMovesRef, results, sessionsRef, windowClosingRef
+    }, ids, target, closeWindow);
   }
   // The tabs now live in another window: forget them here without closing their sessions.
   function detachTabs(ids, sessionIds) {

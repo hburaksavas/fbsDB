@@ -1,4 +1,4 @@
-// Exporting and copying results as INSERT statements, CSV, JSON and TSV. App keeps a function of the same name that passes its values in; see docs/architecture.md.
+// Exporting, copying and streaming results as INSERT statements, CSV, JSON and TSV. App keeps a function of the same name that passes its values in; see docs/architecture.md.
 import { isNativeHost, sendNativeCommand } from "./nativeBridge";
 import { applyResultFeatures, copyResultData } from "./resultFeatures";
 import { projectDisplayExport } from "./resultPresentationData";
@@ -99,4 +99,14 @@ export async function copyResultsTsv(ctx) {
     const lines = [resultExportColumns().map((column) => cell(column.name)).join("\t"), ...resultExportRows().map((row) => row.map(cell).join("\t"))];
     try { await navigator.clipboard.writeText(lines.join("\r\n")); setCopiedResults(true); setTimeout(() => setCopiedResults(false), 1600); }
     catch { setRunState("Clipboard access failed. Export the fetched rows as CSV instead."); }
+  }
+
+export function streamResultToFile(ctx, format, overrideOptions) {
+  const {
+    fileName, resultExportData, sqlResult, updateTabResult, updateTabSession
+  } = ctx;
+    updateTabSession('operationStartedAt',Date.now());
+    if(!isNativeHost || !sqlResult?.columns?.length)return;
+    updateTabResult('streamState',{busy:true,message:'Choose a CSV destination…'});
+    sendNativeCommand('result.export',{format,csvOptions:resultExportData(overrideOptions).settings,resultId:sqlResult.resultId,columns:sqlResult.columns,rows:sqlResult.rows,hasMore:sqlResult.hasMore,fileName:(fileName||'query').replace(/\.sql$/i,'')+'-results.'+format});
   }

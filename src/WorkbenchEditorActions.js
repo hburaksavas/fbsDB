@@ -1,4 +1,4 @@
-// Editor commands: the run gutter, formatting, refactorings, quick fixes, surround and paste-as, statement moves, bookmarks, schema and bind drops, definitions and problem navigation. App keeps a function of the same name that passes its values in; see docs/architecture.md.
+// Editor commands: the run gutter, formatting, refactorings, quick fixes, surround and paste-as, statement moves, bookmarks, navigation history, structural search, schema and bind drops, definitions and problem navigation. App keeps a function of the same name that passes its values in; see docs/architecture.md.
 import { columnCursorDraft } from "./columnMulticursor";
 import { docSkeletonAt } from "./docSkeleton";
 import { dragSqlDraft } from "./dragToSql";
@@ -376,4 +376,64 @@ export function openBookmark(ctx, mark) {
     if(tab){if(documents.activeId!==tab.id)activateTab(tab.id);requestAnimationFrame(()=>{const editor=editorRef.current,position=editor?.getModel()?.validatePosition(mark);if(position){editor.setPosition(position);editor.revealPositionInCenter(position);editor.focus()}});return;}
     if(mark.path&&isNativeHost){pendingSearchPositionRef.current={path:mark.path,lineNumber:mark.lineNumber,column:mark.column};sendNativeCommand('file.openPath',{path:mark.path});return;}
     setRunState('This session-only bookmark source is no longer open.');
+  }
+
+export function showProjectionSource(ctx, columnIndex, reveal) {
+  const {
+    documents, editorRef, monacoRef, projectionDecorations, projectionMapping
+  } = ctx;
+    const editor=editorRef.current,model=editor?.getModel(),range=projectionMapping?.[columnIndex];
+    projectionDecorations.current?.clear();
+    if(!editor||!model||!range){if(reveal)notifyFeedback({kind:'warning',title:'Source expression',message:projectionMapping?'This column comes from * or an unmatched projection.':'The editor changed since this execution, so result columns are not linked to the SQL.',scope:documents.activeId});return}
+    const from=model.getPositionAt(range.start),to=model.getPositionAt(range.end),monacoRange=new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column);
+    projectionDecorations.current=editor.createDecorationsCollection([{range:monacoRange,options:{inlineClassName:'projection-source-highlight'}}]);
+    if(reveal){editor.setSelection(monacoRange);editor.revealRangeInCenterIfOutsideViewport(monacoRange);editor.focus()}
+  }
+
+export function navigateHistory(ctx, direction) {
+  const {
+    activateTab, documents, editorRef, navigatingRef, navigationHistoryRef, rememberLocation
+  } = ctx;
+    if(direction<0&&navigationHistoryRef.current.index===navigationHistoryRef.current.items.length-1)rememberLocation();
+    const location=navigationHistoryRef.current.move(direction,item=>documents.tabs.some(tab=>tab.id===item.tabId));if(!location)return;
+    navigatingRef.current=true;
+    if(location.tabId!==documents.activeId)activateTab(location.tabId);
+    requestAnimationFrame(()=>{editorRef.current?.setPosition(location);editorRef.current?.revealPositionInCenter(location);editorRef.current?.focus();navigatingRef.current=false});
+  }
+
+export function navigateEdit(ctx, direction) {
+  const {
+    activateTab, documents, editLocationsRef, editorRef, jumpToOffset, setObjectTabActive, setRunState
+  } = ctx;
+    const history=editLocationsRef.current,available=item=>documents.tabs.some(tab=>tab.id===item.tabId);
+    const item=direction==='last'?history.last(available):history.move(direction,available);
+    if(!item){setRunState('No further edit location is available.');return;}
+    setObjectTabActive(false);if(documents.activeId!==item.tabId)activateTab(item.tabId);
+    requestAnimationFrame(()=>jumpToOffset(Math.min(item.offset,editorRef.current?.getModel()?.getValueLength()||0)));
+  }
+
+export function openExtractProcedure(ctx) {
+  const {
+    documents, editorIsReadonly, editorRef, setExtractProcedure
+  } = ctx;
+    const editor=editorRef.current,model=editor?.getModel(),selection=editor?.getSelection();
+    if(!model||!selection||selection.isEmpty()||editorIsReadonly()){notifyFeedback({kind:'warning',title:'Extract Procedure',message:'Select complete PL/SQL assignment statements first.',scope:documents.activeId});return}
+    setExtractProcedure({tabId:documents.activeId,model,version:model.getVersionId(),source:model.getValue(),start:model.getOffsetAt(selection.getStartPosition()),end:model.getOffsetAt(selection.getEndPosition())});
+  }
+
+export function openStructuralSearch(ctx) {
+  const {
+    documents, editorRef, setStructuralSearch, workspace
+  } = ctx; const editor = editorRef.current, model = editor?.getModel(), selection = editor?.getSelection(), position = editor?.getPosition(); const selected = model && selection && !selection.isEmpty() ? model.getValueInRange(selection).trim() : ''; const initialName = /^[\w$#".]{1,128}$/.test(selected) ? selected : model && position ? model.getWordAtPosition(position)?.word || '' : ''; setStructuralSearch({ root: isNativeHost ? workspace.root || null : null, document: { ...documents.active, content: documents.text }, initialName }); }
+
+export function learnSqlUsage(ctx, source) {
+  const {
+    completionClientRef, completionSettingsRef, learningEpochRef, publishLearning, suggestionLearningRef, suggestionScope
+  } = ctx;
+    if (source.length>=LARGE_FILE_THRESHOLD || !completionSettingsRef.current.learning || !completionClientRef.current) return;
+    const scope = suggestionScope(), epoch = learningEpochRef.current;
+    completionClientRef.current.request('learn', source, 0).then(result => {
+      if (!completionSettingsRef.current.learning || epoch !== learningEpochRef.current) return;
+      suggestionLearningRef.current.observe(scope, result.observations || []); publishLearning();
+    });
   }
