@@ -31,7 +31,7 @@ function fixture(){
 test('generated object SQL connects its new session to the originating profile without executing SQL',()=>{
   const {scope,connections,commands}=fixture();
   scope.newSqlFileNow=()=>scope.documents.open({id:'draft',path:null,content:'',dirty:false});
-  const open=appFunction('openObjectSqlDraft','async function objectContextAction',scope);
+  const open=appFunction('openObjectSqlDraft','function objectContextAction',scope);
   open('SELECT * FROM "APP"."T";', {name:'T'}, 'dev');
   assert.deepEqual(connections,[{id:'DEV',hasSavedCredentials:true,tabId:'draft'}]);
   assert.equal(scope.documents.tabs[0].connectionProfileId,'dev');

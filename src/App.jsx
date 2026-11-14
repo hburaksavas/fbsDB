@@ -16,9 +16,9 @@ import {createQueryOperations} from './queryExecution.js';
 import './RunMenu';
 import { configureFeedback } from './feedbackStore';
 import { useFeedbackState, notifyFeedback, dismissFeedback, setFeedbackScopes } from './Feedback';
-import { objectSqlDraft, qualifiedObject, editableObjectDefinition } from './oracleObjectActions.js';
+import './oracleObjectActions.js';
 import './editorShortcuts.js';
-import { sqlFormatterStyle } from './sqlFormatterSettings.js';
+import './sqlFormatterSettings.js';
 import { SuggestionLearning, learningScope } from './suggestionLearning.js';
 import { automaticCompletionAllowed } from './oracleCompletionContext.js';
 import { loadSettings,saveSettings,newResultDefaults,saveResultDefaults,resolveSetting,changeSetting,settingDefinitions,resultPageSizes } from './settingsModel';
@@ -80,13 +80,13 @@ import {previewOpenPlan,settlePreview} from './previewTabs';
 import { nextScratchName, promptsOnClose } from './scratchFiles';
 import {codeLensItems} from './codeLenses';
 import {createConsoleEntry,createConsoleStore} from './runConsole';
-import { loadBindDefinitions, saveBindDefinitions } from './bindDefinitions';
-import {createSummaryStore,summaryHover,summaryLabel} from './executionSummaries';
+import { loadBindDefinitions } from './bindDefinitions';
+import { createSummaryStore } from './executionSummaries';
 import './postfixProvider';
 import {formatElapsed,playCompletionTone,postExecutionActions,taskbarProgressState} from './postExecution';
-import {extractCteSnippet} from './postfixCompletion';
-import {columnCursorDraft} from './columnMulticursor';
-import {dragSqlDraft} from './dragToSql';
+import './postfixCompletion';
+import './columnMulticursor';
+import './dragToSql';
 import {contextualQuickFixes} from './quickFixes';
 import {planStatementMove} from './statementMove';
 import {embeddedSqlAt} from './embeddedSql';
@@ -95,7 +95,7 @@ import { effectiveLanguage, effectiveRegion } from './localeProfile';
 import { KeyTips } from "./KeyTips.jsx";
 import "./ServerSourceTree.jsx";
 import "./quickEval.js";
-import { cellDragType, planBindDrop } from "./resultBindDrop.js";
+import "./resultBindDrop.js";
 import "./exportProgress.js";
 import { loadIconPacks, resolveIconTheme, setIconTheme } from "./iconTheme.js";
 import { countTabDrafts } from "./draftStore.js";
@@ -109,19 +109,19 @@ import "./bindLookup.js";
 import { InlineBindStore, inlineBindParameters } from "./inlineBinds.js";
 import { ToolbarPrefsContext } from "./toolbarPrefs.js";
 import { isNativeHost, sendNativeCommand, subscribeNativeMessages, setNativeTabId } from "./nativeBridge";
-import { offsetAtOraclePosition } from "./plsqlDiagnostics";
+import "./plsqlDiagnostics";
 import './runtimeStack';
 import './StackTraceLinks';
 import { useSourceBookmarks } from './useSourceBookmarks';
 import './WorkbenchStatus';
 import './workbenchStatusModel.js';
-import { EditLocations, currentExecutionOffset } from './editLocations';
-import {batchClosePlan} from './batchClose';
+import { EditLocations } from './editLocations';
+import './batchClose';
 import {LayoutLockContext} from './LayoutLockContext';
 import './FileStructurePanel';
 import "./ProblemsPanel";
 import { getOracleBindNames } from "./oracleBinds";
-import { getSqlStatements } from "./sqlStatements.js";
+import "./sqlStatements.js";
 import { OracleCompletionClient } from "./oracleCompletionClient";
 import { OracleMetadataBroker, completionCancellation } from "./oracleMetadataBroker";
 import "./oracleLanguageProviders";
@@ -153,6 +153,10 @@ import { renderToolbarDefs } from './WorkbenchToolbarDefs.jsx';
 import { renderManagementContent } from './WorkbenchManagementContent.jsx';
 import { installWorkbenchShortcuts, installEditorShortcuts } from './WorkbenchShortcutEffects.js';
 import { reviewSourceBaselines, installLanguageProviders, scheduleDiagnostics, installEditorContextMenu } from './WorkbenchEditorEffects.js';
+import * as contextActions from './WorkbenchContextActions.js';
+import * as editorActions from './WorkbenchEditorActions.js';
+import * as tabActions from './WorkbenchTabActions.js';
+import * as resultExports from './WorkbenchResultExports.js';
 
 const EMPTY_SCHEMA_OBJECTS = [];
 const mockConnections = [
@@ -533,16 +537,9 @@ export function App() {
   }
   // Rewrites only the statement around the selection; Tab edits the CTE name in both places at once.
   function extractSelectionToCte() {
-    const editor=editorRef.current,model=editor?.getModel(),selection=editor?.getSelection();
-    if(!model||activeTabReadonly)return;
-    if(!selection||selection.isEmpty()){notifyFeedback({kind:'warning',title:'Extract CTE',message:'Select the subquery to extract.',scope:documents.activeId});return}
-    const text=model.getValue(),start=model.getOffsetAt(selection.getStartPosition()),end=model.getOffsetAt(selection.getEndPosition()),statement=getSqlStatements(text).find(item=>item.start<=start&&end<=item.end);
-    if(!statement){notifyFeedback({kind:'warning',title:'Extract CTE',message:'The selection must be inside one statement.',scope:documents.activeId});return}
-    const raw=text.slice(statement.start,statement.end),result=extractCteSnippet(raw,start-statement.start,end-statement.start);
-    if(result.error){notifyFeedback({kind:'warning',title:'Extract CTE',message:result.error,scope:documents.activeId});return}
-    const from=model.getPositionAt(statement.start),to=model.getPositionAt(statement.end);
-    editor.setSelection(new monacoRef.current.Selection(from.lineNumber,from.column,to.lineNumber,to.column));editor.focus();
-    editor.getContribution('snippetController2').insert(result.snippet.replace(/\n/g,model.getEOL()),{adjustWhitespace:false,undoStopBefore:true,undoStopAfter:true});
+    return editorActions.extractSelectionToCte({
+      activeTabReadonly, documents, editorRef, monacoRef
+    });
   }
   // Completes the construct on the cursor line as one undoable edit; it never runs SQL.
   smartEnterRef.current=()=>{
@@ -835,39 +832,11 @@ export function App() {
 
   function updateTokenColor(token, color) { setAllTokenColors((current) => ({ ...current, [theme]: { ...current[theme], [token]: color } })); }
   function editorIsReadonly() { return objectTabActive || !!documents.tabs.find(tab => tab.id === documents.activeId)?.readOnly; }
-  async function navigateProblem(problem) {
-    const tab = documents.tabs.find(tab => tab.id === problem.tabId);
-    if (!tab) return;
-    const text = problem.tabId === documents.activeId ? documents.text : tab.content;
-    if(problem.source==='Oracle stack'&&problem.definition){
-      const session=sessionsRef.current[problem.tabId]||{};
-      if(session.connectionLost||problem.executedProfileId&&problem.executedProfileId!==session.activeConnection?.id||problem.executedConnectionGeneration!=null&&problem.executedConnectionGeneration!==(session.connectionGeneration??0)){
-        notifyFeedback({kind:'warning',title:'Stack source',message:'The execution session changed. Return to its connection context before loading source.'});return;
-      }
-    }
-
-    if (problem.offset != null && problem.editorSnapshot === text) {
-      rememberLocation();
-      if (problem.tabId !== documents.activeId) activateTab(problem.tabId);
-      requestAnimationFrame(() => { const editor = editorRef.current, model = editor?.getModel(); if (!model || model.getValue() !== text) return; const position = model.getPositionAt(problem.offset); editor.setPosition(position); editor.revealPositionInCenter(position); editor.focus(); rememberLocation(problem.tabId,position); });
-      return;
-    }
-    if (problem.definition) {
-      let source = problem.definition;
-      if (!source.text) {
-        if(problem.source==='Oracle stack')completionMetadataRef.current.invalidate(problem.tabId,{...source});
-        const epoch=completionMetadataRef.current.session(problem.tabId).epoch;
-        const loaded = await completionMetadataRef.current.load(problem.tabId, { owner: source.owner, name: source.name, type: source.type.replace(/ BODY$/, ''), body: source.type.endsWith(' BODY') }, null, 'definition');
-        if (!loaded||completionMetadataRef.current.session(problem.tabId).epoch!==epoch||closedTabsRef.current.has(problem.tabId)) return;
-        source = { ...loaded, originTabId: problem.tabId, sourceVersionNotice:problem.source==='Oracle stack'?'Current server source retrieved after failure. The execution source version is unknown; this line may have changed.':null };
-      }
-      const offset = offsetAtOraclePosition(source.text, problem.oracleLine, problem.oracleColumn);
-      const prefix = offset == null ? null : source.text.slice(0, offset);
-      openOracleDefinition(source, prefix == null ? null : { lineNumber: prefix.split('\n').length, column: prefix.length - prefix.lastIndexOf('\n') });
-      return;
-    }
-    if (problem.tabId !== documents.activeId) activateTab(problem.tabId);
-    if (problem.source === 'Oracle') setResultTab('Output', problem.tabId);
+  function navigateProblem(problem) {
+    return editorActions.navigateProblem({
+      activateTab, closedTabsRef, completionMetadataRef, documents, editorRef, openOracleDefinition, rememberLocation, sessionsRef,
+      setResultTab
+    }, problem);
   }
   function rememberLocation(tabId=documents.activeId,position=editorRef.current?.getPosition()) { if(!navigatingRef.current&&position)navigationHistoryRef.current.push({tabId,...position}); }
   function navigateHistory(direction) {
@@ -896,15 +865,9 @@ export function App() {
     requestAnimationFrame(()=>jumpToOffset(Math.min(item.offset,editorRef.current?.getModel()?.getValueLength()||0)));
   }
   function returnToExecution() {
-    const owner=documents.active?.metadataOriginTabId||documents.activeId,context=operations.metadata.get(owner),original=documents.tabs.find(tab=>tab.id===owner);
-    if(!context||!original){setRunState('No execution source is recorded for this document.');return;}
-    setObjectTabActive(false);
-    const offset=currentExecutionOffset(context,original);
-    if(offset!=null){if(documents.activeId!==owner)activateTab(owner);requestAnimationFrame(()=>jumpToOffset(offset));return;}
-    const id=`execution-snapshot:${owner}`,hasPosition=Number.isInteger(context.statementOffset),content=hasPosition?context.editorSnapshot:context.executedSql;
-    if(typeof content!=='string'){setRunState('The execution source position was not recorded.');return;}
-    rememberEditorPosition();documents.open({id,name:`Execution · ${context.fileName||original.name}`,content,readOnly:true,dirty:false,metadataOriginTabId:owner,sourceVersionNotice:'Recorded execution snapshot. Current editor source differs or its position is unavailable.'});setNativeTabId(owner);
-    requestAnimationFrame(()=>jumpToOffset(hasPosition?context.statementOffset:0));
+    return editorActions.returnToExecution({
+      activateTab, documents, jumpToOffset, operations, rememberEditorPosition, setObjectTabActive, setRunState
+    });
   }
   function jumpToOffset(offset) {const editor=editorRef.current;if(!editor?.getModel())return;rememberLocation();const position=editor.getModel().validatePosition(sourcePositionAt(documents.text,offset));editor.setPosition(position);editor.revealPositionInCenter(position);editor.focus();rememberLocation();}
   useEffect(()=>installEditorContextMenu({
@@ -915,30 +878,10 @@ export function App() {
     if(!bind||!filePath)return 'VARCHAR2';
     return loadBindDefinitions(localStorage,filePath,getOracleBindNames(text)).find(item=>item.name===bind.name)?.type||'VARCHAR2';
   }
-  async function editorContextAction(action,context){
-    const configured=resolveSetting(settings,'editor.shortcuts').value,shortcuts={run:configured.run,format:configured.format,comment:configured.commentLine,find:configured.find,replace:configured.replace,undo:'Ctrl+Z',redo:'Ctrl+Y',cut:'Ctrl+X',copy:'Ctrl+C',paste:'Ctrl+V',selectAll:'Ctrl+A'};
-    if(shortcuts[action])coachShortcut(`editor:${action}`,{run:'Run SQL',format:'Format SQL',comment:'Toggle comment',selectAll:'Select all'}[action]||action[0].toUpperCase()+action.slice(1),shortcuts[action]);
-    const editor=editorRef.current,valid=()=>documents.activeId===context.tabId&&editor.getModel()===context.model&&!context.model.isDisposed()&&context.model.getVersionId()===context.version;
-    const check=()=>{if(!valid())throw Error('The editor changed. Open the menu again.')};check();editor.setSelection(context.selection);editor.focus();
-    if(action.startsWith('bind:')&&context.bind){
-      const bind=context.bind,from=context.model.getPositionAt(bind.start),to=context.model.getPositionAt(bind.end);
-      if(action.startsWith('bind:type:')){
-        const names=getOracleBindNames(context.model.getValue()),definitions=loadBindDefinitions(localStorage,filePath,names).map(item=>item.name===bind.name?{...item,type:action.slice(10)}:item);
-        saveBindDefinitions(localStorage,filePath,definitions);
-        notifyFeedback({kind:'success',title:'Bind type',message:`:${bind.name} is now ${action.slice(10)} in this file's bind form. SQL text is unchanged.`,scope:context.tabId});return;
-      }
-      if(action==='bind:copy'){await navigator.clipboard.writeText(`:${bind.name}`);return}
-      if(action==='bind:find'){editor.setSelection(new monacoRef.current.Range(from.lineNumber,from.column,to.lineNumber,to.column));editor.getAction('actions.find')?.run();return}
-      if(action==='bind:run'){runQuery();return}
-    }
-    if(action==='run'){runQuery();return}if(action==='explain'){explainQuery();return}if(action==='format'){await formatSql();return}
-    if(editorCommandRunners[action]){await editorCommandRunners[action](context);return}
-    if(action==='selectAll'){editor.setSelection(context.model.getFullModelRange());return}
-    if(action==='copy'||action==='cut'){await navigator.clipboard.writeText(context.model.getValueInRange(context.selection));if(action==='copy')return;check()}
-    if(action==='cut'||action==='paste'){if(context.readOnly)return;const text=action==='paste'?await navigator.clipboard.readText():'';check();editor.pushUndoStop();editor.executeEdits('context-menu',[{range:context.selection,text}]);editor.pushUndoStop();return}
-    if(action==='undo'||action==='redo'){editor.trigger('context-menu',action,{});return}
-    const command=editor.getAction({comment:'editor.action.commentLine',find:'actions.find',replace:'editor.action.startFindReplaceAction'}[action]);
-    if(!command?.isSupported())throw Error('This editor action is unavailable.');await command.run();
+  function editorContextAction(action,context){
+    return contextActions.editorContextAction({
+      coachShortcut, documents, editorCommandRunners, editorRef, explainQuery, filePath, formatSql, monacoRef, runQuery, settings
+    }, action, context);
   }
   function openObjectContext(event,item) {
     event.preventDefault();event.stopPropagation();
@@ -972,43 +915,11 @@ export function App() {
     if(save&&isNativeHost)documentSavesRef.current.start(sendNativeCommand,{id,path:null,name,content:text,dirty:true,connectionProfileId:profileId});
     else if(save){const url=URL.createObjectURL(new Blob([text],{type:'text/plain;charset=utf-8'})),link=document.createElement('a');link.href=url;link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(url),0)}
   }
-  async function objectContextAction(action,context) {
-    const {item,originTabId,editorTabId,profileId,epoch}=context,broker=completionMetadataRef.current;
-    const valid=()=>!context.cancellation.token.isCancellationRequested&&documents.activeId===editorTabId&&!closedTabsRef.current.has(originTabId)&&broker.session(originTabId).epoch===epoch&&sessionsRef.current[originTabId]?.activeConnection?.id===profileId;
-    const check=()=>{if(!valid())throw Error('The originating tab or connection changed. Open the menu again.')};
-    const load=async(kind,target=item)=>{check();const value=await broker.load(originTabId,target,context.cancellation.token,kind);check();if(!value)throw Error(broker.session(originTabId).lastError||'Oracle metadata is unavailable for this object.');return value};
-    check();
-    if(action.startsWith('details:')){openExplorerObject(item,action.slice(8),originTabId);return}
-    if(action==='favorite'){const key=oracleSchemaKey(item);setObjectFavorites(keys=>{const next=keys.includes(key)?keys.filter(k=>k!==key):[...keys,key];persistLocal(localStorage, 'fbsdb.objectFavorites',JSON.stringify(next));return next});return}
-    if(action.startsWith('copy:')){await navigator.clipboard.writeText(action==='copy:name'?item.name:qualifiedObject(item));return}
-    if(action==='refresh'){broker.invalidate(originTabId,item);requestSchemaDetails(item,originTabId,true);if(objectTabActive&&inspectorObject&&oracleSchemaKey(inspectorObject)===oracleSchemaKey(item))inspectOracleObject(item,originTabId,objectTab?.view==='Related tables');return}
-    if(action==='target'){
-      if(item.dbLink)throw Error('Remote synonym targets cannot be navigated locally. Use Open SELECT instead.');
-      const target=item.targetName?item:await load('metadata');
-      const owner=target.targetOwner,name=target.targetName;
-      const found=(sessionsRef.current[originTabId]?.schemaObjects||schemaObjects).find(o=>o.owner===owner&&o.name===name&&['TABLE','VIEW','MATERIALIZED VIEW','SYNONYM'].includes(o.type));
-      if(!found)throw Error('The target is not available in this session’s loaded object list.');
-      openExplorerObject(found,'Overview',originTabId);return;
-    }
-    if(action==='table'){
-      const detailed=(sessionsRef.current[originTabId]?.schemaObjects||schemaObjects).find(o=>oracleSchemaKey(o)===oracleSchemaKey(item))||item;
-      const name=detailed.targetName;
-      if(!name){if(detailed.details?.length)throw Error('This object has no accessible table target.');requestSchemaDetails(item,originTabId,true);throw Error('Table metadata is loading. Retry Go to table after it arrives.');}
-      const found=(sessionsRef.current[originTabId]?.schemaObjects||schemaObjects).find(o=>o.owner===(detailed.targetOwner||item.owner)&&o.name===name&&['TABLE','VIEW'].includes(o.type));
-      if(!found)throw Error('The related table is not available in the loaded object list.');
-      openExplorerObject(found,'Overview',originTabId);return;
-    }
-    if(action.startsWith('ddl:')){
-      const definition=await load('definition',action==='ddl:body-open'?{...item,body:true}:item),text=editableObjectDefinition(item,definition.text);
-      if(action==='ddl:copy'){await navigator.clipboard.writeText(text);return}
-      openObjectSqlDraft(text,item,profileId,action==='ddl:save');return;
-    }
-    if(action.startsWith('sql:')){
-      const kind=action.slice(4),metadata=['insert','update','merge'].includes(kind)?await load('objectDraftMetadata'):kind.startsWith('call')?await load('metadata'):{};
-      if(kind==='call'&&metadata.members?.length>1)return {choices:metadata.members.map(r=>({id:'sql:call:'+r.subprogramId,label:r.name+' ('+(r.parameters||[]).map(p=>p.name+' '+p.mode+' '+p.type).join(', ')+')'+(r.returnType?' → '+r.returnType:''),icon:'sql'}))};
-      const text=objectSqlDraft(item,kind,metadata);check();openObjectSqlDraft(text,item,profileId);return;
-    }
-    throw Error('This object action is unavailable.');
+  function objectContextAction(action,context) {
+    return contextActions.objectContextAction({
+      closedTabsRef, completionMetadataRef, documents, inspectOracleObject, inspectorObject, objectTab, objectTabActive, openExplorerObject,
+      openObjectSqlDraft, requestSchemaDetails, schemaObjects, sessionsRef, setObjectFavorites
+    }, action, context);
   }
   async function inspectOracleObject(target,requestedOriginTabId=metadataOriginTabId,relationships=false) {
     objectAnalysisRequestRef.current?.cancel();const cancellation=completionCancellation();objectAnalysisRequestRef.current=cancellation;
@@ -1032,13 +943,11 @@ export function App() {
     notifyFeedback({id:feedbackId,kind:'info',title:'Keyboard shortcut',message:hint.message,actions:[{label:"Don't show again",onClick:()=>{dismissShortcutHint(globalThis.localStorage,id);dismissFeedback(feedbackId)}}]});
   }
   function choosePaletteItem(item) {
-    if(item.kind==='file'){if(item.objectTab){const tab=objectTabs.find(t=>t.id===item.tabId);if(tab){setActiveObjectTabId(tab.id);setObjectTabActive(true);setActiveObject(tab.key);inspectOracleObject(tab.object,tab.originTabId,tab.view==='Related tables');}}else if(item.tabId){setObjectTabActive(false);activateTab(item.tabId);}else openWorkspaceFile(item);}
-    else if(item.kind==='object')openExplorerObject(item,'Overview');
-    else if(item.kind==='connection'){const profile=dbConnections.find(profile=>profile.id===item.profileId);if(profile)switchConnection(profile);}
-    else if(item.kind==='history'){newSqlFileNow();requestAnimationFrame(()=>insertHistorySql(item.sql));}
-    else if(item.kind==='outline'){setObjectTabActive(false);requestAnimationFrame(()=>jumpToOffset(item.start));}
-    else if(item.kind==='setting'){setSettingsFocus({query:item.label,category:['privacy','accessibility'].includes(item.detail)?'preferences':item.detail});setShowAppearance(true);}
-    else {item.run?.();if(item.detail)coachShortcut(`palette:${item.id}`,item.label,item.detail)}
+    return contextActions.choosePaletteItem({
+      activateTab, coachShortcut, dbConnections, insertHistorySql, inspectOracleObject, jumpToOffset, newSqlFileNow, objectTabs,
+      openExplorerObject, openWorkspaceFile, setActiveObject, setActiveObjectTabId, setObjectTabActive, setSettingsFocus, setShowAppearance,
+      switchConnection
+    }, item);
   }
   useEffect(()=>{
     setDocumentOutline([]);if(!largePolicy.outline||!monaco||!completionClientRef.current)return;
@@ -1048,37 +957,14 @@ export function App() {
   },[sql,activeTabId,monaco,completionSettings,completionObjects,completionSchema,completionSession.oracleVocabulary,allSqlSnippets,largePolicy.outline]);
   // Dropping a result cell inserts only a bind placeholder; the cell value is kept in memory for the next bind prompt and never written to the SQL or to disk.
   function attachBindDrop(editor) {
-    const node = editor.getDomNode();
-    if (!node || node.dataset.bindDrop) return;
-    node.dataset.bindDrop = '1';
-    node.addEventListener('dragover', event => { if ([...(event.dataTransfer?.types || [])].includes(cellDragType)) { event.preventDefault(); event.dataTransfer.dropEffect = 'copy'; } }, true);
-    node.addEventListener('drop', event => {
-      const raw = event.dataTransfer?.getData(cellDragType);
-      if (!raw) return;
-      event.preventDefault(); event.stopPropagation();
-      const model = editor.getModel();
-      if (!model || editorIsReadonly()) { notifyFeedback({ kind: 'warning', title: 'Bind placeholder', message: 'This editor is read-only.', scope: documents.activeId }); return; }
-      const hit = editor.getTargetAtClientPoint(event.clientX, event.clientY), position = hit && [6, 7].includes(hit.type) && hit.position ? hit.position : editor.getPosition();
-      const plan = planBindDrop(raw, getOracleBindNames(model.getValue()));
-      if (!plan || !position) return;
-      editor.executeEdits('result-bind-drop', [{ range: new monacoRef.current.Range(position.lineNumber, position.column, position.lineNumber, position.column), text: plan.insertText, forceMoveMarkers: true }]);
-      if (plan.prefill) bindPrefillRef.current[plan.prefill.name] = plan.prefill;
-      notifyFeedback({ kind: 'success', title: 'Bind created', message: `${plan.insertText} (${plan.type}) was inserted. ${plan.prefill ? 'Its value is offered only in the next bind prompt and is not saved.' : 'No value was carried over.'}`, scope: documents.activeId });
-      editor.focus();
-    }, true);
+    return editorActions.attachBindDrop({
+      bindPrefillRef, documents, editorIsReadonly, monacoRef
+    }, editor);
   }
   function openOracleDefinition(source, selection) {
-    if (!['PACKAGE', 'PACKAGE BODY', 'PROCEDURE', 'FUNCTION', 'TRIGGER', 'TYPE', 'TYPE BODY'].includes(source.type)) {
-      setObjectDefinition({ ...source, originTabId: source.originTabId || documents.activeId });
-      return;
-    }
-    rememberLocation();
-    const originTabId = source.originTabId, id = `definition:${originTabId}:${source.owner}:${source.type}:${source.name}`;
-    rememberEditorPosition();
-    const tab = { id, name: `${source.owner}.${source.name}${source.type.endsWith(" BODY") ? ".body" : ""}.sql`, path: null, content: source.text, dirty: false, readOnly: true, metadataOriginTabId: originTabId, definitionObject: { owner: source.owner, name: source.name, type: source.type }, sourceVersionNotice:source.sourceVersionNotice };
-    documents.open(tab);
-    setNativeTabId(originTabId);
-    requestAnimationFrame(() => { const position = { lineNumber: selection?.startLineNumber || selection?.lineNumber || 1, column: selection?.startColumn || selection?.column || 1 }; editorRef.current?.setPosition(position); editorRef.current?.revealPositionInCenter(position); editorRef.current?.focus(); rememberLocation(id,position); });
+    return editorActions.openOracleDefinition({
+      documents, editorRef, rememberEditorPosition, rememberLocation, setObjectDefinition
+    }, source, selection);
   }
   useEffect(()=>{
     if(recovery)return;
@@ -1191,18 +1077,10 @@ export function App() {
     if(impact.error){notifyFeedback({kind:'warning',title:'Delete review',message:impact.error,scope:tabId});return}
     setDeleteReview(impact);setWorkspaceSearchScope(null);setSearchQuery(impact.name);setShowSearch(true);
   }
-  async function pasteColumnCursors() {
-    const editor=editorRef.current,model=editor?.getModel(),selection=editor?.getSelection(),tabId=documents.activeId,version=model?.getVersionId();
-    if(!model||!selection||editorIsReadonly())return;
-    try {
-      const draft=columnCursorDraft(await navigator.clipboard.readText(),model.getEOL());
-      if(draft.error)throw Error(draft.error);
-      if(documents.activeId!==tabId||editor.getModel()!==model||model.isDisposed()||model.getVersionId()!==version)throw Error('The editor changed. Copy the columns and try again.');
-      const start=model.getOffsetAt(selection.getStartPosition());
-      editor.pushUndoStop();editor.executeEdits('column-cursors',[{range:selection,text:draft.text,forceMoveMarkers:true}]);editor.pushUndoStop();
-      editor.setSelections(draft.spans.map(span=>{const a=model.getPositionAt(start+span.start),b=model.getPositionAt(start+span.end);return new monacoRef.current.Selection(a.lineNumber,a.column,b.lineNumber,b.column)}));
-      editor.focus();
-    } catch(error) {notifyFeedback({kind:'warning',title:'Column cursors',message:error.message||'Clipboard unavailable',scope:tabId})}
+  function pasteColumnCursors() {
+    return editorActions.pasteColumnCursors({
+      documents, editorIsReadonly, editorRef, monacoRef
+    });
   }
   // Wraps whole selected lines with a snippet so Tab moves through the placeholders.
   function openSurroundMenu(x,y,trigger) {
@@ -1352,20 +1230,9 @@ export function App() {
     else close();
   }
   function closeTabs(ids) {
-    const selected=[...new Set(ids)],dirty=selected.map(id=>documents.tabs.find(tab=>tab.id===id)).filter(promptsOnClose);
-    const run=choices=>{
-      let queue;try{queue=batchClosePlan(documents.tabs,selected,choices,dirty)}catch(error){setBatchClose(current=>({...current,error:error.message}));return;}
-      setBatchClose(null);
-      const next=()=>{
-        const item=queue.shift();if(!item){batchDiscardRef.current.clear();return;}
-        const tab=documents.tabs.find(tab=>tab.id===item.id);if(!tab){next();return;}
-        const close=()=>closeTab(item.id,()=>setTimeout(next,0));
-        if(item.action==='save'&&tab.dirty){setObjectTabActive(false);if(documents.activeId!==item.id)activateTab(item.id);saveSqlFile(close)}
-        else {if(item.action==='discard')batchDiscardRef.current.add(item.id);close()}
-      };next();
-    };
-    if(dirty.length>1)setBatchClose({items:dirty.map(tab=>({...tab})),cleanCount:selected.length-dirty.length,run});
-    else {const queue=[...selected];const next=()=>{const id=queue.shift();if(id)closeTab(id,()=>setTimeout(next,0));else batchDiscardRef.current.clear()};next()}
+    return tabActions.closeTabs({
+      activateTab, batchDiscardRef, closeTab, documents, saveSqlFile, setBatchClose, setObjectTabActive
+    }, ids);
   }
   function newSqlFile() { newSqlFileFromLastConnection(); }
   function newSqlFileOnProfile(profileId) {
@@ -1402,19 +1269,10 @@ export function App() {
   const { connectInBackground, beginConnection, switchConnection, disconnectActiveConnection, submitConnectionCredentials, finishTransaction } = useConnectionLifecycle({ guardDrafts, connectionLost:!!tabSession.connectionLost, documents, pendingConnectionsRef, updateTabSession, setConnecting, setConnectionError, setAuthProfile, editorIsReadonly, setManagementError, setShowPicker, activeConnection, transactionPending, setPendingSwitch, setActiveConnection, setRunState, authProfile, authTestRequestRef, pendingSwitch });
   function previewConnectionOrganization(payload){const next=changeConnectionOrganization(connectionOrg,payload,dbConnections);setConnectionOrg(next);setDbConnections(current=>organizedProfiles(current,next).map(p=>({...p,group:p.groups[0]||''})))}
   function connectionContextAction(action,context){
-    const item=context.item,folderId=context.kind==='folder'?item.id:context.kind==='profile'?item.folderId:null;
-    if(action==='newSql'){newSqlFileNow();if(isNativeHost)beginConnection({...item,tabId:documents.activeId});return;}
-    if(action==='connect'||action==='reconnect')switchConnection(item,action==='reconnect');
-    else if(action==='disconnect')disconnectActiveConnection();
-    else if(action==='rename')setConnectionRename(item.id);
-    else if(action==='edit')setProfileEditor(item);
-    else if(action==='duplicate')setProfileEditor({...item,id:undefined,name:(item.name||item.id)+' copy',hasSavedCredentials:false,credentials:undefined});
-    else if(action==='favorite')setFavorites(current=>current.includes(item.id)?current.filter(id=>id!==item.id):[...current,item.id]);
-    else if(action==='delete')setProfileEditor({...item,libraryAction:'delete'});
-    else if(action==='newConnection')setProfileEditor({method:'basic',folderId:folderId||null,groupIds:[]});
-    else if(action==='newFolder'||action==='newGroup'||action==='manageFolder'||action==='renameFolder')setProfileEditor({libraryContext:{folderId:folderId||null,action}});
-    else if(action==='manage')setProfileEditor(true);
-    else if(action==='refresh')sendNativeCommand('connection.list');
+    return contextActions.connectionContextAction({
+      beginConnection, disconnectActiveConnection, documents, newSqlFileNow, setConnectionRename, setFavorites, setProfileEditor,
+      switchConnection
+    }, action, context);
   }
 
 
@@ -1445,39 +1303,9 @@ export function App() {
     link.href = url; link.download = `${(fileName || "query").replace(/\.sql$/i, "")}-results.json`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0);
   }
   function exportResultsInsertSql() {
-    if (!sqlResult?.columns?.length) return;
-    const identifier = (value) => `"${String(value).replaceAll('"', '""')}"`;
-    const literal = (value, type = "") => {
-      if (value == null) return "NULL";
-      const text = String(value), normalizedType = type.toUpperCase();
-      if (/NUMBER|INTEGER|INT|DECIMAL|NUMERIC|FLOAT|DOUBLE|REAL/.test(normalizedType) && /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(text)) return text;
-      if (/TIMESTAMP/.test(normalizedType)) {
-        const valueText = text.replace(/Z$/i, "+00:00");
-        const match = valueText.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(\.\d+)?([+-]\d{2}:\d{2})?$/);
-        if (match) {
-          const timestamp = `${match[1]} ${match[2]}${match[3] ?? ""}`;
-          if (/WITH (LOCAL )?TIME ZONE/.test(normalizedType) && match[4]) return `TO_TIMESTAMP_TZ('${timestamp}${match[4]}', 'YYYY-MM-DD HH24:MI:SS${match[3] ? ".FF" : ""} TZH:TZM')`;
-          return `TO_TIMESTAMP('${timestamp}', 'YYYY-MM-DD HH24:MI:SS${match[3] ? ".FF" : ""}')`;
-        }
-      }
-      if (/^DATE$/.test(normalizedType)) {
-        const match = text.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})/);
-        if (match) return `TO_DATE('${match[1]} ${match[2]}', 'YYYY-MM-DD HH24:MI:SS')`;
-      }
-      return `'${text.replaceAll("'", "''")}'`;
-    };
-    const columns = resultExportColumns();
-    const rows = resultExportRows();
-    const statements = [
-      "-- Generated by fbsDB from fetched query results.",
-      "-- Replace YOUR_TABLE with the destination table before running.",
-      ...(sqlResult.truncated ? [`-- Result was truncated; this script contains the ${rows.length} fetched rows only.`] : []),
-      "",
-      ...rows.map((row) => `INSERT INTO YOUR_TABLE (${columns.map((column) => identifier(column.name)).join(", ")}) VALUES (${columns.map((column, index) => literal(row[index], column.type)).join(", ")});`),
-      "",
-    ];
-    const url = URL.createObjectURL(new Blob([statements.join("\r\n")], { type: "text/sql;charset=utf-8" })), link = document.createElement("a");
-    link.href = url; link.download = `${(fileName || "query").replace(/\.sql$/i, "")}-inserts.sql`; link.click(); setTimeout(() => URL.revokeObjectURL(url), 0);
+    return resultExports.exportResultsInsertSql({
+      fileName, resultExportColumns, resultExportRows, sqlResult
+    });
   }
   async function copyResultsTsv() {
     if (!sqlResult?.columns?.length) return;
@@ -1495,70 +1323,22 @@ export function App() {
     event.dataTransfer.effectAllowed='copy';
   }
   function dropSchemaInEditor(event){
-    if(!event.dataTransfer?.types?.includes('application/x-fbsdb-schema'))return;
-    event.preventDefault();event.stopPropagation();
-    const editor=editorRef.current,model=editor?.getModel();
-    if(!model||editorIsReadonly())return;
-    let payload;try{payload=JSON.parse(event.dataTransfer.getData('application/x-fbsdb-schema'))}catch{return}
-    if(payload.tabId!==metadataOriginTabId)return;
-    const item=schemaObjects.find(object=>oracleSchemaKey(object)===payload.key),draft=dragSqlDraft(item,payload.column,model.getValue(),schemaObjects);
-    if(!draft)return;
-    const position=editor.getTargetAtClientPoint(event.clientX,event.clientY)?.position||editor.getPosition(),range=model.validateRange(editor.getSelection()?.containsPosition(position)?editor.getSelection():new monacoRef.current.Range(position.lineNumber,position.column,position.lineNumber,position.column));
-    editor.pushUndoStop();editor.executeEdits('schema-drag',[{range,text:draft.text,forceMoveMarkers:true}]);editor.pushUndoStop();editor.focus();setFileDirty(true);
+    return editorActions.dropSchemaInEditor({
+      editorIsReadonly, editorRef, metadataOriginTabId, monacoRef, schemaObjects, setFileDirty
+    }, event);
   }
   function handleEditorChange(value) { if (controlledEditorUpdateRef.current||editorIsReadonly()) return; documents.edit(value ?? ""); queueSchemaForSql(documents.text); }
-  async function formatSql() {
-    if (editorIsReadonly()) return;
-    const editor = editorRef.current, model = editor?.getModel(), client = completionClientRef.current;
-    if (!editor || !model || !client) return;
-    const selection = editor.getSelection(), hasSelection = selection && !selection.isEmpty(), range = hasSelection ? selection : model.getFullModelRange();
-    const source = model.getValueInRange(range), version = model.getVersionId(), owner = documents.activeId;
-    const result = await client.request("format", source, 0, null, { style: sqlFormatterStyle(resolveSetting(settingsRef.current,'editor.sqlFormatter').value, codeStyle) });
-    if (model.isDisposed() || model.getVersionId() !== version || documents.activeId !== owner || editor.getModel() !== model || typeof result?.formatted !== "string") return;
-    const formatted = result.formatted;
-    if (formatted === source) { setRunState("No formatting changes."); return; }
-    editor.pushUndoStop(); editor.executeEdits("fbsdb.formatSql", [{ range, text: hasSelection ? formatted.replace(/\n$/, "") : formatted, forceMoveMarkers: true }]); editor.pushUndoStop();
-    setFileDirty(true); setRunState("SQL / PL/SQL formatted."); editor.focus();
+  function formatSql() {
+    return editorActions.formatSql({
+      codeStyle, completionClientRef, documents, editorIsReadonly, editorRef, setFileDirty, setRunState, settingsRef
+    });
   }
   formatterRef.current = formatSql;
 
   function installRunGutter(editor, monacoInstance) {
-    const decorations = editor.createDecorationsCollection(), summaryDecorations = editor.createDecorationsCollection();
-    let statementsByLine = new Map();
-    const refresh = () => {
-      const model = editor.getModel();
-      statementsByLine = new Map();
-      if (!model || editorIsReadonly() || model.getValueLength()>=LARGE_FILE_THRESHOLD&&!largeFileOverridesRef.current[documents.activeId]?.source) { decorations.clear(); summaryDecorations.clear(); return; }
-      for (const statement of getSqlStatements(model.getValue())) {
-        const position = model.getPositionAt(statement.start);
-        // A gutter click targets only the first statement starting on this line.
-        const current = statementsByLine.get(position.lineNumber);
-        if (!current) statementsByLine.set(position.lineNumber, { ...statement, position });
-      }
-      const summaryItems = [];
-      for (const statement of getSqlStatements(model.getValue())) {
-        const summary = executionSummaries.current.get(documents.activeId, statement.sql);
-        if (!summary) continue;
-        const end = model.getPositionAt(statement.end), column = model.getLineMaxColumn(end.lineNumber);
-        summaryItems.push({ range: new monacoInstance.Range(end.lineNumber, column, end.lineNumber, column), options: { showIfCollapsed: true, stickiness: monacoInstance.editor.TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges, after: { content: summaryLabel(summary), inlineClassName: summary.ok ? 'sql-exec-summary' : 'sql-exec-summary failed' }, hoverMessage: { value: summaryHover(summary) } } });
-      }
-      summaryDecorations.set(summaryItems);
-      decorations.set([...statementsByLine.values()].map(({ position, sql }) => ({
-        range: new monacoInstance.Range(position.lineNumber, 1, position.lineNumber, 1),
-        options: { glyphMarginClassName: "sql-run-glyph", glyphMarginHoverMessage: { value: "Run SQL statement\n\n" + sql.slice(0, 160) } },
-      })));
-    };
-    const subscriptions = [editor.onDidChangeModelContent(refresh), editor.onDidChangeModel(refresh), editor.onMouseDown((event) => {
-      if (event.target.element?.closest?.('.sql-exec-summary') || event.target.detail?.injectedText?.options?.inlineClassName?.includes('sql-exec-summary')) { setResultTab('Results'); updateLayout(current => ({ ...current, resultsCollapsed: false })); return; }
-      if (event.target.type !== monacoInstance.editor.MouseTargetType.GUTTER_GLYPH_MARGIN || event.event.rightButton) return;
-      const statement = statementsByLine.get(event.target.position?.lineNumber);
-      if (!statement) return;
-      editor.setPosition(statement.position); editor.focus();
-      runQueryRef.current?.(statement.sql);
-    })];
-    refresh();
-    window.addEventListener('fbsdb.refreshRunGutter',refresh);
-    editor.onDidDispose(() => {window.removeEventListener('fbsdb.refreshRunGutter',refresh); subscriptions.forEach((subscription) => subscription.dispose()); decorations.clear(); summaryDecorations.clear(); });
+    return editorActions.installRunGutter({
+      documents, editorIsReadonly, executionSummaries, largeFileOverridesRef, runQueryRef, setResultTab, updateLayout
+    }, editor, monacoInstance);
   }
   function beginReadOnlyAnalysis() {
     if(!isNativeHost||executing||connecting||transactionPending||fetchingPage||view.streamState?.busy)return;
@@ -1660,18 +1440,11 @@ export function App() {
   }
   // The tabs now live in another window: forget them here without closing their sessions.
   function detachTabs(ids, sessionIds) {
-    for (const id of ids) {
-      setObjectDefinition(current => current?.originTabId === id ? null : current);
-      documentSavesRef.current.forget(id); executionSummaries.current?.forget(id); runConsoleStore.current?.clear(id);
-      bookmarks.forgetDocument(id); editLocationsRef.current.forget(id); batchDiscardRef.current.delete(id); closedTabsRef.current.add(id); operations.pages.delete(id); completionMetadataRef.current.forget(id); completionRecentRef.current.delete(id);
-      operations.metadata.delete(id); results.forget(id);
-    }
-    setTabSessions(current => { const next = { ...current }; for (const id of sessionIds) delete next[id]; return next; });
-    setSideEditor(current => current && ids.includes(current.tabId) ? null : current);
-    const remaining = documents.tabs.filter(tab => !ids.includes(tab.id));
-    const activeMoved = ids.includes(documents.activeId), index = documents.tabs.findIndex(tab => tab.id === documents.activeId);
-    setTabs(current => current.filter(tab => !ids.includes(tab.id)));
-    if (activeMoved) { if (remaining.length) activateTab(remaining[Math.max(0, Math.min(index, remaining.length) - 1)].id, false); else newSqlFileNow(); }
+    return tabActions.detachTabs({
+      activateTab, batchDiscardRef, bookmarks, closedTabsRef, completionMetadataRef, completionRecentRef, documentSavesRef, documents,
+      editLocationsRef, executionSummaries, newSqlFileNow, operations, results, runConsoleStore, setObjectDefinition, setSideEditor,
+      setTabSessions, setTabs
+    }, ids, sessionIds);
   }
   function adoptTransfer(transfer) {
     for (const id of [...transfer.sessionIds, ...transfer.documents.map(tab => tab.id)]) { closedTabsRef.current.delete(id); draftsConfirmedRef.current.delete(id); }
