@@ -14,7 +14,7 @@ node scripts/refactor/verify-functions.mjs .artifacts/refactor-stage
 
 `function-safety.mjs` lists the component's function declarations by size with `OK` or the reason a function cannot move. A function moves behind a wrapper of the same name and parameter list, which passes the component's values in one object: `function closeTab(id, onClosed = null) { return tabActions.closeTab({ … }, id, onClosed); }`. Because the wrapper reads all those values when it is called, a function is refused when:
 
-- the render can reach a reference to it before a `const` it reads is initialised (references inside effects count as after the render);
+- the render can reach a reference to it before a `const` it reads is initialised. References count as after the render when they sit inside an effect, inside a function written directly as a JSX attribute value (`onClick={() => f()}`), or in a closure that is only stored: `const g = () => f()`, `ref.current = () => f()` or `ref.current = f`. Such a closure then runs when `g` or `ref` is itself reached, which is followed the same way, so a ref that the render calls still blocks the function;
 - it uses its own `this`, `arguments` or `new.target`, is a generator, assigns to a component value or reads a `let` or `var`;
 - a parameter default contains a function;
 - it reads a declaration of the component's module that is not an import;

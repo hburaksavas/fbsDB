@@ -50,6 +50,33 @@ test('function safety refuses a function the render can reach before a const it 
   assert.deepEqual(problems.save, []);
 });
 
+test('function safety does not count closures that only run after the render, and still counts a ref called during it', async () => {
+  const body = (mid) => `import { useRef, useState } from 'react';
+export function App() {
+  const [count, setCount] = useState(0);
+  const lateRef = useRef(null);
+  lateRef.current = () => deferred();
+  const storeRef = useRef(null);
+  storeRef.current = stored;
+${mid}
+  const limit = count + 1;
+  const alias = () => viaConst();
+  function deferred() { return limit; }
+  function stored() { return limit; }
+  function viaConst() { return limit; }
+  function clicked() { return limit; }
+  function direct() { return limit; }
+  return <button onClick={() => clicked()}>{alias.name}</button>;
+}
+`;
+  const problems = async (src) => Object.fromEntries((await analyseFunctions(src)).results.map(r => [r.name, r.problems.length]));
+  assert.deepEqual(await problems(body('')), { deferred: 0, stored: 0, viaConst: 0, clicked: 0, direct: 0 }, 'ref closures, stored functions, const arrows and JSX handlers are after the render');
+  const called = await problems(body('  lateRef.current(); storeRef.current(); direct();'));
+  assert.equal(called.deferred, 1, 'a ref closure called in the render may run before the const it reads');
+  assert.equal(called.stored, 1, 'a stored function called through its ref in the render is counted');
+  assert.equal(called.direct, 1);
+});
+
 test('moved functions keep their parameter list in the wrapper and verify back to the original', async () => {
   const { file, stage } = fixture();
   await moveFunctions({ plan: [{ module: 'Actions', ns: 'actions', comment: 'Test actions.', functions: ['bump', 'save'] }], stage, file });

@@ -20,16 +20,26 @@ export async function analyseFunctions(src, component = 'App') {
   // Every reference to a component name, with its top-level statement, the enclosing top-level function declaration if any, and whether it
   // sits in an effect callback. A nested binding that shadows the name makes this over-report, which only makes the result more conservative.
   const refs = new Map();
+  // A function written directly as a JSX attribute value (`onClick={() => f()}`) is only stored in the element. The component body that
+  // creates the element never calls it, so references inside count like references in an effect: after the render.
+  const deferred = new Set();
   for (const s of top) {
     const isEffect = s.type === 'ExpressionStatement' && s.expression.type === 'CallExpression' && ['useEffect', 'useLayoutEffect'].includes(s.expression.callee.name);
     const effectCb = isEffect ? s.expression.arguments[0] : null;
-    (function walk(node, parentKey, inEffect) {
+    // The name a closure of this statement is reached through: a function declaration, `const f = () => …`, or `ref.current = () => …`.
+    // The closure runs when that name's own references run; its declaration or assignment only stores it.
+    const isFn = (n) => ['ArrowFunctionExpression', 'FunctionExpression'].includes(n?.type);
+    const refClosure = s.type === 'ExpressionStatement' && s.expression.type === 'AssignmentExpression' && s.expression.operator === '=' && (isFn(s.expression.right) || (s.expression.right.type === 'Identifier' && fnDecl.has(s.expression.right.name)))
+      && s.expression.left.type === 'MemberExpression' && !s.expression.left.computed && s.expression.left.property.name === 'current' && s.expression.left.object.type === 'Identifier' && appNames.has(s.expression.left.object.name) ? s.expression.left.object.name : null;
+    (function walk(node, parentKey, inEffect, fnName) {
       if (!node || typeof node !== 'object') return;
-      if (Array.isArray(node)) { node.forEach(n => walk(n, parentKey, inEffect)); return; }
-      if (node === effectCb) inEffect = true;
+      if (Array.isArray(node)) { node.forEach(n => walk(n, parentKey, inEffect, fnName)); return; }
+      if (node.type === 'VariableDeclarator' && node.id.type === 'Identifier' && isFn(node.init)) fnName = node.id.name;
+      if (node === effectCb || deferred.has(node)) inEffect = true;
+      if (node.type === 'JSXAttribute' && node.value?.type === 'JSXExpressionContainer' && ['ArrowFunctionExpression', 'FunctionExpression'].includes(node.value.expression.type)) deferred.add(node.value.expression);
       if (node.type === 'Identifier' && appNames.has(node.name) && parentKey !== 'property' && parentKey !== 'key-noncomputed' && parentKey !== 'decl-id') {
         if (!refs.has(node.name)) refs.set(node.name, []);
-        refs.get(node.name).push({ stmt: s, fn: s.type === 'FunctionDeclaration' ? s.id.name : null, inEffect });
+        refs.get(node.name).push({ stmt: s, fn: fnName, inEffect });
       }
       for (const k of Object.keys(node)) {
         if (k === 'type' || k === 'start' || k === 'end') continue;
@@ -38,9 +48,10 @@ export async function analyseFunctions(src, component = 'App') {
         else if ((node.type === 'Property' || node.type === 'MethodDefinition' || node.type === 'PropertyDefinition') && k === 'key' && !node.computed) pk = node.shorthand ? 'value' : 'key-noncomputed';
         else if (node.type === 'JSXAttribute' || node.type === 'JSXIdentifier') pk = 'property';
         else if (s.type === 'FunctionDeclaration' && node === s && k === 'id') pk = 'decl-id';
-        walk(node[k], pk, inEffect);
+        else if (node.type === 'VariableDeclarator' && k === 'id' && node.id.type === 'Identifier') pk = 'decl-id';
+        walk(node[k], pk, inEffect, fnName);
       }
-    })(s, null, false);
+    })(s, null, false, s.type === 'FunctionDeclaration' ? s.id.name : refClosure);
   }
   // Earliest point a reference can run during the render: its statement's start; for a reference inside function g, the earliest point of g's
   // references; effects run after the render. Recursion through hoisted functions is unknown and treated as the start of the component.

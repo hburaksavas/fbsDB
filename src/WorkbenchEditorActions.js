@@ -1,13 +1,14 @@
-// Editor commands: the run gutter, formatting, refactorings, quick fixes, surround and paste-as, statement moves, bookmarks, navigation history, structural search, schema and bind drops, definitions and problem navigation. App keeps a function of the same name that passes its values in; see docs/architecture.md.
+// x
 import { columnCursorDraft } from "./columnMulticursor";
 import { docSkeletonAt } from "./docSkeleton";
 import { dragSqlDraft } from "./dragToSql";
 import { currentExecutionOffset } from "./editLocations";
 import { summaryHover, summaryLabel } from "./executionSummaries";
 import { notifyFeedback } from "./Feedback";
-import { LARGE_FILE_THRESHOLD } from "./largeFilePolicy.js";
+import { LARGE_FILE_THRESHOLD, largeFilePolicy } from "./largeFilePolicy.js";
 import { isNativeHost, sendNativeCommand, setNativeTabId } from "./nativeBridge";
 import { getOracleBindNames } from "./oracleBinds";
+import { completionCancellation } from "./oracleMetadataBroker";
 import { oracleSchemaKey } from "./OracleObjectTree.jsx";
 import { inListSql, insertTemplateSql, jsonTableSql } from "./pasteToCode";
 import { offsetAtOraclePosition } from "./plsqlDiagnostics";
@@ -437,3 +438,27 @@ export function learnSqlUsage(ctx, source) {
       suggestionLearningRef.current.observe(scope, result.observations || []); publishLearning();
     });
   }
+
+export function queueSchemaForSql(ctx, text) {
+  const {
+    completionClientRef, completionMetadataRef, documents, editorRef, largeFileOverridesRef, schemaReadyRef, schemaWarmupRef, sessionsRef
+  } = ctx;
+    if (schemaWarmupRef.current) { clearTimeout(schemaWarmupRef.current.timer); schemaWarmupRef.current.cancel(); }
+    if (!largeFilePolicy(text,largeFileOverridesRef.current[documents.activeId]).completion || !isNativeHost || !schemaReadyRef.current || (sessionsRef.current[documents.activeId]?.executing||sessionsRef.current[documents.activeId]?.scriptRun?.running)) return;
+    const owner = documents.activeId, cancellation = completionCancellation();
+    const timer = setTimeout(async () => {
+      const client = completionClientRef.current;
+      if (!client || owner !== documents.activeId || text !== documents.text || cancellation.token.isCancellationRequested) return;
+      const model = editorRef.current?.getModel(), position = editorRef.current?.getPosition(), revision = client.revision;
+      const analysis = await client.request('analyze', text, model && position ? model.getOffsetAt(position) : text.length, cancellation.token, { mode: 'complete' });
+      if (revision !== client.revision || owner !== documents.activeId || cancellation.token.isCancellationRequested) return;
+      await Promise.all((analysis.targets || []).map(target => completionMetadataRef.current.load(owner, target, cancellation.token)));
+      if (revision === client.revision && owner === documents.activeId && !cancellation.token.isCancellationRequested) client.metadata(completionMetadataRef.current.objects(owner), completionMetadataRef.current.systemObjects(owner), completionMetadataRef.current.version(owner));
+    }, 200);
+    schemaWarmupRef.current = { ...cancellation, timer };
+  }
+
+export function requestSchemaDetails(ctx, item, originTabId, force) {
+  const {
+    schemaLoadedRef, schemaRequestedRef
+  } = ctx; const key = oracleSchemaKey(item).toLowerCase(); if(force){schemaLoadedRef.current.delete(key);schemaRequestedRef.current.delete(key)} if (!isNativeHost || schemaLoadedRef.current.has(key) || schemaRequestedRef.current.has(key)) return; schemaRequestedRef.current.add(key); sendNativeCommand("schema.objectDetails", { tabId:originTabId, owner: item.owner, name: item.name, objectType: item.type }); }

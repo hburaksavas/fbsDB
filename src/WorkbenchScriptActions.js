@@ -1,5 +1,7 @@
-// Previewing a script run and reviewing a paused one. App keeps a function of the same name that passes its values in; see docs/architecture.md.
-import { describeOracleSource } from "./oracleSourceIdentity.js";
+// x
+import { isNativeHost } from "./nativeBridge";
+import { describeOracleSource, relatedPackageDocument } from "./oracleSourceIdentity.js";
+import { sourceRunConfigurations } from "./runConfigurations";
 import { prepareSourceCompilation } from "./sourceCompilation";
 
 export function openScriptPreview(ctx) {
@@ -16,4 +18,38 @@ export function reviewPausedScript(ctx, owner) {
     if(documents.activeId!==owner)activateTab(owner);
     const prepared={sql:waiting.sql,original:waiting.sql};
     setSourceCompile({document:{...document,content:run.source},prepared,statementOffset:waiting.offset,tabId:owner,profileId:waiting.profileId,generation:waiting.generation,scriptRequestId:run.requestId,scriptIndex:waiting.index,reviewNonce:waiting.reviewNonce});
+  }
+
+export function reviewSourceForCompilation(ctx, statement, target) {
+  const {
+    documents, objectTabActive, sessionsRef, setRunState, setShowPicker, setSourceCompile, workspace
+  } = ctx;
+    const document=documents.active,session=sessionsRef.current[document?.id]||{};
+    if(!document||document.readOnly||objectTabActive||session.executing||session.fetchingPage||session.scriptRun?.running)return;
+    if(!isNativeHost||!session.activeConnection||['No connection','Disconnected'].includes(session.activeConnection.id)){setShowPicker(true);return;}
+    const prepared=prepareSourceCompilation(typeof statement==='string'?{...document,content:statement}:document,workspace.projectRules);
+    if(prepared.error){setRunState(prepared.error);return;}
+    setSourceCompile({document:{...document},prepared,statementOffset:typeof statement==='string'?target?.start??null:0,tabId:document.id,profileId:session.activeConnection.id});
+  }
+
+export function openRunConfigurations(ctx) {
+  const {
+    activateTab, documents, objectTab, objectTabActive, sessionsRef, setObjectTabActive, setRunConfigurations, workspace
+  } = ctx;
+    let source=objectTabActive?{name:'',content:''}:documents.active;if(!source)return;
+    const origin=objectTabActive&&objectTab?objectTab.originTabId:source.metadataOriginTabId||source.id;setObjectTabActive(false);
+    if(describeOracleSource(source,workspace.projectRules).declaration?.type==='PACKAGE BODY')source=relatedPackageDocument(source,documents.tabs,{root:workspace.root,sessions:sessionsRef.current,rules:workspace.projectRules}).target||source;
+    const generated=sourceRunConfigurations(source,workspace.projectRules,sessionsRef.current[origin]?.schemaOwner||'');
+    if(documents.activeId!==origin)activateTab(origin);
+    if(documents.active?.readOnly)return;
+    setRunConfigurations({root:workspace.root,tabId:origin,signatures:generated.configurations,signatureErrors:generated.errors});
+  }
+
+export function switchPackageSource(ctx) {
+  const {
+    activateTab, documents, sessionsRef, setRelatedSources, workspace
+  } = ctx;
+    const result = relatedPackageDocument(documents.active || {}, documents.tabs, {root: workspace.root, sessions: sessionsRef.current,rules:workspace.projectRules});
+    if (result.target) activateTab(result.target.id);
+    else if (isNativeHost && workspace.root && ['PACKAGE','PACKAGE BODY'].includes(describeOracleSource(documents.active || {},workspace.projectRules).declaration?.type)) setRelatedSources({root:workspace.root,document:documents.active});
   }

@@ -1,5 +1,5 @@
 import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import {nextQueryName} from './tabPathLabels';
+import './tabPathLabels';
 import {useEditorOverview} from './useEditorOverview.js';
 import { largeFilePolicy } from './largeFilePolicy.js';
 import { layoutPresets, restoreLayout } from './savedLayouts.js';
@@ -38,10 +38,10 @@ import { explainExpressionAt } from './expressionExplain.js';
 import './SideEditorPane.jsx';
 import './newQueryOptions';
 import {dismissShortcutHint,nextShortcutHint} from './shortcutCoach';
-import { sourceRunConfigurations } from './runConfigurations';
+import './runConfigurations';
 import { documentConnection } from './executionContext';
 import './ExecutionContextBadges';
-import { prepareSourceCompilation } from './sourceCompilation';
+import './sourceCompilation';
 import { projectOptions } from './projectRules';
 import './FileMenu';
 import './ViewMenu';
@@ -123,7 +123,7 @@ import "./ProblemsPanel";
 import { getOracleBindNames } from "./oracleBinds";
 import "./sqlStatements.js";
 import { OracleCompletionClient } from "./oracleCompletionClient";
-import { OracleMetadataBroker, completionCancellation } from "./oracleMetadataBroker";
+import { OracleMetadataBroker } from "./oracleMetadataBroker";
 import "./oracleLanguageProviders";
 import { hostWindow } from "./hostWindow.js";
 import { usePlsqlDebugger } from "./usePlsqlDebugger.js";
@@ -330,8 +330,9 @@ export function App() {
   const tabSession = tabSessions[activeTabId] || {};
   useLayoutEffect(() => { setNativeTabId(documents.active?.metadataOriginTabId || activeTabId); }, [activeTabId, documents]);
   function updateTabSession(key, value, owner = replyOwnerRef.current || documents.activeId) {
-    if (closedTabsRef.current.has(owner)) return;
-    setTabSessions(current => { const previous = current[owner] || {}; return { ...current, [owner]: { ...previous, [key]: typeof value === "function" ? value(previous[key] ?? (key === "activeConnection" ? { id: "No connection" } : undefined)) : value } }; });
+    return tabActions.updateTabSession({
+      closedTabsRef, setTabSessions
+    }, key, value, owner);
   }
   const activeConnection = tabSession.activeConnection ?? (!isNativeHost && activeTabId === "tab-1" ? mockConnections[0] : { id: "No connection", title: "No active session", host: "", port: "", service: "", env: "—", color: "neutral" });
   const setActiveConnection = (value, owner) => updateTabSession("activeConnection", value, owner);
@@ -664,19 +665,9 @@ export function App() {
   dbConnectionsRef.current = dbConnections; activeConnectionRef.current = activeConnection; authProfileRef.current = authProfile; pendingSwitchRef.current = pendingSwitch; transactionPendingRef.current = transactionPending; schemaLookupRef.current = schemaLookup; monacoRef.current = monaco;
 
   function queueSchemaForSql(text) {
-    if (schemaWarmupRef.current) { clearTimeout(schemaWarmupRef.current.timer); schemaWarmupRef.current.cancel(); }
-    if (!largeFilePolicy(text,largeFileOverridesRef.current[documents.activeId]).completion || !isNativeHost || !schemaReadyRef.current || (sessionsRef.current[documents.activeId]?.executing||sessionsRef.current[documents.activeId]?.scriptRun?.running)) return;
-    const owner = documents.activeId, cancellation = completionCancellation();
-    const timer = setTimeout(async () => {
-      const client = completionClientRef.current;
-      if (!client || owner !== documents.activeId || text !== documents.text || cancellation.token.isCancellationRequested) return;
-      const model = editorRef.current?.getModel(), position = editorRef.current?.getPosition(), revision = client.revision;
-      const analysis = await client.request('analyze', text, model && position ? model.getOffsetAt(position) : text.length, cancellation.token, { mode: 'complete' });
-      if (revision !== client.revision || owner !== documents.activeId || cancellation.token.isCancellationRequested) return;
-      await Promise.all((analysis.targets || []).map(target => completionMetadataRef.current.load(owner, target, cancellation.token)));
-      if (revision === client.revision && owner === documents.activeId && !cancellation.token.isCancellationRequested) client.metadata(completionMetadataRef.current.objects(owner), completionMetadataRef.current.systemObjects(owner), completionMetadataRef.current.version(owner));
-    }, 200);
-    schemaWarmupRef.current = { ...cancellation, timer };
+    return editorActions.queueSchemaForSql({
+      completionClientRef, completionMetadataRef, documents, editorRef, largeFileOverridesRef, schemaReadyRef, schemaWarmupRef, sessionsRef
+    }, text);
   }
 
   function finishHistoryEntry(status, detail) {
@@ -1096,17 +1087,14 @@ export function App() {
     }, fix);
   }
   function switchPackageSource() {
-    const result = relatedPackageDocument(documents.active || {}, documents.tabs, {root: workspace.root, sessions: sessionsRef.current,rules:workspace.projectRules});
-    if (result.target) activateTab(result.target.id);
-    else if (isNativeHost && workspace.root && ['PACKAGE','PACKAGE BODY'].includes(describeOracleSource(documents.active || {},workspace.projectRules).declaration?.type)) setRelatedSources({root:workspace.root,document:documents.active});
+    return scriptActions.switchPackageSource({
+      activateTab, documents, sessionsRef, setRelatedSources, workspace
+    });
   }
   function reviewSourceForCompilation(statement, target) {
-    const document=documents.active,session=sessionsRef.current[document?.id]||{};
-    if(!document||document.readOnly||objectTabActive||session.executing||session.fetchingPage||session.scriptRun?.running)return;
-    if(!isNativeHost||!session.activeConnection||['No connection','Disconnected'].includes(session.activeConnection.id)){setShowPicker(true);return;}
-    const prepared=prepareSourceCompilation(typeof statement==='string'?{...document,content:statement}:document,workspace.projectRules);
-    if(prepared.error){setRunState(prepared.error);return;}
-    setSourceCompile({document:{...document},prepared,statementOffset:typeof statement==='string'?target?.start??null:0,tabId:document.id,profileId:session.activeConnection.id});
+    return scriptActions.reviewSourceForCompilation({
+      documents, objectTabActive, sessionsRef, setRunState, setShowPicker, setSourceCompile, workspace
+    }, statement, target);
   }
   function reviewPausedScript(owner) {
     return scriptActions.reviewPausedScript({
@@ -1117,22 +1105,14 @@ export function App() {
     if(tabSession.scriptRun?.awaitingSourceReview)reviewPausedScript(activeTabId);
   },[activeTabId,tabSession.scriptRun?.awaitingSourceReview?.reviewNonce]);
   function openRunConfigurations() {
-    let source=objectTabActive?{name:'',content:''}:documents.active;if(!source)return;
-    const origin=objectTabActive&&objectTab?objectTab.originTabId:source.metadataOriginTabId||source.id;setObjectTabActive(false);
-    if(describeOracleSource(source,workspace.projectRules).declaration?.type==='PACKAGE BODY')source=relatedPackageDocument(source,documents.tabs,{root:workspace.root,sessions:sessionsRef.current,rules:workspace.projectRules}).target||source;
-    const generated=sourceRunConfigurations(source,workspace.projectRules,sessionsRef.current[origin]?.schemaOwner||'');
-    if(documents.activeId!==origin)activateTab(origin);
-    if(documents.active?.readOnly)return;
-    setRunConfigurations({root:workspace.root,tabId:origin,signatures:generated.configurations,signatureErrors:generated.errors});
+    return scriptActions.openRunConfigurations({
+      activateTab, documents, objectTab, objectTabActive, sessionsRef, setObjectTabActive, setRunConfigurations, workspace
+    });
   }
   function newSqlFileNow(content = "", extra = {}) {
-    const id = `new-${crypto.randomUUID()}`;
-    rememberEditorPosition();
-    documents.open({ id, name: nextQueryName(documents.tabs), path: null, content, dirty: Boolean(content), connectionProfileId: null, ...extra });
-    setNativeTabId(id);
-    if (isNativeHost) sendNativeCommand("file.new", { tabId: id });
-    schemaReadyRef.current = false; schemaLookupRef.current = new Map(); schemaLoadedRef.current.clear(); schemaRequestedRef.current.clear();
-    requestAnimationFrame(() => editorRef.current?.focus());
+    return tabActions.newSqlFileNow({
+      documents, editorRef, rememberEditorPosition, schemaLoadedRef, schemaLookupRef, schemaReadyRef, schemaRequestedRef
+    }, content, extra);
   }
   function applyProjectRunDefaults() {
     if(editorIsReadonly()||executing||fetchingPage||tabSession.scriptRun?.running)return;
@@ -1226,7 +1206,11 @@ export function App() {
       resultExportColumns, resultExportRows, setCopiedResults, setRunState, sqlResult
     });
   }
-  function requestSchemaDetails(item,originTabId=metadataOriginTabId,force=false) { const key = oracleSchemaKey(item).toLowerCase(); if(force){schemaLoadedRef.current.delete(key);schemaRequestedRef.current.delete(key)} if (!isNativeHost || schemaLoadedRef.current.has(key) || schemaRequestedRef.current.has(key)) return; schemaRequestedRef.current.add(key); sendNativeCommand("schema.objectDetails", { tabId:originTabId, owner: item.owner, name: item.name, objectType: item.type }); }
+  function requestSchemaDetails(item,originTabId=metadataOriginTabId,force=false) {
+    return editorActions.requestSchemaDetails({
+      schemaLoadedRef, schemaRequestedRef
+    }, item, originTabId, force);
+  }
   function refreshSchema(owner = documents.activeId) { if (schemaRequestRef.current) sendNativeCommand('schema.cancel', { requestId: schemaRequestRef.current, tabId: owner }); const id = sendNativeCommand("schema.refresh", { tabId: owner }); schemaRequestRef.current = id || null; return id; }
   function insertEditorText(text) { const editor = editorRef.current; if (!editor || editorIsReadonly()) return; editor.executeEdits("schema-explorer", [{ range: editor.getSelection(), text, forceMoveMarkers: true }]); editor.focus(); setFileDirty(true); }
   function startSchemaDrag(event,item,column=null){

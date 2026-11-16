@@ -7,6 +7,7 @@ import { isNativeHost, sendNativeCommand, setNativeTabId } from "./nativeBridge"
 import { newQueryTemplates } from "./newQueryOptions";
 import { projectOptions } from "./projectRules";
 import { promptsOnClose } from "./scratchFiles";
+import { nextQueryName } from "./tabPathLabels";
 import { buildTabTransfer, tabMoveBlocker, windowDraftKey } from "./tabTransfer.js";
 import { pathKey } from "./workspaceTree";
 
@@ -193,3 +194,24 @@ export function newSqlFileFromLastConnection(ctx, extra) {
   const {
     activeConnectionRef, beginConnection, dbConnectionsRef, documents, newSqlFileNow, setActiveConnection, setTabs
   } = ctx; const current = activeConnectionRef.current; const profile = dbConnectionsRef.current.find(item => item.id === (current && !['No connection', 'Disconnected'].includes(current.id) ? current.id : null)); newSqlFileNow("", extra); if (profile) { if (isNativeHost) beginConnection({ ...profile, tabId: documents.activeId }); else { setActiveConnection(profile); setTabs(tabs => tabs.map(tab => tab.id === documents.activeId ? { ...tab, connectionProfileId: profile.id } : tab)); } } }
+
+export function newSqlFileNow(ctx, content, extra) {
+  const {
+    documents, editorRef, rememberEditorPosition, schemaLoadedRef, schemaLookupRef, schemaReadyRef, schemaRequestedRef
+  } = ctx;
+    const id = `new-${crypto.randomUUID()}`;
+    rememberEditorPosition();
+    documents.open({ id, name: nextQueryName(documents.tabs), path: null, content, dirty: Boolean(content), connectionProfileId: null, ...extra });
+    setNativeTabId(id);
+    if (isNativeHost) sendNativeCommand("file.new", { tabId: id });
+    schemaReadyRef.current = false; schemaLookupRef.current = new Map(); schemaLoadedRef.current.clear(); schemaRequestedRef.current.clear();
+    requestAnimationFrame(() => editorRef.current?.focus());
+  }
+
+export function updateTabSession(ctx, key, value, owner) {
+  const {
+    closedTabsRef, setTabSessions
+  } = ctx;
+    if (closedTabsRef.current.has(owner)) return;
+    setTabSessions(current => { const previous = current[owner] || {}; return { ...current, [owner]: { ...previous, [key]: typeof value === "function" ? value(previous[key] ?? (key === "activeConnection" ? { id: "No connection" } : undefined)) : value } }; });
+  }
