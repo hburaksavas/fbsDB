@@ -149,6 +149,24 @@ export function analyse(ast) {
 
 export async function freeNames(source) { return analyse(await parse(source)).free; }
 
+// The function of an exported component: `export function X() {}`, or a wrapped one such as
+// `export const X = memo(function X() {})`, `memo(() => {})` or `forwardRef(...)` (also nested wrappers).
+export function exportedComponent(ast, component) {
+  for (const node of ast.body) {
+    if (node.type !== 'ExportNamedDeclaration' || !node.declaration) continue;
+    const decl = node.declaration;
+    if (decl.type === 'FunctionDeclaration' && decl.id?.name === component) return decl;
+    if (decl.type !== 'VariableDeclaration') continue;
+    for (const d of decl.declarations) {
+      if (d.id?.type !== 'Identifier' || d.id.name !== component) continue;
+      let init = d.init;
+      while (init?.type === 'CallExpression') init = init.arguments[0];
+      if (init?.type === 'FunctionExpression' || init?.type === 'ArrowFunctionExpression') return init;
+    }
+  }
+  throw new Error(`no exported function ${component}`);
+}
+
 // Names bound at module level, and at the top level of the exported function component (App by default).
 export async function appBindings(source, component = 'App') {
   const ast = await parse(source);
@@ -157,8 +175,7 @@ export async function appBindings(source, component = 'App') {
     if (node.type === 'ImportDeclaration') for (const sp of node.specifiers) moduleNames.set(sp.local.name, { kind: 'import', source: node.source.value, type: sp.type, imported: sp.imported?.name });
     else { const names = []; collectTop(node, names); for (const n of names) moduleNames.set(n, { kind: 'decl' }); }
   }
-  const app = ast.body.find(n => n.type === 'ExportNamedDeclaration' && n.declaration?.id?.name === component)?.declaration;
-  if (!app) throw new Error(`no exported function ${component}`);
+  const app = exportedComponent(ast, component);
   const appNames = new Set();
   const params = []; for (const p of app.params) patternNames(p, params); for (const n of params) appNames.add(n);
   for (const s of app.body.body) { const names = []; collectTop(s, names); for (const n of names) appNames.add(n); }

@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { parseAst } from 'rollup/parseAst';
-import { freeNames } from './scope.mjs';
+import { freeNames, exportedComponent } from './scope.mjs';
 
 export { parseAst };
 
@@ -19,9 +19,7 @@ export function parseArgs(argv, defaults) {
 export const eolOf = (text) => text.includes('\r\n') ? '\r\n' : '\n';
 
 export function findComponent(ast, component) {
-  const node = ast.body.find(n => n.type === 'ExportNamedDeclaration' && n.declaration?.type === 'FunctionDeclaration' && n.declaration.id.name === component);
-  if (!node) throw new Error(`no exported function ${component}`);
-  return node.declaration;
+  return exportedComponent(ast, component);
 }
 
 export function patternIds(p, out) {

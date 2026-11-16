@@ -64,6 +64,22 @@ test('moved functions keep their parameter list in the wrapper and verify back t
   assert.ok((await verifyFunctions(stage, quiet)).some(f => /does not give the original/.test(f)));
 });
 
+test('a component wrapped in memo or forwardRef is found, moved and verified like a plain exported function', async () => {
+  const wrapped = component.replace('export function App() {', 'export const Grid = memo(forwardRef(function Grid(props, ref) {').replace(/\n  return unused;\n\}\n$/, '\n  return unused;\n}));\n');
+  assert.notEqual(wrapped, component);
+  const { results } = await analyseFunctions(wrapped, 'Grid');
+  assert.deepEqual(results.find(r => r.name === 'bump').problems, []);
+  const arrow = component.replace('export function App() {', 'export const Grid = memo(() => {').replace(/\n  return unused;\n\}\n$/, '\n  return unused;\n});\n');
+  assert.deepEqual((await analyseFunctions(arrow, 'Grid')).results.find(r => r.name === 'save').problems, []);
+  const { dir, stage } = fixture();
+  const file = path.join(dir, 'src', 'Grid.jsx');
+  fs.writeFileSync(file, wrapped);
+  await moveFunctions({ plan: [{ module: 'Actions', ns: 'actions', comment: 'Test actions.', functions: ['bump', 'save'] }], stage, file, component: 'Grid' });
+  assert.match(fs.readFileSync(path.join(stage, 'Grid.jsx'), 'utf8'), /return actions\.bump\(\{/);
+  assert.deepEqual(await verifyFunctions(stage, quiet), []);
+  await assert.rejects(analyseFunctions(component, 'Missing'), /no exported function Missing/);
+});
+
 test('a function that is not safe to move is refused', async () => {
   const { file, stage } = fixture();
   await assert.rejects(moveFunctions({ plan: [{ module: 'Actions', ns: 'actions', comment: '', functions: ['late'] }], stage, file }), /late: may run before/);
