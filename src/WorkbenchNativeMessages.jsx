@@ -26,7 +26,7 @@ export function subscribeWorkbenchMessages(ctx) {
     setKeyValues, setLookupPicker, setManagementError, setObjectTabs, setOutputMessage, setPageError, setPendingSwitch, setPendingTabClose,
     setPreviewTabId, setQueryResult, setQuickEval, setRecentProfiles, setRelatedAutoRun, setResultTab, setRunState, setSchemaError,
     setSchemaLoading, setSchemaObjects, setSchemaOwner, setSchemaStale, setSearchMatches, setSearchTruncated, setSearching, setSettingsError,
-    setSourceCompile, setSqlResult, setSshHostKey, setSubqueryTrial, setTabSessions, setTabs, setTnsAliases, setTransactionPending,
+    setSourceCompile, setSqlResult, setSubqueryTrial, setTabSessions, setTabs, setTnsAliases, setTransactionPending,
     setUncertainCommit, setWorkspace, setWorkspaceDev, sourceBaselineRequests, sourceDefinitionRequestRef, tabCloseActionsRef, tabSessions,
     updateTabResult, updateTabSession, windowMessageRef, workspace, workspaceDevRequestsRef
   } = ctx;
@@ -188,12 +188,8 @@ export function subscribeWorkbenchMessages(ctx) {
           if (!message.success) setManagementError(message.message);
           else { setFavorites(current => current.filter(id => id !== message.profileId)); setRecentProfiles(current => current.filter(id => id !== message.profileId)); }
         }
-      } else if (message?.type === "connection.sshHostKey") {
-        // FI-069: the connection that follows fails; the user may trust the key and connect again.
-        setSshHostKey({ ...message, tabId: owner });
       } else if (message?.type === "connection.connected") {
         completionMetadataRef.current.reset(owner);
-        updateTabSession("tunnel", message.tunnel || null, owner);
         updateTabSession("connectionLost",false,owner);updateTabSession("connectionGeneration",generation=>(generation||0)+1,owner);updateTabSession("connectionEnvironment",message.profile?.env||'UNKNOWN',owner);
         updateTabSession("inactive",false,owner);
         updateTabSession("analysisReadOnly",false,owner);
@@ -215,7 +211,6 @@ export function subscribeWorkbenchMessages(ctx) {
           updateTabResult("resultSets", sets => (sets || []).map(item => ({ ...item, result: { ...item.result, hasMore: false, cursorUnavailable: item.result.hasMore } })));
         }
       } else if (message?.type === "connection.disconnected") {
-        updateTabSession("tunnel", null, owner);
         updateTabSession("sessionContext",null,owner);updateTabSession("rendering",false,owner);
         updateTabSession("analysisReadOnly",false,owner);
         completionMetadataRef.current.reset(owner);

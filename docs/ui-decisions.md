@@ -45,15 +45,12 @@ User-approved product decision. Preserve these choices in later changes.
 - Database sessions stay in one process; each session belongs to exactly one window, and another window's command for it is refused. Window titles and the status bar name the owning window.
 - Closing a secondary window returns its tabs, with their sessions, to the main window. Closing the main window returns all tabs first, so their unsaved SQL is offered on the next start.
 
-## 2026-11-09 — SSH tunnels (FI-069)
+## 2026-11-09 — SSH tunnels (FI-069) — removed 2026-11-16
 
-User-approved product decision. Preserve these choices in later changes.
+User-approved on 2026-11-09 and removed by the user's decision on 2026-11-16. Do not bring it back without asking.
 
-- Tunnels use the Windows OpenSSH client (`ssh.exe -N -L`) as a child process, so the user's ssh config, ssh-agent and known_hosts apply. No SSH library is bundled.
-- Sign-in uses keys or ssh-agent only (`BatchMode=yes`). fbsDB stores no SSH passwords or passphrases.
-- An unknown SSH host shows its SHA256 key fingerprint; only after the user confirms it is that key added to known_hosts. A changed host key is always refused, never replaced by fbsDB.
-- One tunnel per profile is shared by every tab connected through it and closes with the last of them. The status bar shows `SSH` for a session that uses a tunnel.
-- The first version covers Basic (host, port, service) profiles; TNS aliases and custom descriptors are not rewritten for tunnels.
+- Removed together: the SSH fields in the connection editor, the unknown-host fingerprint dialog, the `SSH` status-bar mark, the `ssh.trustHost` command, the `connection.sshHostKey` and `ssh.hostTrusted` replies, the tunnel registry (`SshTunnels.cs`) and its tests.
+- A profile saved earlier with an SSH setting keeps its `ssh` entry in `settings.json` but is shown as unavailable, never connected directly: its host was only reachable through the tunnel. Saving the profile again in the editor drops the entry.
 
 ## 2026-11-10 — PL/SQL debugging (FI-007)
 

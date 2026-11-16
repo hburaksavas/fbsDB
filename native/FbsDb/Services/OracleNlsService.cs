@@ -44,8 +44,7 @@ public sealed partial class OracleSessionService
         var validated=OracleNlsSettings.Validate(overrides);
         if(string.IsNullOrEmpty(password)){var saved=await GetSavedCredentialsAsync(profile.Id);if(saved is not null&&(string.IsNullOrWhiteSpace(user)||string.Equals(user,saved.Value.User,StringComparison.OrdinalIgnoreCase)))(user,password)=saved.Value;}
         if(string.IsNullOrWhiteSpace(user)||string.IsNullOrEmpty(password))throw new InvalidOperationException("Provide temporary test credentials or explicitly save credentials for this profile first.");
-        await using var lease=await SshTunnelRegistry.Shared.AcquireAsync(profile,token);
-        var builder=new OracleConnectionStringBuilder{DataSource=lease.DataSource,UserID=user,Password=password,Pooling=false,ConnectionTimeout=15};
+        var builder=new OracleConnectionStringBuilder{DataSource=profile.Descriptor,UserID=user,Password=password,Pooling=false,ConnectionTimeout=15};
         if(profile.Method=="tns")builder.TnsAdmin=Path.GetDirectoryName(profile.Source);
         await using var connection=new OracleConnection(builder.ConnectionString);await connection.OpenAsync(token);
         var initial=await ReadNlsConnectionAsync(connection,null,token);var effective=await ApplyNlsConnectionAsync(connection,validated,token);

@@ -19,7 +19,6 @@ Get `fbsDB-win-x64.zip` from the [latest release](https://github.com/hburaksavas
 - Profiles use host/port/service or SID, a TNS alias, or a custom Oracle Net descriptor. `tnsnames.ora` is found through `TNS_ADMIN`, `ORACLE_HOME\network\admin` and the standard locations; more paths can be added in Settings.
 - Saved credentials are encrypted for the current Windows user (DPAPI).
 - Each SQL tab has its own session and pending transaction. DEV/TEST/UAT/PROD labels are shown on the editor and its tab.
-- A Basic profile can connect through an **SSH tunnel**. fbsDB runs the Windows OpenSSH client with your ssh config, ssh-agent and `known_hosts`, signs in with keys only and stores no SSH secrets.
 
 ### SQL editor
 

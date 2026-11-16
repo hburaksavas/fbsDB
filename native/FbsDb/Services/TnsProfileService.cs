@@ -15,9 +15,6 @@ public sealed record ConnectionProfile(string Id, string Host, string Port, stri
     public string Environment { get; init; } = "UNKNOWN";
     public bool Available { get; init; } = true;
     public IReadOnlyDictionary<string,string> Nls {get;init;} = new Dictionary<string,string>();
-    // FI-069: reach the host and port through this SSH server.
-    public SshTunnelSettings? Ssh { get; init; }
-
 }
 
 public sealed class TnsProfileService
@@ -136,15 +133,14 @@ public sealed class TnsProfileService
                 var target = method == "tns"
                     ? (aliasesBySource.TryGetValue(Read("alias"), out var sources) && sources.TryGetValue(Read("source"), out var found) ? found : new ConnectionProfile(Read("alias"), "", "", "", Read("source"), "") { Available = false })
                     : BuildDirectTarget(method, Read("host"), Read("port"), Read("service"), Read("targetType"), Read("descriptor"));
-                // An SSH setting that cannot be read never falls back to a direct connection.
-                return target with { Nls=item["nls"] is JsonObject nls?nls.ToDictionary(entry=>entry.Key,entry=>entry.Value?.GetValue<string>()??""):new Dictionary<string,string>(), Id = Read("id"), Alias = Read("alias"), Name = Read("name"), User = Read("user"), Environment = Read("environment") is { Length: > 0 } env ? env : "UNKNOWN", Ssh = ReadSsh(item["ssh"], out var sshError) } with { Available = !sshError && target.Available };
+                // SSH tunnels were removed. A profile saved with one is not connected directly, because its host was only reachable through the tunnel; saving it again drops the old setting.
+                return target with { Nls=item["nls"] is JsonObject nls?nls.ToDictionary(entry=>entry.Key,entry=>entry.Value?.GetValue<string>()??""):new Dictionary<string,string>(), Id = Read("id"), Alias = Read("alias"), Name = Read("name"), User = Read("user"), Environment = Read("environment") is { Length: > 0 } env ? env : "UNKNOWN" } with { Available = item["ssh"] is null && target.Available };
             }).OrderBy(p => p.Name).ToArray();
         }
         finally { _settingsGate.Release(); }
     }
-    public async Task<string> SaveProfileAsync(string? id, string name, string alias, string source, string user, string environment, string method = "tns", string host = "", string port = "1521", string service = "", string targetType = "service", string descriptor = "", string? folderId = null, IReadOnlyList<string>? groupIds = null, SshTunnelSettings? ssh = null)
+    public async Task<string> SaveProfileAsync(string? id, string name, string alias, string source, string user, string environment, string method = "tns", string host = "", string port = "1521", string service = "", string targetType = "service", string descriptor = "", string? folderId = null, IReadOnlyList<string>? groupIds = null)
     {
-        if (ssh is not null && method != "basic") throw new InvalidOperationException("SSH tunnels are available for host, port and service connections.");
         if (string.IsNullOrWhiteSpace(name) || name.Length > 80 || string.IsNullOrWhiteSpace(user) || user.Length > 128) throw new InvalidOperationException("Enter a connection name and Oracle username.");
         if (!new[] { "UNKNOWN", "DEV", "TEST", "UAT", "PROD" }.Contains(environment)) throw new InvalidOperationException("Invalid environment.");
         var target = await ResolveTargetAsync(method, alias, source, host, port, service, targetType, descriptor);
@@ -160,7 +156,6 @@ public sealed class TnsProfileService
             id ??= Guid.NewGuid().ToString("N");
             var entry = new JsonObject { ["id"] = id, ["name"] = name.Trim(), ["alias"] = alias, ["source"] = source, ["user"] = user.Trim(), ["environment"] = environment, ["method"] = method, ["host"] = target.Host, ["port"] = target.Port, ["service"] = target.Service, ["targetType"] = target.TargetType, ["descriptor"] = method == "descriptor" ? target.Descriptor : "" };
             if(existing?["nls"] is JsonNode nls)entry["nls"]=nls.DeepClone();
-            if (ssh is not null) entry["ssh"] = ssh.ToJson();
             if (method != "tns") { entry["alias"] = ""; entry["source"] = ""; }
             var organization = ConnectionOrganization.Ensure(settings);
             if (existing is null) profiles.Add(entry); else profiles[profiles.IndexOf(existing)] = entry;
@@ -196,11 +191,6 @@ public sealed class TnsProfileService
         if (method != "tns") return BuildDirectTarget(method, host, port, service, targetType, descriptor);
         return (await GetAliasesAsync()).FirstOrDefault(a => a.Id.Equals(alias, StringComparison.OrdinalIgnoreCase) && a.Source.Equals(source, StringComparison.OrdinalIgnoreCase))
             ?? throw new InvalidOperationException("Alias source is unavailable. Refresh TNS sources.");
-    }
-    private static SshTunnelSettings? ReadSsh(JsonNode? node, out bool invalid)
-    {
-        invalid = false;
-        try { return SshTunnelSettings.Read(node); } catch (InvalidOperationException) { invalid = true; return null; }
     }
     private static ConnectionProfile BuildDirectTarget(string method, string host, string port, string service, string targetType, string descriptor)
     {

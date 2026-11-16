@@ -1070,30 +1070,6 @@ export const bridgeContract = {
               "string",
               "null"
             ]
-          },
-          "sshHost": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "sshPort": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "sshUser": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "sshKeyFile": {
-            "type": [
-              "string",
-              "null"
-            ]
           }
         },
         "required": []
@@ -1218,30 +1194,6 @@ export const bridgeContract = {
             ]
           },
           "password": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "sshHost": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "sshPort": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "sshUser": {
-            "type": [
-              "string",
-              "null"
-            ]
-          },
-          "sshKeyFile": {
             "type": [
               "string",
               "null"
@@ -3281,32 +3233,6 @@ export const bridgeContract = {
         "required": []
       }
     },
-    "ssh.trustHost": {
-      "handler": "oracle",
-      "resumeSession": false,
-      "payload": {
-        "type": "object",
-        "properties": {
-          "tabId": {
-            "type": "string"
-          },
-          "host": {
-            "type": "string"
-          },
-          "port": {
-            "type": "integer"
-          },
-          "fingerprint": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "host",
-          "port",
-          "fingerprint"
-        ]
-      }
-    },
     "debug.objects": {
       "handler": "oracle",
       "resumeSession": true,
@@ -3682,8 +3608,7 @@ export const bridgeContract = {
           "type": "boolean"
         },
         "serverVersion": {},
-        "profile": {},
-        "tunnel": {}
+        "profile": {}
       },
       "required": []
     },
@@ -6063,78 +5988,6 @@ export const bridgeContract = {
         }
       },
       "required": []
-    },
-    "connection.sshHostKey": {
-      "type": "object",
-      "properties": {
-        "requestId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "tabId": {
-          "type": "string"
-        },
-        "autoCommit": {
-          "type": "boolean"
-        },
-        "profileId": {
-          "type": "string"
-        },
-        "host": {
-          "type": "string"
-        },
-        "port": {
-          "type": "integer"
-        },
-        "keyType": {
-          "type": "string"
-        },
-        "fingerprint": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "host",
-        "port",
-        "keyType",
-        "fingerprint"
-      ]
-    },
-    "ssh.hostTrusted": {
-      "type": "object",
-      "properties": {
-        "requestId": {
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "tabId": {
-          "type": "string"
-        },
-        "autoCommit": {
-          "type": "boolean"
-        },
-        "host": {
-          "type": "string"
-        },
-        "port": {
-          "type": "integer"
-        },
-        "success": {
-          "type": "boolean"
-        },
-        "message": {
-          "type": "string"
-        }
-      },
-      "required": [
-        "host",
-        "port",
-        "success"
-      ]
     },
     "debug.objects": {
       "type": "object",

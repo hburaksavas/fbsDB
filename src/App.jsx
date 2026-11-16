@@ -373,7 +373,6 @@ export function App() {
   const setTabResults = results.set;
   const closedTabsRef = useRef(new Set());
   const windowClosingRef = useRef(false), pendingWindowMovesRef = useRef(new Map()), windowMessageRef = useRef(null);
-  const [sshHostKey, setSshHostKey] = useState(null);
   const [appWindows, setAppWindows] = useState({ current: hostWindow.id, label: hostWindow.label, windows: [] });
   const view = tabResults[activeTabId] || {};
   const queryResult = (view.selectedResultKey ? (view.resultSets || []).find(item=>item.key===view.selectedResultKey)?.result : view.queryResult) || null, explainResult = view.explainResult || null, explainMessage = view.explainMessage || "", outputMessage = view.outputMessage || "", resultTab = view.resultTab || "Results", resultFilter = view.resultFilter || "";
@@ -718,7 +717,7 @@ export function App() {
       setKeyLookup, setKeyValues, setLookupPicker, setManagementError, setObjectTabs, setOutputMessage, setPageError, setPendingSwitch,
       setPendingTabClose, setPreviewTabId, setQueryResult, setQuickEval, setRecentProfiles, setRelatedAutoRun, setResultTab, setRunState,
       setSchemaError, setSchemaLoading, setSchemaObjects, setSchemaOwner, setSchemaStale, setSearchMatches, setSearchTruncated, setSearching,
-      setSettingsError, setSourceCompile, setSqlResult, setSshHostKey, setSubqueryTrial, setTabSessions, setTabs, setTnsAliases,
+      setSettingsError, setSourceCompile, setSqlResult, setSubqueryTrial, setTabSessions, setTabs, setTnsAliases,
       setTransactionPending, setUncertainCommit, setWorkspace, setWorkspaceDev, sourceBaselineRequests, sourceDefinitionRequestRef,
       tabCloseActionsRef, tabSessions, updateTabResult, updateTabSession, windowMessageRef, workspace, workspaceDevRequestsRef
     }), []);
@@ -1602,8 +1601,8 @@ export function App() {
       pendingTabClose, pendingTabCloseRef, plscopeReport, queryTimeout, renameResult, saveSqlFile, sessionsRef, setAuthProfile, setBatchClose,
       setCodeStyle, setCompletionSettings, setDateFormatDesigner, setDraftGuard, setKeyLookup, setNewResultName, setPendingBindSql, setPendingDdl,
       setPendingFileAction, setPendingSwitch, setPendingTabClose, setPlscopeReport, setQueryTimeout, setRenameResult, setRunState, setSettingsFocus,
-      setShortcutMap, setShowAppearance, setShowBookmarks, setShowPackageApi, setShowPicker, setSshHostKey, setTheme, setUncertainCommit, settings,
-      settingsError, settingsFocus, shortcutMap, showAppearance, showBookmarks, showPackageApi, sshHostKey, submitConnectionCredentials,
+      setShortcutMap, setShowAppearance, setShowBookmarks, setShowPackageApi, setShowPicker, setTheme, setUncertainCommit, settings,
+      settingsError, settingsFocus, shortcutMap, showAppearance, showBookmarks, showPackageApi, submitConnectionCredentials,
       systemLocale, tabResults, tabSessions, theme, tnsAliases, tokenColors, uncertainCommit, updateTokenColor, workspace
     })}
   </main></ExecutionTargetContext.Provider></ToolbarPrefsContext.Provider>;
