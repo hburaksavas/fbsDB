@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url'
 
 const root = resolve(fileURLToPath(new URL('../..', import.meta.url)))
 const src = join(root, 'src')
-const files = ['App.jsx', ...readdirSync(src).filter(name => /^Workbench.*\.jsx$/.test(name))]
+const files = ['App.jsx', 'ResultsGrid.jsx', ...readdirSync(src).filter(name => /^(Workbench.*\.jsx|ResultsGrid(Commands|Pointer)\.js)$/.test(name))]
   .map(name => relative(root, join(src, name)))
 
 const tsc = join(root, 'node_modules', 'typescript', 'bin', 'tsc')

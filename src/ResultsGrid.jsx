@@ -9,36 +9,37 @@ import {appliedReadbackCells} from './gridReadback';
 import {nextEditableCell} from './tabEntry';
 import './DescriptionsPanel';
 import {announce,gridAnnouncement} from './announcer';
-import { descriptionMap, loadLookupDescriptions, lookupColumnKey, prepareDescriptionQuery } from './lookupDescriptions';
-import {numberSeparators,parseLocaleNumber} from './localeNumber';
+import { loadLookupDescriptions } from './lookupDescriptions';
+import './localeNumber';
 import {matchRowIds,rowIdRefusal} from './gridRowIds';
 import {mapApplyErrors} from './oracleErrorMap';
 import {reconcileDrafts,resolveConflict} from './draftReconcile';
-import { cellDraft, editCell, emptyDrafts, isDirty, pendingSummary, redo as redoDraft, settleApplied, toggleDeleted, undo as undoDraft } from './gridDrafts';
-import {cellEditorKind,explainEditability} from './gridEditability';
-import {buildDml} from './dmlPreview';
-import {invalidDraftCells} from './cellValidation';
+import { emptyDrafts, isDirty, pendingSummary, settleApplied } from './gridDrafts';
+import { explainEditability } from './gridEditability';
+import './dmlPreview';
+import './cellValidation';
 import './resultVerticalView';
-import { formatResultValue, copyResultData, selectionStatistics, sqlIdentifier, sqlLiteral, isExpandableResultValue } from "./resultFeatures";
+import { formatResultValue, copyResultData, selectionStatistics, isExpandableResultValue } from "./resultFeatures";
 import { isResultCellSelected, selectResultRange, resultSelectionTsv } from "./resultSelection";
 import { ExactDecimal, formatExact } from "./exactDecimal";
-import { lazy, memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ArrowUp } from "lucide-react";
+import { lazy, memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { getResultWindow } from "./resultWindow";
 import "./ColumnFormatPopover";
 import './ColumnActionsMenu';
-import { moveColumn, columnSqlDraft } from './resultColumnActions';
-import { resolveResultRowJump } from './resultRowJump';
+import './resultColumnActions';
+import './resultRowJump';
 import { cellOverlayPlacement, cellOverlayText } from './cellTextOverlay';
 import { distributeColumnSpace, equalizeColumnWidths } from './columnWidths';
 import { rowMarkerPositions } from './rowMarkers';
-import { columnAliasKey, resolveColumnAliases } from './columnAliases';
+import { resolveColumnAliases } from './columnAliases';
 import './smartLinks';
 import './codeCellModel';
 const ResultValueDialog = lazy(() => import('./ResultDialogs').then(module => ({ default: module.ResultValueDialog })));
 import { floatingToolbarEnabled, floatingToolbarPlacement } from './floatingSelectionToolbar';
 import 'react-dom';
 import { renderResultsGridView } from './ResultsGridView.jsx';
+import * as gridCommands from './ResultsGridCommands.js';
+import * as gridPointer from './ResultsGridPointer.js';
 
 const sourceDefinitionMatches=(column,definition)=>Boolean(column?.sourceTable&&definition&&String(definition.name||"").toUpperCase()===String(column.sourceColumn||column.name||"").toUpperCase()&&String(definition.table||"").toUpperCase()===String(column.sourceTable||"").toUpperCase()&&(!column.sourceSchema||!definition.schema||String(definition.schema).toUpperCase()===String(column.sourceSchema).toUpperCase()));
 
@@ -223,31 +224,14 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
     setCopyState(""); root.current.focus({ preventScroll: true });
   }
   function reorderColumn(source,target,x){
-    if(!Number.isInteger(source)||!Number.isInteger(target)||source===target)return;
-    const ordered=[...new Set([...order.filter(index=>Number.isInteger(index)&&index>=0&&index<columns.length),...columns.map((_,index)=>index)])],from=ordered.indexOf(source);
-    if(from<0||!ordered.includes(target))return;
-    ordered.splice(from,1);
-    const targetIndex=ordered.indexOf(target),targetHeader=root.current?.querySelector(`th[data-column-index="${target}"]`),rect=targetHeader?.getBoundingClientRect(),after=rect?x>rect.left+rect.width/2:false;
-    ordered.splice(Math.max(0,targetIndex+(after?1:0)),0,source);setOrder(ordered);
+    return gridPointer.reorderColumn({
+      columns, order, root, setOrder
+    }, source, target, x);
   }
   function startColumnDrag(event,index){
-    if(event.button!==0)return;
-    const drag={index,pointerId:event.pointerId,startX:event.clientX,startY:event.clientY,active:false,target:null};dragColumn.current=drag;
-    const move=moveEvent=>{
-      if(moveEvent.pointerId!==drag.pointerId)return;
-      if(!drag.active&&Math.abs(moveEvent.clientX-drag.startX)+Math.abs(moveEvent.clientY-drag.startY)>6){drag.active=true;document.body.classList.add("column-reordering")}
-      if(!drag.active)return;
-      moveEvent.preventDefault();
-      const target=document.elementFromPoint(moveEvent.clientX,moveEvent.clientY)?.closest("th[data-column-index]");
-      drag.target=target?Number(target.dataset.columnIndex):null;setDropColumn(drag.target);
-    };
-    const finish=finishEvent=>{
-      if(finishEvent.pointerId!==drag.pointerId)return;
-      document.removeEventListener("pointermove",move);document.removeEventListener("pointerup",finish);document.removeEventListener("pointercancel",finish);document.body.classList.remove("column-reordering");
-      if(drag.active){suppressColumnClick.current=true;if(drag.target!=null)reorderColumn(drag.index,drag.target,finishEvent.clientX);setTimeout(()=>{suppressColumnClick.current=false},0)}
-      dragColumn.current=null;setDropColumn(null);
-    };
-    document.addEventListener("pointermove",move);document.addEventListener("pointerup",finish);document.addEventListener("pointercancel",finish);
+    return gridPointer.startColumnDrag({
+      dragColumn, reorderColumn, setDropColumn, suppressColumnClick
+    }, event, index);
   }
   function selectAllCells() {
     setLoadedColumn(null);
@@ -256,71 +240,14 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
     setCopyState(""); root.current?.focus({ preventScroll: true });
   }
   function startRowMove(event, source) {
-    if (event.button !== 0) return;
-    event.preventDefault(); event.stopPropagation(); selectionDragCleanup.current?.();
-    const handle = event.currentTarget; handle.setPointerCapture(event.pointerId);
-    let x = event.clientX, y = event.clientY, moved = false, target = null, animation;
-    const startX = x, startY = y;
-    const update = () => {
-      if (!moved) return;
-      const rect = root.current.getBoundingClientRect();
-      const hit = document.elementFromPoint(Math.max(rect.left + 20, Math.min(rect.right - 14, x)), Math.max(rect.top + 41, Math.min(rect.bottom - 14, y)))?.closest("tr[data-result-row]");
-      if (!hit || !root.current.contains(hit)) { target = null; setDropRow(null); return; }
-      const rowRect = hit.getBoundingClientRect();
-      target = { index: Number(hit.dataset.resultRow), after: y > rowRect.top + rowRect.height / 2 };
-      setDropRow(target);
-    };
-    const move = e => { if (e.pointerId !== event.pointerId) return; x = e.clientX; y = e.clientY; moved ||= Math.abs(x - startX) + Math.abs(y - startY) > 4; update(); };
-    const tick = () => {
-      if (moved) { const rect = root.current.getBoundingClientRect(); const dy = y < rect.top + 55 ? -12 : y > rect.bottom - 24 ? 12 : 0; if (dy) { root.current.scrollTop += dy; update(); } }
-      animation = requestAnimationFrame(tick);
-    };
-    const cleanup = () => {
-      cancelAnimationFrame(animation); document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", end); document.removeEventListener("pointercancel", cancel); document.defaultView.removeEventListener("blur", cancel);
-      if (handle.hasPointerCapture(event.pointerId)) handle.releasePointerCapture(event.pointerId);
-      selectionDragCleanup.current = null; setDropRow(null);
-    };
-    const end = e => { if (e.pointerId !== event.pointerId) return; if (moved && target && target.index !== source) onReorder?.(source, target.index, target.after); cleanup(); };
-    const cancel = () => cleanup();
-    document.addEventListener("pointermove", move); document.addEventListener("pointerup", end); document.addEventListener("pointercancel", cancel); document.defaultView.addEventListener("blur", cancel);
-    selectionDragCleanup.current = cleanup; animation = requestAnimationFrame(tick);
+    return gridPointer.startRowMove({
+      onReorder, root, selectionDragCleanup, setDropRow
+    }, event, source);
   }
   function startSelectionDrag(event) {
-    if (event.button !== 0 || event.target.closest(".row-move-handle")) return;
-    const cell = event.target.closest("[data-cell], [data-row-select]");
-    if (!cell || !root.current.contains(cell)) return;
-    event.preventDefault();
-    const mode = cell.hasAttribute("data-row-select") ? "row" : "cell";
-    const [r, c] = mode === "row" ? [Number(cell.dataset.rowSelect), 0] : cell.dataset.cell.split(":").map(Number);
-    select(r, c, event.shiftKey, mode, event.ctrlKey || event.metaKey);
-    setPointerActive(true);window.addEventListener('pointerup',()=>setPointerActive(false),{once:true});
-    selectionDragCleanup.current?.();
-    let x = event.clientX, y = event.clientY, lastR = r, lastC = c, animation, dragging=false;
-    const startX=x,startY=y;
-    const update = () => {
-      const element = root.current, rect = element.getBoundingClientRect();
-      const hit = document.elementFromPoint(Math.max(rect.left + 2, Math.min(rect.right - 12, x)), Math.max(rect.top + 40, Math.min(rect.bottom - 12, y)))?.closest("[data-cell], [data-row-select]");
-      if (!hit || !element.contains(hit)) return;
-      const [nextR, nextC] = hit.hasAttribute("data-row-select") ? [Number(hit.dataset.rowSelect), 0] : hit.dataset.cell.split(":").map(Number);
-      if (nextR !== lastR || nextC !== lastC) {
-        lastR = nextR; lastC = nextC;
-        setSelection(previous => selectResultRange(previous, nextR, mode === "row" ? 0 : nextC, { extend: true, mode }));
-      }
-    };
-    const move = e => { if (e.pointerId !== event.pointerId) return; x = e.clientX; y = e.clientY; dragging ||= Math.abs(x-startX)+Math.abs(y-startY)>4; if(dragging)update(); };
-    const tick = () => {
-      const element = root.current, rect = element.getBoundingClientRect();
-      const dy = y < rect.top + 55 ? -14 : y > rect.bottom - 24 ? 14 : 0;
-      const dx = mode === "cell" ? x < rect.left + 45 ? -14 : x > rect.right - 24 ? 14 : 0 : 0;
-      if (dragging && (dy || dx)) { element.scrollTop += dy; element.scrollLeft += dx; update(); }
-      animation = requestAnimationFrame(tick);
-    };
-    const end = e => { if (e?.pointerId != null && e.pointerId !== event.pointerId) return; cleanup(); };
-    const cleanup = () => {
-      cancelAnimationFrame(animation); document.removeEventListener("pointermove", move); document.removeEventListener("pointerup", end); document.removeEventListener("pointercancel", end); document.defaultView.removeEventListener("blur", cleanup); selectionDragCleanup.current = null;
-    };
-    document.addEventListener("pointermove", move); document.addEventListener("pointerup", end); document.addEventListener("pointercancel", end); document.defaultView.addEventListener("blur", cleanup);
-    selectionDragCleanup.current = cleanup; animation = requestAnimationFrame(tick);
+    return gridPointer.startSelectionDrag({
+      root, select, selectionDragCleanup, setPointerActive, setSelection
+    }, event);
   }
   useEffect(()=>{if(sourceDefinition&&inspectorEnabled){setInspectorMode('source');setInspectorVisible(true)}},[sourceDefinition]);
   useEffect(()=>{if(!inspectorEnabled||inspectorMode!=='source'||!inspectorVisible)return;if(!sourceColumn?.sourceTable){if(sourceDefinition)onCloseSourceDefinition?.();return}if(!sourceDefinitionMatches(sourceColumn,sourceDefinition))onSourceDefinition?.(sourceColumn)},[selectedColumn,inspectorMode,inspectorVisible]);
@@ -335,98 +262,52 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
   }
   const scalarText=value=>value==null?null:typeof value==='string'||typeof value==='number'||typeof value==='bigint'?String(value):value instanceof ExactDecimal?formatExact(value):value?.kind==='temporal'&&/^(DATE|TIMESTAMP(\(\d+\))?)$/i.test(value.oracleType||'')&&!value.offset&&!value.region?String(value.value):undefined;
   function beginEdit(r,c,typed){
-    const item=rows[r],col=visible[c];
-    if(!item||col==null||applyState)return;
-    const info=editability?.columns[col];
-    if(!info?.editable){notifyFeedback({kind:'info',title:'Edit rows',message:info?.reason||'This cell cannot be edited.'});return}
-    if(unidentified(item.index)){notifyFeedback({kind:'info',title:'Edit rows',message:changedSinceRead});return}
-    const original=scalarText(baseRow(item.index)?.[col]);
-    if(original===undefined){notifyFeedback({kind:'info',title:'Edit rows',message:'Dates, binary and structured values are not edited as text.'});return}
-    const draft=cellDraft(drafts,item.index,col),kind=cellEditorKind(columns[col],draft?draft.value:original);
-    const next={r,c,col,rowIndex:item.index,original,initial:draft?(draft.isNull?'':draft.value):original??'',typed:kind==='datetime'?undefined:typed,kind};
-    editRef.current=next;setEditing(next);
+    return gridCommands.beginEdit({
+      applyState, baseRow, changedSinceRead, columns, drafts, editRef, editability, rows, scalarText, setEditing, unidentified, visible
+    }, r, c, typed);
   }
   function stageEdit(text){
-    const active=editRef.current;
-    if(!active)return;
-    editRef.current=null;setEditing(null);
-    if(/NUMBER|INTEGER|INT|DECIMAL|NUMERIC|FLOAT|DOUBLE|REAL/i.test(columns[active.col]?.type||'')&&text.trim()!==''){const parsed=parseLocaleNumber(text,numberSeparators(options.locale));if(parsed.value!==undefined)text=parsed.value}
-    setApplyErrors(current=>current.filter(item=>!(item.row===active.rowIndex&&(item.col===active.col||item.col==null))));
-    // Oracle stores empty text as NULL, so clearing a cell means NULL.
-    setDrafts(current=>editCell(current,active.rowIndex,active.col,active.original,text===''?{isNull:true}:{value:text}));
-    root.current?.focus();
+    return gridCommands.stageEdit({
+      columns, editRef, options, root, setApplyErrors, setDrafts, setEditing
+    }, text);
   }
   function cancelEdit(){editRef.current=null;setEditing(null);root.current?.focus()}
   function applyChanges(){
-    const current=draftsRef.current;
-    if(applyState||!isDirty(current))return;
-    if(!editability?.editable||!isNativeHost){notifyFeedback({kind:'info',title:'Apply',message:editability?.reasons?.[0]||'This result cannot be edited.'});return}
-    // Values Oracle would reject, or store differently than typed (a zoned date without its offset), stop here and are marked in the grid.
-    const invalid=invalidDraftCells(current.cells,columns);
-    if(invalid.length){setApplyErrors(invalid);notifyFeedback({kind:'error',title:'Apply',message:`Row ${invalid[0].row+1}: ${invalid[0].message}${invalid.length>1?` (${invalid.length-1} more marked in the grid)`:''}\nNothing was sent.`});return}
-    const built=buildDml({table:editability.table,columns,identity:editability.identity,rowAt:baseRow,drafts:current,rowIds:byRowId?rowIds.ids:null});
-    if(built.problems.length||!built.statements.length){notifyFeedback({kind:'error',title:'Apply',message:built.problems.join('\n')||'There is nothing to apply.'});return}
-    setApplyErrors([]);
-    // One batch: if any statement fails, Oracle returns to the point before Apply and the changes stay in the grid.
-    const requestId=sendNativeCommand('sql.applyDml',{statements:built.statements.map(item=>({kind:item.kind,sql:item.sql,binds:item.binds,expectRows:item.expectRows,readColumns:item.readColumns})),timeoutSeconds:60,onFailure:'rollback'});
-    setApplyState({requestId,statements:built.statements});
+    return gridCommands.applyChanges({
+      applyState, baseRow, byRowId, columns, draftsRef, editability, rowIds, setApplyErrors, setApplyState
+    });
   }
   function discardChanges(){
-    const total=pendingSummary(draftsRef.current).total;
-    if(!total||!globalThis.confirm?.(`Discard ${total} unapplied change${total===1?'':'s'}?`))return;
-    cancelEdit();setDrafts(emptyDrafts());setApplyErrors([]);
+    return gridCommands.discardChanges({
+      cancelEdit, draftsRef, setApplyErrors, setDrafts
+    });
   }
   function focusedCell(){const focus=selection?.focus;if(!focus)return null;const item=rows[focus.r],col=visible[focus.c];return item&&col!=null?{r:focus.r,c:focus.c,rowIndex:item.index,col}:null}
-  function setFocusedNull(){const cell=focusedCell();if(!cell)return;const info=editability?.columns[cell.col];if(!info?.editable){notifyFeedback({kind:'info',title:'Edit rows',message:info?.reason||'This cell cannot be edited.'});return}if(unidentified(cell.rowIndex)){notifyFeedback({kind:'info',title:'Edit rows',message:changedSinceRead});return}const original=scalarText(baseRow(cell.rowIndex)?.[cell.col]);if(original===undefined)return;setDrafts(current=>editCell(current,cell.rowIndex,cell.col,original,{isNull:true}))}
+  function setFocusedNull(){
+    return gridCommands.setFocusedNull({
+      baseRow, changedSinceRead, editability, focusedCell, scalarText, setDrafts, unidentified
+    });
+  }
   function tabFrom(r,c,direction){
     const step=nextEditableCell({rowCount:rows.length,visible,isEditable:col=>Boolean(editability?.columns[col]?.editable)},{r,c},direction);
     if(step.end||step.none||step.start)return;
     select(step.r,step.c);setTimeout(()=>beginEdit(step.r,step.c),0);
   }
-  async function loadDescriptions(col,template){
-    const plan=prepareDescriptionQuery(template,sourceRows.map(item=>scalarText(item.row[col])));
-    if(plan.error){setDescStatus(plan.error);return}
-    setDescStatus('Reading descriptions…');
-    const requestId=sendNativeCommand('sql.evaluate',{sql:plan.sql,parameters:plan.parameters,rowLimit:50,timeoutSeconds:30});
-    const reply=await new Promise(resolve=>{evalWaiters.current.set(requestId,resolve);setTimeout(()=>{if(evalWaiters.current.delete(requestId))resolve({error:'No answer from Oracle within 30 seconds.'})},31000)});
-    if(reply.error){setDescStatus(reply.error);return}
-    const map=descriptionMap(reply.rows||[]);
-    setDescMaps(current=>({...current,[col]:map}));
-    setDescStatus(`${map.size} description${map.size===1?'':'s'} for ${plan.covered} of ${plan.total} distinct value${plan.total===1?'':'s'}${plan.covered<plan.total?` (the first ${plan.covered} were read)`:''}. The stored values are unchanged.`);
+  function loadDescriptions(col,template){
+    return gridCommands.loadDescriptions({
+      evalWaiters, scalarText, setDescMaps, setDescStatus, sourceRows
+    }, col, template);
   }
-  function deleteFocusedRow(){const cell=focusedCell();if(!cell)return;if(unidentified(cell.rowIndex)){notifyFeedback({kind:'info',title:'Edit rows',message:changedSinceRead});return}setDrafts(current=>toggleDeleted(current,cell.rowIndex))}
+  function deleteFocusedRow(){
+    return gridCommands.deleteFocusedRow({
+      changedSinceRead, focusedCell, setDrafts, unidentified
+    });
+  }
   function keyDown(event) {
-    if((event.ctrlKey||event.metaKey)&&event.shiftKey&&event.key.toLowerCase()==='p'){event.preventDefault();onTools?.('Commands');return;}
-    if((event.ctrlKey||event.metaKey)&&event.altKey&&['ArrowDown','ArrowUp'].includes(event.key)){event.preventDefault();jumpToMark(event.key==='ArrowDown'?1:-1);return;}
-    if((event.ctrlKey||event.metaKey)&&!event.shiftKey&&event.key.toLowerCase()==='g'){event.preventDefault();setRowJump({value:'',message:''});return;}
-    if (!rows.length || !visible.length) return;
-    if (event.key === "Escape") { setLoadedColumn(null);setSelection(null); return; }
-    if(event.key==='ContextMenu'||event.shiftKey&&event.key==='F10'){event.preventDefault();const rect=root.current.getBoundingClientRect();const focus=selection?.focus||{r:0,c:0};if(!selection)select(0,0);setMenu({x:Math.min(rect.left+40,document.documentElement.clientWidth-265),y:Math.max(5,Math.min(rect.top+45,document.documentElement.clientHeight-450)),column:visible[focus.c],row:focus.r});return;}
-    if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "a") { event.preventDefault(); setLoadedColumn(null);setSelection(selectResultRange(selectResultRange(null, 0, 0), rows.length - 1, visible.length - 1, { extend: true })); return; }
-    const current = selection?.focus || { r: 0, c: 0 };
-    if(editMode&&(event.ctrlKey||event.metaKey)&&!event.shiftKey&&!event.altKey&&['z','y'].includes(event.key.toLowerCase())){event.preventDefault();setDrafts(state=>event.key.toLowerCase()==='z'?undoDraft(state):redoDraft(state));return}
-    if(editMode&&editability?.editable&&selection&&!event.altKey&&!event.ctrlKey&&!event.metaKey){
-      if(!event.shiftKey&&(event.key==='F2'||event.key==='Enter')){event.preventDefault();beginEdit(current.r,current.c);return}
-      if(event.key==='Delete'||event.key==='Backspace'){event.preventDefault();setFocusedNull();return}
-      // Typing on a selected cell starts editing it with that character, as in a spreadsheet.
-      if(event.key.length===1){event.preventDefault();beginEdit(current.r,current.c,event.key);return}
-    }
-    if (event.altKey && event.key === "Enter") { event.preventDefault(); expandCell(current.r, current.c); return; }
-    if (event.shiftKey && event.key === "Enter") { event.preventDefault(); openCellDrawer(current.r, current.c); return; }
-    if (event.key === "Enter" || event.key === "F2") { event.preventDefault(); inspect(current.r, current.c); return; }
-    const directions = { ArrowUp: [-1, 0], ArrowDown: [1, 0], ArrowLeft: [0, -1], ArrowRight: [0, 1], Home: [0, -visible.length], End: [0, visible.length], PageUp: [-Math.max(1, Math.floor(viewport.height / rowHeight) - 2), 0], PageDown: [Math.max(1, Math.floor(viewport.height / rowHeight) - 2), 0] };
-    if (!directions[event.key]) return;
-    event.preventDefault(); const [dr, dc] = directions[event.key];
-    const r = Math.max(0, Math.min(rows.length - 1, current.r + dr)), c = Math.max(0, Math.min(visible.length - 1, current.c + dc));
-    select(r, c, event.shiftKey, selection?.mode === "row" && dc === 0 ? "row" : "cell");
-    const top = r * rowHeight, bottom = top + rowHeight + 39;
-    if (top < root.current.scrollTop) root.current.scrollTop = top;
-    else if (bottom > root.current.scrollTop + root.current.clientHeight) root.current.scrollTop = bottom - root.current.clientHeight;
-    const left = 37 + widths.slice(0, c).reduce((a, b) => a + b, 0), right = left + widths[c];
-    if (visible[c] !== pinned) {
-      if (left < root.current.scrollLeft + 37) root.current.scrollLeft = left - 37;
-      else if (right > root.current.scrollLeft + root.current.clientWidth) root.current.scrollLeft = right - root.current.clientWidth;
-    }
+    return gridPointer.keyDown({
+      beginEdit, editMode, editability, expandCell, inspect, jumpToMark, onTools, openCellDrawer, pinned, root, rowHeight, rows, select,
+      selection, setDrafts, setFocusedNull, setLoadedColumn, setMenu, setRowJump, setSelection, viewport, visible, widths
+    }, event);
   }
   function resize(event, i) {
     event.preventDefault(); event.stopPropagation(); const element = event.currentTarget, start = event.clientX, width = sizes[i] || autoWidths[i]; element.setPointerCapture(event.pointerId);
@@ -442,10 +323,9 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
   }
   const rowMarkers=useMemo(()=>rowMarkerPositions(rows,options.marks||[],{height:viewport.height}),[rows,options.marks,viewport.height]);
   function jumpToMark(direction) {
-    const current=selection?.focus?.r??-1,marks=new Set(options.marks||[]),positions=rows.map((item,r)=>marks.has(item.index)?r:-1).filter(r=>r>=0);
-    if(!positions.length){setLayoutMessage('No marked rows in this view.');return}
-    const next=direction>0?positions.find(r=>r>current)??positions[0]:[...positions].reverse().find(r=>r<current)??positions.at(-1);
-    reveal(next,selection?.focus?.c||0);
+    return gridCommands.jumpToMark({
+      options, reveal, rows, selection, setLayoutMessage
+    }, direction);
   }
   const selectedColumnIndices=()=>loadedColumn!=null?[loadedColumn]:visible.filter((_,c)=>rows.some((_,r)=>selected(r,c)));
   function applyColumnWidths(kind) {
@@ -481,10 +361,9 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
   },[expanded]);
   // Returns a message when the row cannot be shown; other pages are opened before revealing.
   function jumpToRow(value) {
-    const target=resolveResultRowJump(value,{rows,viewRows:allRows,loadedCount:sourceRowCount??allRows.length,frozenRows:options.frozenRows||[],pageSize:onRowPage?pageSize:0});
-    if(target.position!=null){reveal(target.position,selection?.focus?.c||0);return ''}
-    if(target.page!=null){setPendingRow(target.index);onRowPage(target.page);return ''}
-    return target.error||target.message;
+    return gridCommands.jumpToRow({
+      allRows, onRowPage, options, pageSize, reveal, rows, selection, setPendingRow, sourceRowCount
+    }, value);
   }
   // The vertical view replaces the grid, so unapplied edits would be lost with it.
   function openVerticalView(r){setMenu(null);if(!onVerticalView||!rows.length)return;if(editMode&&draftSummary.total>0){setLayoutMessage('Apply or discard the pending changes before switching to the vertical view.');return}onVerticalView(rows[r]?.index??rows[0].index)}
@@ -493,43 +372,13 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
   useEffect(()=>{const wanted=pendingFocus.current;if(wanted==null||!root.current)return;const r=rows.findIndex(item=>item.index===wanted);if(r<0)return;reveal(r,0);const settled=setTimeout(()=>{pendingFocus.current=null},0);return()=>clearTimeout(settled)},[rows,hidden,order,pinned]);
   function reveal(r,c) { select(r,c); root.current.scrollTop = Math.max(0,r*rowHeight-50); root.current.scrollLeft = Math.max(0, widths.slice(0,c).reduce((a,b)=>a+b,0)); }
   function performCommand(command) {
-    if(!command) return;
-    if(command.type==='batch'){command.actions.forEach(performCommand);return;}
-    if(command.type==='toggleEdit'){setEditMode(on=>!on);cancelEdit();return;}
-    if(command.type==='toggleDescriptions'){setDescOpen(open=>!open);return;}
-    if(command.type==='resetView'){setLoadedColumn(null);setColumnMenu(null);setSelection(null);setSizes({});setHidden([]);setPinned(null);setOrder([]);setMenu(null);setFormatMenu(null);setDropColumn(null);setExecutionOpen(false);setInspectorVisible(false);setInspectorMode('row');setFind('');setFindOpen(false);setFindIndex(-1);setCopyState('');setLayoutMessage('');selectionDragCleanup.current?.();onCloseSourceDefinition?.();return;}
-    if(command.type==='layoutApply'){setHidden(command.layout.hidden||[]);setPinned(command.layout.pinned??null);setOrder(command.layout.order||[]);setSizes(command.layout.sizes||{});return;}
-    if(['source','related','children','selectColumnSql','whereSql','orderSql','updateDraft','openUrl'].includes(command.type)){
-      const focus=selection?.focus;if(!focus||!rows[focus.r])return;const i=visible[focus.c],column=columns[i],row=rows[focus.r].row,value=row[i];
-      if(command.type==='source'&&column.sourceTable)onSourceDefinition?.(column);
-      if(command.type==='related'&&column.sourceTable)onRelated?.(column,value,Object.fromEntries(columns.map((c,index)=>[c.sourceColumn||c.name,row[index]])));
-      if(command.type==='children'&&column.sourceTable)onChildren?.(column,Object.fromEntries(columns.map((c,index)=>[c.sourceColumn||c.name,row[index]])));
-      if(command.type==='updateDraft')onUpdateDraft?.(columns,selectionData.fullRows.length?selectionData.fullRows:[row]);
-      if(command.type==='selectColumnSql')onSql?.(sqlIdentifier(column.sourceColumn||column.name));
-      if(command.type==='whereSql')onSql?.(`WHERE ${sqlIdentifier(column.sourceColumn||column.name)} ${value==null?'IS NULL':`= ${sqlLiteral(value)}`}`);
-      if(command.type==='orderSql')onSql?.(`ORDER BY ${sqlIdentifier(column.sourceColumn||column.name)}`);
-      if(command.type==='openUrl'&&/^https?:\/\//i.test(String(value))){if(isNativeHost)sendNativeCommand('result.openUrl',{url:String(value)});else document.defaultView.open(String(value),'_blank','noopener')}
-    }
-    if(command.type==='copyTsv')copyFormat('tsv');
-    if(command.type==='copyFormat')copyFormat(command.format,command.headers);
-    if(command.type==='inspect'){const focus=selection?.focus;if(focus)inspect(focus.r,focus.c)}
-    if(command.type==='details')openVerticalView(selection?.focus.r??0);
-    if(command.type==='execution'){setExecutionOpen(true);setInspectorMode('execution');setInspectorVisible(true)}
-    if(command.type==='marks')settings({markedOnly:!options.markedOnly});
-    if(command.type==='columnVisible')setHidden(current=>command.visible?current.filter(i=>i!==command.column):[...new Set([...current,command.column])]);
-    if(command.type==='columnPin')setPinned(current=>current===command.column?null:command.column);
-    if(command.type==='showAll')setHidden([]);
-    if(command.type==='find')setFindOpen(true);
-    if(command.type==='jumpRow')setRowJump({value:'',message:''});
-    if(command.type==='copyJson')copyFormat('json');
-    if(command.type==='freezeSelection')settings({frozenRows:[...new Set([...(options.frozenRows||[]),...rows.filter((_,r)=>visible.some((_,c)=>selected(r,c))).map(item=>item.index)])].slice(0,10)});
-    if(command.type==='unfreeze')settings({frozenRows:[]});
-    if(command.type==='hideSelection')setHidden(current=>[...new Set([...current,...visible.filter((_,c)=>rows.some((_,r)=>selected(r,c)))])]);
-    if(command.type==='useVisibleExport')command.apply?.(visible);
-    if(command.type==='equalWidths'||command.type==='fitViewport') {const selectedColumns=visible.filter((_,c)=>rows.some((_,r)=>selected(r,c)));const targets=selectedColumns.length?selectedColumns:visible;const size=command.type==='fitViewport'?Math.max(70,Math.floor((root.current.clientWidth-37)/visible.length)):160;setSizes(current=>({...current,...Object.fromEntries(targets.map(i=>[i,size]))}));}
-    if(command.type==='fitAll') visible.forEach(fit);
-    if(command.type==='goTo'&&command.kind==='row') {const message=jumpToRow(command.target);if(message)setLayoutMessage(message);}
-    else if(command.type==='goTo') {const c=visible.findIndex(i=>columns[i].name.toLowerCase()===String(command.target).toLowerCase());if(c>=0)reveal(0,c);else setLayoutMessage('Column is not visible in this view.');}
+    return gridCommands.performCommand({
+      cancelEdit, columns, copyFormat, fit, inspect, jumpToRow, onChildren, onCloseSourceDefinition, onRelated, onSourceDefinition, onSql,
+      onUpdateDraft, openVerticalView, options, performCommand, reveal, root, rows, selected, selection, selectionData,
+      selectionDragCleanup, setColumnMenu, setCopyState, setDescOpen, setDropColumn, setEditMode, setExecutionOpen, setFind, setFindIndex,
+      setFindOpen, setFormatMenu, setHidden, setInspectorMode, setInspectorVisible, setLayoutMessage, setLoadedColumn, setMenu, setOrder,
+      setPinned, setRowJump, setSelection, setSizes, settings, visible
+    }, command);
   }
   const handledCommand=useRef(command?.seq);
   useEffect(()=>{if(command&&command.seq!==handledCommand.current){handledCommand.current=command.seq;performCommand(command)}},[command]);
@@ -553,7 +402,11 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
   },[toolbarKey,toolbarOn,pointerActive,loadedColumn,toolbarDismissed,viewport.top,widths.join(',')]);
   const formatAggregate=value=>{const rounded=new ExactDecimal(value).round(5);if(rounded.n===0n)return "0";const locale=options.locale||"en-US",formatted=formatExact(value,{decimals:5,locale,grouping:true}),separator=new Intl.NumberFormat(locale).formatToParts(1.1).find(part=>part.type==="decimal")?.value||".";const at=formatted.lastIndexOf(separator);if(at<0)return formatted;const fraction=formatted.slice(at+separator.length).replace(/0+$/,"");return fraction?formatted.slice(0,at+separator.length)+fraction:formatted.slice(0,at)};
   useEffect(()=>{const hasSelection=selectionData.stats.count>0;onSelectionChange?.(hasSelection,hasSelection?selectedColumn:null,hasSelection?{cells:selectionData.stats.count,rows:selectionData.selectedRowCount,columns:selectionData.selectedColumnCount,scope:loadedColumn!=null?'loaded rows':'current page'}:null);return()=>onSelectionChange?.(false,null,null)},[selectionData.stats.count,selectionData.selectedRowCount,selectionData.selectedColumnCount,selectedColumn,loadedColumn,onSelectionChange]);
-  async function copyFormat(format,headers=false) {try{await navigator.clipboard.writeText(copyResultData(selectionData.rows,selectionData.columns,format,headers));setCopyState('Selection copied');notifyFeedback({kind:'success',title:'Results',message:'Selection copied'});}catch{setCopyState('Clipboard unavailable');notifyFeedback({kind:'error',title:'Results',message:'Clipboard unavailable'})}setMenu(null);}
+  function copyFormat(format,headers=false) {
+    return gridCommands.copyFormat({
+      selectionData, setCopyState, setMenu
+    }, format, headers);
+  }
   const matches=useMemo(()=>{if(!find)return [];const found=[];let regex;try{if(options.searchRegex)regex=new RegExp(find,options.caseSensitive?'':'i')}catch{return []}const normalize=text=>options.caseSensitive?String(text):String(text).toLowerCase(),needle=normalize(find);rows.forEach(({row},r)=>visible.forEach((i,c)=>{if(regex?regex.test(String(row[i]??'NULL')):normalize(row[i]??'NULL').includes(needle))found.push({r,c})}));return found},[find,rows,order,hidden,pinned,options.searchRegex,options.caseSensitive]);
   function nextMatch() {if(!matches.length)return;const next=(findIndex+1)%matches.length;setFindIndex(next);reveal(matches[next].r,matches[next].c);}
   const warnings = [...new Set(columns.filter((c,i)=>columns.findIndex(x=>x.name.toUpperCase()===c.name.toUpperCase())!==i).map(c=>`Duplicate column: ${c.name}`)), ...(options.cursorUnavailable?['Cursor closed; loaded rows remain available. Rerun to load more.']:[]), ...(options.truncated?['The source reports truncated values/results.']:[])];
@@ -562,32 +415,12 @@ export const ResultsGrid = memo(function ResultsGrid({ rows: sourceRows, textFil
   function openColumnMenu(event,i){event.preventDefault();event.stopPropagation();setMenu(null);setFormatMenu(null);const rect=columnHeader(i)?.getBoundingClientRect();setColumnMenu({column:i,x:event.clientX||rect?.left||8,y:event.clientY||rect?.bottom||8})}
   function selectLoadedColumn(i){const c=visible.indexOf(i);if(c<0)return;setSelection(selectResultRange(null,0,c,{mode:'column',rowCount:rows.length,columnCount:visible.length}));setLoadedColumn(i);setCopyState('');root.current?.focus({preventScroll:true})}
   function columnAction(action,payload){
-    const i=columnMenu.column,column=columns[i],c=visible.indexOf(i),trigger=columnHeader(i);
-    if(action==='alias'){const value=aliasLabels[i]||column.name;closeColumnMenu(false);setTimeout(()=>setEditingAlias({column:i,value}));return}
-    if(action==='sourceExpression'){closeColumnMenu(false);onColumnSource?.(i,true);return}
-    if(action==='clearAlias'){onColumnAlias?.(columnAliasKey(columns,i),'');closeColumnMenu();return}
-    const clipboard=text=>{navigator.clipboard.writeText(text).then(()=>{setCopyState('Column copied');notifyFeedback({kind:'success',title:'Results',message:'Column copied'})},()=>{setCopyState('Clipboard unavailable');notifyFeedback({kind:'error',title:'Results',message:'Clipboard unavailable'})})};
-    if(action==='format'){const rect=trigger.getBoundingClientRect();formatTrigger.current=trigger;setFormatMenu({column:i,position:{left:Math.max(8,Math.min(rect.left,innerWidth-300)),top:Math.max(8,Math.min(rect.bottom+6,innerHeight-450))}});closeColumnMenu(false);return;}
-    if(action==='sql'){closeColumnMenu(false);onSql?.(columnSqlDraft(column,payload));return;}
-    if(action==='source'){closeColumnMenu(false);select(0,c);setInspectorMode('source');setInspectorVisible(true);onSourceDefinition?.(column);return;}
-    if(action==='select'){selectLoadedColumn(i);setColumnMenu(null);return;}
-    if(action==='copyName')clipboard(column.name);
-    if(action==='copyIdentifier')clipboard(columnSqlDraft(column,'identifier'));
-    if(action==='copyAll')clipboard(copyResultData(allRows.map(item=>[item.row[i]]),[column],'tsv',Boolean(payload)));
-    if(action==='copySelected'){const selectedRows=loadedColumn===i?allRows:rows.filter((_,r)=>selected(r,c));clipboard(copyResultData(selectedRows.map(item=>[item.row[i]]),[column],'tsv'));}
-    if(action==='sort')onSort?.(i,payload);
-    if(action==='filter')settings({filters:[...(options.filters||[]),payload]});
-    if(action==='clearFilters')settings({filters:(options.filters||[]).filter(rule=>rule.column!==i)});
-    if(action==='highlight')settings({rules:[...(options.rules||[]),payload]});
-    if(action==='clearHighlights'){const rules=(options.rules||[]).filter(rule=>rule.column!==i);settings({rules,...(!rules.length?{highlightedOnly:false}:{})});}
-    if(action==='fitContent'||action==='fitTitle')fit(i,action==='fitTitle');
-    if(action==='width')setSizes(current=>({...current,[i]:Math.max(70,Math.min(1200,payload))}));
-    if(action==='pin'){if(payload==='left'){setPinned(i);settings({pinnedRight:(options.pinnedRight||[]).filter(index=>index!==i)})}else if(payload==='right'){if(pinned===i)setPinned(null);settings({pinnedRight:[...new Set([...(options.pinnedRight||[]),i])]})}else{if(pinned===i)setPinned(null);settings({pinnedRight:(options.pinnedRight||[]).filter(index=>index!==i)})}}
-    if(action==='move')setOrder(current=>moveColumn(current,columns.length,i,payload));
-    if(action==='hide')setHidden(current=>[...new Set([...current,i])]);
-    if(action==='show')setHidden(current=>current.filter(index=>index!==payload));
-    if(action==='showAll')setHidden([]);
-    closeColumnMenu(true);
+    return gridCommands.columnAction({
+      aliasLabels, allRows, closeColumnMenu, columnHeader, columnMenu, columns, fit, formatTrigger, loadedColumn, onColumnAlias,
+      onColumnSource, onSort, onSourceDefinition, onSql, options, pinned, rows, select, selectLoadedColumn, selected, setColumnMenu,
+      setCopyState, setEditingAlias, setFormatMenu, setHidden, setInspectorMode, setInspectorVisible, setOrder, setPinned, setSizes,
+      settings, visible
+    }, action, payload);
   }
   const resultWindow = getResultWindow(rows.length, viewport.top, viewport.height, rowHeight);
   const spacer = height => height > 0 && <tr aria-hidden="true" className="result-spacer"><td colSpan={visible.length + 1} style={{ height }} /></tr>;
