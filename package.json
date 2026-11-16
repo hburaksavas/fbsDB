@@ -17,6 +17,7 @@
     "test:desktop": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test/test-desktop.ps1",
     "clean:test-output": "node scripts/test/clean-test-output.mjs",
     "typecheck:domain": "tsc -p tsconfig.domain.json",
+    "check:names": "node scripts/check/check-names.mjs",
     "test:release": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test/test-release.ps1"
   },
   "dependencies": {

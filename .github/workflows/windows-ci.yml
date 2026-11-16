@@ -59,6 +59,9 @@ jobs:
       - name: Check history and query outcome types
         run: npm run typecheck:domain
 
+      - name: Check for undefined names in App and Workbench modules
+        run: npm run check:names
+
       - name: Build web bundle
         run: npm run build
 

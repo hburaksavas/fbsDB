@@ -1,11 +1,11 @@
-# Windows continuous integration
+﻿# Windows continuous integration
 
 `.github/workflows/windows-ci.yml` runs on pull requests, pushes to the repository's `master` branch, merge-queue events, and manual workflow dispatch. The `Windows validation` job uses `windows-2025`, Node.js 24, and the .NET SDK selected by `global.json`.
 
 The job performs these checks in order:
 
 1. Install JavaScript dependencies with `npm ci`.
-2. Reject stale generated bridge files, then typecheck the TypeScript bridge API and the history and query outcome helpers.
+2. Reject stale generated bridge files, then typecheck the TypeScript bridge API and the history and query outcome helpers. Then check that App.jsx and the Workbench modules use no undefined name (`npm run check:names`).
 3. Build the web bundle and reject generated theme-file drift.
 4. Run JavaScript tests with console and JUnit reports.
 5. Run the load smoke scenarios with budgets enforced.
@@ -26,6 +26,7 @@ npm ci
 npm run check:bridge
 npm run typecheck:bridge
 npm run typecheck:domain
+npm run check:names
 npm run build
 npm test
 npm run test:load -- --profile smoke --enforce-budgets
