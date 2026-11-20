@@ -1,4 +1,5 @@
 import { getSqlStatements } from './sqlStatements.js';
+import { resolveTarget } from './sqlPlus.js';
 
 const searchText = value => String(value).normalize('NFKD').replace(/\p{M}/gu, '').toLowerCase().replaceAll('ı','i');
 
@@ -27,15 +28,16 @@ export function filterEditorTabs(tabs, query) {
 }
 
 export function executionTarget(text, { start = 0, end = start, caret = start, override } = {}) {
-  if (override == null && end > start) return { sql: text.slice(start, end), start, end, kind: 'selection' };
-  const statements = getSqlStatements(text);
-  const selected = statements.find(s => s.end === caret) || statements.find(s => caret < s.end) || statements.at(-1);
+  const items = getSqlStatements(text, { directives: true });
+  if (override == null && end > start) return resolveTarget(items, { sql: text.slice(start, end), start, end, kind: 'selection' });
+  const statements = items.filter(s => !s.directive);
   if (override != null) {
     const matching = statements.filter(s => s.sql === override.trim());
     const match = matching.find(s => s.start <= caret && caret <= s.end) || (matching.length === 1 ? matching[0] : null);
     return match ? { ...match, kind: 'statement' } : { sql: override, start: null, end: null, kind: 'generated SQL' };
   }
-  return selected ? { ...selected, kind: 'statement' } : null;
+  const selected = items.find(s => s.end === caret) || items.find(s => caret < s.end) || items.at(-1);
+  return selected ? resolveTarget(items, { ...selected, kind: 'statement' }) : null;
 }
 
 export function actionableState({ connected, error = '', hasItems = false, filtered = false }) {

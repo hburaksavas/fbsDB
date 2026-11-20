@@ -1,6 +1,7 @@
 import {Feedback,FeedbackDialog} from './Feedback';
 import { useMemo, useRef, useState } from 'react';
 import { getSqlStatements } from './sqlStatements';
+import { prepareScript } from './sqlPlus';
 import { getOracleBindNames } from './oracleBinds';
 import { isDdl } from './sqlSafety.js';
 import { ModalBackdrop } from './ModalBackdrop';
@@ -8,10 +9,10 @@ import { useDialogFocus } from './ConnectionManager';
 
 export function SqlScriptDialog({source,run,timeout,autoCommit=false,onTimeout,onStart,onCancel,onClose,disabled,onReviewSource,projectVariables=[],defaultContinueOnError=false}) {
   const ref=useRef(null);useDialogFocus(ref,onClose);
-  const statements=useMemo(()=>getSqlStatements(source),[source]);
+  const prepared=useMemo(()=>prepareScript(getSqlStatements(source,{directives:true})),[source]),statements=prepared.statements;
   const binds=useMemo(()=>[...new Set(statements.flatMap(item=>getOracleBindNames(item.sql)))],[statements]);
   const hasDdl=useMemo(()=>statements.some(item=>isDdl(item.sql)),[statements]);
-  const [continueOnError,setContinueOnError]=useState(defaultContinueOnError),[selected,setSelected]=useState(0),[values,setValues]=useState({});
+  const [continueOnError,setContinueOnError]=useState(prepared.continueOnError??defaultContinueOnError),[selected,setSelected]=useState(0),[values,setValues]=useState({});
   const busy=Boolean(run?.running);
   const [confirmDdl,setConfirmDdl]=useState(false),[validationError,setValidationError]=useState('');
   const start=()=>{setConfirmDdl(false);const missing=binds.find(name=>projectVariables.some(item=>item.name.toUpperCase()===name.toUpperCase()&&item.required)&&!values[name]?.value);if(missing){setValidationError('Enter a value for required project variable :'+missing);return;}setValidationError('');onStart(statements,binds.map(name=>({name,type:values[name]?.type||projectVariables.find(item=>item.name.toUpperCase()===name.toUpperCase())?.type||'VARCHAR2',value:values[name]?.value||null})),continueOnError)};

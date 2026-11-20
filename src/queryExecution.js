@@ -36,6 +36,7 @@ export function createQueryExecution(getPorts) {
         override: typeof statementOverride === 'string' ? statementOverride : undefined,
       });
       const statement = target?.sql;
+      if (target?.kind === 'sql*plus') { p.session.status(`SQL*Plus ${target.command} is read by the script and is not sent to Oracle.`, owner); return; }
       if (!statement?.trim()) { p.session.status('Place the cursor in a SQL statement or select SQL to run.', owner); return; }
       p.editor.flash(target);
       if (p.ui.reviewSource?.(statement, target)) return;

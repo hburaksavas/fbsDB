@@ -1,3 +1,5 @@
+import { directiveAt } from './sqlPlus.js';
+
 function startsPlsql(text, start) {
   let at=start;
   const label=/^<<\s*(?:"(?:[^"]|"")+"|[\w$#]+)\s*>>/.exec(text.slice(at));
@@ -24,7 +26,7 @@ function startsPlsql(text, start) {
 }
 
 // Statement ranges share offsets with Monaco's model, including comments and literals.
-export function getSqlStatements(text) {
+export function getSqlStatements(text, options = {}) {
   const statements = [];
   let start = null, plsql = false;
   const finish = (end) => {
@@ -40,6 +42,13 @@ export function getSqlStatements(text) {
     const lineEnd = text.indexOf('\n', i);
     const endOfLine = lineEnd < 0 ? text.length : lineEnd;
     if (ch === '/' && text.slice(lineStart, endOfLine).trim() === '/') { finish(i); i = endOfLine; continue; }
+    if (start === null && text.slice(lineStart, i).trim() === '') {
+      const directive = directiveAt(text, i);
+      if (directive) {
+        if (options.directives) statements.push({ start: i, end: directive.end, sql: text.slice(i, directive.end).trim(), directive });
+        i = directive.end; continue;
+      }
+    }
     if (start === null) {
       if (ch === ';') { i++; continue; }
       start = i;

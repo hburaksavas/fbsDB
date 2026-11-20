@@ -20,6 +20,10 @@ Portable Windows x64 build. Extract the whole ZIP and run `fbsDB.exe`. Needs Mic
 - Large LOB values arrive as previews and are loaded in parts on request. Rows copied from another grid can be pasted as new rows.
 - The toolbar shows nine actions by default; the others are in its overflow menu and the palette.
 
+### SQL scripts
+
+- A small SQL*Plus subset runs locally and never reaches Oracle: `DEFINE`/`UNDEFINE` with `&name` substitution, `SET DEFINE ON|OFF`, `WHENEVER SQLERROR CONTINUE|EXIT` (the script's continue-on-error default), `DESCRIBE` for tables and views, and `PROMPT`, `REM` and other `SET` lines are skipped. They no longer merge into the next statement.
+
 ### Workspace and windows
 
 - A tab can move to its own window together with its session, fetched rows and pending transaction. A side editor shows a second document beside the main one.
